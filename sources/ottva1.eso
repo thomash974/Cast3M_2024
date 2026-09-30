@@ -1,0 +1,196 @@
+C OTTVA1    SOURCE    FD218221  21/06/10    21:15:43     11030          
+      SUBROUTINE OTTVA1 (NMAT,XMAT,NVINT,VINT0,NTEN,SIG0,DEPST,
+     &                                   VINTF,     SIGF,      KERRE)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC CCREEL
+
+C-----------------------------------------------------------------------
+C
+C     Point d'entrée de l'intégration du modèle OttoVari
+C
+C
+C     Arguments d'entrée
+C     ------------------
+C
+C     NMAT            : Nombre de paramètres matériau
+C     XMAT(NMAT)      : Valeurs des paramètres matériau
+C       XMAT(1)       : YOUN  Module de Young
+C       XMAT(2)       : NU    Coefficient de Poisson
+C       XMAT(3)       : LRT   Limite en traction
+C       XMAT(4)       : GFTR  Energie de fissuration
+C       XMAT(5)       : BETA  Facteur pour refermeture de fissure
+C       XMAT(6)       : LCS   Limite en compression
+C       XMAT(7)       : RHO   Masse volumique
+C       XMAT(8)       : ALPH  Coefficient dilatation thermique linéaire
+C       XMAT(9)       : VISQ  Coefficient de viscosité
+C       XMAT(10 a 15) : Lij   sortie de TAILLE
+C       XMAT(16 a 21) : Pij   sortie de TAILLE
+C       XMAT(22)      : TREF  Température de référence
+C       XMAT(23)      : TALP  Température de référence coef. dilatation
+C
+C     NVINT            : Nombre de variables internes
+C     VINT0(NVINT)     : Variables internes au début du pas de temps
+C       VINT0( 1)      : W1
+C       VINT0( 2)      : W1MA
+C       VINT0( 3)      : VF1X
+C       VINT0( 4)      : VF1Y
+C       VINT0( 5)      : VF1Z
+C       VINT0( 6)      : W2
+C       VINT0( 7)      : W2MA
+C       VINT0( 8)      : VF2X
+C       VINT0( 9)      : VF2Y
+C       VINT0(10)      : VF2Z
+C       VINT0(11)      : W3
+C       VINT0(12)      : W3MA
+C       VINT0(13)      : VF3X
+C       VINT0(14)      : VF3Y
+C       VINT0(15)      : VF3Z
+C       VINT0(16)      : LBCD
+C       VINT0(17)      : IVL1
+C       VINT0(18)      : IVL2
+C       VINT0(19)      : IVL3
+C
+C     NTEN            : Nombre de composantes des tenseurs de
+C                       déformation et contrainte
+C     SIG0(NTEN)      : Contraintes au début du pas de temps
+C       SIG0(1)       : SMXX
+C       SIG0(2)       : SMYY
+C       SIG0(3)       : SMZZ
+C       SIG0(4)       : SMXY
+C       SIG0(5)       : SMXZ
+C       SIG0(6)       : SMYZ
+C
+C     DEPST(NTEN)     : Incrément du tenseur de déformation totale
+C       DEPST(1)      : EPXX
+C       DEPST(2)      : EPYY
+C       DEPST(3)      : EPZZ
+C       DEPST(4)      : GAXY
+C       DEPST(5)      : GAXZ
+C       DEPST(6)      : GAYZ
+C
+C
+C     Arguments de sortie
+C     -------------------
+C
+C     VINTF(NVINT)    : Variables internes à la fin du pas de temps
+C                       --> composantes identiques à VINT0
+C     SIGF(NTEN)      : Contraintes à la fin du pas de temps
+C                       --> composantes identiques à SIG0
+C     KERRE           : Indicateur d'erreur
+C
+C-----------------------------------------------------------------------
+C
+      REAL*8        XMAT(NMAT),VINT0(NVINT),VINTF(NVINT),
+     &              SIG0(NTEN),SIGF(NTEN),DEPST(NTEN),
+     &              VAR0(7),VARF(7),VAUX0(15),VAUXF(15),YMAT(18)
+      KERRE=0
+      NVAR=7
+      NVAUX=15
+      MMAT=18
+C
+C     YMAT ne contient que les parmètres matériaux utiles de XMAT
+      YMAT(1 )=XMAT(1)
+      YMAT(2 )=XMAT(2)
+      YMAT(3 )=XMAT(3)
+      YMAT(4 )=XMAT(4)
+      YMAT(5 )=XMAT(5)
+      YMAT(6 )=XMAT(6)
+      YMAT(7 )=XMAT(10)
+      YMAT(8 )=XMAT(11)
+      YMAT(9 )=XMAT(12)
+      YMAT(10)=XMAT(13)
+      YMAT(11)=XMAT(14)
+      YMAT(12)=XMAT(15)
+      YMAT(13)=XMAT(16)
+      YMAT(14)=XMAT(17)
+      YMAT(15)=XMAT(18)
+      YMAT(16)=XMAT(19)
+      YMAT(17)=XMAT(20)
+      YMAT(18)=XMAT(21)
+C
+C     Séparation des variables internes en 2 catégories VAR et VAUX
+C     VAR0 VAUX0 : valeur au debut du pas
+C     VARF VAUXF : valeur a la fin du pas (seront calculees par OTTVA2)
+      VAR0(1)=VINT0(1)
+      VAR0(2)=VINT0(2)
+      VAUX0(1)=VINT0(3)
+      VAUX0(2)=VINT0(4)
+      VAUX0(3)=VINT0(5)
+      VAUX0(4)=SQRT(VAUX0(1)*VAUX0(1)+VAUX0(2)*VAUX0(2)
+     &             +VAUX0(3)*VAUX0(3))
+      IF(VAUX0(4).LT.XSZPRE) THEN
+        VAUX0(4)=0.
+      ELSEIF (ABS(VAUX0(4)-1.).LT.XSZPRE) THEN
+        VAUX0(4)=1.
+      ELSE
+        KERRE=1
+        GOTO 999
+      ENDIF
+      VAR0(3)=VINT0(6)
+      VAR0(4)=VINT0(7)
+      VAUX0(5)=VINT0(8)
+      VAUX0(6)=VINT0(9)
+      VAUX0(7)=VINT0(10)
+      VAUX0(8)=SQRT(VAUX0(5)*VAUX0(5)+VAUX0(6)*VAUX0(6)
+     &             +VAUX0(7)*VAUX0(7))
+      IF(VAUX0(8).LT.XSZPRE) THEN
+        VAUX0(8)=0.
+      ELSEIF (ABS(VAUX0(8)-1.).LT.XSZPRE) THEN
+        VAUX0(8)=1.
+      ELSE
+        KERRE=1
+        GOTO 999
+      ENDIF
+      VAR0(5)=VINT0(11)
+      VAR0(6)=VINT0(12)
+      VAUX0( 9)=VINT0(13)
+      VAUX0(10)=VINT0(14)
+      VAUX0(11)=VINT0(15)
+      VAUX0(12)=SQRT(VAUX0(9)*VAUX0(9)+VAUX0(10)*VAUX0(10)
+     &              +VAUX0(11)*VAUX0(11))
+      IF(VAUX0(12).LT.XSZPRE) THEN
+        VAUX0(12)=0.
+      ELSE IF (ABS(VAUX0(12)-1.).LT.XSZPRE) THEN
+        VAUX0(12)=1.
+      ELSE 
+        KERRE=1
+        GOTO 999
+      ENDIF
+      VAR0(7)=VINT0(16)
+      VAUX0(13)=VINT0(17)
+      VAUX0(14)=VINT0(18)
+      VAUX0(15)=VINT0(19)
+C
+C     Appel a ottva2
+      CALL OTTVA2(DEPST,NTEN,SIG0,VAR0,NVAR,SIGF,VARF,VAUX0,VAUXF,NVAUX,
+     &            YMAT,MMAT,KERRE)
+      IF(KERRE.NE.0) GOTO 999
+C
+C     Regroupement des variables internes
+      VINTF( 1)=VARF(1)
+      VINTF( 2)=VARF(2)
+      VINTF( 3)=VAUXF(1)
+      VINTF( 4)=VAUXF(2)
+      VINTF( 5)=VAUXF(3)
+      VINTF( 6)=VARF(3)
+      VINTF( 7)=VARF(4)
+      VINTF( 8)=VAUXF(5)
+      VINTF( 9)=VAUXF(6)
+      VINTF(10)=VAUXF(7)
+      VINTF(11)=VARF(5)
+      VINTF(12)=VARF(6)
+      VINTF(13)=VAUXF(9)
+      VINTF(14)=VAUXF(10)
+      VINTF(15)=VAUXF(11)
+      VINTF(16)=VARF(7)
+      VINTF(17)=VAUXF(13)
+      VINTF(18)=VAUXF(14)
+      VINTF(19)=VAUXF(15)
+C
+C     Sortie
+999   RETURN
+      END
+
+ 

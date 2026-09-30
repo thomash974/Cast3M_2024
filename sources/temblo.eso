@@ -1,0 +1,105 @@
+C TEMBLO    SOURCE    CB215821  19/07/09    21:15:38     10252          
+      SUBROUTINE TEMBLO(IFLAG)
+
+C***********************************************************************
+C     Temps ecoule dans les blocs : procedures ou boucles
+C***********************************************************************
+C     IFLAG = 0 : PROCEDURES
+C             1 : BOUCLES
+C***********************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC CCPERF
+      SEGMENT IVALE(NBBLOC)
+      SEGMENT ITRAV(NBBLOC)
+
+      CHARACTER*4       MOT1(3)
+      CHARACTER*3       CC(1)
+      CHARACTER*(LONOM) MO24
+
+      DATA CC  /' | '/
+      DATA MOT1/'HORL','CPU ','APPE'/
+
+      IF    (IFLAG .EQ. 0)THEN
+        ITPSBL=ITPSPR
+        MOTERR = 'Procedure:'
+      ELSEIF(IFLAG .EQ. 1) THEN
+        ITPSBL=ITPSBO
+        MOTERR = 'Boucle   :'
+      ELSE
+        CALL ERREUR(5)
+      ENDIF
+      IF(ITPSBL .EQ. 0) RETURN
+      SEGACT,ITPSBL
+      NBBLOC=ITPSBL.NBAPRO(/1)
+
+      CALL LIRMOT(MOT1,3,I1,0)
+      IF    (I1 .EQ. 0)THEN
+        ITRAV = 0
+      ELSE
+        SEGINI,ITRAV,IVALE
+        DO II=1,NBBLOC
+          ITRAV(II)=II
+        ENDDO
+        IF   (I1 .EQ. 1)THEN
+C         Trie decroissant selon 'HORL'
+          DO II=1,NBBLOC
+            IVALE(II)=ITPSBL.DURPRO(1,II)
+          ENDDO
+          CALL ORDO04(IVALE(1),NBBLOC,.TRUE.,ITRAV(1))
+        ELSEIF(I1 .EQ. 2)THEN
+C         Trie decroissant selon 'CPU '
+          DO II=1,NBBLOC
+            IVALE(II)=ITPSBL.DURPRO(2,II)
+          ENDDO
+          CALL ORDO04(IVALE(1),NBBLOC,.TRUE.,ITRAV(1))
+        ELSEIF(I1 .EQ. 3)THEN
+C         Trie decroissant selon 'APPE'
+          DO II=1,NBBLOC
+            IVALE(II)=ITPSBL.NBAPRO(II)
+          ENDDO
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+
+        CALL ORDO04(IVALE(1),NBBLOC,.TRUE.,ITRAV(1))
+      ENDIF
+
+ 10   FORMAT(3X,A3,A24,A3,I16,A3,I16,A3,I16,A3,I16,A3)
+
+      CALL ERREUR(-363)
+      CALL ERREUR(-362)
+      CALL ERREUR(-363)
+      
+      DO II=1,NBBLOC
+        IF(I1 .EQ. 0)THEN
+          JJ=II
+        ELSE
+          JJ=ITRAV(II)
+        ENDIF
+        MO24  =ITPSBL.CDPROC(JJ)
+        IELAPS=ITPSBL.DURPRO(1,JJ)/10
+        ICPU  =ITPSBL.DURPRO(2,JJ)/10
+        IAPPEL=ITPSBL.NBAPRO(JJ)
+        IF(IELAPS .EQ. 0)THEN
+          IEFF = 0
+        ELSE
+          IEFF =(100*ICPU)/IELAPS
+        ENDIF
+        WRITE(IOIMP,10) CC,MO24,CC,IELAPS,CC,ICPU,CC,IEFF,CC,IAPPEL,CC
+      ENDDO
+      CALL ERREUR(-363)
+
+      IF(ITRAV .NE. 0)SEGSUP,ITRAV,IVALE
+
+      END
+ 
+ 
+ 
+ 

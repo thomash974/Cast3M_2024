@@ -1,0 +1,46 @@
+C HSELEI    SOURCE    KICH      22/11/21    21:15:03     11505          
+      subroutine hselei(ith)
+C
+C
+      implicit integer(i-n)
+      implicit real*8(a-h,o-z)
+C
+-INC CCASSIS
+
+      common/CCONNE/iwrk3,ipmodl1,xmultl,icle1,ihgsel
+      common/CCONNE/jconl,ihg1,ihg2,ihg,nbthr,ixlong1
+      COMMON/CHSELE/imfopa,ishg,ihug,imcord,ihgt
+
+      segment hgsele
+         real*8 xmult,ymult,zmult
+         real*8 hmaxt,xlong2,tmax,tmin,xlong2m
+         integer nels,nbpb,ipass
+         integer nbzt,indt,khug
+      endsegment
+
+      hgsele = ihgsel
+      nbthr1 = nbthr
+      if (ith.gt.nbthr1) goto 9999
+      ires = mod(nels,nbthr1)
+      if (ires.eq.0) then
+         ilon1 = nels / nbthr1
+         ideb = (ith - 1) * ilon1 + 1
+      else
+         if (ith.le.ires) then
+            ilon1 = nels / nbthr1 + 1
+            ideb = (ith - 1) * ilon1 + 1
+         else
+            ilon1 = nels / nbthr1
+            ideb = (ires * (ilon1 + 1)) + (ith - ires - 1) * ilon1 + 1
+         endif
+      endif
+      ifin = ideb + ilon1 - 1
+      if (ifin.ge.ideb) then
+         call hsele1(ith,ideb,ifin,imfopa,ihg1,ihg2,iwrk3,ishg
+     +        ,ihug,ihgsel,ihg,ipmodl1,icle1,imcord,ihgt,ixlong1) 
+      endif
+ 9999 continue
+      return
+      end
+ 
+ 

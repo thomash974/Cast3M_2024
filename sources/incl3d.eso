@@ -1,0 +1,2444 @@
+C INCL3D    SOURCE    FD218221  24/02/07    21:15:15     11834          
+       subroutine incl3d(xmat,NMAT,sig0,sigf,deps,NSTRS,var0,
+     # varf,NVARI,NBELAS3D,teta1,teta2,dt,ierr1,iso,MFR,local,NMAT1,
+     # ifou,istep,epst0,epstf,NBRTAIL3D,NBNMAX3D,NBNB3D,IDIMB3D,XE3D,
+     # NBRINC3D,NBPARC3D,NBPPARP3D,NBVARISOG,NBVARTENG,NBVARISOPP,
+     # NBVARTENPP,NVTOT1,NBVARISOPI,NBVARTENPI)
+        
+c     2014/03/01 calcul de l ecoulement pour inclusion3d : A.Sellier et al. 
+c     2021/02/25
+c     2022/02/02 (sur la base de Maple Homogenisation_v3 pour 1 inclusion)
+c     2022/02/07 reorganisation des parametres et des vari pour 1 inclusion 
+c     2022/02/17 Correction d ecoulement v3 vers ecoulement v4/v5 (maple)
+c     2022/06/02 passage des def chimiques aux pressions chimiques 
+
+c***********************************************************************
+c    ATTENTION: epst0,epstf ne contiennen PAS le deformation thermique
+c               epst0,epstf contiennent des GAMMA hors digonale 
+c               TTREF chargé dans les parametres materiau doit etre le
+c               meme que celui declaré dans les procedures de chargement
+c***********************************************************************
+
+c     tables de dimension fixe pour resolution des systemes lineaires 
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c***************** iteration de controle des criteres actifs ***********
+      integer itermax
+      parameter (itermax=1000)
+c     residu global actuel et precedent
+      real*8 RESGA,RESGP 
+      
+c**************** precision relative a RTP pour la verif des criteres ***
+      real*8 precision3d,prec_tol
+c     precision sur les criteres individuel
+      parameter(precision3d=1.0d-6)
+c     precision sur la minimisation du residu global des criteres
+      parameter(prec_tol=precision3d)
+      
+c******** declaration des variables externes ***************************
+      integer nmat,nstrs,nvari,nbelas3d,ierr1,mfr
+      real*8 xmat(nmat),sig0(nstrs),sigf(nstrs),deps(nstrs)
+      real*8 epst0(nstrs),epstf(nstrs)
+      real*8 var0(nvari),varf(nvari)
+      real*8 dt,teta1,teta2        
+      
+c     *********** nombre maxi d inclusions *****************************
+      integer NBRINC3D 
+      
+c     *** nombre de parametres materiaux *******************************
+c     nombre de parametre communs (cf. idvisc et cinclusion)
+      integer NBPARC3D    
+c     nombre de parametres materiaux par phase (cf. idvisc et cinclusion)   
+      integer NBPPARP3D
+c     nombre max de parametres de taille de l element 
+c     (cf. idvisc et cinclusion)   
+      integer NBRTAIL3D
+      
+c     *** nombre de variables internes *********************************
+c     nombre de vari iso globales, tensorielle globales 
+      integer NBVARISOG,NBVARTENG
+c     nombre de vari iso par phase, tensoreille par phase      
+      integer NBVARISOPP,NBVARTENPP
+c     sous total des vari globales et par phase (sans les interfaces)
+      integer NVTOT1      
+c     nombre de vari iso par interface, tensorielle par interface      
+      integer NBVARISOPI,NBVARTENPI
+           
+c     **** tableau des coordonnees des noeuds de l element *************     
+      integer NBNMAX3D,NBNB3D,idimb3d
+      real*8 XE3D(3,NBNMAX3D)
+      
+c     **** variables de controle ***************************************      
+c     variable logique pour activer le  traitement local et l elasticite isotrope
+      logical local,iso      
+c     taille  de xmat sans les caracteristiques geometriques nmat1 
+c     (cf idvisc et cinclusion)
+      integer nmat1
+c     ifou numero de la formulation, istep etape non locale    
+      integer ifou,istep      
+      
+c*****fin de declaration des parametres externes ***********************
+
+
+     
+c***********************************************************************
+c     declarations locales pour le modele 
+c***********************************************************************
+
+
+c     ******************************************************************
+c     declaration des parametres locaux 
+c     ******************************************************************
+
+c     * nombre maxi d inclusion consideree pour les declarations locales      
+      integer NBRINC
+      parameter (NBRINC=1)
+c     * nombre de tenseur de def elastique par inclusion (ere,eie,eoe)
+c     * c est aussi le nombre de point d interet par phase (NBR PT Interet)
+      integer NBRPTI
+      parameter (NBRPTI=3) 
+c     * nombre de contraintes cinematiques au niveau des deformations desactive
+c     * interfaces d une inclusion
+      integer NBR_RELA
+      parameter(NBR_RELA=3)     
+c     * nombre de type de deformation generalisee (ee,ept,epc,epv)      
+      integer NDIM_EP
+      parameter (NDIM_EP=4)
+c     * nombre de variables de controle poro_mecanique par phase (bwPw,bgVg,bgVd) 
+      integer NDIM_PM
+      parameter (NDIM_PM=3)
+c     * plus 2 deformations orthotropes imposees ( dans la matrice et a
+c      l infini (eca et e inf) )
+
+
+c     * dimension de la base generalisee pour la resolution de localisation
+      integer NDIMG
+      parameter (NDIMG=3*(NBRINC*NBRPTI+1))
+c     table locale pour la resolution systeme lineaires
+      integer ngf,err1      
+c     cf lcls3d pour dimension maxi de la matrice de couplage AA et 
+c     nombre de paramètres de chargement Poro meca par phase pour JEA     
+      parameter(ngf=NDIMG)
+      real*8 aa(ngf,ngf+1),bb(ngf),xx(ngf),a2(ngf*ngf)
+      real*8 aai(ngf,ngf+1),bbi(ngf)
+      integer ipzero(ngf) 
+
+c     * dimension du chargement dans la base des deformations imposees      
+      parameter (NDIMA=NDIMG+6+NDIM_PM*(NBRINC+1))   
+
+c     Res residus des criteres (somme Rsesi **2 )**0.5
+      real*8 Rest
+
+c     **** NOMBRE DE TYPES DE PLASTICITE *******************************
+      integer NTYP_PLAST
+c     traction diffuse, cisaillement, traction localise
+      parameter(NTYP_PLAST=3)
+c     dimension de l espace d ecoulement plastique
+      integer NDIMPL
+c     chaque type de plasticite existe sur toutes les composantes de l espace des deformations generalisees
+      parameter (NDIMPL=NTYP_PLAST*NDIMG)
+c     matrice d -bgpg / d ea ds l espace de minimisation
+      real*8 Jsgep(NDIMG,NDIMPL)
+c     Vecteur R.grad(R) dans l espace de minimisation
+      real*8 RgR(NDIMPL)
+c     jacobienne Je1epg dans la base des ecoulements plastiques
+      real*8 Je1epg(NDIMG,NDIMPL)
+c     matrice inv(A).Jea pour resdir3d
+      real*8 AAP(NDIMG,NDIMPL)
+c     matrice jsp=dseff g/deps p (base ecoulement plastique)
+      real*8 jsp(NDIMG,NDIMPL)
+c     ******************************************************************
+
+      
+c     *** NOMBRE DE CRITERES DE TRACTION DIFFUSES **********************
+c     1 tenseur dans l inclusion, 1 radial et 1 orthoradial = 3 par 
+c     inclusion +1 a l infini
+      integer NTYPT
+      parameter(NTYPT=3)
+c     on enleve les 3 relations cinematiques entre deformations orthoradiales
+      integer NTMAX
+      parameter(NTMAX=NBRINC*NTYPT*3+3)
+c     criteres des fissures de traction diffuses 
+      real*8 FT(NTMAX)
+c     activite des criteres      
+      logical ACTIFT(NTMAX)
+c     numero des criteres retenus pour les tensions refermeture      
+      integer LNUMCRT(NTMAX)
+c     derivee du seuil plastique par rapport à la contrainte (Petit F)
+      real*8 DPFTDS(NTMAX,NDIMG)
+c     derivee du potentiel plastique par rapport à la contrainte (Grand F)
+      real*8 DGFTDS(NTMAX,NDIMG) 
+c     nombre de criteres actif traction, numero d ordre du dernier traitement 
+      integer NBRACT
+c     gradients ponderes dans l espace de l ecoulement generalise
+      real*8 PFT_GRAD_PFT(NDIMPL),PFT_GRAD_GFT(NDIMPL)
+c     gradient pondéré des fonctions seuil et pseudo potentiels pour les critères de Cisaillement diffus
+      real*8 PFC_GRAD_PFC(NDIMPL),PFC_GRAD_GFC(NDIMPL) 
+c     indicateur de plasticite elementaire      
+      logical PLASTT
+      logical Log_RTG(NTMAX)
+c     ******************************************************************
+
+
+c     *** NBR DE CRITERE DE CISAILLEMENT *******************************
+c     2 tenseurs par inclusion  (plus 1 a l infini)
+      integer NTYPC
+      parameter(NTYPC=2)
+c     nbr max de tenseur compte tenu du nbr d inclusions
+      integer NCMAX
+      parameter(NCMAX=NBRINC*NTYPC+1)
+c     criteres de cisaillement
+      real*8 FC(NCMAX)
+c     activite des criteres de cisaillement
+      logical ACTIFC(NCMAX)
+c     graidant des citeres et de leur pseudo potentiels
+      real*8 DPFCDS(NCMAX,NDIMG),DGFCDS(NCMAX,NDIMG) 
+c     liste classee des numeros des criteres de cisaillement actifs   
+      integer LNUMCRC(NCMAX)
+c     nombre de criteres actif cisaillement, numero d ordre du dernier traitement 
+      integer NBRACC
+      real*8 GFC_GRAD_GFC(NDIMPL),GFC_GRAD_PFC(NDIMPL) 
+c     indicateur de plasticite elementaire      
+      logical PLASTC
+c     ******************************************************************
+
+c     *** NBR DE CRITERES POUR LE DECOLLEMENT LOCALISE *****************
+c     * nombre de types de criteres localise par inclusion 3 plus 1a l infini
+      integer NBTYPL
+      parameter (NBTYPL=1)
+c     on enleve les 3 relations cinematiques entre deformations orthoradiales
+      integer NLMAX
+      parameter(NLMAX=NBRINC*NBTYPL*3+3)
+c     criteres de fissures localisees
+      real*8 FL(NLMAX),DEPSL1(NDIMG),RESL
+      integer NBRACL,LNUMCRL(NLMAX)
+      logical ACTIFL(NLMAX)
+      real*8 DPFLDS(NLMAX,NDIMG),DGFLDS(NLMAX,NDIMG)
+      real*8 PFL_GRAD_PFL(NDIMPL),PFL_GRAD_GFL(NDIMPL) 
+c     par de fgradf due a la pression de gel pour les criteres de decollement
+      real*8 PFG_GRAD_PFG(NDIMPL)
+c     indicateur de plasticite elementaire      
+      logical PLASTL
+      logical Log_RLG(NLMAX)
+c     ******************************************************************
+      
+              
+c     ***     parametres materiau **************************************
+     
+c     nombre reel d inclusion
+      integer NINC
+c     temperature de reference
+      real*8 TTREF              
+c     fractions volumiques des phases      
+      real*8 FRAC(0:NBRINC)
+c     module elastique      
+      real*8 YOUNG(-1:NBRINC)
+c     coeff de Poisson      
+      real*8 NU(-1:NBRINC)      
+c     Coefficient de dilatation thermique directionnel
+      real*8 ALP(-1:NBRINC)
+c     resistance a la traction de la phase
+      real*8 RTP(-1:NBRINC) 
+c     resistance a la traction de l interface      
+      real*8 RTI(-1:NBRINC) 
+c     resistance a la refermeture de la phase
+      real*8 RFP(-1:NBRINC)
+c     resistance a la refermeture  de l interface      
+      real*8 RFI(-1:NBRINC)   
+c     saturation en eau de la phase
+      real*8 SRW(0:NBRINC)      
+c     potentiel de gonflement chimique de l inclusion
+      real*8 VCH(0:NBRINC)
+c     temps caracteristique de la reaction chimique de l inclusion
+      real*8 TCH(0:NBRINC) 
+c     energie d activation de la reaction chimique de l inclusion
+      real*8 EAC(0:NBRINC)
+c     seuil de teneur en eau pour la reaction chimique      
+      real*8 SRS(0:NBRINC)
+c     avancement chimique seuil
+      real*8 ACHS(0:NBRINC)
+c     temps caracteristique du fluage a ttref
+      real*8 TFL(0:NBRINC)  
+c     energie d activation du fluage
+      real*8 EAF(0:NBRINC) 
+c     coeff de fluage de Maxwell
+      real*8 KFLM(0:NBRINC)  
+c     coeff de fluage de Kelvin
+      real*8 KFLK(0:NBRINC)        
+c     prorosite
+      real*8 PORO(0:NBRINC) 
+c     module de Van Genuchten      
+      real*8 MVG(0:NBRINC)      
+c     exposant de Van Genuchten      
+      real*8 NVG(0:NBRINC)
+c     proprite pour Drucker Pragger
+      real*8 DELTA(0:NBRINC),BETA(0:NBRINC),COHE(0:NBRINC)
+c     constante de variation de volume par pression osmotique
+      real*8 CPHY(0:NBRINC) 
+c     resistances en base generalisee
+      real*8 RTG(NDIMG),RTLG(NDIMG),RFG(NDIMG),RFLG(NDIMG)
+c     image des resistances dans la base des forces thermodynamiques
+      real*8 FTRAC(NDIMG)
+c     donnes poro-mechaniques (eau, gel, dechrage)      
+      real*8 dbwPw(0:NBRINC),dbgVg(0:NBRINC),dbgVd(0:NBRINC)
+c     coeff de biot et module de biot des gels
+      real*8 bg(0:NBRINC,0:1),Mbg(0:NBRINC,0:1)  
+c     poro mecanique
+      real*8 bwPw(0:NBRINC),bgPg(0:NBRINC),bgVg(0:NBRINC)     
+       
+      
+c     parametres geometriques en cas de calcul 2d (axi et def plane) ***            
+c     dimension hors plan en cas de calcul 2d      
+      real*8 DIM3
+
+c     parametres deduits directement
+c     modules elastiques
+      real*8 MK(0:NBRINC),MG(0:NBRINC)      
+      
+c     *******   variables internes  ************************************
+
+c     indicateur premier pas 
+      logical PPAS      
+c     avancement des reactions chimique par phase DEBUT DE PAS
+      real*8 ACH(0:NBRINC,0:1)
+      real*8 DVGT(0:NBRINC),DACH(0:NBRINC)
+c     compressibilite du produit neo forme
+      real*8 KCH(0:NBRINC)      
+c     indicateur de diffusion produits chimiques dans fissure
+      real*8 GCH(0:NBRINC)        
+c     differentiel de deformation thermique isotrope imposee/ttref     
+      real*8 ETH(0:NBRINC,0:1),DETH(0:NBRINC)
+c     contrainte effective hydrique
+      real*8 SEW(0:NBRINC,0:1),DSEW(0:NBRINC)
+c     deformation osmotique     
+      real*8 EPH(0:NBRINC,0:1),DEPH(0:NBRINC)
+c     reduction pour cause d ecoulement chemoplastique
+      real*8 reduc_ch(0:NBRINC)
+      
+      
+c     remarque (le dimensionnement a -1 des phases et interfaces est 
+c     necessaire pour pouvoir utiliser dcmp3d et recm3d
+
+c     contraintes totale non endommagee (radiale pour inclusions, infini pour matrice)
+      real*8 STOTR(-1:NBRINC,6,0:1),STOTG(NDIMG)
+      real*8 STOTR_PRIN(-1:NBRINC,3),STOTR_COMP(-1:NBRINC,6)
+c     contraintes effectives(radiale pour inclusions, infini pour matrice)
+      real*8 SEFFR(-1:NBRINC,6,0:1)
+      real*8 SEFFR_PRIN(-1:NBRINC,3),SEFFR_COMP(-1:NBRINC,6)
+c     deformation elastique (radiale pour inclusions infini pour matrice)
+      real*8 EPSER(-1:NBRINC,6,0:1),EPSER0(-1:NBRINC,6,0:1)
+      real*8 EPSER_PRIN(-1:NBRINC,3),EPSER_COMP(-1:NBRINC,6)
+c     deformation maxwell (radiale pour inclusions infini pour matrice)
+      real*8 EPSMR(-1:NBRINC,6,0:1),EPSMR0(-1:NBRINC,6,0:1) 
+      real*8 EPSMR_PRIN(-1:NBRINC,3),EPSMR_COMP(-1:NBRINC,6) 
+c     deformation Kelvin (radiale pour inclusions infini pour matrice)
+      real*8 EPSKR(-1:NBRINC,6,0:1),EPSKR0(-1:NBRINC,6,0:1)  
+      real*8 EPSKR_PRIN(-1:NBRINC,3),EPSKR_COMP(-1:NBRINC,6)      
+c     deformations plastiques de traction (radiale pour inclusions,infini pour matrice)
+      real*8 EPSTR(-1:NBRINC,6,0:1)
+      real*8 EPSTR_PRIN(-1:NBRINC,3),EPSTR_COMP(-1:NBRINC,6)
+c     deformations plastiques de cisaillement (radiale pour inclusions,infini pour matrice)
+      real*8 EPSCR(-1:NBRINC,6,0:1) 
+      real*8 EPSCR_PRIN(-1:NBRINC,3),EPSCR_COMP(-1:NBRINC,6)
+c     deformations plastiques de traction localisee (decollement)
+      real*8 EPSLR(-1:NBRINC,6,0:1) 
+      real*8 EPSLR_PRIN(-1:NBRINC,3),EPSLR_COMP(-1:NBRINC,6)      
+c     contraintes effectives radiales(radiale pour interface pour matrice)
+      real*8 SEFFI(-1:NBRINC,6,0:1)
+      real*8 SEFFI_PRIN(-1:NBRINC,3),SEFFI_COMP(-1:NBRINC,6)
+c     contraintes effectives orthoradiales(radiale pour inclusions infini pour matrice)
+      real*8 SEFFO(-1:NBRINC,6,0:1)
+      real*8 SEFFO_PRIN(-1:NBRINC,3),SEFFO_COMP(-1:NBRINC,6)      
+c     deformation radiale elastique a l interface      
+      real*8 EPSEI(-1:NBRINC,6,0:1),EPSEI0(-1:NBRINC,6,0:1)
+      real*8 EPSEI_PRIN(-1:NBRINC,3),EPSEI_COMP(-1:NBRINC,6)      
+c     deformation orthoradiale elastique a l interface      
+      real*8 EPSEO(-1:NBRINC,6,0:1),EPSEO0(-1:NBRINC,6,0:1)
+      real*8 EPSEO_PRIN(-1:NBRINC,3),EPSEO_COMP(-1:NBRINC,6)      
+c     deformation radiale maxwell a l interface      
+      real*8 EPSMI(-1:NBRINC,6,0:1),EPSMI0(-1:NBRINC,6,0:1)
+      real*8 EPSMI_PRIN(-1:NBRINC,3),EPSMI_COMP(-1:NBRINC,6)      
+c     deformation orthoradiale maxwell a l interface      
+      real*8 EPSMO(-1:NBRINC,6,0:1),EPSMO0(-1:NBRINC,6,0:1)
+      real*8 EPSMO_PRIN(-1:NBRINC,3),EPSMO_COMP(-1:NBRINC,6)      
+c     deformation kelvin radiale axisymetrique a l interface      
+      real*8 EPSKI(-1:NBRINC,6,0:1),EPSKI0(-1:NBRINC,6,0:1)
+      real*8 EPSKI_PRIN(-1:NBRINC,3),EPSKI_COMP(-1:NBRINC,6)
+c     deformation kelvin orthoradiale axisymetrique a l interface      
+      real*8 EPSKO(-1:NBRINC,6,0:1),EPSKO0(-1:NBRINC,6,0:1)
+      real*8 EPSKO_PRIN(-1:NBRINC,3),EPSKO_COMP(-1:NBRINC,6)      
+c     deformation plastique radiale axisymetrique a l interface      
+      real*8 EPSTI(-1:NBRINC,6,0:1)
+      real*8 EPSTI_PRIN(-1:NBRINC,3),EPSTI_COMP(-1:NBRINC,6)
+c     deformation plastique orthoradiale a l interface      
+      real*8 EPSTO(-1:NBRINC,6,0:1) 
+      real*8 EPSTO_PRIN(-1:NBRINC,3),EPSTO_COMP(-1:NBRINC,6)      
+c     deformation plastique cisaillement radiale axisymetrique a l interface      
+      real*8 EPSCI(-1:NBRINC,6,0:1)
+      real*8 EPSCI_PRIN(-1:NBRINC,3),EPSCI_COMP(-1:NBRINC,6)
+c     deformation plastique cisaillement orthoradiale a l interface      
+      real*8 EPSCO(-1:NBRINC,6,0:1)
+      real*8 EPSCO_PRIN(-1:NBRINC,3),EPSCO_COMP(-1:NBRINC,6)      
+C c     deformation plastique en volume radiale axisymetrique a l interface      
+C       real*8 EPSVI(-1:NBRINC,6,0:1)
+C       real*8 EPSVI_PRIN(-1:NBRINC,3),EPSVI_COMP(-1:NBRINC,6)      
+C c     deformation plastique en volume orthoradiale a l interface      
+C       real*8 EPSVO(-1:NBRINC,6,0:1)
+C       real*8 EPSVO_PRIN(-1:NBRINC,3),EPSVO_COMP(-1:NBRINC,6)
+c     deformation chemo-plastique homogene 
+      real*8 EPSRH(-1:NBRINC,6,0:1)      
+      real*8 EPSRH_PRIN(-1:NBRINC,3),EPSRH_COMP(-1:NBRINC,6)
+c     increment cumule sur le pas de la deformation chemo-plastique homogene 
+      real*8 DEPSRH(-1:NBRINC,6,0:1)      
+      real*8 DEPSRH_PRIN(-1:NBRINC,3),DEPSRH_COMP(-1:NBRINC,6)
+c     residu de gonflement pour correction ecoulement de gel
+      real*8 ResDEPSG(-1:NBRINC,6,0:1)      
+      real*8 ResDEPSG_PRIN(-1:NBRINC,3),ResDEPSG_COMP(-1:NBRINC,6)
+c     volume neoforme et part de ce volume dans les fissures
+      real*8 VGT(0:NBRINC,0:1),VGF(0:NBRINC,0:1)      
+      
+c     ***** tables provisoires pour les changements de base ************
+      
+      real*8 x6(6),x33(3,3),x3(3),v33(3,3),v33t(3,3)
+      real*8 xtot             
+c     increments de deformations  principales
+      real*8 depst3(3),depst6(6),epstf6(6)
+c     base principale de l increment de deformation totale      
+      real*8 v33d(3,3),v33dt(3,3)
+c     base principale de la contrainte effective moyenne      
+      real*8 v33s(3,3),v33st(3,3)         
+c     deformation elastique libre de depression capillaire
+      real*8 EPSMW 
+c     temperature moyenne sur le passage
+      real*8 teta 
+c     entiers de parametratge des tables de stockage      
+      integer JGM0,IPHASE,ICOMP,nv3d,IDEBUT      
+      integer NBVIND3D,NBVPARP3D,NBVPARI3D,NBROBL 
+c     jacobienne depse/depsimp si un seul type dinclusion
+      real*8 JEA(NDIMG,NDIMA)
+c     jacobienne d sigma / d epse      
+      real*8 JSE(NDIMG,NDIMG) 
+c     gestion de la boucle iterative
+      integer ITER
+      logical affiche_iter        
+c     variables logiques pour le traitement des non lineraites      
+      logical plast
+c     indicateur de calcul du fluage dans la phase      
+      logical FLUAGE(0:NBRINC),LOG_FLU,affiche_fluage,affiche_jacobi
+      logical affiche_reduc,affiche_gel
+c     variable complementaires pour modif du temps de fluage
+      real*8 DTH0,DTH1
+c     coeff pour le fluage
+      real*8 CMp(0:NBRINC),CTHp(0:NBRINC),CTHv(0:NBRINC)
+      real*8 VWp(0:NBRINC),CWp(0:NBRINC),CWv(0:NBRINC)       
+c     coeff de consolidation pour Maxwell-non-lineaire
+c     (cf Sellier, A., Vidal, T., Lacarriere, L., Cagnon, H., 
+c     2019. Modelling of prestressed concrete behaviour in the 
+c     range 20-40°C, in: Framcos’10. pp. 1–10.
+c     https://doi.org/10.21012/FC10.235516)     
+      real*8 CCR(0:NBRINC,3),CCI(0:NBRINC,3),CCO(0:NBRINC,3)
+c     coeffs de fluage pour le suysteme lineaire      
+      real*8 AFLUMR1(0:NBRINC,3),AFLUKR1(0:NBRINC),BFLUKR1(0:NBRINC)
+      real*8 AFLUMI1(0:NBRINC,3),AFLUKI1(0:NBRINC),BFLUKI1(0:NBRINC)      
+      real*8 AFLUMO1(0:NBRINC,3),AFLUKO1(0:NBRINC),BFLUKO1(0:NBRINC)
+c     vecteurs pour le tor viscoelastique
+      real*8 ak(NDIMG),bk(NDIMG),am(NDIMG)
+      real*8 ek0(NDIMG),ee0(NDIMG)    
+c     variable d echanges lors du calcul des consolidations      
+      real*8 keff,taufluk,tauflum
+      real*8 epsm6(6),epse6(6),cc3(3) 
+c     table d echange pour les tables d increments
+      real*8 xp3(-1:NBRINC,3) 
+c     pour les deformation anelastiques on rajoute la localisee en dernier
+C     EPS(1-3)=INCLUSION
+C     EPS(4-6)=INTERFACE RADIALE
+C     EPS(7-9)=INTERFACE ORTHORADIALE
+C     EPS(10-12)=INFINI MATRICE      
+c     vecteur deformations solutions       
+      real*8 DEPSE1(NDIMG),DEPSM1(NDIMG),DEPSK1(NDIMG)
+c     pour les deformation anelastiques on rajoute la localisee en dernier
+C     EPS(1-3)=INCLUSION
+C     EPS(4-6)=INTERFACE RADIALE
+C     EPS(7-9)=INTERFACE ORTHORADIALE
+C     EPS(10-12)=INFINI MATRICE      
+C     EPS(13-15)=CONSTANTE MATRICE
+C     EPS(16-18)=LOCALISEE NIVEAU HOMOGENE      
+c     vecteur solution def anelastiques      
+      real*8 DEPST1(NDIMG),DEPSC1(NDIMG)
+c     pointeur de point et de type de contrainte
+      integer idir 
+c     contrainte totale fin de passage
+      real*8 sigef6(6),sigf6(6)          
+c     contrainte en base generalisees
+      real*8 SEFFG(NDIMG),FTHG(NDIMG)
+c     deformation plastique de traction generalisee
+      real*8 EPSTG(NDIMG),EPSPLG(NDIMG)      
+c     increment de contrainte effective dans la matrice
+      real*8 DSEFFG(NDIMG)       
+c     gestion du retour radial lors des refermetures de fissures
+      real*8 reduc
+      real*8 reduc_prov(NDIMG)
+
+   
+c     contrainte hydrique moyenne dans la zone non endommagee
+      real*8 SWM
+c     indicateur d etape de calcul plastique
+      integer ietap 
+c     ietap=0 tir elastique, ietap=4 retour plastique
+      integer posi
+c     posi=0 debut d ecoulement actuel
+c     posi=1 fin fin d ecoulement actuel      
+c     Numero de criteres actifs  
+      integer naux,numa     
+c     logique pour savoir si reduction ecoulement de gel dans fissures      
+      logical LogReducGEL
+c     deformation chemo-chimique imposee      
+      real*8 DEPSG3(0:NBRINC,3)
+c     convergence locale forcee
+      logical CONV_FORCEE
+c     poro meca gels
+      real*8 dbgPg(0:NBRINC)
+c     variable auxiliaire pour les directions d ecoulement       
+      real*8 AUX_DIRT(NDIMG),AUX_DFDST(NDIMG)
+c     coeff de relaxation du residu
+      real*8 reduc_resg      
+c     calcul de la convergence pour la difference entre 2 iterations
+      real*8 tolerance,Rmin,Dresg
+      integer iter_aff
+      parameter (iter_aff=int(9*itermax/10))
+c     traitement ecoulement gel ds fissure
+      real*8 dbgvg_actuel,dbgvg_maxi
+c     gestion des affichages
+c***********************************************************************      
+c     affichage par defaut pour inclusion3d
+c***********************************************************************
+
+      logical AFFICHE,AFFICHE_DEFAULT
+      parameter (AFFICHE_DEFAULT=.false.)
+      affiche=AFFICHE_DEFAULT  
+      affiche_fluage=AFFICHE_DEFAULT
+      affiche_jacobi=AFFICHE_DEFAULT 
+      affiche_reduc=AFFICHE_DEFAULT
+      affiche_iter=AFFICHE_DEFAULT
+      affiche_gel=AFFICHE_DEFAULT 
+ 
+c      affiche_iter=.true.
+c      affiche_gel=.true.   
+c      affiche_reduc=.true.     
+c      affiche_jacobi=.true.
+
+c***********************************************************************
+     
+c***********************************************************************
+c      test de compatibilite de declarations code EF -modele INCLUSION3D
+       if(NBRINC.ne.NBRINC3D) then
+            print*,'Pb NBRINC.ne.NBRINC3D dans INCL3D'
+            ierr1=1
+            return
+       end if  
+c      position calculee dans idvar4 des variables internes
+c      nombre total de variables globales          
+       NBVIND3D=NBVARISOG+6*NBVARTENG
+c      nombre de variables par phase commune a toutes les phases 
+       NBVPARP3D=NBVARISOPP+6*NBVARTENPP  
+c      nombre total de variables propres aux interfaces
+       NBVPARI3D=NBVARISOPI+6*NBVARTENPI
+c      nombre de variables internes totales 
+       if(NVTOT1.ne.NBVIND3D+(NBRINC3D+1)*NBVPARP3D ) then
+         print*,'Pb de dimension nvtot1 dans incl3d'
+         ierr1=1
+         return
+       end if         
+       NBROBL=NVTOT1+NBVPARI3D*NBRINC 
+       if(NBROBL.ne.NVARI) then
+            print*,'Pb de declaration de variables dans incl3d'
+            ierr1=1
+            return
+       end if
+       
+c****** indicateur 1er passage *****************************************
+       if (var0(1).eq.0.) then
+         ppas=.true.
+       else
+         ppas=.false.
+       end if
+c***********************************************************************       
+       
+        
+c***********************************************************************
+c     chargement des parametres materiau
+c***********************************************************************
+
+c     print*,'xmat',xmat
+c     initialisation du compteur de position dans la table des xmat
+      JGM0=NBELAS3D
+
+c     **** milieu homogeneise pour les matrices de rigidite des EF *****
+
+c     Module d young homogeneisé                            
+      YOUNG(-1)=xmat(1)       
+c     coefficient de Poisson homogénéisé    
+      NU(-1)=xmat(2)
+c     coeff de dilatation thermique homogénéisé
+      ALP(-1)=xmat(3)
+c     nombre d inclusions
+      NINC=int(xmat(JGM0+1)) 
+      if(NINC.gt.NBRINC) then
+        print*,'Nombre maximum de types d inclusion depasse'
+        print*,'Nombre d inclusions:', NINC,', Nb maxi:',NBRINC
+        ierr1=1
+        return
+      else if (NINC.ne.1) then
+        print*,'Implantation realisee pour un type d inclusion'
+        print*,'dans incl3d : NINC doit etre de 1...'
+        ierr1=1
+        return
+      end if
+c     temperature de reference pour tous les parametres      
+      TTREF=xmat(JGM0+2)
+c     verif de compatibilité teta chargement (teta1) et ttref materiau      
+      if(ppas.and.(abs(ttref-teta1).gt.precision3d)) then
+         print*,'Inclusion3d: TTREF non egal a TETA1'
+         print*,'teta1',teta1,' teta2',teta2,'ttref',ttref
+         print*,'les temperatures de reference   du modele et du code'
+         print*,'different ce qui peut induire une dilatation imprévue'
+         print*,'des phases'
+         ierr1=1
+         return
+      end if
+c     resistance du maillon faible
+      RTP(-1)=xmat(JGM0+3)
+c     resistance à la refermeture du maillon faible
+      RTI(-1)=xmat(JGM0+4)      
+c     dimension hors plan en cas de calcul 2d 
+      if (NBRTAIL3D.eq.1) then     
+         DIM3=xmat(JGM0+NBPARC3D+NBRINC3D*NBPPARP3D+1)
+      else if (NBRTAIL3D.ne.0) then        
+         print*,'Inclusion3d: pb sur NBRTAIL3D sur cette formulation'
+         ierr1=1
+         return
+      end if
+      
+c     **** donnees pour toutes les phases ****************************** 
+     
+      do IPHASE=0,NINC
+c       debut de la table
+        idebut=JGM0+NBPARC3D+IPHASE*NBPPARP3D      
+c       fractions volumiques des phases      
+        FRAC(IPHASE)=xmat(idebut+1)
+c       module elastique      
+        YOUNG(IPHASE)=xmat(idebut+2)
+c       coeff de Poisson      
+        NU(IPHASE)=xmat(idebut+3)      
+c       Coefficient de dilatation thermique directionnel
+        ALP(IPHASE)=xmat(idebut+4) 
+c       resistance a la traction
+        RTP(IPHASE)=xmat(idebut+5)  
+c       resistance de l interface     
+        RTI(IPHASE)=xmat(idebut+6)   
+c       saturation en eau de la phase
+        SRW(IPHASE)=xmat(idebut+7)       
+c       potentiel de gonflement chimique de l inclusion
+        VCH(IPHASE)=xmat(idebut+8) 
+c       temps caracteristique de la reaction chimique de l inclusion
+        TCH(IPHASE)=xmat(idebut+9)  
+c       energie d activation de la reaction chimique de l inclusion
+        EAC(IPHASE)=xmat(idebut+10) 
+c       seuil de teneur en eau pour la reaction chimique      
+        SRS(IPHASE)=xmat(idebut+11) 
+c       avancement chimique seuil
+        ACHS(IPHASE)=xmat(idebut+12) 
+c       temps caracteristique du fluage a ttref
+        TFL(IPHASE)=xmat(idebut+13)
+c       pour enlever le fluage mettre le temps caracteristique <=0        
+        if(TFL(IPHASE).le.0.) then
+            FLUAGE(IPHASE)=.false.
+        else
+            FLUAGE(IPHASE)=.true.
+        end if
+c       energie d activation du fluage
+        EAF(IPHASE)=xmat(idebut+14)  
+c       coeff de fluage de Maxwell
+        KFLM(IPHASE)=xmat(idebut+15)   
+c       coeff de fluage de Kelvin
+        KFLK(IPHASE)=xmat(idebut+16)         
+c       prorosite
+        PORO(IPHASE)=xmat(idebut+17)  
+c       module de Van Genuchten      
+        MVG(IPHASE)=xmat(idebut+18)      
+c       exposant de Van Genuchten      
+        NVG(IPHASE)=xmat(idebut+19)
+c       frottement Drucker Pragger
+        DELTA(IPHASE)=xmat(idebut+20)
+c       dilatance        
+        BETA(IPHASE)=xmat(idebut+21)
+c       cohesion        
+        COHE(IPHASE)=xmat(idebut+22) 
+c       coeff de pression osmotique        
+        CPHY(IPHASE)=xmat(idebut+23)
+c       coeff de compressibilite du produit chimique forme
+        KCH(IPHASE)=xmat(idebut+24)
+c       resistance a la refermeture de la phase
+        RFP(IPHASE)=xmat(idebut+25)
+c       resistance a la refermeture de l interface
+        RFI(IPHASE)=xmat(idebut+26)       
+      end do
+
+c     *********verif completude volumique des phases********************
+
+      xtot=0.d0
+      do i=0,ninc
+c        print*,'Phase ',i, 'fraction volumique: ', FRAC(i)
+c        print*,'FRAC(',i,')',FRAC(i) 
+         xtot=xtot+FRAC(i)               
+      end do
+
+      if(abs(xtot-1.d0).gt.precision3d) then
+        print*,'Pour le modele inclusion3d'
+        print*,'La somme des fractions volumiques des phases est '
+        print*,'differente de 1 : Corriger les donnees pour inclusion3d'
+        do i=0,ninc
+             print*,'phase:',i,'->',FRAC(i)
+        end do
+        print*,'total=',xtot
+        ierr1=1
+        return
+      end if  
+      
+      if(affiche) then
+        do i=1,nmat
+          write(*,'(A10,I2,A2,E10.3)') 'Parametre(',i,')=',xmat(i)
+        end do
+      end if
+      
+c     *****coherence entre cohesion et traction ************************
+
+      do iphase=0,Ninc
+c       il faut une cohesion minimale pour chaque phase
+        t1 = sqrt(0.3D1)
+        Ccmin = RTP(iphase) * delta(iphase) / 0.3D1 +
+     #  t1 * RTP(iphase) / 0.3D1   
+        if(COHE(iphase).lt.Ccmin) then
+            print*,'Pb dans incl3d avec cohesion phase:',iphase
+            write(*,'(A47,E10.3)') 
+     #      'Cohesion minimale a saturation pour cette phase:',Ccmin
+            ierr1=1
+            return
+        end if
+      end do
+
+c     **** definition de la tolerence locales **************************
+
+      Rmin=RTP(0)
+      do iphase=0,ninc
+        Rmin=min(Rmin,RTP(iphase),RTI(iphase),COHE(iphase))
+      end do
+      if(Rmin.le.0.d0) then
+        print*,'La tolerance locale est nulle dans incl3d'
+        print*,'car l une des RTP,RTI ou COHE d une phase est nulle'
+        ierr1=1
+        return
+      else
+c       la tolerance de convergence locale 
+        tolerance=prec_tol*Rmin
+      end if
+        
+c****** fin de la recuperation des parametres materiaux **************** 
+
+
+c***********************************************************************
+c     Chargement increment de deformation imposee et deformation finale
+c***********************************************************************
+
+      if(nstrs.lt.6) then
+         do i=1,nstrs
+             DEPST6(i)=deps(i)
+             epstf6(i)=epstf(i)
+         end do
+         do i=nstrs+1,6
+             DEPST6(i)=0.d0
+             epstf6(i)=0.d0
+         end do
+      else
+         do i=1,6
+             DEPST6(i)=deps(i)
+             epstf6(i)=epstf(i)
+         end do      
+      end if
+c     passage des gammas en epsilons
+      do i=4,6
+         DEPST6(i)=0.5d0*depst6(i)
+         epstf6(i)=0.5d0*epstf6(i)
+      end do    
+c     directions principales du tenseur des increments de deformations
+c     pour le predicteur visco elastique
+c     passage gama-> epsilon
+      do i=1,6
+            X6(I)=DEPST6(I)
+      end do
+c     stockage matrice 33      
+      call x6x33(X6,X33) 
+c     vecteurs et valeurs propres      
+      call b3_v33(X33,X3,V33) 
+c     matrice de passage inverse      
+      call traps1(V33T,V33,3)
+c     stockage provisoire des increments de deformations principales
+      if(affiche) then
+         print*,'Increment de deformation mecanique'
+      end if
+c     deformations imposees dans leur base principale      
+      do i=1,3      
+       DEPST3(i)=X3(i)
+       if (affiche) then
+        write(*,'(A7,1X,I1,1X,A2,1X,E10.3)') 'depsiH(',i,')=',DEPST3(i)
+       end if        
+      end do 
+c     stockage de la base principale de l increment de deformation
+      do i=1,3
+        do j=1,3
+            V33D(i,j)=V33(i,j)      
+            V33DT(i,j)=V33T(i,j)
+        end do
+      end do
+c     affichage eventuel      
+      if(affiche) then
+         print*,'incl3d matrices de passage'
+         call afic33(V33)
+         call afic33(V33T)
+      end if
+
+      
+c***********************************************************************      
+c     a cette etape V33 base principale de l increment de deformation      
+c***********************************************************************      
+   
+
+c***********************************************************************
+c   Debut de la resolution non lineaire
+c***********************************************************************
+
+c     initialisation des indicateurs de non linearite      
+c     traction
+      PLASTT=.false.    
+      NBRACT=0     
+      do icr=1,NTMAX
+        LNUMCRT(icr)=0
+        FT(icr)=0.d0 
+        Log_RTG(icr)=.false.
+      end do
+c     initialisation de la liste des criteres de cisaillement 
+      PLASTC=.false.  
+      NBRACC=0    
+      do icr=1,NCMAX
+        LNUMCRC(icr)=0
+        FC(icr)=0.d0
+      end do 
+c     initialisation de la liste des criteres de de decollement 
+      PLASTL=.false.  
+      NBRACL=0    
+      do icr=1,NLMAX
+        LNUMCRL(icr)=0
+        FL(icr)=0.d0
+      end do 
+c     indicateur global de plasticite      
+      PLAST=.false.    
+      
+c     ******************************************************************
+c     Chargement des variables internes tensorielles
+c     ******************************************************************
+
+c      **** variables internes globales ********************************
+       if (affiche) then
+         print*,'Variable internes debut de pas'
+         do i=1,nvari
+          write(*,'(A5,I3,A2,E10.3,1X,A5,I3,A2,E10.3)')
+     #    'VAR0(',i,')=',VAR0(i),'VARF(',i,')=',VARF(i)
+         end do
+       end if
+       
+c      on charge les var0 
+      
+c      *** variables internes pour le milieu homogeneisé
+       IPHASE=-1       
+       do ICOMP=1,6
+c           contraintes effectives homogeneisees         
+            nv3d=NBVARISOG+ICOMP
+            SEFFR(IPHASE,ICOMP,0)=var0(nv3d)
+c           deformation plastique traction localisee         
+            nv3d=NBVARISOG+6+ICOMP
+            EPSTR(IPHASE,ICOMP,0)=var0(nv3d)       
+       end do
+     
+       
+c      *** Variables internes des phases *******************************
+
+       do IPHASE=0,NINC       
+c        avancement reaction chimique 
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+1       
+         ACH(IPHASE,0)=var0(nv3d)          
+c        volume chimique formee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+2
+         VGT(IPHASE,0)=var0(nv3d)  
+c        deformation thermique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+3
+         ETH(IPHASE,0)=var0(nv3d)  
+c        contrainte hydrique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+4
+         SEW(IPHASE,0)=var0(nv3d)  
+c        deformation physique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+5
+         EPH(IPHASE,0)=var0(nv3d)  
+c        volume de gel dans les fissures
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+6
+         VGF(IPHASE,0)=var0(nv3d) 
+c        contrainte chemo mecanique due au gel
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+7
+         bgpg(IPHASE)=-var0(nv3d)           
+c        debut de la zone memoire des tenseurs
+         IDEBUT=NBVIND3D+IPHASE*NBVPARP3D+NBVARISOPP         
+         do ICOMP=1,6
+c           contrainte effective radiale dans la phase
+            nv3d=IDEBUT+ICOMP 
+            SEFFR(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation elastique (radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+6+ICOMP
+            EPSER(IPHASE,ICOMP,0)=var0(nv3d)
+c           stockage pour recalcul des coeffs de fluage dans les sous iterations            
+            EPSER0(IPHASE,ICOMP,0)=var0(nv3d)
+c           deformation maxwell (radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+12+ICOMP
+            EPSMR(IPHASE,ICOMP,0)=var0(nv3d)
+c           stockage pour recalcul des coeffs de fluage dans les sous iterations            
+            EPSMR0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation Kelvin (radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+18+ICOMP
+            EPSKR(IPHASE,ICOMP,0)=var0(nv3d) 
+c           stockage pour recalcul des coeffs de fluage dans les sous iterations            
+            EPSKR0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformations plastiques de traction (radiale pour inclusions,infini pour matrice)
+            nv3d=IDEBUT+24+ICOMP
+            EPSTR(IPHASE,ICOMP,0)=var0(nv3d)
+c           deformations plastiques de cisaillement (radiale pour inclusions,infini pour matrice)
+            nv3d=IDEBUT+30+ICOMP
+            EPSCR(IPHASE,ICOMP,0)=var0(nv3d)
+c           deformations plastiques de traction localisee (decollement)
+            nv3d=IDEBUT+36+ICOMP
+            EPSLR(IPHASE,ICOMP,0)=var0(nv3d)
+c           contrainte moyenne non endommagee (radiale pour inclusions,infini pour matrice)
+            nv3d=IDEBUT+42+ICOMP
+            STOTR(IPHASE,ICOMP,0)=var0(nv3d)             
+         end do
+     
+       end do
+        
+c      ********Variables internes des interfaces ***********************
+
+       do IPHASE=1,NINC      
+         do ICOMP=1,6       
+c           contraintes effectives radiales(radiale pour inclusions, infini pour matrice)
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+ICOMP
+            SEFFI(IPHASE,ICOMP,0)=var0(nv3d)      
+c           contraintes effectives orthoradiales(radiale pour inclusions infini pour matrice)
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+6+ICOMP
+            SEFFO(IPHASE,ICOMP,0)=var0(nv3d)
+c           deformation radiale elastique a l interface
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+12+ICOMP
+            EPSEI(IPHASE,ICOMP,0)=var0(nv3d)
+c*          stockage pour recalul des coeffs de fluage dans les sous iterations            
+            EPSEI0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation orthoradiale elastique a l interface
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+18+ICOMP      
+            EPSEO(IPHASE,ICOMP,0)=var0(nv3d)
+c*          stockage pour recalul des coeffs de fluage dans les sous iterations            
+            EPSEO0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation radiale maxwell a l interface 
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+24+ICOMP     
+            EPSMI(IPHASE,ICOMP,0)=var0(nv3d)
+c*          stockage pour recalul des coeffs de fluage dans les sous iterations            
+            EPSMI0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation orthoradiale maxwell a l interface 
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+30+ICOMP     
+            EPSMO(IPHASE,ICOMP,0)=var0(nv3d)
+c*          stockage pour recalul des coeffs de fluage dans les sous iterations            
+            EPSMO0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation kelvin radiale  a l interface
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+36+ICOMP      
+            EPSKI(IPHASE,ICOMP,0)=var0(nv3d)
+c*          stockage pour recalul des coeffs de fluage dans les sous iterations            
+            EPSKI0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation kelvin orthoradiale axisymetrique a l interface
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+42+ICOMP      
+            EPSKO(IPHASE,ICOMP,0)=var0(nv3d) 
+c*          stockage pour recalul des coeffs de fluage dans les sous iterations            
+            EPSKO0(IPHASE,ICOMP,0)=var0(nv3d)            
+c           deformation plastique radiale traction a l interface
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+48+ICOMP      
+            EPSTI(IPHASE,ICOMP,0)=var0(nv3d) 
+c           deformation plastique orthoradiale a l interface 
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+54+ICOMP     
+            EPSTO(IPHASE,ICOMP,0)=var0(nv3d) 
+c           deformation plastique cisaillement radiale axisymetrique a l interface  
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+60+ICOMP    
+            EPSCI(IPHASE,ICOMP,0)=var0(nv3d) 
+c           deformation plastique cisaillement orthoradiale a l interface
+            nv3d=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI+66+ICOMP      
+            EPSCO(IPHASE,ICOMP,0)=var0(nv3d)              
+         end do          
+      end do        
+      
+c     ******************************************************************
+c     Construction des Jacobiennes : deps elast/deps imp
+c     ******************************************************************
+
+      if (NINC.eq.1) then
+           
+c       ----- Module Elastiques-----------------------------------------
+
+        do iphase=0,ninc
+c         module de compressibilite
+          MK(IPHASE)=YOUNG(IPHASE)/3.d0/(1.d0-2.d0*NU(IPHASE))
+c         module de cisaillement
+          MG(IPHASE)=YOUNG(IPHASE)/2.d0/(1.d0+NU(IPHASE))    
+        end do
+         
+c       ---- relation dsigma effectif/depse en variables generalisee ---      
+        call jslc3d(NBRINC,NDIMG,NINC,MK,MG,FRAC,JSE,ERR1,AFFICHE)
+        if(err1.eq.1) then
+            print*,'Pb 2 dans incl3d lors du calcul de JSE'
+            ierr1=1
+            return
+        end if
+        if(affiche_jacobi) then
+          print*,'Dans incl3d, JSE pour 1 inclusion'
+          do i=1,12
+            write (*,12) (JSE(i,j),j=1,12) 
+12              format (12E10.3)
+          end do
+        end if  
+        
+      else 
+      
+        print*,'Inclusion 3d limite a 1 type d inclusion:'
+        ierr1=1
+        return
+        
+      end if      
+                    
+        
+c     ******************************************************************
+c     Calcul des variables  physico-chimiques fin de pas de temps
+c     ******************************************************************
+
+c     recup temperature
+c     temperature moyenne sur la pas de temps
+      teta=0.5d0*(teta1+teta2)
+      
+c     ----- variables scalaires propres aux phases ---------------------
+
+      do IPHASE=0,NINC
+      
+
+          
+c         --- avancement chimique --------------------------------------
+          
+          call avch3d(VCH(IPHASE),TCH(IPHASE),EAC(IPHASE),
+     #    TTREF,SRW(IPHASE),SRS(IPHASE),teta1,teta2,dt,
+     #    ACH(IPHASE,0),ACH(IPHASE,1),ierr1)
+          if(ierr1.eq.1) then
+             print*,'Pb calcul chimique phase', IPHASE ,'ds incl3d'
+             return
+          end if
+          DACH(IPHASE)=ACH(IPHASE,1)-ACH(IPHASE,0)
+          
+c         --- deformation chimique imposee fin de pas (Vg eff) ---------
+
+          if((ACH(IPHASE,1)-ACH(IPHASE,0)).gt.0.) then
+            if(ACH(IPHASE,0).gt.ACHS(IPHASE)) then
+                DVGT(IPHASE)=(ACH(IPHASE,1)-ACH(IPHASE,0))*VCH(IPHASE)
+            else if (ACH(IPHASE,1).gt.ACHS(IPHASE)) then           
+                DVGT(IPHASE)=(ACH(IPHASE,1)-ACHS(IPHASE))*VCH(IPHASE)               
+            else 
+                DVGT(IPHASE)=0.d0
+            end if
+          else
+            DVGT(IPHASE)=0.d0
+          end if
+
+          if(DVGT(IPHASE).gt.0.d0) then
+c           normalisation de l increment
+            xnorm=(1.d0-ACHS(IPHASE))**(-1)
+            DVGT(IPHASE)=DVGT(IPHASE)*xnorm
+          else
+            DVGT(IPHASE)=0.d0
+          end if 
+                    
+c         -- actualisation volume de gel ds les phases ----------------- 
+
+c         volume de gel cree par phase          
+          VGT(IPHASE,1)=VGT(IPHASE,0)+DVGT(IPHASE)
+c         Approximation des coeffs de Biot des gels dans les phases          
+C           bg(iphase,0)=2.d0*VGT(IPHASE,0)/(1.d0+VGT(IPHASE,0))
+C           bg(iphase,1)=2.d0*VGT(IPHASE,1)/(1.d0+VGT(IPHASE,1))
+c         calcul exact des coeffs de Biot pour le pas
+          call bitm3d(MK(IPHASE),MG(IPHASE),VGT(IPHASE,0),
+     #    bg(iphase,0),err1,precision3d)
+          call bitm3d(MK(IPHASE),MG(IPHASE),VGT(IPHASE,1),
+     #    bg(iphase,1),err1,precision3d)
+c         calcul exact des modules de Biot
+          call mbio3d(MK(IPHASE),VGT(IPHASE,0),bg(iphase,0),
+     #    KCH(IPHASE),Mbg(Iphase,0),err1)
+          call mbio3d(MK(IPHASE),VGT(IPHASE,1),bg(iphase,1),
+     #    KCH(IPHASE),Mbg(Iphase,1),err1)
+         
+c         -- increments  du volume poro-meca par phase -----------------
+          if(VGT(iphase,1).ne.0.d0) then       
+            dbgVg(iphase)=(bg(iphase,1)*Mbg(Iphase,1)*VGT(iphase,1)
+     #      -bg(iphase,0)*Mbg(Iphase,0)*VGT(IPHASE,0))/Mbg(Iphase,1)
+          else
+            dbgVg(iphase)=0.d0
+          end if
+c         variation de pression lors du tir viscoelastique
+          dbgpg(iphase)=Mbg(Iphase,1)*dbgVg(iphase)
+          bgpg(iphase)=bgpg(iphase)+dbgpg(iphase)
+
+c         - volume initial de gel ds les fissures ----------------------
+          VGF(iphase,1)=VGF(iphase,0)
+
+c         - indicateurs de prise en compte du couplage chemo-plastique -
+         
+          if(VGT(IPHASE,1).eq.0.d0) then
+c           on desactive la migration vers les fissures pour cette phase 
+            GCH(IPHASE)=0.d0  
+          else 
+c           la migration des produits chimiques vers les fissures est 
+c           autorisee pour cette phase
+            GCH(IPHASE)=1.d0
+          end if
+c         dans les deux cas l increment de volume de fissure remplies de
+c         de gel est initialise a zero        
+          dbgVd(iphase)=0.d0
+        
+          
+c         --- deformation thermique fin de pas--------------------------
+
+c         (attention même TTREF que pour le reste)               
+          ETH(IPHASE,1)=(ALP(IPHASE)-ALP(-1))*(teta2-TTREF)
+c         increment de def thermique pour la phase         
+          DETH(IPHASE)=ETH(IPHASE,1)-ETH(IPHASE,0) 
+          
+c         --- contrainte hydrique si non saturee -----------------------
+     
+          call epsw3d(PORO(IPHASE),SRW(IPHASE),MVG(IPHASE),
+     #    NVG(IPHASE),MK(IPHASE),MG(IPHASE),EPSMW,SEW(IPHASE,1),IERR1)
+c         sew=-biot*sw*pw=+biot*sw*pc si pg=0   
+          if(err1.eq.1)then
+             print*,'Pb 1 calcul  du retrait dans inclusion 3d'
+             ierr1=1
+             return
+          end if
+c         increment de def equivalente hydrique (attention c  est bien 
+c         une depression capillaire qui est appliquee niveau statique
+          DSEW(IPHASE)=SEW(IPHASE,1)-SEW(IPHASE,0)
+          dbwpw(IPHASE)=-DSEW(IPHASE)
+          
+c       --- deformation physique liee la variation du volume d eau -----
+
+          EPH(IPHASE,1)=-CPHY(IPHASE)*
+     #    PORO(IPHASE)*(1.d0-SRW(IPHASE))/3.d0
+c         increment de def osmotique          
+          DEPH(IPHASE)=EPH(IPHASE,1)-EPH(IPHASE,0)
+        
+      end do
+
+c     ----- fin  d actualisation physico-chimique ----------------------
+
+c     ---- relation depse / depsa en variables generalisees  -----------
+   
+      call jelc3d(NBRINC,NINC,NDIMG,NDIMA,FRAC,MK,MG,MBG,JEA,
+     # affiche,err1)
+      if(affiche_jacobi) then
+          print*,'Dans incl3d, JEA pour 1 inclusion'
+          do i=1,NDIMG
+            write (*,11) (JEA(i,j),j=1,NDIMA) 
+11              format (24E10.3)
+          end do
+      end if 
+
+c     ------------------------------------------------------------------
+      
+      
+c***********************************************************************
+c     CALCUL de L ECOULEMENT 
+c*********************************************************************** 
+
+
+c     ---- initialisation du compteur du nombre d iterations locale ----      
+      iter=0
+c     choix de l etape de calcul (tir viso-elastique si ietap=0)      
+      ietap=0
+c     reduction du residu lors du retour radial
+      reduc_resg=1.0d0
+c     residu global
+      resgp=0.d0
+      resga=0.d0
+      dresg=0.d0     
+      
+c     --- compteur d iterations pour l ecoulement local ----------------
+15    iter=iter+1 
+
+
+c     --- gestion nombre maxi d iterations -----------------------------
+      if(iter.lt.itermax) then
+c       iteration normale pas de convergence forcee      
+        CONV_FORCEE=.false.      
+        if((iter.ge.iter_aff).and.(.not. affiche_iter))then
+          write(*,'(A23,I4,1X,A14,E10.3,2(1X,A9,E10.3))')
+     #   'Inclusion3d Iteration :',iter,
+     #   'Residu global:',RESGP,
+     #   'D(RESG):',Dresg,
+     #   'Tolerance',tolerance 
+        end if
+        if(iter.ge.(itermax-2))then
+c           la non convergence approche on commence a afficher des infos        
+            affiche=.true.
+        end if
+      else if (iter.eq.itermax) then
+        print*,'Nbre max sous iterations atteint '
+        print*,'dans INCL3D',iter
+        print*,'Residus locaux',RESGP
+        affiche=.true.
+c       on passe en convergence forcee        
+        CONV_FORCEE=.true.
+        plast=.false.
+        plastt=.false.
+        plastc=.false.
+        plastl=.false.
+c       on procede a un dernier calcul visco elastique avant de sortir        
+        ietap=0
+      else
+        ierr1=1
+        return
+      end if 
+
+c     ******************************************************************
+c     Decomposition des variables tensorielles en partie diagonale  
+c     et partie complémentaire dans la base principale de travail : v33 
+c     ******************************************************************  
+
+c     niveau macro 
+      iphase=-1      
+      call dcmp3d(IPHASE,0,NBRINC,SEFFR,SEFFR_PRIN,SEFFR_COMP,
+     # v33,v33t,AFFICHE,'SEFFR')      
+      call dcmp3d(IPHASE,0,NBRINC,EPSTR,EPSTR_PRIN,EPSTR_COMP,
+     # v33,v33t,AFFICHE,'EPSTR')
+      do iphase=0,ninc
+c        projection et decomposition par phase         
+         call dcmp3d(IPHASE,0,NBRINC,SEFFR,SEFFR_PRIN,SEFFR_COMP,
+     #   v33,v33t,AFFICHE,'SEFFR')    
+         call dcmp3d(IPHASE,0,NBRINC,EPSER,EPSER_PRIN,EPSER_COMP,
+     #   v33,v33t,AFFICHE,'EPSER')       
+         call dcmp3d(IPHASE,0,NBRINC,EPSMR,EPSMR_PRIN,EPSMR_COMP,
+     #   v33,v33t,AFFICHE,'EPSMR')      
+         call dcmp3d(IPHASE,0,NBRINC,EPSKR,EPSKR_PRIN,EPSKR_COMP,
+     #   v33,v33t,AFFICHE,'EPSKR')      
+         call dcmp3d(IPHASE,0,NBRINC,EPSTR,EPSTR_PRIN,EPSTR_COMP,
+     #   v33,v33t,AFFICHE,'EPSTR')      
+         call dcmp3d(IPHASE,0,NBRINC,EPSCR,EPSCR_PRIN,EPSCR_COMP,
+     #   v33,v33t,AFFICHE,'EPSCR')      
+         call dcmp3d(IPHASE,0,NBRINC,EPSLR,EPSLR_PRIN,EPSLR_COMP,
+     #   v33,v33t,AFFICHE,'EPSLR')      
+         if(iphase.ge.1) then     
+c           projection et decomposition des composantes radiales d interface          
+            call dcmp3d(IPHASE,0,NBRINC,SEFFI,SEFFI_PRIN,SEFFI_COMP,
+     #      v33,v33t,AFFICHE,'SEFFI')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSEI,EPSEI_PRIN,EPSEI_COMP,
+     #      v33,v33t,AFFICHE,'EPSEI')       
+            call dcmp3d(IPHASE,0,NBRINC,EPSMI,EPSMI_PRIN,EPSMI_COMP,
+     #      v33,v33t,AFFICHE,'EPSMI')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSKI,EPSKI_PRIN,EPSKI_COMP,
+     #      v33,v33t,AFFICHE,'EPSKI')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSTI,EPSTI_PRIN,EPSTI_COMP,
+     #      v33,v33t,AFFICHE,'EPSTI')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSCI,EPSCI_PRIN,EPSCI_COMP,
+     #      v33,v33t,AFFICHE,'EPSCI')           
+c           projection et decomposition des composantes orthoradiales d interface         
+            call dcmp3d(IPHASE,0,NBRINC,SEFFO,SEFFO_PRIN,SEFFO_COMP,
+     #      v33,v33t,AFFICHE,'SEFFO')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSEO,EPSEO_PRIN,EPSEO_COMP,
+     #      v33,v33t,AFFICHE,'EPSEO')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSMO,EPSMO_PRIN,EPSMO_COMP,
+     #      v33,v33t,AFFICHE,'EPSMO')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSKO,EPSKO_PRIN,EPSKO_COMP,
+     #      v33,v33t,AFFICHE,'EPSKO')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSTO,EPSTO_PRIN,EPSTO_COMP,
+     #      v33,v33t,AFFICHE,'EPSTO')      
+            call dcmp3d(IPHASE,0,NBRINC,EPSCO,EPSCO_PRIN,EPSCO_COMP,
+     #      v33,v33t,AFFICHE,'EPSCO')       
+         end if
+      end do
+
+c     ******************************************************************
+c     Coeffs de Fluage dans la base d ecoulement V33
+c     ******************************************************************
+      
+      if((iter.eq.1).or.(ietap.ge.4).or.(CONV_FORCEE)) then
+      
+c       reevaluation des coeff de fluage le cas echeant
+        LOG_FLU=.false.      
+        do iphase=0,ninc
+      
+c           indicateur de presence d au moins une phase visco elastique
+            LOG_FLU=LOG_FLU.or.FLUAGE(IPHASE)
+          
+c           -- coeffs fluage dans les zones homogenes des phases--------
+   
+            if(FLUAGE(IPHASE)) then
+          
+c             --- Maxwell consolidant ---------------------------------- 
+        
+c             - recuperation des deformation de maxwell et elastiques
+c             debut de pas de temps          
+              do ICOMP=1,6
+                    epse6(ICOMP)=EPSER0(IPHASE,ICOMP,0)
+                    epsm6(ICOMP)=EPSMR0(IPHASE,ICOMP,0)
+              end do               
+c             - initialisation des coeff modificateurs du potentiel
+c             - pas  de fluage non lin a cette echelle
+              CMp(IPHASE)=1.d0
+c             - prise en compte de la saturation
+              VWp(IPHASE)=PORO(IPHASE)*SRW(IPHASE)
+c             -effet de l eau sur la vitesse de fluage
+              CWv(iphase)=SRW(IPHASE)   
+c             le coeff d amplification hydrique est inactif              
+              CWp(IPHASE)=1.d0         
+c             - pas d endo thermique 
+              DTH0=0.d0 
+              DT80=0.d0
+              EADTH=0.d0               
+c             - prise en compte de la temperature sur la vitesse 
+c             calcul des coeff thermiques de fluage de Maxwell 
+c            (tetas=81>80 evite de calculer  dth)                                      
+              call thrm3d(teta1,EADTH,81.,TTREF,DT80,
+     #        DTH0,DTH1,CTHP(IPHASE),CTHV(IPHASE),PORO(IPHASE),
+     #        VWp(IPHASE),EAF(IPHASE))
+c             activation de l affichage pour les coeffs de fluage     
+              if(affiche_fluage) then
+                print*,'Calcul des coeffs de fluage dans incl3d'
+                write(*,'(A39,I2,1X,A3,E10.3)') 
+     #          'Calcul coeffs fluage radial dans phase:',
+     #          iphase,'Dt=',dt
+                write(*,'(A5,I2,A2,E10.3,1X,A5,I2,A2,E10.3)') 
+     #          'CTHP(',IPHASE,')=',CTHP(IPHASE),
+     #          'CTHV(',IPHASE,')=',CTHV(IPHASE)
+              end if
+c             - Consolidation de Maxwell-non-lineaire
+              call conso3d(keff,KFLM(IPHASE),1.d0,epsm6,epse6,cc3,
+     #        v33,CMp(IPHASE),CTHp(IPHASE),CTHv(IPHASE),CWp(IPHASE))
+              if(affiche_fluage) then
+                write(*,'(2(A5,I2,A2,E10.3,1X),A5,E10.3)') 
+     #          'CMP(',IPHASE,')=',CMp(IPHASE),
+     #          'CWv(',IPHASE,')=',CWv(IPHASE),
+     #          'Keff',keff
+                do i=1,3
+                  write(*,'(A3,I2,A2,E10.3)') 'CC(',i,')=',cc3(i)
+                end do                
+              end if              
+c             - temps caracteristique pour le fluage de Maxwell             
+              tauflum=(TFL(IPHASE)*CWv(iphase))/CTHV(IPHASE)     
+              do ICOMP=1,3
+                CCR(IPHASE,ICOMP)=cc3(ICOMP)
+c               coeff de fluage de Maxwell                
+                AFLUMR1(IPHASE,ICOMP)=
+     #          keff*log(1.d0+dt/(keff*tauflum*cc3(ICOMP))) 
+                if(affiche_fluage) then
+                    write(*,'(A8,I2,A1,I2,A2,E10.3)') 
+     #              'AFLUMR1(',IPHASE,',',ICOMP,')=',
+     #              AFLUMR1(IPHASE,ICOMP)
+                end if                
+              end do   
+              
+c             --- Kelvin -----------------------------------------------
+
+c             Temps caracteristique pour le fluage de Kelvin             
+              taufluk=(TFL(IPHASE)*CWv(IPHASE))/CTHv(IPHASE)
+              BFLUKR1(IPHASE)=1.d0-exp(-dt/taufluk)
+              AFLUKR1(IPHASE)=KFLK(IPHASE)*BFLUKR1(IPHASE)
+              if(affiche_fluage) then
+                 write(*,'(A8,I2,A2,E10.3)') 
+     #           'AFLUKR1(',IPHASE,')=',AFLUKR1(IPHASE)
+                 write(*,'(A8,I2,A2,E10.3)') 
+     #           'BFLUKR1(',IPHASE,')=',BFLUKR1(IPHASE)     
+              end if 
+              
+            else
+
+c             --- Pas de Maxwell pour cette phase ----------------------
+
+              do ICOMP=1,3          
+                AFLUMR1(IPHASE,ICOMP)=0.d0                   
+              end do   
+              
+c             --- Pas de Kelvin pour cette phase -----------------------
+
+              BFLUKR1(IPHASE)=0.d0
+              AFLUKR1(IPHASE)=0.d0
+              
+            end if
+          
+c           --- coeffs fluage dans les zones homogenes des phases ------
+
+            if((IPHASE.ne.0).and.FLUAGE(0)) then
+          
+c            -- composante radiale de la deformation a l interface ----- 
+         
+c            -- Maxwell interfaces radiales-----------------------------              
+          
+             do ICOMP=1,6
+                epse6(ICOMP)=EPSEI0(IPHASE,ICOMP,0)
+                epsm6(ICOMP)=EPSMI0(IPHASE,ICOMP,0)
+             end do
+c            attention ici c est la matrice qui flue
+             if(affiche_fluage) then
+               write(*,'(A38,I2,1X,A3,E10.3)') 
+     #        'Calcul coeffs fluage radial interface:',
+     #          iphase,'Dt=',dt
+                write(*,'(A5,I2,A2,E10.3,1X,A5,I2,A2,E10.3)') 
+     #          'CTHP(',0,')=',CTHP(0),
+     #          'CTHV(',0,')=',CTHV(0)
+             end if
+c            - etat initial de consolidation de l interface radiale             
+             call conso3d(keff,KFLM(0),1.d0,epsm6,epse6,cc3,
+     #       V33,CMp(0),CTHp(0),CTHv(0),CWp(0))
+             if(affiche_fluage) then
+               write(*,'(A5,I2,A2,E10.3,1X,A5,I2,A2,E10.3,A4,1X,E10.3)') 
+     #          'CMP(',0,')=',CMp(0),
+     #          'CWp(',0,')=',CWp(0),
+     #          'Keff',keff
+                do i=1,3
+                  write(*,'(A3,I2,A2,E10.3)') 'CC(',i,')=',cc3(i)
+                end do                
+             end if 
+c            - temps caracteristique pour le fluage de Maxwell              
+             tauflum=(TFL(0)*CWv(0))/CTHV(0)     
+             do ICOMP=1,3
+                CCI(IPHASE,ICOMP)=cc3(ICOMP)
+c               coeff de fluage de Maxwell                
+                AFLUMI1(IPHASE,ICOMP)=
+     #          keff*log(1.d0+dt/(keff*tauflum*cc3(ICOMP)))
+                if(affiche_fluage) then
+                 write(*,'(A8,I2,A1,I2,A2,E10.3)') 
+     #           'AFLUMI1(',IPHASE,',',ICOMP,')=',AFLUMI1(IPHASE,ICOMP)
+                end if      
+             end do   
+              
+c            --- Kelvin interfaces radiales-----------------------------
+
+c            Temps caracteristique pour le fluage de Kelvin             
+             taufluk=(TFL(0)*CWv(0))/CTHv(0)
+             BFLUKI1(IPHASE)=1.d0-exp(-dt/taufluk)
+             AFLUKI1(IPHASE)=KFLK(0)*BFLUKI1(IPHASE)
+             if(affiche_fluage) then
+                 write(*,'(A8,I2,A2,E10.3)') 
+     #           'AFLUKI1(',IPHASE,')=',AFLUKI1(IPHASE)
+                 write(*,'(A8,I2,A2,E10.3)') 
+     #           'BFLUKI1(',IPHASE,')=',BFLUKI1(IPHASE)     
+             end if 
+
+c            -- Maxwell interface orthoradiale -------------------------             
+          
+             do ICOMP=1,6
+                epse6(ICOMP)=EPSEO0(IPHASE,ICOMP,0)
+                epsm6(ICOMP)=EPSMO0(IPHASE,ICOMP,0)
+             end do
+c            attention ici c est la matrice qui flue
+c            pas de fluage non lin aux interfaces
+             if(affiche_fluage) then
+                write(*,'(A42,I2,1X,A3,E10.3)') 
+     #          'Calcul coeffs fluage orthoradial interface:',
+     #          iphase,'Dt=',dt
+                write(*,'(A5,I2,A2,E10.3,1X,A5,I2,A2,E10.3)') 
+     #          'CTHP(',0,')=',CTHP(0),
+     #          'CTHV(',0,')=',CTHV(0)
+             end if 
+c            etat initial de consolidation orthoradiale de l interface             
+             call conso3d(keff,KFLM(0),1.d0,epsm6,epse6,cc3,
+     #       V33,CMp(0),CTHp(0),CTHv(0),CWp(0))  
+             if(affiche_fluage) then
+                write(*,'(2(A5,I2,A2,E10.3,1X),A5,E10.3)') 
+     #         'CMP(',0,')=',CMp(0),
+     #         'CWp(',0,')=',CWp(0),
+     #         'Keff',keff
+               do i=1,3
+                    write(*,'(A3,I2,A2,E10.3)') 'CC(',i,')=',cc3(i)
+               end do                
+             end if      
+             do ICOMP=1,3
+                CCO(IPHASE,ICOMP)=cc3(ICOMP)
+c               coeff de fluage de Maxwell                
+                AFLUMO1(IPHASE,ICOMP)=
+     #          keff*log(1.d0+dt/(keff*tauflum*cc3(ICOMP)))
+                if(affiche_fluage) then
+                    write(*,'(A8,I2,A1,I2,A2,E10.3)') 
+     #              'AFLUMO1(',IPHASE,',',ICOMP,')=',
+     #              AFLUMO1(IPHASE,ICOMP)
+                end if      
+             end do   
+              
+c            --- Kelvin interface orthoradiale-------------------------- 
+
+c            - idem radial interface             
+             BFLUKO1(IPHASE)=BFLUKI1(IPHASE)
+             AFLUKO1(IPHASE)=AFLUKI1(IPHASE)
+             if(affiche_fluage) then
+                 write(*,'(A8,I2,A2,E10.3)') 
+     #           'AFLUKO1(',IPHASE,')=',AFLUKO1(IPHASE)
+                 write(*,'(A8,I2,A2,E10.3)') 
+     #           'BFLUKO1(',IPHASE,')=',BFLUKO1(IPHASE)     
+             end if   
+              
+            else if(.not.fluage(0)) then
+
+
+             do ICOMP=1,3
+             
+c               - Pas de fluage de Maxwell aux interfaces --------------
+
+                AFLUMI1(IPHASE,ICOMP)=0.D0
+                AFLUMO1(IPHASE,ICOMP)=0.d0
+             end do  
+             
+c            - Pas de fluage de Kelvin aux interfaces ------------------
+
+             AFLUKI1(IPHASE)=0.D0
+             AFLUKO1(IPHASE)=0.d0                
+             BFLUKI1(IPHASE)=0.D0
+             BFLUKO1(IPHASE)=0.d0 
+              
+            end if          
+          
+c           retour a l affichage par defaut 
+            if(affiche_fluage.and.LOG_FLU) then
+                print*,'Dans incl3d Valider pour continuer'
+                read*
+            end if  
+        
+        end do
+       
+       
+c       -- passage des coefficients viscoelastique en espace generalise-
+
+        do IPHASE=0,NINC
+c        placement du pointeur        
+            If(IPHASE.eq.0) then
+                IDEBUT=9*NINC
+            else
+                IDEBUT=(IPHASE-1)*9
+            end if
+c           remplissage des vecteurs            
+            do ICOMP=1,3
+c            -phase            
+                ak(IDEBUT+ICOMP)=AFLUKR1(IPHASE)       
+                bk(IDEBUT+ICOMP)=BFLUKR1(IPHASE)
+                am(IDEBUT+ICOMP)=AFLUMR1(IPHASE,ICOMP)
+                if(iter.eq.1) then
+                    ek0(IDEBUT+ICOMP)=EPSKR_PRIN(IPHASE,ICOMP)
+                    ee0(IDEBUT+ICOMP)=EPSER_PRIN(IPHASE,ICOMP)
+                else
+                    ek0(IDEBUT+ICOMP)=0.d0
+                    ee0(IDEBUT+ICOMP)=0.d0
+                end if                    
+                if(IPHASE.ge.1) then
+c                 -interface direction radiale
+                    ak(IDEBUT+3+ICOMP)=AFLUKI1(IPHASE)       
+                    bk(IDEBUT+3+ICOMP)=BFLUKI1(IPHASE)
+                    am(IDEBUT+3+ICOMP)=AFLUMI1(IPHASE,ICOMP)
+                    if(iter.eq.1) then
+                        ek0(IDEBUT+3+ICOMP)=EPSKI_PRIN(IPHASE,ICOMP)
+                        ee0(IDEBUT+3+ICOMP)=EPSEI_PRIN(IPHASE,ICOMP)
+                    else
+                        ek0(IDEBUT+3+ICOMP)=0.d0
+                        ee0(IDEBUT+3+ICOMP)=0.d0
+                    end if
+c                   -interface direction otho-radiale
+                    ak(IDEBUT+6+ICOMP)=AFLUKO1(IPHASE)       
+                    bk(IDEBUT+6+ICOMP)=BFLUKO1(IPHASE)
+                    am(IDEBUT+6+ICOMP)=AFLUMO1(IPHASE,ICOMP)
+                    if(iter.eq.1) then
+                        ek0(IDEBUT+6+ICOMP)=EPSKO_PRIN(IPHASE,ICOMP)
+                        ee0(IDEBUT+6+ICOMP)=EPSEO_PRIN(IPHASE,ICOMP)
+                    else
+                        ek0(IDEBUT+6+ICOMP)=0.d0
+                        ee0(IDEBUT+6+ICOMP)=0.d0
+                    end if    
+                end if
+            end do
+        end do
+        if(affiche_fluage) then
+            print*,'Coeff de couplage visco elastiques'
+            do icomp=1,NDIMG
+                write(*,'(A3,I2,A2,E10.3)') 'AK(',icomp,')=',ak(icomp)
+            end do 
+            do icomp=1,NDIMG
+                write(*,'(A3,I2,A2,E10.3)') 'BK(',icomp,')=',bk(icomp)
+            end do
+            do icomp=1,NDIMG
+                write(*,'(A3,I2,A2,E10.3)') 'AM(',icomp,')=',am(icomp)
+            end do 
+            do icomp=1,NDIMG
+                write(*,'(A3,I2,A2,E10.3)') 'EE(',icomp,')=',ee0(icomp)
+            end do 
+            do icomp=1,NDIMG
+                write(*,'(A3,I2,A2,E10.3)') 'EK(',icomp,')=',ek0(icomp)
+            end do                         
+        end if
+      end if  
+      
+c     --- fin de l actualisation des coeff de fluage -------------------
+
+
+c     --- gonflement imposee homogene orthotrope des phases ------------
+
+      do iphase=0,NINC
+        if(affiche_gel) then
+            print*,'Inclusion3d GCH(',iphase,')=',GCH(iphase)
+        end if                    
+      end do
+      
+c     --- fin maj gonflement imposee des phases ------------------------
+  
+      
+c     ******************************************************************       
+c     Tir ou ecoulement pour le cas avec un seul type d inclusion 
+c     ******************************************************************
+
+      if(affiche_gel) then
+          do iphase=0,ninc
+            write(*,'(A23,I2,A2,E10.3,2(1X,A10,I2,A2,E10.3))')
+     #      'Dans incl3d dbgvg(',iphase,')=',dbgvg(iphase),
+     #      'Gch(',iphase,')=',Gch(iphase),
+     #      'bg(',iphase,')=',bg(iphase,1)
+          end do
+      end if
+
+c     tir (ietap=0) ou ecoulement plastique (ietap =4)
+
+       call lcls3d(IETAP,NGF,ERR1,AA,XX,A2,BB,AAI,BBI,AAP,IPZERO,
+     # NBRINC,NINC,NDIMG,NDIMA,LOG_FLU,PLAST,ITER,DETH,DEPH,DEPST3,
+     # JEA,JSE,AK,BK,AM,EE0,EK0,DEPSE1,DEPSM1,DEPSK1,FRAC,DEPST1,
+     # NTMAX,FT,NBRACT,LNUMCRT,ACTIFT,PLASTT,DPFTDS,DGFTDS,REST,
+     # PFT_GRAD_PFT,PFT_GRAD_GFT,DEPSC1,NCMAX,NBRACC,FC,LNUMCRC,
+     # ACTIFC,PLASTC,DPFCDS,DGFCDS,RESC,PFC_GRAD_PFC,PFC_GRAD_GFC,
+     # DEPSL1,NLMAX,FL,NBRACL,LNUMCRL,ACTIFL,PLASTL,DPFLDS,DGFLDS,
+     # RESL,PFL_GRAD_PFL,PFL_GRAD_GFL,Gch,bg,dbgVg,dbgVd,dbwPw,
+     # reduc_resg,JSP,Je1epg,Mbg,NDIMPL,RgR,Jsgep,PFG_GRAD_PFG,
+     # PRECISION3D,AFFICHE,CONV_FORCEE)   
+     
+c     verif solution localisation
+      if(affiche) then 
+        do i=1,NDIMG
+         write(*,'(A7,I2,A2,E10.3)') 'DEPSE1(',i,')=',depse1(i)
+        end do
+      end if
+                  
+c     traitement erreur lcls3d
+      if(err1.eq.1) ierr1=1
+      if(ierr1.eq.1) then
+        print*,'Pb dans incl3d apres lcls3d'
+        print*,'fluage:',LOG_FLU
+        print*,'plasticite:',plast
+        return
+      end if 
+
+c     compteur de reduction par refermeture de fissure (epsplt>0)      
+      iter_rf=1
+
+      
+c     ******************************************************************      
+c     Preparation Boucle de mise a jour conditionelle des deformations
+c     ******************************************************************
+
+c     variable logique pour savoir si on doit reinjecter du gel dans une 
+c     phase suite aux reductions
+      LogReducGEL=.false. 
+c     initialisation du volume de fissure accessible au gel par phase
+      do iphase=1,NINC
+        VGF(iphase,1)=VGF(iphase,0)
+      end do      
+            
+c     ******************************************************************
+c     point de redémarrage des test de refermeture et ecoulement
+c     chemo plastique en cas de refermture et d ecoulement simultanees
+c     ******************************************************************
+            
+c     initialisation du coeff de reduction de retour radial
+40    reduc=1.d0
+      do idir=1,NDIMG
+        reduc_prov(idir)=1.d0
+      end do
+
+c     actualisation du volume de gel residuel
+      
+c     ******************************************************************
+c     Tests d admissibilite des refermeture et mise a jour
+c     ******************************************************************
+     
+      do iphase=0,ninc    
+        if(iphase.eq.0) then
+c           matrice 
+            idebut=9*ninc         
+        else        
+c           inclusion et interface 
+            idebut=9*(iphase-1)
+        end if                
+c       elastique dans la phase        
+        do i=1,3
+            xp3(iphase,i)=DEPSE1(idebut+i)+EPSER_PRIN(iphase,i)
+        end do
+        call recm3d(iphase,1,EPSER_COMP,xp3,EPSER,v33,v33t)
+c       Maxwell dans la phase
+        do i=1,3
+            xp3(iphase,i)=DEPSM1(idebut+i)+EPSMR_PRIN(iphase,i)
+        end do
+        call recm3d(iphase,1,EPSMR_COMP,xp3,EPSMR,v33,v33t)        
+c       Kelvin dans la phase          
+        do i=1,3
+            xp3(iphase,i)=DEPSK1(idebut+i)+EPSKR_PRIN(iphase,i)
+        end do
+        call recm3d(iphase,1,EPSKR_COMP,xp3,EPSKR,v33,v33t) 
+C       Plasticite en traction dans la phase
+        if(PLASTT) then
+          do i=1,3
+            xp3(iphase,i)=DEPST1(idebut+i)+EPSTR_PRIN(iphase,i)
+            if(Log_RTG(idebut+i)) then            
+              if(xp3(iphase,i).lt.(-precision3d)) then
+              
+c               --- test de refermeture radiale dans les phases --------
+
+                if(DEPST1(idebut+i).lt.(-precision3d)) then
+                    reduc_prov(idebut+i)=
+     #              (-EPSTR_PRIN(iphase,i))
+     #              /(DEPST1(idebut+i))
+                end if
+                reduc=min(reduc,reduc_prov(idebut+i)) 
+                if(reduc.le.precision3d) then
+                    print*,'Dans incl3d lors du calcul de reduc'
+                    write(*,'(A6,I2,1X,A6,I2,1X,A4,I2)')
+     #              'PHASE:',iphase,'debut:',idebut,'dir:',i            
+                    write(*,'(A11,E10.3)')
+     #              'EPSTR_PRIN=',EPSTR_PRIN(iphase,i)            
+                    write(*,'(A7,E10.3)')                         
+     #              'DEPST1=',DEPST1(idebut+i)  
+                end if 
+                 
+c               --------------------------------------------------------               
+              end if
+            end if
+          end do
+          call recm3d(iphase,1,EPSTR_COMP,xp3,EPSTR,v33,v33t)
+        else
+           do i=1,6
+                EPSTR(iphase,i,1)=EPSTR(iphase,i,0)
+           end do
+        end if          
+C       Plasticite en cisaillement dans la phase
+        do i=1,3
+            xp3(iphase,i)=DEPSC1(idebut+i)+EPSCR_PRIN(iphase,i)
+        end do
+        call recm3d(iphase,1,EPSCR_COMP,xp3,EPSCR,v33,v33t)
+
+C       Plasticite localisee dans la phase
+        if(PLASTL) then
+          do i=1,3
+            xp3(iphase,i)=DEPSL1(idebut+i)+EPSLR_PRIN(iphase,i)
+            if(Log_RLG(idebut+i)) then            
+              if(xp3(iphase,i).lt.(-precision3d)) then
+              
+c               --- test de refermeture radiale dans les interfaces ----
+
+                if(DEPSL1(idebut+i).lt.(-precision3d)) then
+                    reduc_prov(idebut+i)=
+     #              (-EPSLR_PRIN(iphase,i))
+     #              /(DEPSL1(idebut+i))
+                end if
+                reduc=min(reduc,reduc_prov(idebut+i)) 
+                if(reduc.le.precision3d) then
+                    print*,'Dans incl3d lors du calcul de reduc'
+                    write(*,'(A6,I2,1X,A6,I2,1X,A4,I2)')
+     #              'PHASE:',iphase,'debut:',idebut,'dir:',i            
+                    write(*,'(A11,E10.3)')
+     #              'EPSLR_PRIN=',EPSLR_PRIN(iphase,i)            
+                    write(*,'(A7,E10.3)')                         
+     #              'DEPSL1=',DEPSL1(idebut+i)  
+                end if 
+                 
+c               --------------------------------------------------------               
+              end if
+            end if
+          end do
+          call recm3d(iphase,1,EPSLR_COMP,xp3,EPSLR,v33,v33t)
+        else
+           do i=1,6
+                EPSLR(iphase,i,1)=EPSLR(iphase,i,0)
+           end do
+        end if                
+c       variable en + pour les interfaces        
+        if (iphase.ge.1) then
+c           Elastique radiale dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSE1(idebut+3+i)+EPSEI_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSEI_COMP,xp3,EPSEI,v33,v33t)
+c           Elastique orthoradiale dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSE1(idebut+6+i)+EPSEO_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSEO_COMP,xp3,EPSEO,v33,v33t)
+c           Maxwell radial dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSM1(idebut+3+i)+EPSMI_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSMI_COMP,xp3,EPSMI,v33,v33t)
+c           Maxwell orthoradiale dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSM1(idebut+6+i)+EPSMO_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSMO_COMP,xp3,EPSMO,v33,v33t)
+c           Kelvin radial dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSK1(idebut+3+i)+EPSKI_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSKI_COMP,xp3,EPSKI,v33,v33t)
+c           Kelvin orthoradiale dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSK1(idebut+6+i)+EPSKO_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSKO_COMP,xp3,EPSKO,v33,v33t)
+c           Traction radiale dans l interface de l inclusion 
+            if(PLASTT) then     
+              do i=1,3
+                xp3(iphase,i)=DEPST1(idebut+3+i)+EPSTI_PRIN(iphase,i)
+                if(Log_RTG(idebut+3+i)) then  
+                  if(xp3(iphase,i).lt.(-precision3d)) then
+                  
+c                  --- test de refermeture radiale dans ITZ ------------
+
+                   if(DEPST1(idebut+3+i).lt.(-precision3d)) then
+                     reduc_prov(idebut+3+i)=
+     #               -EPSTI_PRIN(iphase,i)/DEPST1(idebut+3+i)
+                   end if
+                   reduc=min(reduc,reduc_prov(idebut+3+i)) 
+                   if(reduc.le.precision3d) then
+                     print*,'Dans incl3d lors du calcul de reduc'
+                     write(*,'(A6,I2,1X,A6,I2,1X,A4,I2)')
+     #               'PHASE:',iphase,'debut:',idebut,'dir:',i            
+                     write(*,'(A11,E10.3)')
+     #               'EPSTI_PRIN=',EPSTI_PRIN(iphase,i)            
+                     write(*,'(A7,E10.3)')                         
+     #               'DEPST1=',DEPST1(idebut+3+i)
+                   end if 
+                   
+c                  -----------------------------------------------------
+
+                  end if
+                end if                  
+              end do
+              call recm3d(iphase,1,EPSTI_COMP,xp3,EPSTI,v33,v33t)
+            else
+              do i=1,6
+                EPSTI(iphase,i,1)=EPSTI(iphase,i,0)
+              end do
+            end if
+c           Traction orthoradiale dans ITZ
+            if(PLASTT) then      
+              do i=1,3
+                xp3(iphase,i)=DEPST1(idebut+6+i)+EPSTO_PRIN(iphase,i)
+                if(Log_RTG(idebut+6+i)) then 
+                  if(xp3(iphase,i).lt.(-precision3d)) then
+                  
+c                   -test de refermeture orthoradiale dans ITZ ---------
+
+                    if(DEPST1(idebut+6+i).lt.(-precision3d)) then
+                      reduc_prov(idebut+6+i)=-EPSTO_PRIN(iphase,i)/
+     #                DEPST1(idebut+6+i)
+                    end if
+                    reduc=min(reduc,reduc_prov(idebut+6+i)) 
+                    if(reduc.le.precision3d) then
+                      print*,'Dans incl3d lors du calcul de reduc'
+                      write(*,'(A6,I2,1X,A6,I2,1X,A4,I2)')
+     #                'PHASE:',iphase,'debut:',idebut,'dir:',i            
+                      write(*,'(A11,E10.3)')
+     #                'EPSTO_PRIN=',EPSTO_PRIN(iphase,i)            
+                      write(*,'(A7,E10.3)')                         
+     #                'DEPST1=',DEPST1(idebut+6+i)
+                    end if   
+                    
+c                   ----------------------------------------------------
+
+                  end if
+                end if                  
+              end do
+              call recm3d(iphase,1,EPSTO_COMP,xp3,EPSTO,v33,v33t)
+            else
+              do i=1,6
+                EPSTO(iphase,i,1)=EPSTO(iphase,i,0)
+              end do
+            end if            
+c           Cisaillement radial dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSC1(idebut+3+i)+EPSCI_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSCI_COMP,xp3,EPSCI,v33,v33t)
+c           Cisaillement orthoradiale dans l interface de l inclusion      
+            do i=1,3
+                xp3(iphase,i)=DEPSC1(idebut+6+i)+EPSCO_PRIN(iphase,i)
+            end do
+            call recm3d(iphase,1,EPSCO_COMP,xp3,EPSCO,v33,v33t)         
+        end if        
+      end do
+      
+C     ***** Plasticite en traction localisee au niveau macro desactivee*
+
+      iphase=-1
+      do i=1,3
+          xp3(iphase,i)=0.d0+EPSTR_PRIN(iphase,i)
+      end do
+      call recm3d(iphase,1,EPSTR_COMP,xp3,EPSTR,v33,v33t)
+      
+c     ***** test ecoulement gel dans les fissures **********************
+
+      do iphase=0,ninc
+        if((gch(iphase).eq.1.d0).and.(ietap.ne.0)) then
+c          volume de gel qui vient de s ecouler dans les fissures
+c          actualise par la reduction d ecoulement plastique par les 
+c          conditions de refermeture
+           dbgvd_actuel=reduc*dbgVd(iphase)
+c          variation de pression dans le gel induite par l ecoulement
+           dbgpg(iphase)=-Mbg(iphase,1)*dbgvd_actuel
+c          nouvelle pression dans le gel
+           bgpg_actuel=bgpg(iphase)+dbgpg(iphase)
+c          le gel peut s ecouler dans les fissures s il est en surpression
+           if((bgpg_actuel.lt.0.d0).and.(dbgpg(iphase).ne.0.d0)) then                 
+c               la quantite de gel ecoulé ds les fissures est plus grande
+c               que le gel disponible, il faut reduire la fissuration pour
+c               limiter la chute de pression du gel dans cette phase 
+                reduc_ch(iphase)=-bgpg(iphase)/dbgpg(iphase)
+C               if (dbgvd_actuel.gt.dbgvg(iphase)) then
+C                   reduc_ch(iphase)=-dbgvg(iphase)/dbgvd_actuel
+                if(reduc_ch(iphase).gt.1.) then
+                    print*,'Dans incl3d...'
+                    print*,'Pb lors de la reduction  de fissuration'
+                    print*,'a cause du gel, reduc_ch(',iphase,')=',
+     #              reduc_ch(iphase)
+                    print*,'bgpg(',iphase,')=',bgpg(iphase)
+                    print*,'dbgpg(',iphase,')=',dbgpg(iphase)
+                    err1=1
+                    return
+                else
+                    LogReducGEL=.true.
+                    if(reduc_ch(iphase).le.0.) then
+c                       le gel passe en depression 
+                        if(affiche_gel.or.affiche_reduc) then
+                         print*,'incl3d,le gel passe '
+                         print*,'en depression, on reduit'
+                         print*,'l increment de plasticite'
+                         print*,'Avant la reduction on a :'
+                         print*,'bgpg(',iphase,')=',bgpg(iphase)
+                         print*,'dbgpg(',iphase,')=',dbgpg(iphase)
+                         print*,'-> pression a 0 pour phase',iphase
+                         ierr1=1
+                         return
+*                         read*
+                        end if
+                        reduc_ch(iphase)=0.d0
+                    end if
+                    Gch(iphase)=0.d0
+                end if
+            else
+                reduc_ch(iphase)=1.d0
+            end if
+            reduc=reduc*reduc_ch(iphase)
+            if((reduc.lt.1.d0).and.((Gch(1).ne.0.).or.(Gch(0).ne.0.))) 
+     #          then
+                LogReducGEL=.true.
+                if(affiche_reduc)then
+                    print*,'Inc3d,Reduction de l ecoulement phase ',
+     #              iphase,'=',reduc_ch(iphase),bgpg(iphase),
+     #              dbgpg(iphase)
+c                   read*
+                end if
+            end if
+        else
+            dbgpg(iphase)=0.d0
+        end if
+      end do
+      
+c     ******************************************************************
+c     Traitement reduction  d ecoulement plastique
+c     ******************************************************************
+      
+      if(reduc.ne.1.d0) then
+c       compteur d iteration pour les refermetures      
+        iter_rf=iter_rf+1
+ 
+c       reduction des increments et cumul des residus correctifs        
+        call redu3d(NBRINC,NINC,NDIMG,DEPSE1,DEPSM1,DEPSK1,
+     #  DEPST1,DEPSC1,DEPSL1,LogReducGEL,reduc,dbgvd,Mbg,dbgpg,
+     #  precision3d,ierr1,affiche)    
+       
+        if(ierr1.ne.1) then
+          if(iter_rf.gt.3) then
+            print*,'Pb incl3d sous iteration fermeture',iter_rf
+            do j=0,ninc
+                print*,'Reduction chimique phase',j,'=',reduc_ch(iphase)
+                print*,'reduc:',reduc
+                print*,'reduc_prov',reduc_prov
+            end do
+            ierr1=1
+            return
+          else
+c           on va refaire une iteration pour la mise a jour des variables
+            goto 40            
+          end if        
+        else
+          print*,'Pb incl3d reduction / fermeture iter',iter_rf
+          return
+        end if     
+      end if 
+
+      
+c     ******************************************************************      
+c     Calcul des des contraintes effectives (G=notation globale (1->12))
+c     ******************************************************************
+
+      if(ninc.eq.1) then         
+         do idir=1,NDIMG
+            DSEFFG(idir)=0.d0
+c           prise en compte solution elastique pour 
+c           la contrainte effective (dans le solide et non endommagee)        
+            do jdir=1,NDIMG
+               DSEFFG(idir)=DSEFFG(idir)+JSE(idir,jdir)*DEPSE1(jdir)
+            end do           
+            if(affiche) then
+                write(*,'(A7,1X,I2,1X,A2,1X,E10.3)')
+     #          'dsigma(',idir,')=',DSEFFG(idir)
+            end if            
+         end do
+      else        
+         print*,'Dans incl3d JSE inaptee a ',ninc,' inclusions'
+         ierr1=1
+         return     
+      end if      
+     
+c     **** stockage contraintes radiales dans base fixe ****************
+      
+c     on a passe tous les tests de limitation de refermeture 
+c     et tous les test de limitation d ecoulement chemo-plastique
+c     on peut donc conserver les vari et les contraintes  
+      do iphase=-1,ninc
+         if(iphase.eq.-1) then
+c           milieu homogene
+            do idir=1,3
+                xp3(iphase,idir)=0.d0
+c               contribution de toutes les phase                
+                do jphase=0,ninc
+                    if(jphase.eq.0) then
+                        idebut=9*ninc
+                    else
+                        idebut=9*(jphase-1)
+                    end if                    
+                    xp3(iphase,idir)=xp3(iphase,idir)+
+     #              FRAC(jphase)*DSEFFG(idebut+idir)
+                end do
+c               mise a jour de la projection                
+                xp3(iphase,idir)=xp3(iphase,idir)
+     #          +SEFFR_PRIN(iphase,idir)            
+            end do 
+         else            
+            if(iphase.eq.0) then
+c               sig matrice a l infini = sig moyen matrice
+                idebut=9*ninc
+            else 
+c               sig 1er type d inclusion = sig moyen inclusion 
+                idebut=9*(iphase-1)  
+            end if           
+c           combinaison avec le tenseur de contrainte effective macro
+            do idir=1,3
+                xp3(iphase,idir)=DSEFFG(idebut+idir)
+     #          +SEFFR_PRIN(iphase,idir)            
+            end do
+         end if
+c        mise a jour du tenseur         
+         call recm3d(iphase,1,SEFFR_COMP,xp3,SEFFR,v33,v33t)
+      end do
+
+c     **** stockage contrainte d interface  dans base fixe *************
+ 
+      do iphase=1,ninc         
+c        contrainte  radiale dans l interface (constituee de matrice)         
+         idebut=9*(iphase-1)+3
+         do idir=1,3
+            xp3(iphase,idir)=DSEFFG(idebut+idir)
+     #      +SEFFI_PRIN(iphase,idir)
+         end do                
+c        combinaison avec le tenseur de contrainte totale  precedent         
+         call recm3d(iphase,1,SEFFI_COMP,xp3,SEFFI,v33,v33t)      
+c        contraintes orthoradiales dans l interface
+         idebut=9*(iphase-1)+6
+         do idir=1,3
+            xp3(iphase,idir)=DSEFFG(idebut+idir)
+     #      +SEFFO_PRIN(iphase,idir)                
+         end do        
+c        combinaison avec le tenseur de contrainte totale  precedent         
+         call recm3d(iphase,1,SEFFO_COMP,xp3,SEFFO,v33,v33t)       
+      end do
+              
+c     ***  affichage des tables de contraintes fin d iteration *********
+      
+      if(affiche) then
+        do iphase=-1,ninc
+            write(*,'(A52,I2)')
+     #      'Contraintes radiales dans phase :',iphase
+            do i=1,6
+                 write(*,'(A6,I2,I2,A2,E10.3)')
+     #           'SEFFR(',iphase,i,')=',SEFFR(iphase,i,1)
+            end do
+            if(iphase.gt.0) then
+                write(*,'(A52,I2)')
+     #          'Contraintes radiales dans interface de :',iphase
+                do i=1,6
+                     write(*,'(A6,I2,I2,A2,E10.3)')
+     #               'SEFFI(',iphase,i,')=',SEFFI(iphase,i,1)
+                end do            
+                 write(*,'(A52,I2)')
+     #          'Contraintes othoradiale radiales dans interface de :'
+     #          ,iphase           
+                do i=1,6
+                     write(*,'(A6,I2,I2,A2,E10.3)')
+     #               'SEFFO(',iphase,i,')=',SEFFO(iphase,i,1)
+                end do             
+            end if
+        end do
+      end if
+      
+c     ---- Pression dans les pores -------------------------------------
+     
+      do iphase=0,NINC
+        if(VGT(iphase,1).gt.0.d0) then
+c           actualisation de la contrainte chemo mecanique       
+            bgpg(iphase)=bgpg(iphase)+dbgpg(iphase)
+            if(bgpg(iphase).lt.0.) then
+                print*,'pression de gel.lt.0 ds incl3d'
+                err1=1
+                return
+            end if
+        else
+            bgpg(iphase)=0.d0
+        end if
+c       actualisation du volume  de gel dans les fissures
+        if(bg(iphase,1).gt.0.d0) then
+            VGF(iphase,1)=VGF(iphase,1)+dbgvd(iphase)/bg(iphase,1)
+        else
+            VGF(iphase,1)=VGF(iphase,0)
+        end if
+c       recuperation de la contrainte hydrique de la phase        
+        bwpw(iphase)=-SEW(iphase,1)
+      end do
+
+c      ---- contraintes totales moyennes non endommagee par phase ------
+
+       do iphase=0,NINC
+            do idir=1,6
+                STOTR(IPHASE,IDIR,1)=SEFFR(IPHASE,IDIR,1)  
+                if(idir.le.3) then
+                    STOTR(iphase,idir,1)=STOTR(iphase,idir,1)
+     #              -bwpw(iphase)-bgpg(iphase)
+                end if
+            end do            
+       end do 
+      
+c     ******************************************************************      
+c     Fin de mise a jour des variables internes LOCALES FINALES 
+c     ******************************************************************
+
+c     les vari LOCALES FINALES sont les tableaux FIN de pas (ITPS=1), 
+c     elles ne seront conservees et utilisees pour le prochain sous-pas 
+c     que si on realise une mise a jour des variables internes LOCALES 
+c     INITIALES avec la subroutine MJVR3D
+
+      call mjvr3d(NBRINC,NINC,ACH,VGT,VGF,ETH,SEW,EPH,
+     # SEFFR,EPSER,EPSMR,EPSKR,EPSTR,EPSCR,EPSLR,EPSRH,STOTR,
+     # SEFFI,EPSEI,EPSMI,EPSKI,EPSTI,EPSCI,
+     # SEFFO,EPSEO,EPSMO,EPSKO,EPSTO,EPSCO) 
+
+c     les vari LOCALES ne deviendront des vari stockables dans la 
+c     table du code que si on les stocke sur le tableau VARF ce qui
+c     ne peut etre fait qu apres convergence de la plasticite      
+    
+c     ******************************************************************
+c     Evaluation des criteres en base generalisee a la fin du sous pas
+c     ******************************************************************
+
+c     on evalue et classe les criteres du + grd au + petit
+c     la liste des numero des criteres a traiter est dans LNUMCRT
+c     idem pour les criteres de cisaillement NUMCR,NSUIVANTC,LNUMCRC...
+
+c     on evalue les criteres fin de pas que :
+c     lors du tir visco elastique : ietap=0
+c     lors des retours radiaux    : ietap=4
+
+      if(.not.CONV_FORCEE) then
+      
+c        evaluation des criteres en fin de sous pas
+
+         call CRER3D(NBRINC,NTYPC,NINC,NDIMG,RTP,RTI,DELTA,
+     # BETA,COHE,FRAC,GCH,bwPw,bgpg,SEFFR,SEFFI,SEFFO,EPSTR,EPSTI,
+     # EPSTO,EPSLR,V33,V33T,V33S,V33ST,EPSTG,EPSPLG,SEFFG,FTHG,
+     # NTMAX,FT,ACTIFT,DPFTDS,DGFTDS,LNUMCRT,NBRACT,PLASTT,Log_RTG,
+     # NCMAX,FC,ACTIFC,DPFCDS,DGFCDS,LNUMCRC,NBRACC,PLASTC,RFP,RFI,
+     # NLMAX,FL,ACTIFL,DPFLDS,DGFLDS,LNUMCRL,NBRACL,PLASTL,Log_RLG,
+     # STOTR,STOTG,RESGA,PLAST,RTG,RTLG,RFG,RFLG,reduc_resg,
+     # PRECISION3D,ERR1,AFFICHE) 
+         
+c        traitement erreur evaluation critere     
+         if(affiche.or.(err1.eq.1)) then
+            if(err1.eq.1) then
+                print*,'Erreur dans incl3d lors de l appel'
+                print*,'a crer3d a l etape:',ietap
+                print*,'a l iteration:',iter
+                ierr1=1
+                return
+            end if
+         end if         
+      
+      else
+      
+c        convergence locale forcee
+
+         plast=.false.
+         plastt=.false.
+         plastc=.false.
+         plastl=.false.
+         
+      end if
+           
+      
+c     --- mise a zero du chargement si sous iteration necessaire -------
+           
+      if(plast.or.LogReducGEL) then 
+c       maj des residu de chargement           
+        do idir=1,3
+            DEPST3(idir)=0.d0
+        end do
+c       residu en THCP impose            
+        do iphase=0,NINC
+            DETH(iphase)=0.d0
+            DEPH(iphase)=0.d0                  
+            dbwpw(iphase)=0.d0
+            dbgvg(iphase)=0.d0              
+        end do
+c       residu en relaxation de deformation elastique initiale 
+        do idir=1,NDIMG            
+            ek0(idir)=0.d0
+            ee0(idir)=0.d0
+        end do   
+c       declaration etape de plasticite        
+        ietap=4
+        if(iter.eq.1) then 
+            goto 15
+        else 
+c           evolution du residu entre deux pas 
+            Dresg=abs(RESGA-RESGP)
+c           decalage du residu pour pas suivant
+            RESGP=RESGA
+            if(affiche_iter) then
+                write(*,'(A23,I4,1X,A14,E10.3,2(1X,A9,E10.3))')
+     #          'Inclusion3d Iteration :',iter,
+     #          'Residu global:',RESGP,
+     #          'D(RESG):',Dresg,
+     #          'Tolerance',tolerance
+            end if
+            if(Dresg.gt.tolerance) then
+c               on poursuit le calcul que si l erreur diminue        
+                goto 15
+            end if
+        end if
+      else
+        RESA=0.d0
+c       decalage du residu pour pas suivant
+        RESGP=RESGA
+        if(affiche_iter) then
+             write(*,'(A23,I4,1X,A14,E10.3,2(1X,A9,E10.3))')
+     #       'Inclusion3d Iteration :',iter,
+     #       'Residu global:',RESGP,
+     #       'D(RESG):',Dresg,
+     #       'Tolerance',tolerance
+        end if
+      end if    
+  
+c***********************************************************************
+c     fin de la boucle de resolution nonlineaire et stockage
+c***********************************************************************
+
+c      **** variables internes globales ********************************
+       
+c      *** variables internes pour le milieu homogeneisé
+       IPHASE=-1               
+       do ICOMP=1,6
+c        contraintes effectives homogeneisees         
+         nv3d=NBVARISOG+ICOMP
+         varf(nv3d)=SEFFR(IPHASE,ICOMP,1)
+c        deformation plastique traction localisee         
+         nv3d=NBVARISOG+6+ICOMP
+         varf(nv3d)=EPSTR(IPHASE,ICOMP,1)       
+       end do
+       
+c      *** variables internes des phases *******************************
+
+       do IPHASE=0,NINC     
+c        avancement reaction chimique 
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+1       
+         varf(nv3d)=ACH(IPHASE,1)          
+c        deformation chimique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+2
+         varf(nv3d)=VGT(IPHASE,1)  
+c        deformation thermique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+3
+         varf(nv3d)=ETH(IPHASE,1)
+c        contrainte hydrique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+4
+         varf(nv3d)=SEW(IPHASE,1)
+c        deformation osmotique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+5
+         varf(nv3d)=EPH(IPHASE,1)
+c        deformation osmotique imposee
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+6
+         varf(nv3d)=VGF(IPHASE,1) 
+c        contrainte chemo mecanique
+         nv3d=NBVIND3D+IPHASE*NBVPARP3D+7
+         varf(nv3d)=-bgpg(IPHASE)          
+c        debut de la zone memoire pour les tenseurs        
+         IDEBUT=NBVIND3D+IPHASE*NBVPARP3D+NBVARISOPP         
+         do ICOMP=1,6
+c           contrainte effective radiale dans la phase
+            nv3d=IDEBUT+ICOMP 
+            varf(nv3d)=SEFFR(IPHASE,ICOMP,1)            
+c           deformation elastique (radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+6+ICOMP
+            varf(nv3d)=EPSER(IPHASE,ICOMP,1)
+c           deformation maxwell (radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+12+ICOMP
+            varf(nv3d)=EPSMR(IPHASE,ICOMP,1)      
+c           deformation Kelvin (radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+18+ICOMP
+            varf(nv3d)=EPSKR(IPHASE,ICOMP,1)
+c           deformations plastiques de traction (radiale pour inclusions,infini pour matrice)
+            nv3d=IDEBUT+24+ICOMP
+            varf(nv3d)=EPSTR(IPHASE,ICOMP,1)
+c           deformations plastiques de cisaillement (radiale pour inclusions,infini pour matrice)
+            nv3d=IDEBUT+30+ICOMP
+            varf(nv3d)=EPSCR(IPHASE,ICOMP,1)
+c           deformations plastiques de traction localisee (decollement)
+            nv3d=IDEBUT+36+ICOMP
+            varf(nv3d)=EPSLR(IPHASE,ICOMP,1)
+c           contrainte moyenne non endommagee (radiale pour inclusions,infini pour matrice)
+            nv3d=IDEBUT+42+ICOMP
+            varf(nv3d)=STOTR(IPHASE,ICOMP,1)            
+         end do        
+       end do
+        
+c      *******variables internes des interfaces ************************
+
+       do IPHASE=1,NINC  
+         IDEBUT=NVTOT1+(IPHASE-1)*NBVPARI3D+NBVARISOPI       
+         do ICOMP=1,6       
+c           contraintes effectives radiales(radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+ICOMP
+            varf(nv3d)=SEFFI(IPHASE,ICOMP,1)      
+c           contraintes effectives orthoradiales(radiale pour inclusions infini pour matrice)
+            nv3d=IDEBUT+6+ICOMP
+            varf(nv3d)=SEFFO(IPHASE,ICOMP,1)
+c           deformation radiale elastique a l interface
+            nv3d=IDEBUT+12+ICOMP
+            varf(nv3d)=EPSEI(IPHASE,ICOMP,1) 
+c           deformation orthoradiale elastique a l interface
+            nv3d=IDEBUT+18+ICOMP      
+            varf(nv3d)=EPSEO(IPHASE,ICOMP,1)       
+c           deformation radiale maxwell a l interface 
+            nv3d=IDEBUT+24+ICOMP     
+            varf(nv3d)=EPSMI(IPHASE,ICOMP,1) 
+c           deformation orthoradiale maxwell a l interface 
+            nv3d=IDEBUT+30+ICOMP     
+            varf(nv3d)=EPSMO(IPHASE,ICOMP,1)      
+c           deformation kelvin radiale  a l interface
+            nv3d=IDEBUT+36+ICOMP      
+            varf(nv3d)=EPSKI(IPHASE,ICOMP,1)
+c           deformation kelvin orthoradiale axisymetrique a l interface
+            nv3d=IDEBUT+42+ICOMP      
+            varf(nv3d)=EPSKO(IPHASE,ICOMP,1)      
+c           deformation plastique radiale traction a l interface
+            nv3d=IDEBUT+48+ICOMP      
+            varf(nv3d)=EPSTI(IPHASE,ICOMP,1) 
+c           deformation plastique orthoradiale a l interface 
+            nv3d=IDEBUT+54+ICOMP     
+            varf(nv3d)=EPSTO(IPHASE,ICOMP,1) 
+c           deformation plastique cisaillement radiale axisymetrique a l interface  
+            nv3d=IDEBUT+60+ICOMP    
+            varf(nv3d)=EPSCI(IPHASE,ICOMP,1) 
+c           deformation plastique cisaillement orthoradiale a l interface
+            nv3d=IDEBUT+66+ICOMP      
+            varf(nv3d)=EPSCO(IPHASE,ICOMP,1)              
+         end do       
+       end do 
+         
+c***********************************************************************
+c       transfert des contraintes totales dans sigef6
+c*********************************************************************** 
+       
+c      -- contrainte totale macroscopiques non endommagee --------------
+      
+       do idir=1,6
+            sigef6(idir)=0.d0
+            do iphase=0,NINC
+                sigef6(idir)=sigef6(idir)+
+     #          FRAC(iphase)*STOTR(iphase,idir,1)
+            end do
+       end do
+       
+c     --- fin contraintes macro totales non endommagee -----------------       
+       
+c***********************************************************************
+c     prise en compte de l endommagement (non actif)
+c***********************************************************************
+
+       do idir=1,6
+            sigf6(idir)=sigef6(idir)
+       end do       
+       
+c***********************************************************************        
+c       affectation dans le tableau de sortie des contraintes
+c***********************************************************************
+
+       do i=1,nstrs
+            sigf(i)=sigf6(i)
+            if(affiche) then
+               write(*,'(A5,I1,A2,E10.3)') 'sigf(',i,')=',sigf(i)
+            end if
+       end do          
+
+c     ** indicateur de passage du premier pas **************************
+
+       varf(1)=1.0d0 
+       if(affiche) then
+            print*,'Inclusion3d: Valider pour continuer'
+            read*
+       end if   
+
+       
+       return
+       end
+c*********************************************************************** 
+     
+ 
+ 
+ 

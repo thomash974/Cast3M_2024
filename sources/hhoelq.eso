@@ -1,0 +1,283 @@
+C HHOELQ    SOURCE    OF166741  24/05/06    21:15:09     11082
+
+C===== FORMULATION HHO =================================================
+C=                  Sous-programme HHOELQ                              =
+C=                  ---------------------                              =
+C= Ce sous programme est l'equivalent du sous programme ELQUOI pour la =
+C= formulation HHO. Il est appele par ELQUOI et s'en inspire fortement =
+C=                                                                     =
+C= Entrees :                                                           =
+C= ---------                                                           =
+C=   IMODEL    : pointeur sur une zone elementaire d'un modele         =
+C=               SEGMENT ACTIF en entree et en sortie                  =
+C=   INTTYP    : type d'integration utilisee par l'operateur           =
+C=   Si l'on desire un segment d'integration pour un champ aux :       =
+C=     1 = NOEUDS  ( appel a RENOEU )                                  =
+C=     2 = points de GAUSS pour centre de GRAVITE et CHAMP CONSTANT    =
+C=     3 = points de GAUSS pour la RIGIDITE                            =
+C=     4 = points de GAUSS pour la MASSE                               =
+C=     5 = points de GAUSS pour les CONTRAINTES                        =
+C     -10= en mecanique on veut calculer les 5 premiers et on les met  =
+C          dans infmod(3 ...)                                          =
+C= Sorties :                                                           =
+C= ---------                                                           =
+C=   retourne IPTR pointeur sur un segment INFO ACTIF contenant :      =
+C=     La dimension de infell est fixee par NINFOS                     =
+C=     infell( 1)  numero de l'element fini                            =
+C=     infell( 2)  nombre de points d'integration en contraintes       =
+C=                 multicouche                                         =
+C=     infell( 3)  nombre de points d'integration pour la masse        =
+C=     infell( 4)  nombre de points d'integration pour SIGMA           =
+C=                 BSIGMA et KSIGMA                                    =
+C=     infell( 5)  nombre de caracteristiques                          =
+C=     infell( 6)  nombre de points d'integration pour la RIGIDITE     =
+C=     infell( 7)  longueur d'un tableau de travail pour l'element     =
+C=     infell( 8)  nombre de fonctions de forme                        =
+C=     infell( 9)  nbre de d.d.l. dans la matrice de RIGIDITE          =
+C=     infell(10)  taille de la matrice de Hooke                       =
+C=     infell(11)  pointeur sur le segment d'integration               =
+C=     infell(12)  pointeur sur le 2nd segment d'integration des       =
+C=                 elements homogeneises ou fluides (COQ6 ou COQ8)     =
+C=     infell(13)  numero de la formulation de l'element fini          =
+C=                 = 89      Formulation HHO
+C=     infell(14)  numero de l'element geometrique associe (NUMGEO)    =
+C=     infell(15)  nombre maximal de d.d.l. par noeud                  =
+C=     infell(16)  nombre de composantes de contraintes ou de deform.  =
+C=======================================================================
+
+      SUBROUTINE HHOELQ (IPMODL,INTTYP, IPTR)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMMODEL
+-INC SMELEME
+-INC SMINTE
+-INC SMLENTI
+
+C  Segment (type LISTENTI) contenant les informations sur un element
+      SEGMENT INFO
+        INTEGER INFELL(JG)
+      ENDSEGMENT
+
+C=======================================================================
+C= INTHHO : SAVE local des pointeurs sur les segments d'integration    =
+C= NBMODE : Nombre de MODEs de calcul (= nb valeurs possibles IFOMOD)  =
+C= NINFOS : Dimension (JG) du tableau infell (segment INFO) = 16       =
+C=======================================================================
+C IFOMOD :  -1     0     1     2     3     4     5     6
+C          PLAN  AXIS  FOUR  TRID  UNID  UNID  UNID  FREQ
+C                                  PLAN  AXIS  SPHE
+C NBMODE = IFOMOD + 2 mais on ne considere pas IFOMOD = 6
+C NTYNTE : 1 --> INTEGRATION aux NOEUDS
+C          2 --> INTEGRATION aux Points d'INTEGRATION
+C          3 --> INTEGRATION au centre de GRAVITE (champ constant par element)
+C NOFACE : pour ordre faces (+1 car ordre 0 accepte)
+C NNFACE : nombre de noeuds decrivant une face (2 en 2D, 3 a HHO_MAX_EDGE en 3D)
+C NOCELL : pour ordre cellules (+1 car ordre 0 accepte)
+C NNCELL : nombre de noeuds decrivant une cellule (3 a HHO_MAX_EDGE en 2D)
+C          pour le 3D voir la remarque ci-dessous :
+C Il faudra revoir ce stockage quand on aura du 3D
+C en 2D --> on a des polygones definis par leur nombre de noeuds, ce 
+C           qui les rend unique !
+
+      PARAMETER ( NTYNTE = 3 , NBMODE = 7 )
+      PARAMETER ( NOCELL = 6 , NNCELL = NFAMAX )
+      PARAMETER ( NOFACE = 6 , NNFACE = NFAMAX )
+      PARAMETER ( NINTEG = NNCELL*NOCELL*NTYNTE*NBMODE )
+      PARAMETER ( NINFOS = 16 )
+
+      CHARACTER*(16) motHHO
+      LOGICAL b_z
+
+      INTEGER INTHHO(NNCELL,NOCELL,NTYNTE,NBMODE)
+      SAVE INTHHO
+      DATA INTHHO / NINTEG*0 /
+
+      IPTR = 0
+
+C On se place sur la bonne "tranche" du tableau INTHHO :
+      IBMODE = IFOMOD + 2
+
+      IF (IBMODE.LT.1 .OR. IBMODE.GT.NBMODE) THEN
+        WRITE(IOIMP,*)
+        WRITE(IOIMP,*) 'HHOELQ : valeur de NBMODE incorrecte !'
+        WRITE(IOIMP,*) '         IBMODE = ',IBMODE,NBMODE,IFOMOD
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+
+      imodel = IPMODL
+
+      CALL HHONOB(IPMODL, nobHHO, iret)
+      IF (nobHHO.LE.0)THEN
+        write(ioimp,*) 'HHOELQ : IPMODL incorrect (not HHO)'
+        CALL ERREUR(5)
+        RETURN
+      END IF
+
+C  Recuperation des donnees de infell en entree
+      MELE   = imodel.NEFMOD
+      MFR    = NUMMFR(MELE)
+      meleme = imodel.IMAMOD
+      IELE   = meleme.itypel
+
+      mlenti = imodel.ivamod(nobhho+1)
+c*      segact,mlenti
+
+C  Ordre des faces et des cellules :
+      n_o_face = mlenti.lect(2)
+      n_o_cell = mlenti.lect(4)
+      if (iimpi.eq.1972)
+     &  write(ioimp,*) 'HHOELQ : ordre face/cell',n_o_face,n_o_cell
+
+      IF (n_o_face .GT. NOFACE) THEN
+        write(ioimp,*) 'HHOELQ : NOFACE incorrect'
+        CALL ERREUR(5)
+        RETURN
+      END IF
+      IF (n_o_cell .GT. NOCELL) THEN
+        write(ioimp,*) 'HHOELQ : NOCELL incorrect'
+        CALL ERREUR(5)
+        RETURN
+      END IF
+
+C  Initialisation
+      JG = NINFOS
+      SEGINI,INFO
+      DO i = 1, NINFOS
+        info.INFELL(i) = 0
+      END DO
+
+C=---------------------------------------------------------------------=
+C= REMPLISSAGE DU TABLEAU infell
+C=---------------------------------------------------------------------=
+C  Remplissage de infell(1) : numero de l'element fini
+C  --------------------------
+      info.INFELL(1) = MELE
+
+C  Remplissage de infell(8) :
+C  --------------------------
+c faces      info.INFELL(8) = -1 * imodel.INFMOD( 9)
+      info.INFELL(8) = -1 * imodel.INFMOD(12)
+
+C  Remplissage de infell(13) et infell(14) :
+C  -----------------------------------------
+C  infell(13) : numero de la FORMULATION - MFR
+      info.INFELL(13) = MFR
+C  infell(14) : numero de l'element GEOMETRIQUE - IELE
+      info.INFELL(14) = IELE
+
+C  Remplissage de infell(10), infell(15) et infell(16) :
+C  -----------------------------------------------------
+C  infell(10) : dimension de la matrice de Hooke
+C  infell(15) : nombre maximal de ddl par noeud
+C  infell(16) : nombre de composantes de contraintes et deformations
+
+      IF (IFOUR.EQ.2) THEN
+        info.infell(10) = 6
+        info.infell(16) = 6
+      ELSE
+        info.infell(10) = 4
+        info.infell(16) = 4
+      ENDIF
+      idifo = mlenti.lect(9)
+      info.infell(15) = idifo * MAX(mlenti.lect(3),mlenti.lect(5))
+
+      info.infell(2) = 0
+
+      NBPINT = mlenti.lect(8)
+      info.infell(3) = NBPINT
+      info.infell(4) = NBPINT
+      info.infell(6) = NBPINT
+C= infell(5) = Nombre de caracteristiques : utilite ?
+      info.infell(5) = 4
+C= infell(7) = Taille du segment de travail a recuperer !
+      info.infell(7) = 100
+
+      info.infell(9) = mlenti.lect(11)
+
+      info.infell(12) = -9
+
+      nb_faces = mlenti.lect(7)
+
+C  Remplissage de infell(11) : INTEGRATION DE L'ELEMENT FINI
+C  ---------------------------
+C Quel(s) type(s) de segment est(sont) a traiter ?
+C  1 = Champ aux noeuds
+      IF (INTTYP.EQ.1) THEN
+        itgdeb = 1
+        itgfin = 1
+C  2 = Point de Gauss, centre de gravite et champ CONSTANT
+      ELSE IF (INTTYP.EQ.2) THEN
+        itgdeb = 2
+        itgfin = 2
+C  3 = Point de Gauss pour la rigidite
+C  4 = Point de Gauss pour la masse
+C  5 = Point de Gauss - calcul des contraintes
+      ELSE IF (INTTYP.GE.3.AND.INTTYP.LE.5) THEN
+        itgdeb = 3
+        itgfin = 3
+C -10 = on fait tous les segments
+      ELSE IF (INTTYP.EQ.-10) THEN
+        itgdeb = 1
+        itgfin = 3
+C    = Pas de segment d'integration
+      ELSE
+        itgdeb = 0
+        itgfin = -1
+      END IF
+
+      iin = 0
+      DO itg = itgdeb, itgfin
+C  Si le segment d'integration a deja ete rempli : iin est non nul ici !
+C  Si le segment n'a pas deja ete rempli : iin = 0
+        iin = INTHHO(nb_faces,n_o_cell+1,itg,IBMODE)
+        IF (iin.EQ.0) THEN
+          minte = 0
+**          nbno = nb_faces
+          nbno = 0
+          IF (itg.EQ.1) THEN
+            nbpgau = nb_faces
+            SEGINI,minte
+          ELSE IF (itg.EQ.2) THEN
+            nbpgau = 1
+            SEGINI,minte
+          ELSE IF (itg.EQ.3) THEN
+            nbpgau = NBPINT
+            SEGINI,minte
+          ENDIF
+          DO i = 1, nbpgau
+            minte.POIGAU(i) = 1.D0 / REAL(nbpgau)
+          END DO
+          IPT1 = minte
+          IF (IPT1.NE.0) CALL SAVSEG(IPT1)
+          iin = IPT1
+          INTHHO(nb_faces,n_o_cell+1,itg,IBMODE) = iin
+        END IF
+        imodel.infmod(2+itg) = iin
+      END DO
+
+      IF (INTTYP.EQ.-10) THEN
+        DO itg = 4,5
+          imodel.infmod(2+itg) = imodel.infmod(2+3)
+        END DO
+      END IF
+
+      info.INFELL(11) = iin
+      MINTE = iin
+      IF (MINTE.GT.0) SEGACT,MINTE
+
+C Sortie de HHOELQ : le segment IPTR=INFO est ACTIF.
+      IPTR = INFO
+
+C*      RETURN
+      END
+

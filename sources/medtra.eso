@@ -1,0 +1,11 @@
+C MEDTRA    SOURCE    OF166741  23/02/15    21:15:07     11416          
+
+C -- NO MORE USED / PLUS UITILISE --------------------------------------
+      SUBROUTINE medtra
+
+      CALL ERREUR(5)
+
+c      return
+      END
+
+ 

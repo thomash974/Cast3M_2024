@@ -1,0 +1,55 @@
+C DCCD3D    SOURCE    PV090527  23/01/27    21:15:21     11574          
+      SUBROUTINE DCCD3D(pt0,pc0,M,Hcc,s1,s2,s3,dcc)
+c     part de dfcc/dlcc due a l ecrouissage seul dans CamClay (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 pt0,pc0,M,Hcc,s1,s2,s3,dcc
+      
+
+     
+C       t6 = pc0 + pt0
+C       t12 = M ** 2
+C       t17 = s1 ** 2
+C       t20 = s2 ** 2
+C       t22 = s3 ** 2
+C       t34 = t6 ** 2
+C       dcc = -t12 * t34 * (0.2D1 * s1 + 0.2D1 * s2 + 0.2D1 * s3 + 0.3D1 *
+C      # pc0 + 0.3D1 * pt0) * Hcc * (0.3D1 / 0.4D1 * t12 * (pt0 + s1 / 0.3
+C      #D1 + s2 / 0.3D1 + s3 / 0.3D1) * t6 * (pc0 + pt0 / 0.3D1 + 0.2D1 / 
+C      #0.9D1 * s1 + 0.2D1 / 0.9D1 * s2 + 0.2D1 / 0.9D1 * s3) + (t17 + (-s
+C      #2 -s3) * s1+ t20 - s2 * s3 + t22) * (pc0 - pt0) / 0.6D1) / 0.12D2
+
+      t1 = sqrt(0.3D1)
+      t3 = M ** 2
+      t4 = sqrt(0.4D1)
+      t8 = 0.3D1 / 0.2D1 * pt0
+      t9 = s1 + s2 + s3 + 0.3D1 / 0.2D1 * pc0 + t8
+      t10 = t9 ** 2
+      t11 = t3 ** 2
+      t13 = s1 ** 2
+      t15 = -s2 - s3
+      t18 = s2 ** 2
+      t20 = s2 * s3
+      t22 = s3 ** 2
+      t25 = pc0 - pt0
+      t26 = t25 ** 2
+      t27 = t26 ** 2
+      t29 = sqrt(t27 * (t11 * t10 + 0.81D2 / 0.2D1 * t13 + 0.81D2 / 0.2D
+     #1 * s1 * t15 + 0.81D2 / 0.2D1 * t18 - 0.81D2 / 0.2D1 * t20 + 0.81D
+     #2 / 0.2D1 * t22))
+      dcc = -t26 * t25 * (t3 * (s1 + s2 + s3 + 0.3D1 * pt0) * (s1 + s2 +
+     # s3 + 0.9D1 / 0.2D1 * pc0 - t8) + 0.9D1 * t13 + 0.9D1 * s1 * t15 +
+     # 0.9D1 * t18 - 0.9D1 * t20 + 0.9D1 * t22) * t9 / t29 * t4 * t3 * t
+     #1 * Hcc / 0.108D3
+
+
+
+
+
+c      print*,'dcc3d:',pt0,pc0,Rt,Cdp0,M,Hcc,s1,s2,s3,dcc
+
+      return
+      end
+      
+ 

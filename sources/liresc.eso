@@ -1,0 +1,121 @@
+C LIRESC    SOURCE    SP204843  23/01/24    21:15:05     11565          
+C   Lire emascule a l'usage d'un esclave
+C
+      SUBROUTINE LIRESC(ITYPE,IRET,ICODE,IRETOU)
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCASSIS
+-INC CCNOYAU
+-INC SMBLOC
+
+      character*(*) itype
+      character*(8) ityp
+
+C      ith=0
+      ith=oothrd
+      if (ith .eq. 0) call erreur(5)
+      mescla=imescl(ith)
+      iretou=0
+      if (icode .eq. -1) then
+        esoplu(imotlv)=.false.
+        return
+      endif
+      if (ierr .ne. 0) return
+      
+      if (itype(1:8).eq.'FLOTTANT') THEN
+        ityp='ENTIER  '
+      else
+        ityp='        '
+      endif
+
+      do 10 i=1,100
+       if (esoplu(i)) goto 10
+
+C      Si on tombe sur un esclave on le remplace par sa valeur
+C      write(6,*) 'Liresc : esopty(i) =',esopty(i)
+       if (esopty(i).eq.'ESCLAVE ') then
+         mesres=esopva(i)
+         segact,mesres
+C        Gestion du SOUCI dans le BLOC (COMMENTE ACTUELLEMENT)
+C        mbsouc=max(mbsouc,esisou)
+         if (.not. loremp) then
+   5       continue
+           segdes,Mesres*RECORD
+           SEGACT,MESRES*(ECR=1,MOD)
+           if (.not. loremp) then
+             write(6,*) ' loremp pas vrai dans liresc '
+             goto  5
+           endif
+         endif
+         esopty(i)=esrety
+         if ( esrety.eq.'LOGIQUE ') then
+             esoplo(i)=esrelo
+         elseif(esrety.eq.'FLOTTANT') then
+             esopre(i)=esrere
+         elseif (esrety.eq.'MOT     ') then
+             esopch(i)=esrech
+         else
+             esopva(i)=esreva
+         end if
+         SEGDES,MESRES
+       else if (esopty(i).eq.'LISTOBJE') then
+         mesres=esopva(i)
+         segact,mesres
+C        Gestion du SOUCI dans le BLOC (COMMENTE ACTUELLEMENT)
+C        mbsouc=max(mbsouc,esisou)
+         if (.not. loremp) then
+   6       continue
+           segdes,Mesres*RECORD
+           SEGACT,MESRES*(ECR=1,MOD)
+           if (.not. loremp) then
+             write(6,*) ' loremp pas vrai dans liresc '
+             goto  6
+           endif
+         endif
+         esopty(i)=esrety
+         if ( esrety.eq.'LOGIQUE ') then
+             esoplo(i)=esrelo
+         elseif (esrety.eq.'FLOTTANT') then
+             esopre(i)=esrere
+         elseif (esrety.eq.'MOT     ') then
+             esopch(i)=esrech
+         else
+             esopva(i)=esreva
+         endif
+         SEGDES,MESRES
+       endif
+
+       if (itype(1:8).eq.'        ') goto 20
+       if (itype(1:8).eq. esopty(i)) goto 20
+       if (ityp      .eq. esopty(i)) goto 20
+  10  continue
+
+      iretou=0
+      if (icode.eq.1) then
+        moterr(1:8)=itype(1:8)
+        call erreur(37)
+       endif
+       return
+
+  20   continue
+       imotlv=i
+       iretou=1
+       itype=esopty(i)
+       iret =esopva(i)
+       esoplu(i)=.true.
+       if (itype(1:8).eq.'FLOTTANT') iret=i
+       if (itype(1:8).eq.'MOT     ') iret=i
+       if (itype(1:8).eq.'LOGIQUE ') iret=i
+
+       end
+
+ 
+ 
+ 
+ 
+ 

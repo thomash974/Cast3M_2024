@@ -1,0 +1,20 @@
+C INDCE1    SOURCE    PV090527  23/01/27    21:15:42     11574          
+c**************************************************************************************
+      subroutine indce1(i,k,l)
+c     indices complementaires dans une matrice carre
+      integer i,k,l
+      if (i.eq.1)then
+       k=2
+       l=3
+      end if
+      if (i.eq.2)then
+       k=1
+       l=3
+      end if
+      if (i.eq.3)then
+       k=1
+       l=2
+      end if
+      return
+      end     
+ 

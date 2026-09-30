@@ -1,0 +1,322 @@
+C TPR15     SOURCE    OF166741  23/12/04    21:15:14     11800          
+
+C=======================================================================
+C=                            T P R 1 5                                =
+C=                            ---------                                =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=   Acquisition des caracteristiques d'integration aux noeuds, aux    =
+C=   points d'integration (Gauss) ou au centre de gravite pour         =
+C=   l'element thermique support PR15.                                 =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   ISUPTH  (E)   Indique le support d'integration demande            =
+C=   IPINTE  (S)   Pointeur sur le segment MINTE associe (ACTIF en S)  =
+C=======================================================================
+
+      SUBROUTINE TPR15 (ISUPTH,IPINTE)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC SMINTE
+
+      PARAMETER ( O0=0.D0, O1=1.D0, O5=.5D0, O2=2.D0, O3=3.D0, O4=4.D0 )
+      PARAMETER ( S=0.774596669241483377035853079956479D0)
+      PARAMETER ( A=0.470142064105115089770441209513447D0)
+      PARAMETER ( B=0.101286507323456338800987361915124D0)
+      PARAMETER ( C=0.333333333333333333333333333333333D0)
+      PARAMETER ( W234=0.0661970763942530D0 )
+      PARAMETER ( W567=0.0629695902724135D0 )
+      PARAMETER ( W234HB=W234*5.D0/9.D0 )
+      PARAMETER ( W234C=W234*8.D0/9.D0 )
+      PARAMETER ( W567HB=W567*5.D0/9.D0 )
+      PARAMETER ( W567C=W567*8.D0/9.D0 )
+      PARAMETER ( W116=1.D0/16.D0 )
+      PARAMETER ( W01=0.1D0 )
+
+      DIMENSION VT(6), DVXT(6),DVYT(6)
+
+      NBNO = 15
+      IF      (ISUPTH.EQ.1) THEN
+        NBPGAU = 15
+      ELSE IF (ISUPTH.EQ.2) THEN
+        NBPGAU = 21
+      ELSE IF (ISUPTH.EQ.3) THEN
+        NBPGAU = 1
+      ELSE
+        RETURN
+      ENDIF
+      SEGINI,MINTE
+
+C COORDONNEES INTRINSEQUES DES 15 NOEUDS
+      IF (ISUPTH.EQ.1) THEN
+        QSIGAU( 1) = O0
+        QSIGAU( 2) = O5
+        QSIGAU( 3) = O1
+        QSIGAU( 4) = O5
+        QSIGAU( 5) = O0
+        QSIGAU( 6) = O0
+        QSIGAU( 7) = O0
+        QSIGAU( 8) = O1
+        QSIGAU( 9) = O0
+        QSIGAU(10) = O0
+        QSIGAU(11) = O5
+        QSIGAU(12) = O1
+        QSIGAU(13) = O5
+        QSIGAU(14) = O0
+        QSIGAU(15) = O0
+
+        ETAGAU( 1) = O0
+        ETAGAU( 2) = O0
+        ETAGAU( 3) = O0
+        ETAGAU( 4) = O5
+        ETAGAU( 5) = O1
+        ETAGAU( 6) = O5
+        ETAGAU( 7) = O0
+        ETAGAU( 8) = O0
+        ETAGAU( 9) = O1
+        ETAGAU(10) = O0
+        ETAGAU(11) = O0
+        ETAGAU(12) = O0
+        ETAGAU(13) = O5
+        ETAGAU(14) = O1
+        ETAGAU(15) = O5
+
+        DZEGAU( 1) = -O1
+        DZEGAU( 2) = -O1
+        DZEGAU( 3) = -O1
+        DZEGAU( 4) = -O1
+        DZEGAU( 5) = -O1
+        DZEGAU( 6) = -O1
+        DZEGAU( 7) =  O0
+        DZEGAU( 8) =  O0
+        DZEGAU( 9) =  O0
+        DZEGAU(10) =  O1
+        DZEGAU(11) =  O1
+        DZEGAU(12) =  O1
+        DZEGAU(13) =  O1
+        DZEGAU(14) =  O1
+        DZEGAU(15) =  O1
+
+        r_z = O1 / 15.D0
+        DO I = 1, NBPGAU
+          POIGAU(1) = r_z
+        ENDDO
+
+C COORDONNEES ET POIDS DES 21 POINTS DE GAUSS
+      ELSE IF (ISUPTH.EQ.2) THEN
+        QSIGAU( 1) = C
+        QSIGAU( 2) = A
+        QSIGAU( 3) = O1-O2*A
+        QSIGAU( 4) = A
+        QSIGAU( 5) = B
+        QSIGAU( 6) = O1-O2*B
+        QSIGAU( 7) = B
+        QSIGAU( 8) = C
+        QSIGAU( 9) = A
+        QSIGAU(10) = O1-O2*A
+        QSIGAU(11) = A
+        QSIGAU(12) = B
+        QSIGAU(13) = O1-O2*B
+        QSIGAU(14) = B
+        QSIGAU(15) = C
+        QSIGAU(16) = A
+        QSIGAU(17) = O1-O2*A
+        QSIGAU(18) = A
+        QSIGAU(19) = B
+        QSIGAU(20) = O1-O2*B
+        QSIGAU(21) = B
+
+        ETAGAU( 1) = C
+        ETAGAU( 2) = A
+        ETAGAU( 3) = A
+        ETAGAU( 4) = O1-O2*A
+        ETAGAU( 5) = B
+        ETAGAU( 6) = B
+        ETAGAU( 7) = O1-O2*B
+        ETAGAU( 8) = C
+        ETAGAU( 9) = A
+        ETAGAU(10) = A
+        ETAGAU(11) = O1-O2*A
+        ETAGAU(12) = B
+        ETAGAU(13) = B
+        ETAGAU(14) = O1-O2*B
+        ETAGAU(15) = C
+        ETAGAU(16) = A
+        ETAGAU(17) = A
+        ETAGAU(18) = O1-O2*A
+        ETAGAU(19) = B
+        ETAGAU(20) = B
+        ETAGAU(21) = O1-O2*B
+
+        DZEGAU( 1) = -S
+        DZEGAU( 2) = -S
+        DZEGAU( 3) = -S
+        DZEGAU( 4) = -S
+        DZEGAU( 5) = -S
+        DZEGAU( 6) = -S
+        DZEGAU( 7) = -S
+        DZEGAU( 8) = O0
+        DZEGAU( 9) = O0
+        DZEGAU(10) = O0
+        DZEGAU(11) = O0
+        DZEGAU(12) = O0
+        DZEGAU(13) = O0
+        DZEGAU(14) = O0
+        DZEGAU(15) = +S
+        DZEGAU(16) = +S
+        DZEGAU(17) = +S
+        DZEGAU(18) = +S
+        DZEGAU(19) = +S
+        DZEGAU(20) = +S
+        DZEGAU(21) = +S
+
+        POIGAU( 1) = W116
+        POIGAU( 2) = W234HB
+        POIGAU( 3) = W234HB
+        POIGAU( 4) = W234HB
+        POIGAU( 5) = W567HB
+        POIGAU( 6) = W567HB
+        POIGAU( 7) = W567HB
+        POIGAU( 8) = W01
+        POIGAU( 9) = W234C
+        POIGAU(10) = W234C
+        POIGAU(11) = W234C
+        POIGAU(12) = W567C
+        POIGAU(13) = W567C
+        POIGAU(14) = W567C
+        POIGAU(15) = W116
+        POIGAU(16) = W234HB
+        POIGAU(17) = W234HB
+        POIGAU(18) = W234HB
+        POIGAU(19) = W567HB
+        POIGAU(20) = W567HB
+        POIGAU(21) = W567HB
+
+C COORDONNEES DU CENTRE DE GRAVITE
+      ELSE IF (ISUPTH.EQ.3) THEN
+        QSIGAU(1) = O0
+        ETAGAU(1) = O0
+        DZEGAU(1) = O0
+        POIGAU(1) = O1
+      ENDIF
+
+C FONCTIONS DE FORME ET LEURS DERIVEES AU(X) NBPGAU POINT(S)
+      DO I = 1, NBPGAU
+        X = QSIGAU(I)
+        Y = ETAGAU(I)
+        Z = DZEGAU(I)
+C- FONCTIONS DE FORME DU T6 DE BASE
+        XY1   = O1-X-Y
+        VT(1) = O2*XY1*(O5-X-Y)
+        VT(2) = O4*X*XY1
+        VT(3) = O2*X*(X-O5)
+        VT(4) = O4*X*Y
+        VT(5) = O2*Y*(Y-O5)
+        VT(6) = O4*XY1*Y
+C- FONCTIONS DE FORME DU PRISME
+        ZM1 = (O1-Z)*O5
+        ZP1 = (O1+Z)*O5
+        ZM2 = O1-Z*Z
+
+        SHPTOT(1, 7,I) = ZM2*XY1
+        SHPTOT(1, 8,I) = ZM2*X
+        SHPTOT(1, 9,I) = ZM2*Y
+
+        SHPTOT(1, 1,I) = ZM1*VT(1)-SHPTOT(1,7,I)*O5
+        SHPTOT(1, 2,I) = ZM1*VT(2)
+        SHPTOT(1, 3,I) = ZM1*VT(3)-SHPTOT(1,8,I)*O5
+        SHPTOT(1, 4,I) = ZM1*VT(4)
+        SHPTOT(1, 5,I) = ZM1*VT(5)-SHPTOT(1,9,I)*O5
+        SHPTOT(1, 6,I) = ZM1*VT(6)
+
+        SHPTOT(1,10,I) = ZP1*VT(1)-SHPTOT(1,7,I)*O5
+        SHPTOT(1,11,I) = ZP1*VT(2)
+        SHPTOT(1,12,I) = ZP1*VT(3)-SHPTOT(1,8,I)*O5
+        SHPTOT(1,13,I) = ZP1*VT(4)
+        SHPTOT(1,14,I) = ZP1*VT(5)-SHPTOT(1,9,I)*O5
+        SHPTOT(1,15,I) = ZP1*VT(6)
+
+C- DERIVEES DES FONCTIONS DE FORME DU T6 DE BASE
+        DVXT(1) = O4*(X+Y)-O3
+        DVXT(2) = O4*(O1-X-X-Y)
+        DVXT(3) = O4*X-O1
+        DVXT(4) = O4*Y
+        DVXT(5) = O0
+        DVXT(6) = -O4*Y
+
+        DVYT(1) = O4*(X+Y)-O3
+        DVYT(2) = -O4*X
+        DVYT(3) = O0
+        DVYT(4) = O4*X
+        DVYT(5) = O4*Y-O1
+        DVYT(6) = O4*(O1-X-Y-Y)
+
+C- DERIVEES EN X DES FONCTIONS DE FORME
+        SHPTOT(2, 7,I) = -ZM2
+        SHPTOT(2, 8,I) =  ZM2
+        SHPTOT(2, 9,I) =  O0
+
+        SHPTOT(2, 1,I) = ZM1*DVXT(1)-SHPTOT(2,7,I)*O5
+        SHPTOT(2, 2,I) = ZM1*DVXT(2)
+        SHPTOT(2, 3,I) = ZM1*DVXT(3)-SHPTOT(2,8,I)*O5
+        SHPTOT(2, 4,I) = ZM1*DVXT(4)
+        SHPTOT(2, 5,I) = ZM1*DVXT(5)-SHPTOT(2,9,I)*O5
+        SHPTOT(2, 6,I) = ZM1*DVXT(6)
+
+        SHPTOT(2,10,I) = ZP1*DVXT(1)-SHPTOT(2,7,I)*O5
+        SHPTOT(2,11,I) = ZP1*DVXT(2)
+        SHPTOT(2,12,I) = ZP1*DVXT(3)-SHPTOT(2,8,I)*O5
+        SHPTOT(2,13,I) = ZP1*DVXT(4)
+        SHPTOT(2,14,I) = ZP1*DVXT(5)-SHPTOT(2,9,I)*O5
+        SHPTOT(2,15,I) = ZP1*DVXT(6)
+
+C- DERIVEES EN Y DES FONCTIONS DE FORME
+        SHPTOT(3, 7,I) = -ZM2
+        SHPTOT(3, 8,I) = O0
+        SHPTOT(3, 9,I) = ZM2
+
+        SHPTOT(3, 1,I) = ZM1*DVYT(1)-SHPTOT(3,7,I)*O5
+        SHPTOT(3, 2,I) = ZM1*DVYT(2)
+        SHPTOT(3, 3,I) = ZM1*DVYT(3)-SHPTOT(3,8,I)*O5
+        SHPTOT(3, 4,I) = ZM1*DVYT(4)
+        SHPTOT(3, 5,I) = ZM1*DVYT(5)-SHPTOT(3,9,I)*O5
+        SHPTOT(3, 6,I) = ZM1*DVYT(6)
+
+        SHPTOT(3,10,I) = ZP1*DVYT(1)-SHPTOT(3,7,I)*O5
+        SHPTOT(3,11,I) = ZP1*DVYT(2)
+        SHPTOT(3,12,I) = ZP1*DVYT(3)-SHPTOT(3,8,I)*O5
+        SHPTOT(3,13,I) = ZP1*DVYT(4)
+        SHPTOT(3,14,I) = ZP1*DVYT(5)-SHPTOT(3,9,I)*O5
+        SHPTOT(3,15,I) = ZP1*DVYT(6)
+
+C- DERIVEES EN Z DES FONCTIONS DE FORME
+        SHPTOT(4, 7,I) = -O2*Z*XY1
+        SHPTOT(4, 8,I) = -O2*Z*X
+        SHPTOT(4, 9,I) = -O2*Z*Y
+
+        SHPTOT(4, 1,I) = -(VT(1)+SHPTOT(4,7,I))*O5
+        SHPTOT(4, 2,I) = -VT(2)*O5
+        SHPTOT(4, 3,I) = -(VT(3)+SHPTOT(4,8,I))*O5
+        SHPTOT(4, 4,I) = -VT(4)*O5
+        SHPTOT(4, 5,I) = -(VT(5)+SHPTOT(4,9,I))*O5
+        SHPTOT(4, 6,I) = -VT(6)*O5
+
+        SHPTOT(4,10,I) = (VT(1)-SHPTOT(4,7,I))*O5
+        SHPTOT(4,11,I) = VT(2)*O5
+        SHPTOT(4,12,I) = (VT(3)-SHPTOT(4,8,I))*O5
+        SHPTOT(4,13,I) = VT(4)*O5
+        SHPTOT(4,14,I) = (VT(5)-SHPTOT(4,9,I))*O5
+        SHPTOT(4,15,I) = VT(6)*O5
+
+      ENDDO
+
+      IPINTE = MINTE
+
+C      RETURN
+      END
+
+ 

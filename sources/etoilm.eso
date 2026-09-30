@@ -1,0 +1,63 @@
+C ETOILM    SOURCE    GOUNAND   21/03/31    21:15:06     10931          
+      SUBROUTINE ETOILM(NODE,IPT1,
+     $        IPT3)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : ETOILM
+C
+C DESCRIPTION : Etant donné un maillage complexe IPT1 constitue
+C     d'elements de type POI1, SEG2, TRI3 ou QUA4 et un noeud NODE, on
+C     construit IPT3 le maillage obtenu par étoilement de IPT1 avec
+C     NODE. Interface à ETOIL1.
+C     L'étoilement est fait avec les éléments de IPT1 qui ne
+C     contiennent pas NODE.
+C     IPT3 et ses sous-maillages actifs*MOD.
+C
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 27/04/2020, version initiale
+C HISTORIQUE : v1, 27/04/2020, création
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+*     
+* Executable statements
+*
+      SEGACT IPT1
+      NSOUS=IPT1.LISOUS(/1)
+      IF (NSOUS.NE.0) THEN
+         NBNN=0
+         NBELEM=0
+         NBSOUS=0
+         NBREF=0
+         SEGINI IPT3
+      ENDIF
+*
+      DO ISOUS=1,MAX(1,NSOUS)
+         IF (NSOUS.EQ.0) THEN
+            IPT2=IPT1
+         ELSE
+            IPT2=IPT1.LISOUS(ISOUS)
+            SEGACT IPT2
+         ENDIF
+         CALL ETOIL1(NODE,IPT2,IPT4)
+         IF (IERR.NE.0) RETURN
+         IF (NSOUS.EQ.0) THEN
+            IPT3=IPT4
+         ELSE
+            IPT3.LISOUS(ISOUS)=IPT4
+         ENDIF
+      ENDDO
+      RETURN
+*
+* End of subroutine ETOILM
+*
+      END
+
+ 

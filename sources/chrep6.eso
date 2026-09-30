@@ -1,0 +1,42 @@
+C CHREP6    SOURCE    PV090527  23/01/27    21:15:13     11574          
+      subroutine chrep6(x6,vp33,controle,xp6)
+      
+c     changement de base d'un pseudo vecteur de deformation
+c     contenant des gama si controle=vrai
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables externes           
+      real*8 x6(6),vp33(3,3),xp6(6)
+      logical controle
+      
+c     variables locales
+      integer j
+      real*8 x33(3,3),xp33(3,3)
+            
+
+c     chargement et passage des deformations
+
+      if (controle) then   
+c       gama->epsilon             
+        do j=4,6
+           x6(j)=0.5d0*x6(j)
+        end do
+      end if
+      
+      call x6x33(x6,x33)         
+      call chre3(xp33,x33,vp33)
+      call x33x6(xp33,xp6)
+      
+      if(controle) then
+c       epsilon->gama si controle         
+        do j=4,6
+           x6(j)=2.d0*x6(j)
+           xp6(j)=2.d0*xp6(j)
+        end do
+      end if
+      return
+      end
+      
+ 

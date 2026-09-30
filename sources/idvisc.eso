@@ -1,0 +1,2020 @@
+C IDVISC    SOURCE    PV090527  24/02/09    21:15:03     11835          
+      SUBROUTINE IDVISC (MFR,TABOBL,TABFAC,JGOBL,JGFAC,ITA,IPLAC,IRET)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+C=======================================================================
+C=      Noms de composantes de materiaux viscoplastiques               =
+C=                                                                     =
+C=  ENTREES :                                                          =
+C=  ---------                                                          =
+C=     MFR      Numero de formulation                                  =
+C=     TABOBL   Tableau des mots OBLIGATOIRES                          =
+C=     TABFAC   Tableau des mots FACULTATIFS                           =
+C=     JGOBL    Taille utilisee du tableau des mots OBLIGATOIRES       =
+C=     JGFAC    Taille utilisee du tableau des mots FACULTATIFS        =
+C=     IPLAC    Numero du materiau dans MODVIS                         =
+C=                                                                     =
+C=  SORTIE :                                                           =
+C=  --------                                                           =
+C=     IRET     =0 si probleme                                         =
+C=======================================================================
+
+c***sellier ajout de parametres pour FLUENDO ENDO INCLUSION  ***********
+
+      character*1 motinc1,motren1,motdir1
+      character*2 motinc2,motren2
+      character*3 motinc3,motren3
+      character*4 motinc4,motren4     
+c     nombre de renforts et de parametres par renfort      
+c      include './nombre_renforts.h'
+-INC HNBRREN
+c     nombre de parametres pour fluendo3d
+c      include './nombre_fluendo3d.h'
+-INC HNBRF3D  
+c     autres parametres
+      integer NDEBUT,IRENFR,IDIR1,NBRT3D,ICOMP
+c     ajouts de parametres pour le modele incl3d
+      integer IPHASE,NBPARC3D,NBRINC3D,NBPPARP3D,NBRTAIL3D
+c     vecteur du nombre de parametres par sous type de modele pour FLUISO3D
+c     nombre maxi de sous types de modeles a coupler
+      integer NSTYPEI,NSTYPEO
+      parameter (NSTYPEI=9,NSTYPEO=4)
+c     nombre de parametres scalaires par sous type de modele
+      integer VNMATI(NSTYPEI),VNMATO(NSTYPEO)  
+
+c***fin ajout declaration sellier **************************************
+
+-INC PPARAM
+-INC CCOPTIO
+      CHARACTER*8  TABOBL(ITA),TABFAC(ITA)
+      IRET=1
+C ===
+C  1 - Modele viscoplastique de GUIONNET
+C ===
+      IF (IPLAC.EQ.1) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+20
+        TABOBL(JGM0+ 1)='N   '
+        TABOBL(JGM0+ 2)='K   '
+        TABOBL(JGM0+ 3)='CK  '
+        TABOBL(JGM0+ 4)='R0  '
+        TABOBL(JGM0+ 5)='CD  '
+        TABOBL(JGM0+ 6)='M   '
+        TABOBL(JGM0+ 7)='A   '
+        TABOBL(JGM0+ 8)='A1  '
+        TABOBL(JGM0+ 9)='C   '
+        TABOBL(JGM0+10)='C1  '
+        TABOBL(JGM0+11)='G   '
+        TABOBL(JGM0+12)='R   '
+        TABOBL(JGM0+13)='NN  '
+        TABOBL(JGM0+14)='C2  '
+        TABOBL(JGM0+15)='Q   '
+        TABOBL(JGM0+16)='G1  '
+        TABOBL(JGM0+17)='R1  '
+        TABOBL(JGM0+18)='BETA'
+        TABOBL(JGM0+19)='C0  '
+        TABOBL(JGM0+20)='P1M0'
+        RETURN
+C ===
+C  2 - Modele viscoplastique ONERA
+C ===
+      ELSE IF (IPLAC.EQ.2) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+22
+        TABOBL(JGM0+ 1)='ALF '
+        TABOBL(JGM0+ 2)='N   '
+        TABOBL(JGM0+ 3)='KK  '
+        TABOBL(JGM0+ 4)='K0  '
+        TABOBL(JGM0+ 5)='ALFK'
+        TABOBL(JGM0+ 6)='ALFR'
+        TABOBL(JGM0+ 7)='C1  '
+        TABOBL(JGM0+ 8)='A1  '
+        TABOBL(JGM0+ 9)='PHI '
+        TABOBL(JGM0+10)='C2  '
+        TABOBL(JGM0+11)='A2  '
+        TABOBL(JGM0+12)='B   '
+        TABOBL(JGM0+13)='BET1'
+        TABOBL(JGM0+14)='BET2'
+        TABOBL(JGM0+15)='R1  '
+        TABOBL(JGM0+16)='R2  '
+        TABOBL(JGM0+17)='GAMA'
+        TABOBL(JGM0+18)='M   '
+        TABOBL(JGM0+19)='ETA '
+        TABOBL(JGM0+20)='MU  '
+        TABOBL(JGM0+21)='QMAX'
+        TABOBL(JGM0+22)='QSTA'
+*       TABFAC(JGM0+23)='QT  '
+
+        JGM0=JGFAC
+        JGFAC=JGM0+1
+        TABFAC(JGM0+1)='QT  '
+        RETURN
+C ===
+C  3 - Modele d'ecrouissage-VISCOsite multiplicative avec enDOMMAGEment
+C ===
+      ELSE IF (IPLAC.EQ.3) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+8
+        TABOBL(JGM0+1)='N   '
+        TABOBL(JGM0+2)='M   '
+        TABOBL(JGM0+3)='KK  '
+        TABOBL(JGM0+4)='ALP1'
+        TABOBL(JGM0+5)='BLP1'
+        TABOBL(JGM0+6)='R   '
+        TABOBL(JGM0+7)='A   '
+        TABOBL(JGM0+8)='EVOL'
+
+        JGM0=JGFAC
+        JGFAC=JGM0+1
+        TABFAC(JGM0+1)='SMAX'
+        RETURN
+C ===
+C  4 - Modele viscoplastique PARFAIT
+C ===
+      ELSE IF (IPLAC.EQ.4) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+3
+        TABOBL(JGM0+1)='SIGY'
+        TABOBL(JGM0+2)='N   '
+        TABOBL(JGM0+3)='K   '
+        RETURN
+C ===
+C  5 - Modele viscoplastique POUDRE_A
+C ===
+      ELSE IF (IPLAC.EQ.5) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+16
+        TABOBL(JGM0+ 1)='N   '
+        TABOBL(JGM0+ 2)='A   '
+        TABOBL(JGM0+ 3)='QSRT'
+        TABOBL(JGM0+ 4)='F0  '
+        TABOBL(JGM0+ 5)='F1  '
+        TABOBL(JGM0+ 6)='F2  '
+        TABOBL(JGM0+ 7)='F3  '
+        TABOBL(JGM0+ 8)='F4  '
+        TABOBL(JGM0+ 9)='F5  '
+        TABOBL(JGM0+10)='C0  '
+        TABOBL(JGM0+11)='C1  '
+        TABOBL(JGM0+12)='C2  '
+        TABOBL(JGM0+13)='C3  '
+        TABOBL(JGM0+14)='C4  '
+        TABOBL(JGM0+15)='C5  '
+        TABOBL(JGM0+16)='RHOR'
+        RETURN
+C ===
+C  6 - Modele viscoplastique POUDRE_B
+C ===
+      ELSE IF (IPLAC.EQ.6) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+23
+        TABOBL(JGM0+ 1)='N   '
+        TABOBL(JGM0+ 2)='A   '
+        TABOBL(JGM0+ 3)='QSRT'
+        TABOBL(JGM0+ 4)='F0  '
+        TABOBL(JGM0+ 5)='F1  '
+        TABOBL(JGM0+ 6)='F2  '
+        TABOBL(JGM0+ 7)='F3  '
+        TABOBL(JGM0+ 8)='F4  '
+        TABOBL(JGM0+ 9)='F5  '
+        TABOBL(JGM0+10)='C0  '
+        TABOBL(JGM0+11)='C1  '
+        TABOBL(JGM0+12)='C2  '
+        TABOBL(JGM0+13)='C3  '
+        TABOBL(JGM0+14)='C4  '
+        TABOBL(JGM0+15)='C5  '
+        TABOBL(JGM0+16)='G0  '
+        TABOBL(JGM0+17)='G1  '
+        TABOBL(JGM0+18)='G2  '
+        TABOBL(JGM0+19)='G3  '
+        TABOBL(JGM0+20)='G4  '
+        TABOBL(JGM0+21)='G5  '
+        TABOBL(JGM0+22)='G6  '
+        TABOBL(JGM0+23)='RHOR'
+        RETURN
+C ===
+C  7 -  Modele viscoplastique de OHNO
+C ===
+      ELSE IF (IPLAC.EQ.7) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+24
+        TABOBL(JGM0+ 1)='ALF '
+        TABOBL(JGM0+ 2)='N   '
+        TABOBL(JGM0+ 3)='KK  '
+        TABOBL(JGM0+ 4)='K0  '
+        TABOBL(JGM0+ 5)='ALFK'
+        TABOBL(JGM0+ 6)='ALFR'
+        TABOBL(JGM0+ 7)='C1  '
+        TABOBL(JGM0+ 8)='A1  '
+        TABOBL(JGM0+ 9)='PHI '
+        TABOBL(JGM0+10)='C2  '
+        TABOBL(JGM0+11)='A2  '
+        TABOBL(JGM0+12)='B   '
+        TABOBL(JGM0+13)='BET1'
+        TABOBL(JGM0+14)='BET2'
+        TABOBL(JGM0+15)='R1  '
+        TABOBL(JGM0+16)='R2  '
+        TABOBL(JGM0+17)='GAMA'
+        TABOBL(JGM0+18)='M   '
+        TABOBL(JGM0+19)='ETA '
+        TABOBL(JGM0+20)='MU  '
+        TABOBL(JGM0+21)='QMAX'
+        TABOBL(JGM0+22)='QSTA'
+        TABOBL(JGM0+23)='EXP1'
+        TABOBL(JGM0+24)='EXP2'
+        RETURN
+C ===
+C  8 - Modele viscoplastique DDI
+C ===
+      ELSE IF (IPLAC.EQ.8) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+18
+        TABOBL(JGM0+ 1)='RP0 '
+        TABOBL(JGM0+ 2)='QP  '
+        TABOBL(JGM0+ 3)='BP  '
+        TABOBL(JGM0+ 4)='CP1 '
+        TABOBL(JGM0+ 5)='CP2 '
+        TABOBL(JGM0+ 6)='DP1 '
+        TABOBL(JGM0+ 7)='DP2 '
+        TABOBL(JGM0+ 8)='KS  '
+        TABOBL(JGM0+ 9)='N   '
+        TABOBL(JGM0+10)='RV0 '
+        TABOBL(JGM0+11)='QV  '
+        TABOBL(JGM0+12)='BV  '
+        TABOBL(JGM0+13)='CV1 '
+        TABOBL(JGM0+14)='CV2 '
+        TABOBL(JGM0+15)='DV1 '
+        TABOBL(JGM0+16)='DV2 '
+        TABOBL(JGM0+17)='CVP1'
+        TABOBL(JGM0+18)='CVP2'
+
+        JGM0=JGFAC
+        JGFAC=JGM0+10
+        TABFAC(JGM0+ 1)='ALP7'
+        TABFAC(JGM0+ 2)='BETA'
+        TABFAC(JGM0+ 3)='M   '
+        TABFAC(JGM0+ 4)='SU  '
+        TABFAC(JGM0+ 5)='SL  '
+        TABFAC(JGM0+ 6)='B   '
+        TABFAC(JGM0+ 7)='C   '
+        TABFAC(JGM0+ 8)='A   '
+        TABFAC(JGM0+ 9)='R   '
+        TABFAC(JGM0+10)='KK  '
+        RETURN
+C ===
+C  9 - Modele viscoplastique de KOCK
+C ===
+      ELSE IF (IPLAC.EQ.9) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+10
+        TABOBL(JGM0+ 1)='A   '
+        TABOBL(JGM0+ 2)='B   '
+        TABOBL(JGM0+ 3)='M   '
+        TABOBL(JGM0+ 4)='Q   '
+        TABOBL(JGM0+ 5)='R   '
+        TABOBL(JGM0+ 6)='H0  '
+        TABOBL(JGM0+ 7)='AP  '
+        TABOBL(JGM0+ 8)='SB  '
+        TABOBL(JGM0+ 9)='N   '
+        TABOBL(JGM0+10)='S0  '
+        RETURN
+C ====
+C  10 - Modele viscoplastique NOUAILHAS_A
+C ====
+      ELSE IF (IPLAC.EQ.10) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+22
+        TABOBL(JGM0+ 1)='ALF '
+        TABOBL(JGM0+ 2)='N   '
+        TABOBL(JGM0+ 3)='KK  '
+        TABOBL(JGM0+ 4)='K0  '
+        TABOBL(JGM0+ 5)='ALFK'
+        TABOBL(JGM0+ 6)='ALFR'
+        TABOBL(JGM0+ 7)='CL1 '
+        TABOBL(JGM0+ 8)='DNL1'
+        TABOBL(JGM0+ 9)='PHI '
+        TABOBL(JGM0+10)='CL2 '
+        TABOBL(JGM0+11)='DNL2'
+        TABOBL(JGM0+12)='B   '
+        TABOBL(JGM0+13)='GDM1'
+        TABOBL(JGM0+14)='GDM2'
+        TABOBL(JGM0+15)='PTM1'
+        TABOBL(JGM0+16)='PTM2'
+        TABOBL(JGM0+17)='GAMA'
+        TABOBL(JGM0+18)='M   '
+        TABOBL(JGM0+19)='ETA '
+        TABOBL(JGM0+20)='MU  '
+        TABOBL(JGM0+21)='QMAX'
+        TABOBL(JGM0+22)='QSTA'
+        RETURN
+C ====
+C  11 - Modele viscoplastique NOUAILHAS_B
+C ====
+      ELSE IF (IPLAC.EQ.11) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+14
+        TABOBL(JGM0+ 1)='ALF '
+        TABOBL(JGM0+ 2)='N   '
+        TABOBL(JGM0+ 3)='KK  '
+        TABOBL(JGM0+ 4)='K0  '
+        TABOBL(JGM0+ 5)='CL1 '
+        TABOBL(JGM0+ 6)='DNL1'
+        TABOBL(JGM0+ 7)='PHI '
+        TABOBL(JGM0+ 8)='CL2 '
+        TABOBL(JGM0+ 9)='DNL2'
+        TABOBL(JGM0+10)='B   '
+        TABOBL(JGM0+11)='GDM1'
+        TABOBL(JGM0+12)='PTM1'
+        TABOBL(JGM0+13)='RMAX'
+        TABOBL(JGM0+14)='BR  '
+        RETURN
+C ====
+C  12 - Modele viscoplastique VISK2
+C ====
+      ELSE IF (IPLAC.EQ.12) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+5
+        TABOBL(JGM0+1)='SIGY'
+        TABOBL(JGM0+2)='H   '
+        TABOBL(JGM0+3)='ETA '
+        TABOBL(JGM0+4)='HVIS'
+        TABOBL(JGM0+5)='N   '
+        RETURN
+C ====
+C  13 - Modele VISCOHINTE
+C ====
+      ELSE IF (IPLAC.EQ.13) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+7
+        TABOBL(JGM0+1)='GAM1'
+        TABOBL(JGM0+2)='AL  '
+        TABOBL(JGM0+3)='KK  '
+        TABOBL(JGM0+4)='NN  '
+        TABOBL(JGM0+5)='YO  '
+        TABOBL(JGM0+6)='YC  '
+        TABOBL(JGM0+7)='MM  '
+        RETURN
+C ====
+C  14 - Modele viscoplastique MISTRAL
+C ====
+      ELSE IF (IPLAC.EQ.14) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+13
+        TABOBL(JGM0+ 1)='SIP1'
+        TABOBL(JGM0+ 2)='SIP2'
+        TABOBL(JGM0+ 3)='IBAS'
+        TABOBL(JGM0+ 4)='DILT'
+        TABOBL(JGM0+ 5)='NBRE'
+        TABOBL(JGM0+ 6)='COHI'
+        TABOBL(JGM0+ 7)='ACOU'
+        TABOBL(JGM0+ 8)='EDIR'
+        TABOBL(JGM0+ 9)='RVCE'
+        TABOBL(JGM0+10)='ECRX'
+        TABOBL(JGM0+11)='DVDI'
+        TABOBL(JGM0+12)='CROI'
+        TABOBL(JGM0+13)='INCR'
+        RETURN
+C ====
+C  15 - Modele viscoplastique BETON_URGC
+C ====
+      ELSE IF (IPLAC.EQ.15) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+10
+        TABOBL(JGM0+ 1)='ALFA'
+        TABOBL(JGM0+ 2)='BETA'
+        TABOBL(JGM0+ 3)='LCS '
+        TABOBL(JGM0+ 4)='GFC'
+        TABOBL(JGM0+ 5)='GFT'
+        TABOBL(JGM0+ 6)='ITON'
+        TABOBL(JGM0+ 7)='IMOD'
+        TABOBL(JGM0+ 8)='ICT '
+        TABOBL(JGM0+ 9)='ICC'
+        TABOBL(JGM0+10)='ETA'
+        RETURN
+C ====
+C  16 - Modele LEMENDO (fluage de type LEMaitre avec ENDOmmagement)
+C ====
+      ELSE IF (IPLAC.EQ.16) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+9
+        TABOBL(JGM0+1)='SIGY'
+        TABOBL(JGM0+2)='N   '
+        TABOBL(JGM0+3)='M   '
+        TABOBL(JGM0+4)='KK  '
+        TABOBL(JGM0+5)='ALP1'
+        TABOBL(JGM0+6)='BLP1'
+        TABOBL(JGM0+7)='R   '
+        TABOBL(JGM0+8)='A   '
+        TABOBL(JGM0+9)='EXK '
+        RETURN
+C ====
+C  17 - Modele FLUNOR2 (fluage de type Norton)
+C ====
+      ELSE IF (IPLAC.EQ.17) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+6
+        TABOBL(JGM0+1)='SIGY'
+        TABOBL(JGM0+2)='AF1 '
+        TABOBL(JGM0+3)='AF2 '
+        TABOBL(JGM0+4)='AF3 '
+        TABOBL(JGM0+5)='SFFS'
+        TABOBL(JGM0+6)='EFFS'
+        RETURN
+C ====
+C  18 - Modele GATT_MONERIE
+C ====
+      ELSE IF (IPLAC.EQ.18) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+32
+        TABOBL(JGM0+ 1)='R   '
+        TABOBL(JGM0+ 2)='DG  '
+        TABOBL(JGM0+ 3)='K1  '
+        TABOBL(JGM0+ 4)='M1  '
+        TABOBL(JGM0+ 5)='Q1  '
+        TABOBL(JGM0+ 6)='N1  '
+        TABOBL(JGM0+ 7)='K2  '
+        TABOBL(JGM0+ 8)='M2  '
+        TABOBL(JGM0+ 9)='Q2  '
+        TABOBL(JGM0+10)='N2  '
+        TABOBL(JGM0+11)='OMEG'
+        TABOBL(JGM0+12)='Q   '
+        TABOBL(JGM0+13)='H   '
+        TABOBL(JGM0+14)='BETA'
+        TABOBL(JGM0+15)='K   '
+        TABOBL(JGM0+16)='A   '
+        TABOBL(JGM0+17)='Q3  '
+        TABOBL(JGM0+18)='N3  '
+        TABOBL(JGM0+19)='ADEN'
+        TABOBL(JGM0+20)='KGON'
+        TABOBL(JGM0+21)='POR0'
+        TABOBL(JGM0+22)='BUMI'
+        TABOBL(JGM0+23)='EFIS'
+        TABOBL(JGM0+24)='DG0 '
+        TABOBL(JGM0+25)='CR1 '
+        TABOBL(JGM0+26)='CR2 '
+        TABOBL(JGM0+27)='CR3 '
+        TABOBL(JGM0+28)='CR  '
+        TABOBL(JGM0+29)='KP  '
+        TABOBL(JGM0+30)='AP  '
+        TABOBL(JGM0+31)='BP  '
+        TABOBL(JGM0+32)='QP  '
+
+        JGM0=JGFAC
+        JGFAC=JGM0+6
+        TABFAC(JGM0+ 1)='TYPE'
+        TABFAC(JGM0+ 2)='COMP'
+        TABFAC(JGM0+ 3)='DYN '
+        TABFAC(JGM0+ 4)='DYN1'
+        TABFAC(JGM0+ 5)='DYN2'
+        TABFAC(JGM0+ 6)='DYN3'
+        RETURN
+C ====
+C  19 -  Modele UO2 = OTTOSEN + GATT_MONERIE
+C ====
+      ELSE IF (IPLAC.EQ.19) THEN
+C= 19.1 - Modes de calcul PLAN DEFO, PLAN GENE, Axisymetrie, Fourier
+        IF (IFOUR.EQ.-3.OR.IFOUR.EQ.-1.OR.
+     .      IFOUR.EQ.0.OR.IFOUR.EQ.1) THEN
+          JGM0=JGOBL
+          JGOBL=JGM0+39
+          TABOBL(JGM0+ 1)='R   '
+          TABOBL(JGM0+ 2)='DG  '
+          TABOBL(JGM0+ 3)='K1  '
+          TABOBL(JGM0+ 4)='M1  '
+          TABOBL(JGM0+ 5)='Q1  '
+          TABOBL(JGM0+ 6)='N1  '
+          TABOBL(JGM0+ 7)='K2  '
+          TABOBL(JGM0+ 8)='M2  '
+          TABOBL(JGM0+ 9)='Q2  '
+          TABOBL(JGM0+10)='N2  '
+          TABOBL(JGM0+11)='OMEG'
+          TABOBL(JGM0+12)='Q   '
+          TABOBL(JGM0+13)='H   '
+          TABOBL(JGM0+14)='BETA'
+          TABOBL(JGM0+15)='K   '
+          TABOBL(JGM0+16)='A   '
+          TABOBL(JGM0+17)='Q3  '
+          TABOBL(JGM0+18)='N3  '
+          TABOBL(JGM0+19)='ADEN'
+          TABOBL(JGM0+20)='KGON'
+          TABOBL(JGM0+21)='POR0'
+          TABOBL(JGM0+22)='BUMI'
+          TABOBL(JGM0+23)='EFIS'
+          TABOBL(JGM0+24)='DG0 '
+          TABOBL(JGM0+25)='CR1 '
+          TABOBL(JGM0+26)='CR2 '
+          TABOBL(JGM0+27)='CR3 '
+          TABOBL(JGM0+28)='CR  '
+          TABOBL(JGM0+29)='KP  '
+          TABOBL(JGM0+30)='AP  '
+          TABOBL(JGM0+31)='BP  '
+          TABOBL(JGM0+32)='QP  '
+          IF (IFOUR.EQ.-3.OR.IFOUR.EQ.-1) THEN
+            TABOBL(JGM0+33)='LXX '
+            TABOBL(JGM0+34)='LYY '
+            TABOBL(JGM0+35)='LXY '
+            TABOBL(JGM0+36)='LZZ '
+            TABOBL(JGM0+37)='PXX '
+            TABOBL(JGM0+38)='PYY '
+            TABOBL(JGM0+39)='PXY '
+C*        ELSE IF (IFOUR.EQ.0.OR.IFOUR.EQ.1) THEN
+          ELSE
+            TABOBL(JGM0+33)='LRR '
+            TABOBL(JGM0+34)='LZZ '
+            TABOBL(JGM0+35)='LRZ '
+            TABOBL(JGM0+36)='LOO '
+            TABOBL(JGM0+37)='PRR '
+            TABOBL(JGM0+38)='PZZ '
+            TABOBL(JGM0+39)='PRZ '
+          ENDIF
+          JGM0=JGFAC
+          JGFAC=JGM0+28
+          TABFAC(JGM0+ 1)='GFTR'
+          TABFAC(JGM0+ 2)='LTR '
+          TABFAC(JGM0+ 3)='GS  '
+          TABFAC(JGM0+ 4)='BTR '
+          TABFAC(JGM0+ 5)='WRUP'
+          TABFAC(JGM0+ 6)='BILI'
+          TABFAC(JGM0+ 7)='EPSR'
+          TABFAC(JGM0+ 8)='GFT1'
+          TABFAC(JGM0+ 9)='GFT2'
+          TABFAC(JGM0+10)='GFT3'
+          TABFAC(JGM0+11)='GS1 '
+          TABFAC(JGM0+12)='GS2 '
+          TABFAC(JGM0+13)='GS3 '
+          TABFAC(JGM0+14)='LTR1'
+          TABFAC(JGM0+15)='LTR2'
+          TABFAC(JGM0+16)='LTR3'
+          TABFAC(JGM0+17)='WRU1'
+          TABFAC(JGM0+18)='WRU2'
+          TABFAC(JGM0+19)='BIL1'
+          TABFAC(JGM0+20)='BIL2'
+          TABFAC(JGM0+21)='EPSB'
+          TABFAC(JGM0+22)='SIMP'
+          TABFAC(JGM0+23)='TYPE'
+          TABFAC(JGM0+24)='COMP'
+          TABFAC(JGM0+25)='DYN '
+          TABFAC(JGM0+26)='DYN1'
+          TABFAC(JGM0+27)='DYN2'
+          TABFAC(JGM0+28)='DYN3'
+          RETURN
+C= 19.2 - Modes de calcul PLAN CONT et TRIDimensionnel COQUEs minces
+        ELSE IF ((IFOUR.EQ.2.AND.(MFR.EQ.3.OR.MFR.EQ.9)).OR.
+     .           IFOUR.EQ.-2) THEN
+          JGM0=JGOBL
+          JGOBL=JGM0+39
+          TABOBL(JGM0+ 1)='R   '
+          TABOBL(JGM0+ 2)='DG  '
+          TABOBL(JGM0+ 3)='K1  '
+          TABOBL(JGM0+ 4)='M1  '
+          TABOBL(JGM0+ 5)='Q1  '
+          TABOBL(JGM0+ 6)='N1  '
+          TABOBL(JGM0+ 7)='K2  '
+          TABOBL(JGM0+ 8)='M2  '
+          TABOBL(JGM0+ 9)='Q2  '
+          TABOBL(JGM0+10)='N2  '
+          TABOBL(JGM0+11)='OMEG'
+          TABOBL(JGM0+12)='Q   '
+          TABOBL(JGM0+13)='H   '
+          TABOBL(JGM0+14)='BETA'
+          TABOBL(JGM0+15)='K   '
+          TABOBL(JGM0+16)='A   '
+          TABOBL(JGM0+17)='Q3  '
+          TABOBL(JGM0+18)='N3  '
+          TABOBL(JGM0+19)='ADEN'
+          TABOBL(JGM0+20)='KGON'
+          TABOBL(JGM0+21)='POR0'
+          TABOBL(JGM0+22)='BUMI'
+          TABOBL(JGM0+23)='EFIS'
+          TABOBL(JGM0+24)='DG0 '
+          TABOBL(JGM0+25)='CR1 '
+          TABOBL(JGM0+26)='CR2 '
+          TABOBL(JGM0+27)='CR3 '
+          TABOBL(JGM0+28)='CR  '
+          TABOBL(JGM0+29)='KP  '
+          TABOBL(JGM0+30)='AP  '
+          TABOBL(JGM0+31)='BP  '
+          TABOBL(JGM0+32)='QP  '
+          IF (IFOUR.EQ.-2) THEN
+            TABOBL(JGM0+33)='LXX '
+            TABOBL(JGM0+34)='LYY '
+            TABOBL(JGM0+35)='LXY '
+            TABOBL(JGM0+36)='LZZ '
+            TABOBL(JGM0+37)='PXX '
+            TABOBL(JGM0+38)='PYY '
+            TABOBL(JGM0+39)='PXY '
+C*        ELSE IF (IFOUR.EQ.2.AND.(MFR.EQ.3.OR.MFR.EQ.9)) THEN
+          ELSE
+            TABOBL(JGM0+33)='LSS '
+            TABOBL(JGM0+34)='LTT '
+            TABOBL(JGM0+35)='LST '
+            TABOBL(JGM0+36)='LNN '
+            TABOBL(JGM0+37)='PSS '
+            TABOBL(JGM0+38)='PTT '
+            TABOBL(JGM0+39)='PST '
+          ENDIF
+
+          JGM0=JGFAC
+          JGFAC=JGM0+23
+          TABFAC(JGM0+ 1)='GFTR'
+          TABFAC(JGM0+ 2)='LTR '
+          TABFAC(JGM0+ 3)='GS  '
+          TABFAC(JGM0+ 4)='BTR '
+          TABFAC(JGM0+ 5)='WRUP'
+          TABFAC(JGM0+ 6)='BILI'
+          TABFAC(JGM0+ 7)='GFT1'
+          TABFAC(JGM0+ 8)='GFT2'
+          TABFAC(JGM0+ 9)='GS1 '
+          TABFAC(JGM0+10)='GS2 '
+          TABFAC(JGM0+11)='LTR1'
+          TABFAC(JGM0+12)='LTR2'
+          TABFAC(JGM0+13)='WRU1'
+          TABFAC(JGM0+14)='WRU2'
+          TABFAC(JGM0+15)='BIL1'
+          TABFAC(JGM0+16)='BIL2'
+          TABFAC(JGM0+17)='SIMP'
+          TABFAC(JGM0+18)='TYPE'
+          TABFAC(JGM0+19)='COMP'
+          TABFAC(JGM0+20)='DYN '
+          TABFAC(JGM0+21)='DYN1'
+          TABFAC(JGM0+22)='DYN2'
+          TABFAC(JGM0+23)='DYN3'
+          RETURN
+C= 19.3 - Formulation TRIDIMENSIONNELLE MASSIVE
+        ELSE IF (IFOUR.EQ.2.AND.MFR.EQ.1) THEN
+          JGM0=JGOBL
+          JGOBL=JGM0+44
+          TABOBL(JGM0+ 1)='R   '
+          TABOBL(JGM0+ 2)='DG  '
+          TABOBL(JGM0+ 3)='K1  '
+          TABOBL(JGM0+ 4)='M1  '
+          TABOBL(JGM0+ 5)='Q1  '
+          TABOBL(JGM0+ 6)='N1  '
+          TABOBL(JGM0+ 7)='K2  '
+          TABOBL(JGM0+ 8)='M2  '
+          TABOBL(JGM0+ 9)='Q2  '
+          TABOBL(JGM0+10)='N2  '
+          TABOBL(JGM0+11)='OMEG'
+          TABOBL(JGM0+12)='Q   '
+          TABOBL(JGM0+13)='H   '
+          TABOBL(JGM0+14)='BETA'
+          TABOBL(JGM0+15)='K   '
+          TABOBL(JGM0+16)='A   '
+          TABOBL(JGM0+17)='Q3  '
+          TABOBL(JGM0+18)='N3  '
+          TABOBL(JGM0+19)='ADEN'
+          TABOBL(JGM0+20)='KGON'
+          TABOBL(JGM0+21)='POR0'
+          TABOBL(JGM0+22)='BUMI'
+          TABOBL(JGM0+23)='EFIS'
+          TABOBL(JGM0+24)='DG0 '
+          TABOBL(JGM0+25)='CR1 '
+          TABOBL(JGM0+26)='CR2 '
+          TABOBL(JGM0+27)='CR3 '
+          TABOBL(JGM0+28)='CR  '
+          TABOBL(JGM0+29)='KP  '
+          TABOBL(JGM0+30)='AP  '
+          TABOBL(JGM0+31)='BP  '
+          TABOBL(JGM0+32)='QP  '
+          TABOBL(JGM0+33)='LXX '
+          TABOBL(JGM0+34)='LYY '
+          TABOBL(JGM0+35)='LZZ '
+          TABOBL(JGM0+36)='LXY '
+          TABOBL(JGM0+37)='LXZ '
+          TABOBL(JGM0+38)='LYZ '
+          TABOBL(JGM0+39)='PXX '
+          TABOBL(JGM0+40)='PYY '
+          TABOBL(JGM0+41)='PZZ '
+          TABOBL(JGM0+42)='PXY '
+          TABOBL(JGM0+43)='PXZ '
+          TABOBL(JGM0+44)='PYZ '
+
+          JGM0=JGFAC
+          JGFAC=JGM0+28
+          TABFAC(JGM0+ 1)='GFTR'
+          TABFAC(JGM0+ 2)='LTR '
+          TABFAC(JGM0+ 3)='GS  '
+          TABFAC(JGM0+ 4)='BTR '
+          TABFAC(JGM0+ 5)='WRUP'
+          TABFAC(JGM0+ 6)='BILI'
+          TABFAC(JGM0+ 7)='GFT1'
+          TABFAC(JGM0+ 8)='GFT2'
+          TABFAC(JGM0+ 9)='GFT3'
+          TABFAC(JGM0+10)='GS1 '
+          TABFAC(JGM0+11)='GS2 '
+          TABFAC(JGM0+12)='GS3 '
+          TABFAC(JGM0+13)='LTR1'
+          TABFAC(JGM0+14)='LTR2'
+          TABFAC(JGM0+15)='LTR3'
+          TABFAC(JGM0+16)='WRU1'
+          TABFAC(JGM0+17)='WRU2'
+          TABFAC(JGM0+18)='WRU3'
+          TABFAC(JGM0+19)='BIL1'
+          TABFAC(JGM0+20)='BIL2'
+          TABFAC(JGM0+21)='BIL3'
+          TABFAC(JGM0+22)='SIMP'
+          TABFAC(JGM0+23)='TYPE'
+          TABFAC(JGM0+24)='COMP'
+          TABFAC(JGM0+25)='DYN '
+          TABFAC(JGM0+26)='DYN1'
+          TABFAC(JGM0+27)='DYN2'
+          TABFAC(JGM0+28)='DYN3'
+          RETURN
+
+C= 19.4 - Formulation UNIDIMENSIONNELLE (1D) MASSIVE
+        ELSE IF ((IFOUR.GE.3.AND.IFOUR.LE.15).AND.MFR.EQ.1) THEN
+          JGM0=JGOBL
+          JGOBL=JGM0+37
+          TABOBL(JGM0+ 1)='R   '
+          TABOBL(JGM0+ 2)='DG  '
+          TABOBL(JGM0+ 3)='K1  '
+          TABOBL(JGM0+ 4)='M1  '
+          TABOBL(JGM0+ 5)='Q1  '
+          TABOBL(JGM0+ 6)='N1  '
+          TABOBL(JGM0+ 7)='K2  '
+          TABOBL(JGM0+ 8)='M2  '
+          TABOBL(JGM0+ 9)='Q2  '
+          TABOBL(JGM0+10)='N2  '
+          TABOBL(JGM0+11)='OMEG'
+          TABOBL(JGM0+12)='Q   '
+          TABOBL(JGM0+13)='H   '
+          TABOBL(JGM0+14)='BETA'
+          TABOBL(JGM0+15)='K   '
+          TABOBL(JGM0+16)='A   '
+          TABOBL(JGM0+17)='Q3  '
+          TABOBL(JGM0+18)='N3  '
+          TABOBL(JGM0+19)='ADEN'
+          TABOBL(JGM0+20)='KGON'
+          TABOBL(JGM0+21)='POR0'
+          TABOBL(JGM0+22)='BUMI'
+          TABOBL(JGM0+23)='EFIS'
+          TABOBL(JGM0+24)='DG0 '
+          TABOBL(JGM0+25)='CR1 '
+          TABOBL(JGM0+26)='CR2 '
+          TABOBL(JGM0+27)='CR3 '
+          TABOBL(JGM0+28)='CR  '
+          TABOBL(JGM0+29)='KP  '
+          TABOBL(JGM0+30)='AP  '
+          TABOBL(JGM0+31)='BP  '
+          TABOBL(JGM0+32)='QP  '
+C*OF A finir en fonction des definitions de ces grandeurs
+C*OF et en fonction de IFOUR
+          IF (IFOUR.LE.11) THEN
+            TABOBL(JGM0+33)='LXX '
+            TABOBL(JGM0+34)='LYY '
+            TABOBL(JGM0+35)='LZZ '
+            TABOBL(JGM0+36)='PXX '
+            TABOBL(JGM0+37)='PYY '
+          ELSE
+            TABOBL(JGM0+33)='LRR '
+            TABOBL(JGM0+34)='LZZ '
+            TABOBL(JGM0+35)='LOO '
+            TABOBL(JGM0+36)='PRR '
+            TABOBL(JGM0+37)='PZZ '
+          ENDIF
+          JGM0=JGFAC
+          JGFAC=JGM0+28
+C* A finir en fonction de la def. des parametres !
+          TABFAC(JGM0+ 1)='GFTR'
+          TABFAC(JGM0+ 2)='LTR '
+          TABFAC(JGM0+ 3)='GS  '
+          TABFAC(JGM0+ 4)='BTR '
+          TABFAC(JGM0+ 5)='WRUP'
+          TABFAC(JGM0+ 6)='BILI'
+          TABFAC(JGM0+ 7)='GFT1'
+          TABFAC(JGM0+ 8)='GFT2'
+          TABFAC(JGM0+ 9)='GFT3'
+          TABFAC(JGM0+10)='GS1 '
+          TABFAC(JGM0+11)='GS2 '
+          TABFAC(JGM0+12)='GS3 '
+          TABFAC(JGM0+13)='LTR1'
+          TABFAC(JGM0+14)='LTR2'
+          TABFAC(JGM0+15)='LTR3'
+          TABFAC(JGM0+16)='WRU1'
+          TABFAC(JGM0+17)='WRU2'
+          TABFAC(JGM0+18)='WRU3'
+          TABFAC(JGM0+19)='BIL1'
+          TABFAC(JGM0+20)='BIL2'
+          TABFAC(JGM0+21)='BIL3'
+          TABFAC(JGM0+22)='SIMP'
+          TABFAC(JGM0+23)='TYPE'
+          TABFAC(JGM0+24)='COMP'
+          TABFAC(JGM0+25)='DYN '
+          TABFAC(JGM0+26)='DYN1'
+          TABFAC(JGM0+27)='DYN2'
+          TABFAC(JGM0+28)='DYN3'
+          RETURN
+        ENDIF
+C ====
+C  20 - Modele viscoplastique BETON_URGC_ENDO
+C ====
+      ELSE IF (IPLAC.EQ.20) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+12
+        TABOBL(JGM0+ 1)='ALFA'
+        TABOBL(JGM0+ 2)='BETA'
+        TABOBL(JGM0+ 3)='LCS '
+        TABOBL(JGM0+ 4)='GFC '
+        TABOBL(JGM0+ 5)='GFT '
+        TABOBL(JGM0+ 6)='ITON'
+        TABOBL(JGM0+ 7)='IMOD'
+        TABOBL(JGM0+ 8)='DC  '
+        TABOBL(JGM0+ 9)='DT  '
+        TABOBL(JGM0+10)='IASO'
+        TABOBL(JGM0+11)='ICOU'
+        TABOBL(JGM0+12)='ETA '
+        RETURN
+C ====
+C  21 - Modele viscoplastique double endommagement
+C ====
+      ELSE IF (IPLAC.EQ.21) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+11
+         TABOBL(JGM0+1)='SIGY'
+         TABOBL(JGM0+2)='B'
+         TABOBL(JGM0+3)='RI'
+         TABOBL(JGM0+4)='K'
+         TABOBL(JGM0+5)='N'
+         TABOBL(JGM0+6)='SD'
+         TABOBL(JGM0+7)='RD'
+         TABOBL(JGM0+8)='PD'
+         TABOBL(JGM0+9)='SC'
+         TABOBL(JGM0+10)='RC'
+         TABOBL(JGM0+11)='PC'
+         RETURN
+C ====
+C  22 - Modele viscoplastique CHAB_SINH_R
+C ====
+      ELSE IF (IPLAC.EQ.22) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+6
+         TABOBL(JGM0+1)='SIGY'
+         TABOBL(JGM0+2)='B'
+         TABOBL(JGM0+3)='RI'
+         TABOBL(JGM0+4)='K'
+         TABOBL(JGM0+5)='N'
+         TABOBL(JGM0+6)='epso'
+         RETURN
+C ====
+C  23 - Modele viscoplastique CHAB_SINH_X
+C ====
+      ELSE IF (IPLAC.EQ.23) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+9
+         TABOBL(JGM0+1)='SIGY'
+         TABOBL(JGM0+2)='B'
+         TABOBL(JGM0+3)='RI'
+         TABOBL(JGM0+4)='K'
+         TABOBL(JGM0+5)='N'
+           TABOBL(JGM0+6)='epso'
+           TABOBL(JGM0+7)='C1'
+           TABOBL(JGM0+8)='gam1'
+           TABOBL(JGM0+9)='C2'
+         RETURN
+C ====
+C  24 - Modele viscoplastique CHAB_NOR_R
+C ====
+      ELSE IF (IPLAC.EQ.24) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+5
+         TABOBL(JGM0+1)='SIGY'
+         TABOBL(JGM0+2)='B'
+         TABOBL(JGM0+3)='RI'
+         TABOBL(JGM0+4)='K'
+         TABOBL(JGM0+5)='N'
+         RETURN
+C ====
+C  25 - Modele viscoplastique CHAB_NOR_X
+C ====
+      ELSE IF (IPLAC.EQ.25) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+8
+         TABOBL(JGM0+1)='SIGY'
+         TABOBL(JGM0+2)='B'
+         TABOBL(JGM0+3)='RI'
+         TABOBL(JGM0+4)='K'
+         TABOBL(JGM0+5)='N'
+         TABOBL(JGM0+6)='C1'
+         TABOBL(JGM0+7)='gam1'
+         TABOBL(JGM0+8)='C2'
+         RETURN
+C ===
+C  26 - Modele d'ecrouissage-VISCOsite multiplicative avec enDOMMAGEment anisotrope
+C ===
+      ELSE IF (IPLAC.EQ.26) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+8
+        TABOBL(JGM0+1)='N   '
+        TABOBL(JGM0+2)='M   '
+        TABOBL(JGM0+3)='KK  '
+        TABOBL(JGM0+4)='ALF2'
+        TABOBL(JGM0+5)='BET2'
+        TABOBL(JGM0+6)='R   '
+        TABOBL(JGM0+7)='A   '
+        TABOBL(JGM0+8)='Q   '
+
+        JGM0=JGFAC
+        JGFAC=JGM0+1
+        TABFAC(JGM0+1)='SMAX'
+        RETURN
+C ===
+C  27 - Modele FLUTRA
+C ===
+      ELSE IF (IPLAC.EQ.27) THEN
+        JGM0=JGOBL
+        JGOBL=JGM0+24
+         TABOBL(JGM0+1)= 'KTR0'
+         TABOBL(JGM0+2)= 'ATRA'
+         TABOBL(JGM0+3)= 'BTRA'
+         TABOBL(JGM0+4)= 'ACOM'
+         TABOBL(JGM0+5)= 'BCOM'
+         TABOBL(JGM0+6)= 'EKV1'
+         TABOBL(JGM0+7)= 'TKV1'
+         TABOBL(JGM0+8)= 'EKV2'
+         TABOBL(JGM0+9)= 'TKV2'
+         TABOBL(JGM0+10)= 'EKV3'
+         TABOBL(JGM0+11)= 'TKV3'
+         TABOBL(JGM0+12)= 'EKV4'
+         TABOBL(JGM0+13)= 'TKV4'
+         TABOBL(JGM0+14)= 'EKV5'
+         TABOBL(JGM0+15)= 'TKV5'
+         TABOBL(JGM0+16)= 'EKV6'
+         TABOBL(JGM0+17)= 'TKV6'
+         TABOBL(JGM0+18)= 'BETA'
+         TABOBL(JGM0+19)= 'ETA1'
+         TABOBL(JGM0+20)= 'NUPO'
+         TABOBL(JGM0+21)= 'XFDE'
+         TABOBL(JGM0+22)= 'SLMA'
+         TABOBL(JGM0+23)= 'VGEA'
+         TABOBL(JGM0+24)= 'VGEB'
+        RETURN
+C ===
+C  28 - Modele SYMONDS & COWPER SYCO1
+C ===
+      ELSE IF (IPLAC.EQ.28) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+2
+         TABOBL(JGM0+1)='PSYC'
+         TABOBL(JGM0+2)='DSYC'
+      RETURN
+C ===
+C  29 - Modele SYMONDS & COWPER SYCO2
+C ===
+      ELSE IF (IPLAC.EQ.29) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+4
+         TABOBL(JGM0+1)='PSYC'
+         TABOBL(JGM0+2)='ASYC'
+         TABOBL(JGM0+3)='BSYC'
+         TABOBL(JGM0+4)='CSYC'
+      RETURN
+C ===
+C  30 - Modele CHABOCHE  
+C ===
+      ELSE IF (IPLAC.EQ.30) THEN
+         JGM0=JGOBL
+         JGOBL=JGM0+7
+         TABOBL(JGM0+1)='SIGY'
+         TABOBL(JGM0+2)='K   '
+         TABOBL(JGM0+3)='N   '
+         TABOBL(JGM0+4)='A   '
+         TABOBL(JGM0+5)='C   '
+         TABOBL(JGM0+6)='B   '
+         TABOBL(JGM0+7)='Q   '
+      RETURN
+C ===
+c    31  FLUENDO3D Sellier
+C ===
+      ELSE IF (IPLAC.EQ.31) THEN
+c       print*,'DS IDVISC POUR FLUENDO3D IFOUR=',ifour
+c       NOMBRE DE PARAMETRES POUR FLUENDO3D
+c       a preciser dans './nombre_fluendo3d.h (NBRF3D.INC)'  
+c       a preciser dans  NBRF3D.INC 
+c       nombre total de parametres materiaux          
+        NBRT3D=NB_PARA_FLUENDO3D+NB_PARA_SUPP_FLUENDO3D 
+c       renfort et taille de la dimension 3 le cas echeant
+        NBRT3D=NBRT3D+NB_PARA_RENF
+c       nom des parametres        
+c       PRINT*,'DS IDVISC POUR FLUENDO3D NBRT3D=',NBRT3D 
+        JGM0=JGOBL
+        JGOBL=JGM0+NBRT3D  
+        
+c       nom des composantes pour FLUAG3D
+c       degre d hydratation
+        TABOBL(JGM0+1)= 'HYDR' 
+c       hydratation seuil       
+        TABOBL(JGM0+2)= 'HYDS' 
+c       resistance a la traction       
+        TABOBL(JGM0+3)= 'RT  '   
+c       contrainte de refermeture     
+        TABOBL(JGM0+4)= 'REF ' 
+c       resistance a la compression        
+        TABOBL(JGM0+5)= 'RC  ' 
+c       coeff de confinement dans Druker Prager
+        TABOBL(JGM0+6)= 'DELT'  
+c       Dilatance pour Druker Prager
+        TABOBL(JGM0+7)='BETA'
+c       deformation au pic de traction (si endo pre pic de traction)       
+        TABOBL(JGM0+8)='EPT '
+c       ecrouissage relatif pour la plasticite / RGI       
+        TABOBL(JGM0+9)='HRAG'
+c       coeff de concentration de contrainte par les contraintes hydriques
+        TABOBL(JGM0+10)='CSHR' 
+c       module de compressibilite pour le gel de rag     
+        TABOBL(JGM0+11)='KRAG'
+c       energie de fissuration traction       
+        TABOBL(JGM0+12)='GFT '
+c       deformation caracteristique potentiel de fluage        
+        TABOBL(JGM0+13)='EKFL'
+c       rapport module kelvin / module elastique        
+        TABOBL(JGM0+14)='YKSY' 
+c       endommagement maximum par fluage
+        TABOBL(JGM0+15)='XFLU' 
+c       temps caracteristique kelvin
+        TABOBL(JGM0+16)='TAUK'
+c       temps caracteristique maxwell
+        TABOBL(JGM0+17)='TAUM'
+c       NRJ activation du potentiel de fluage de Maxwell
+        TABOBL(JGM0+18)='NRJM'
+c       endommagement thermique caracteristique a 80degC
+        TABOBL(JGM0+19)='DT80' 
+c       biot pour le non sature
+        TABOBL(JGM0+20)='BSHR'
+c       module de biot pour le retrait
+        TABOBL(JGM0+21)='MSHR'
+c       porosite pour le non sature        
+        TABOBL(JGM0+22)='PORO'
+c       volume de phase pour rgi
+        TABOBL(JGM0+23)='VRAG'
+c       volume d eau pour le retrait
+        TABOBL(JGM0+24)='VW  '
+c       couplage endo hydrique endo de compression 
+        TABOBL(JGM0+25)='DCDW' 
+c       exposant pour la loi de vangenuchten
+        TABOBL(JGM0+26)='MVGN'
+c       deformation totale au pic de compression
+        TABOBL(JGM0+27)='EPC '
+c       deformation caracteristique pour la variation de module
+        TABOBL(JGM0+28)='EKDC'
+c       deformation caracteristique pour la loi d ecrouissage de rag
+        TABOBL(JGM0+29)='EKDG' 
+c       energie de refermeture des fissures de traction
+        TABOBL(JGM0+30)='GFR ' 
+c       volume des vides pour le gel
+        TABOBL(JGM0+31)='VVRG'
+c       coeff de concentration de contrainte par la pression de rag
+        TABOBL(JGM0+32)='CRAG' 
+c       temperature de reference pour le fluage propre
+        TABOBL(JGM0+33)='TTRF' 
+c       temperature seuil endo thermique
+        TABOBL(JGM0+34)='TSTH'
+c       endommagement maxi par fluage
+        TABOBL(JGM0+35)='DFMX' 
+c       temps caracteristique alcali reaction a tref
+        TABOBL(JGM0+36)='TRAG'    
+c       energie d'activation de l alcali reaction
+        TABOBL(JGM0+37)='NRJR' 
+c       degre de saturation seuil pour la rag
+        TABOBL(JGM0+38)='SRSR'  
+c       module de Biot pour la deform therm transitoire 
+        TABOBL(JGM0+39)='MDTT' 
+c       volume de ref pour la mesure de RTP
+        TABOBL(JGM0+40)='VREF' 
+c       volume max pour methode wl2        
+        TABOBL(JGM0+41)='VMAX'
+c       coeff de variation de la resistance en traction
+        TABOBL(JGM0+42)='CVRT'
+c       temps cracteristique pour la precipitation de la def      
+        TABOBL(JGM0+43)='TPRD'
+c       energie d activation de precipitation de la def
+        TABOBL(JGM0+44)='NRJP'
+c       saturation caracteristique pour les reactions de def
+        TABOBL(JGM0+45)='SRSD'
+c       quantite maximale de def pouvant etre realise      
+        TABOBL(JGM0+46)='VDEF'
+c       teneur en alcalin libre en solution pour la def
+        TABOBL(JGM0+47)='NALD'
+c       rappot sulfate sur aluminium du ciment
+        TABOBL(JGM0+48)='SSAD'
+c       seuil caracteristique en alcalins pour la DEF
+        TABOBL(JGM0+49)='NAKD'   
+c       seuil en alcalins pour le blocage de la DEF
+        TABOBL(JGM0+50)='NABD' 
+c       exposant de la loi de couplage temperature seuil - alcalins
+c       pour la def
+        TABOBL(JGM0+51)='EXND'  
+c       exposant de la loi de couplage vitesse de precipitation -
+c       alcalins pour la def
+        TABOBL(JGM0+52)='EXMD' 
+c       temperature caracteristique de dissolution de la def
+        TABOBL(JGM0+53)='TTKD' 
+c       temps caracteristique de dissolution pour la def
+        TABOBL(JGM0+54)='TDID'               
+c       temps caracteristique de fixation de l aluminium dans les hydrogrenats
+        TABOBL(JGM0+55)='TFID' 
+c       energie d activation de dissolution de la def
+        TABOBL(JGM0+56)='NRJD'
+c       temperature de reference pour le temps caracteristique de 
+c       precipitation de la def        
+        TABOBL(JGM0+57)='TTRP'
+c       deformation caracteristique caracterisant l endo par sel de def        
+        TABOBL(JGM0+58)='EKDS'
+C       contrainte caracteristique caracterisant l endo hydrique
+        TABOBL(JGM0+59)='SKDW'
+C       temperature caracteristique pour effets temperature sur isotherme
+        TABOBL(JGM0+60)='TTKW'  
+c       temperature seuil pour la fixation des al dans les hydrogrenats en cas de def
+        TABOBL(JGM0+61)='TTKF'
+c       energie dactivation pour la fixation des alu dans les hydrogrenats        
+        TABOBL(JGM0+62)='NRJF'
+c       nombre de moles de sulfates par m3 
+        TABOBL(JGM0+63)='NSUL'   
+c       temps caracteristique pour l amplification de resistance dynamique 
+        TABOBL(JGM0+64)='TDYN' 
+c       temperature de reference pour la rag 
+        TABOBL(JGM0+65)='TTRG' 
+c       modules d ecrouissage sel     
+        TABOBL(JGM0+66)='HDEF'
+c       module des produits de rgi      
+        TABOBL(JGM0+67)='KDEF'
+c       Module de biot pour le gel
+        TABOBL(JGM0+68)='VVDF'
+c       coeff de concentration de contrainte par les RGI
+        TABOBL(JGM0+69)='CDEF'   
+c       ****************module d ecrouissage pour la micro fissure hydrique*************************************libre
+        TABOBL(JGM0+70)='HSHR'       
+c       temperature de reference pour la definition de l'isotherme hydrique
+        TABOBL(JGM0+71)='TTRW'  
+c       coeff de couplag endo de rag endo de compression
+        TABOBL(JGM0+72)='DCDG' 
+c       coeff de couplage endo de def endo de compression    
+        TABOBL(JGM0+73)='DCDS'     
+c       coeff de couplage sechage resitance a la traction    
+        TABOBL(JGM0+74)='KWRT'
+c       coeff de couplage sechage resistance a la compression   
+        TABOBL(JGM0+75)='KWRC'     
+c       hydratation de reference pour la definition des parametres mecaniques    
+        TABOBL(JGM0+76)='HREF'   
+c       temps caracteristique pour la deformation thermique transitoire a la temperature TTRF    
+        TABOBL(JGM0+77)='TDTT' 
+c       quantite d eau de reference pour le calcul de surpression en DTT
+        TABOBL(JGM0+78)='WDTT'
+c       pression d eau de reference dans  les CSH pour la DTT
+        TABOBL(JGM0+79)='PDTT' 
+c       contrainte seuil minimale pour initier le fluage (hydr<hyds)
+        TABOBL(JGM0+80)='SSJA'  
+c       temps caracteristique  ecoulement etat liquide (hydr<hyds)
+        TABOBL(JGM0+81)='TMJA' 
+c       module d young jeune age
+        TABOBL(JGM0+82)='YOJA'
+c       coefficient de poisson jeune age
+        TABOBL(JGM0+83)='NUJA'    
+c       coeff de drucker prager au jeune age
+        TABOBL(JGM0+84)='DLJA'     
+c       rc jeune age
+        TABOBL(JGM0+85)='RCJA'         
+c       RT jeune age
+        TABOBL(JGM0+86)='RTJA' 
+c       coef dilat diff renforts-matrice
+        TABOBL(JGM0+87)='DALR' 
+c       Young reference matrice
+        TABOBL(JGM0+88)='YORF' 
+c       Nu reference matrice
+        TABOBL(JGM0+89)='NURF'    
+c       Influence de l endo de traction sur celui de compresssion
+        TABOBL(JGM0+90)='ALTC'   
+c       avancement chimique latent pour la rag
+        TABOBL(JGM0+91)='ALRG'      
+c       deformation seuil pour amorcer l'endo de rag
+        TABOBL(JGM0+92)='EPSG' 
+c       presence de fibres
+        TABOBL(JGM0+NB_PARA_FLUENDO3D-2)='FIBR' 
+c       declaration de la dimension 3 en cas de calcul 2D
+        TABOBL(JGM0+NB_PARA_FLUENDO3D-1)='DIM3' 
+c       nombre de renforts actifs   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D)='NREN'
+c       numero de la variable derniere variable du modele non lineaire
+        NDEBUT=NB_PARA_FLUENDO3D  
+
+  
+c*******rajouter ici NBSUPP3D variables complementaires au modele ******           
+c       exemple rajout de NBSUPP3D parametres utilisateurs
+c       TABOBL(JGM0+NDEBUT+1)='SUP1'       
+c       ...
+c       TABOBL(JGM0+NDEBUT+NBSUPP3D)='SUPN'
+c       debut ROMAIN fibres
+c       on definit les parametres materiau des fibres apres ceux des renforts
+c       parametres utilisateur fibs3d
+
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+1)='DIFI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+2)='LOFI'         
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+3)='HFI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+4)='TMAX'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+5)='TD'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+6)='SK'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+7)='FABO'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+8)='ALEC'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+9)='MECR'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+10)='LCAN'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+11)='MUF'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+12)='YOFI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+13)='LECH'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+14)='MW'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+15)='FU'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+16)='RTEC'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+17)='RHOF'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+18)='EOF1'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+19)='EOF2'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+20)='EOF3'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+21)='VF11'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+22)='VF12'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+23)='VF13'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+24)='VF21'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+25)='VF22'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+26)='VF23'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U)='FYF'
+     
+C       print*,'idvisc',JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U,jgm0,NB_PARA_FLUENDO3D
+C       read*
+
+c parametres calcules par castem pour fibs3d        
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+1)='K11'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+2)='K12'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+3)='K13' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+4)='K14'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+5)='K15' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+6)='K16'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+7)='K17'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+8)='K18'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+9)='K19'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+10)='K110'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+11)='K21'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+12)='K22'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+13)='K23' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+14)='K24'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+15)='K25' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+16)='K26'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+17)='K27'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+18)='K28'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+19)='K29'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+20)='K210'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+21)='W11'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+22)='W12'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+23)='W13' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+24)='W14'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+25)='W15' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+26)='W16'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+27)='W17'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+28)='W18'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+29)='W19'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+30)='W110'     
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+31)='W21'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+32)='W22'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+33)='W23' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+34)='W24'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+35)='W25' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+36)='W26'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+37)='W27'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+38)='W28'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+39)='W29'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+40)='W210'     
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+41)='FP1'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+42)='FP2'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+43)='FP3' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+44)='FP4'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+45)='FP5' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+46)='FP6'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+47)='FP7'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+48)='FP8'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+49)='FP9'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+50)='FP10'        
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+51)='W31'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+52)='W32'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+53)='W33' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+54)='W34'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+55)='W35' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+56)='W36'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+57)='W37'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+58)='W38'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+59)='W39'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+60)='W310'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+61)='WF1'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+62)='WF2'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+63)='WF3' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+64)='WF4'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+65)='WF5' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+66)='WF6'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+67)='WF7'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+68)='WF8'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+69)='WF9'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+70)='WF10'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+71)='K1MI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+72)='K1MA'   
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+73)='K2MI' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+74)='K2MA'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+75)='W1MI' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+76)='W1MA'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+77)='W2MI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+78)='W2MA'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+79)='FPMI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+80)='FPMA' 
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+81)='W3MI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+82)='W3MA'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+83)='WFMI'
+        TABOBL(JGM0+NB_PARA_FLUENDO3D+NB_PARA_FIBRE_U+84)='WFMA'
+** fin ROMAIN fibres
+        NDEBUT=NDEBUT+NB_PARA_SUPP_FLUENDO3D
+c***********************************************************************
+
+
+c********* declaration des parametres materiaux pour les renforts ******
+c       declaration des parametres pour les renforts si NB_RENF>0
+        do IRENFR=1,NB_RENF
+C           print*,'ds idvisc NDEBUT:',NDEBUT 
+C           print*,'ds idvisc NB_RENF:',NB_RENF 
+C           print*,'ds idvisc NB_PARA_PAR_RENF:',NB_PARA_PAR_RENF
+C           print*,'ds idvisc NB_PARA_RENF:',NB_PARA_RENF 
+C           print*,'ds idvisc IRENFR:',IRENFR         
+c         numero du renfort        
+          write (motren1,'(I1)') IRENFR
+c         taux de renfort 
+          motren3='ROA'                       
+          motren4=motren3//motren1
+c         print*,motren4
+C           print*,'JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+1',
+C      #    JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+1
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+1)=motren4 
+c         diametres equivalent des renforts direction 1
+          motren3='DEQ'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+2)=motren4            
+c         module des renforts direction 1
+          motren3='YOR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+3)=motren4
+c         limite elastique des renforts (plasticite parfaite)
+          motren3='SYR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+4)=motren4
+c         contrainte de cisaillement de l interface renfort matrice
+          motren3='TYR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+5)=motren4
+c         vecteur d orientation du renfort 
+          motren2='VR'
+          do idir1=1,3
+               write (motdir1,'(I1)') idir1
+               motren3=motren2//motren1                
+               motren4=motren3//motdir1
+c              print*,motren4
+               TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+5+idir1)=
+     #         motren4
+          end do
+c         Module d'ecrouissage cinematique
+          motren3='HPL'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+9)=motren4  
+c         Temps caracteristique viscoplasticite
+          motren3='TMR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+10)=motren4 
+c         deformation caracteristique de relaxation
+          motren3='EKR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+11)=motren4  
+c         contrainte caracteristique pour la mesure de la relaxation
+          motren3='SKR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+12)=motren4 
+c         Energie d activation de reference pour la relaxation (Ea)
+          motren3='ATR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+13)=motren4
+c         Coeff de couplage thermo mecanique (gama)
+          motren3='CTM'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+14)=motren4 
+c         Coeff de non linearite du fluage (khi)
+          motren3='XFL'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+15)=motren4 
+c         Precontrainte initiale
+          motren3='PRE'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+16)=motren4 
+c         Temperature de reference pour la relaxation des armatures
+          motren3='TTR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+17)=motren4 
+c         exposant de loi d'activation thermique
+          motren3='XNR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+18)=motren4 
+c         taux de chargement a partir duquel l activation therm 
+c         depend du chargement
+          motren3='MUS'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+19)=motren4 
+c         temps caracteristique de kelvin pour les renforts
+          motren3='TKR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+20)=motren4 
+c         rapport Ekelvin/Eelastique pour les renforts
+          motren3='YKY'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+21)=motren4   
+c         contrainte ultime de traction (pic)
+          motren3='SUR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+22)=motren4   
+c         deformation plastique debut de rupture en traction
+          motren3='EPU'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+23)=motren4  
+c         Energie surfacique de rupture localisee
+          motren3='WPR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+24)=motren4  
+c         Raideur en cisaillement de l interface avec la matrice
+          motren3='HIR'                       
+          motren4=motren3//motren1
+c         print*,motren4
+          TABOBL(JGM0+NDEBUT+(IRENFR-1)*NB_PARA_PAR_RENF+25)=motren4     
+        end do
+        NDEBUT=NDEBUT+NB_PARA_RENF
+c********* fin de la declaration des parametres des renforts ***********
+
+c       print*,'FIN DECLARATION PARAMETRES MATERIAU POUR FLUENDO3D'
+      RETURN
+
+        
+c ===       
+c    32  INCL3D Sellier 
+C ===
+      ELSE IF (IPLAC.EQ.32) THEN
+c       nombre maximal de types d inclusion
+        NBRINC3D=1       
+c       nombre de parametres indifferencies (commun M et I)
+        NBPARC3D=4          
+c       nombre de parametres par phase
+        NBPPARP3D=26        
+c       parametre de taille pour les formulation planes        
+        NBRTAIL3D=1        
+c       nombre total de parametres materiaux          
+        NBRT3D=NBPARC3D+(NBRINC3D+1)*NBPPARP3D+NBRTAIL3D        
+c       nom des parametres 
+c       PRINT*,'-------------------------------------------------------'
+c       PRINT*,'DANS IDVISC POUR INCL3D' 
+c       WRITE(*,'(A31,I3)'),' NOMBRE MAXIMUM D INCLUSION(S):',NBRINC3D  
+c       WRITE(*,'(A31,I3)'),' NOMBRE DE PARAMETRES =:',NBRT3D  
+c       PRINT*,'NOM DES PARAMETRES MATERIAUX'
+c       PRINT*,'-------------------------------------------------------' 
+        
+        JGM0=JGOBL
+        JGOBL=JGM0+NBRT3D 
+        
+c       nom des composantes pour INCL3D 
+
+c       nom des parametres globaux
+
+c       nombre de types d inclusions
+        motinc4='NINC'
+c       print*,1,motinc4,' Nombre d inclusions'
+        TABOBL(JGM0+1)=motinc4
+c       temperature de reference pour l ensemble des parametres
+        motinc4='TTRF'
+        TABOBL(JGM0+2)=motinc4
+c       print*,2,motinc4,' Temperature de reference'
+c       resistance du maillon faible pour la localisation
+        motinc4='RT  '
+        TABOBL(JGM0+3)=motinc4
+c       print*,3,motinc4,' Resistance a la traction localisee'               
+c       resistance a la refermeture pour la localisation
+        motinc4='RR '
+        TABOBL(JGM0+4)=motinc4 
+c       print*,4,motinc4,'contrainte de refermeture fissures localisees'  
+        
+c       nom des parametres communs a toutes les phases
+c       de 0 (la matrice) a NBRINC3D (1 pour cette version)
+        icomp=NBPARC3D
+        do IPHASE=0,NBRINC3D
+            write (motinc1,'(I1)') IPHASE
+c           fraction volumique 
+            motinc3='FRA'           
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4, ' Fraction volumique de la phase' 
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+1)=motinc4
+c           module de Young 
+            motinc3='YOU'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4,' Module d Young de la phase'
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+2)=motinc4 
+c           coefficient de Poisson 
+            motinc3='NUP'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+3)=motinc4 
+c           coeff de dilatation thermique 
+            motinc3='ALP'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+4)=motinc4
+c           resistance effective en traction/refermeture de la phase 
+            motinc3='RTP'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+5)=motinc4
+c           resistance totale a la traction  refermeture d interface 
+            motinc3='RTI'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+6)=motinc4      
+c           saturation en eau
+            motinc3='SWP'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+7)=motinc4
+c           potentiel de gonflement chimique (en proportion du volume de la phase)
+            motinc3='VCH'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+8)=motinc4     
+c           temps caracteristique de la reaction chimique
+            motinc3='TCH'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+9)=motinc4
+c           energie d'activation de la  reaction chimique
+            motinc3='EAC'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+10)=motinc4
+c           saturation en eau de blocage de la reaction chimique
+            motinc3='SRS'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+11)=motinc4  
+c           avancement de la reaction au moment de l inititation du gonflement
+            motinc3='ACS'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+12)=motinc4 
+c           temps caracteristique du fluage pour kelvin et init pour maxwell
+            motinc3='TFL'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+13)=motinc4   
+c           energie d activation thermique du fluage 
+            motinc3='EAF'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+14)=motinc4       
+c           coeff de fluage non lineaire pour potentiel maxwell      
+            motinc3='FLM'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+15)=motinc4  
+c           coeff de fluage reversible de Kelvin (E Fl reversible / Youn)     
+            motinc3='FLK'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+16)=motinc4       
+c           porosite 
+            motinc3='POR'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+17)=motinc4  
+c           module de van genuchten pour la pression capillaire 
+            motinc3='MVG'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+18)=motinc4  
+c           exposant de Van Genucten 
+            motinc3='NVG'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+19)=motinc4
+c           coeff frottement interne
+            motinc3='DLT'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+20)=motinc4 
+c           coeff de dilatance
+            motinc3='BTA'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+21)=motinc4
+c           cohesion en cisaillement
+            motinc3='COH'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+22)=motinc4  
+c           coeff de variation volumique par variation du volume d eau 
+            motinc3='CPH'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+23)=motinc4 
+c           coeff de compressibilite du produit chimique neoforme
+            motinc3='KCH'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+24)=motinc4 
+c           contrainte de refermeture de fissure pour la phase
+            motinc3='RFP'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+25)=motinc4  
+c           contrainte de refermeture de fissure pour l interface
+            motinc3='RFI'            
+            motinc4=motinc3//motinc1
+            icomp=icomp+1
+c           print*,icomp,motinc4     
+            TABOBL(JGM0+NBPARC3D+IPHASE*NBPPARP3D+26)=motinc4           
+        end do
+
+c       composantes taille de l element dans 3eme dimension pour cas plans            
+        icomp=icomp+1
+        TABOBL(JGM0+NBPARC3D+(NBRINC3D+1)*NBPPARP3D+1)='DIM3' 
+c       print*,icomp,'DIM3'  
+        
+c       traitement de la 3eme dimension en cas de calcul plan  
+        IF (.not.((IFOUR.eq.2).or.(IFOUR.eq.0).or.(IFOUR.eq.-1))) THEN  
+            PRINT*,'FORMULATION IMPREVUE POUR INCLUSION3D'
+            PRINT*,'GESTION DES TAILLES A VERIFIER DANS IDVISC'
+            STOP            
+        END IF 
+
+        if(icomp.ne.NBRT3D) then
+          print*,'Pb de numerotation ds idvisc pour inclusion3'
+          stop
+        end if
+
+       RETURN 
+C ===
+c    33  ENDO3D Sellier
+C ===
+      ELSE IF (IPLAC.EQ.33) THEN
+c       print*,'DS IDVISC POUR ENDO3D IFOUR=',ifour
+c       nombre de parametres modele de base sans renforts      
+        NB_PARA_ENDO3D=28       
+c       nombre de parametre supplementaires 
+        NBSUPP3D=0
+c       parametre de taille pour les formulation planes        
+        IF (IFOUR.eq.2) THEN
+c         massif 3d        
+          NBRTAIL3D=0
+        ELSE IF (IFOUR.EQ.0) THEN
+c         AXISYMETRIQUE MASSIVE        
+          NBRTAIL3D=1
+        ELSE IF (IFOUR.EQ.-1) THEN
+c         def plane        
+          NBRTAIL3D=1
+        ELSE
+c         autres cas
+          NBRTAIL3D=1        
+        END IF
+c       nombre total de parametres materiaux          
+        NBRT3D=NB_PARA_ENDO3D+NBSUPP3D+NBRTAIL3D
+c       nom des parametres        
+c       PRINT*,'DS IDVISC POUR ENDO3D NBRT3D=',NBRT3D 
+        JGM0=JGOBL
+        JGOBL=JGM0+NBRT3D  
+        
+c       nom des composantes pour ENDO3D
+c       resistance a la traction       
+        TABOBL(JGM0+1)= 'RT  '   
+c       deformation au pic de traction        
+        TABOBL(JGM0+2)= 'EPT '                 
+c       Energie de fissuration de traction        
+        TABOBL(JGM0+3)= 'GFT ' 
+c       contrainte de refermeture     
+        TABOBL(JGM0+4)= 'REF ' 
+c       Energie de refermeture de traction        
+        TABOBL(JGM0+5)= 'GFR '         
+c       resistance a la compression        
+        TABOBL(JGM0+6)= 'RC  '                
+c       deformation au pic de compression        
+        TABOBL(JGM0+7)= 'EPC '
+c       endomagement au pic de compression
+        TABOBL(JGM0+8)= 'DCPK'        
+c       coeff de confinement dans Druker Prager
+        TABOBL(JGM0+9)= 'DELT'  
+c       Dilatance pour Druker Prager
+        TABOBL(JGM0+10)= 'BETA'
+c       deformation caracteristique pour l endo de compression
+        TABOBL(JGM0+11)= 'EKDC'        
+c       prosite initiale de la matrice
+        TABOBL(JGM0+12)= 'PORO'         
+c       Module d ecrouissage initial pour Cam Clay
+        TABOBL(JGM0+13)= 'MCC'
+c       pression de fin de consolidation pour CamClay
+        TABOBL(JGM0+14)= 'PFCC'    
+c       temperature de debut de reduction thermique pour Rc 
+        TABOBL(JGM0+15)= 'TT0C'
+c       temperature mediane pour la reduction thermique pour Rc 
+        TABOBL(JGM0+16)= 'TT1C'
+c       exposant de non linearite de la reduction thermique pour Rc
+        TABOBL(JGM0+17)= 'MTTC'  
+c       fraction residuelle de resistance a la compression  a haute temperature
+        TABOBL(JGM0+18)= 'PTTC'
+c       temperature de debut de reduction thermique pour Rt 
+        TABOBL(JGM0+19)= 'TT0T'
+c       temperature mediane de reduction thermique pour Rt
+        TABOBL(JGM0+20)= 'TT1T'
+c       exposant de non linearite pour l evolution thermique de Rt
+        TABOBL(JGM0+21)= 'MTTT'  
+c       fraction residuelle de resistance en traction  a haute temperature
+        TABOBL(JGM0+22)= 'PTTT'
+c       temperature de debut de reduction thermique pour le module d Young
+        TABOBL(JGM0+23)= 'TT0E'
+c       temperature mediane de reduction thermique pour le module d Young
+        TABOBL(JGM0+24)= 'TT1E'
+c       exposant de non linearite pour le module d Young
+        TABOBL(JGM0+25)= 'MTTE'  
+c       fraction residuelle du module d Young a haute temperature
+        TABOBL(JGM0+26)= 'PTTE' 
+c       coeff de couplage endo de traction / endo de compression
+        TABOBL(JGM0+27)= 'ALTC' 
+c       pression de preconsolidation a porosite initiale
+        TABOBL(JGM0+28)= 'PPCC'              
+        
+c       traitement de la 3eme dimension en cas de calcul plan  
+        IF (IFOUR.eq.2) THEN  
+            continue        
+        ELSE IF (IFOUR.eq.0) THEN
+C           Formulation AXISYMETRIQUE MASSIVE
+c           composantes taille de l element             
+            TABOBL(JGM0+NBRT3D+1)='DIM3'            
+        ELSE IF (IFOUR.EQ.-1) THEN
+C           Formulation DEFORMATION PLANE MASSIVE 
+c           composantes taille de l element
+            TABOBL(JGM0+NBRT3D+1)='DIM3' 
+        ELSE
+            PRINT*,'FORMULATION IMPREVUE POUR ENDO3D'
+            PRINT*,'GESTION DES TAILLES A VERIFIER DANS IDVISC'
+            STOP            
+        END IF        
+        RETURN 
+c       ****fin ENDO3D Sellier *** 
+
+c ===       
+c    34  FLUISO3D Sellier 
+C ===
+      ELSE IF (IPLAC.EQ.34) THEN
+
+c       nombre de parametres obligatoires
+        NBROBL3D=0
+c       nombre de parametres par sous type
+c                   1   2   3   4   5   6  7  8   9
+c                   ELA,MAX,FLU,KEL,TRA,DP,CC,RAG,RSI 
+        DATA VNMATI /8  ,6  ,4  ,2  ,5  ,6 ,3 ,9  ,9  /
+c       calcul du nombre de parametres obligatoires
+        DO I=1,NSTYPEI
+            NBROBL3D=NBROBL3D+VNMATI(I)
+        END DO
+        PRINT*,'DS IDVISC POUR FLUISO3D NBROBL=',NBROBL3D 
+        JGM0=JGOBL
+        JGOBL=JGM0+NBROBL3D  
+        
+c       nom des composantes classees par sous types de modeles
+c       1- Hoocke et parametres communs
+        NBR0=0 
+        TABOBL(JGM0+NBR0+1)= 'DIM3'
+        TABOBL(JGM0+NBR0+2)= 'PORO'      
+        TABOBL(JGM0+NBR0+3)= 'WCAP'
+        TABOBL(JGM0+NBR0+4)= 'BCAP'      
+        TABOBL(JGM0+NBR0+5)= 'MCAP'
+        TABOBL(JGM0+NBR0+6)= 'NCAP'
+        TABOBL(JGM0+NBR0+7)= 'TTCA'
+        TABOBL(JGM0+NBR0+8)= 'INRT'     
+        NBR0=NBR0+VNMATI(1)  
+c       2- Maxwell consolidant
+        TABOBL(JGM0+NBR0+1)= 'TAUM'      
+        TABOBL(JGM0+NBR0+2)= 'KFLU'
+        TABOBL(JGM0+NBR0+3)= 'NRJF' 
+        TABOBL(JGM0+NBR0+4)= 'TTSF' 
+        TABOBL(JGM0+NBR0+5)= 'DT80'
+        TABOBL(JGM0+NBR0+6)= 'XFLU' 
+        NBR0=NBR0+VNMATI(2)       
+c       3- Maxwell transitoire
+        TABOBL(JGM0+NBR0+1)= 'MDTT'      
+        TABOBL(JGM0+NBR0+2)= 'TDTT'        
+        TABOBL(JGM0+NBR0+3)= 'WDTT'
+        TABOBL(JGM0+NBR0+4)= 'PDTT'
+        NBR0=NBR0+VNMATI(3) 
+c       4- Kelvin
+        TABOBL(JGM0+NBR0+1)= 'TAUK'      
+        TABOBL(JGM0+NBR0+2)= 'YKSY'
+        NBR0=NBR0+VNMATI(4) 
+c       5- Rankine localise
+        TABOBL(JGM0+NBR0+1)= 'RT  '      
+        TABOBL(JGM0+NBR0+2)= 'EPT '
+        TABOBL(JGM0+NBR0+3)= 'GFT '
+        TABOBL(JGM0+NBR0+4)= 'REF '
+        TABOBL(JGM0+NBR0+5)= 'GFR '
+        NBR0=NBR0+VNMATI(5)
+c       6- Drucker Prager
+        TABOBL(JGM0+NBR0+1)= 'RC  ' 
+        TABOBL(JGM0+NBR0+2)= 'EPC ' 
+        TABOBL(JGM0+NBR0+3)= 'DCPK'    
+        TABOBL(JGM0+NBR0+4)= 'DELT'
+        TABOBL(JGM0+NBR0+5)= 'BETA'
+        TABOBL(JGM0+NBR0+6)= 'EKDC' 
+        NBR0=NBR0+VNMATI(6) 
+c       7- Cam Clay
+        TABOBL(JGM0+NBR0+1)= 'MCC '      
+        TABOBL(JGM0+NBR0+2)= 'PCCI'
+        TABOBL(JGM0+NBR0+3)= 'PCCF'
+        NBR0=NBR0+VNMATI(7)
+c       8- RAG
+        TABOBL(JGM0+NBR0+1)= 'VGI '      
+        TABOBL(JGM0+NBR0+2)= 'VGF '
+        TABOBL(JGM0+NBR0+3)= 'SWGI'
+        TABOBL(JGM0+NBR0+4)= 'TAUG'
+        TABOBL(JGM0+NBR0+5)= 'NRJG'
+        TABOBL(JGM0+NBR0+6)= 'KRAG'
+        TABOBL(JGM0+NBR0+7)= 'HRAG'
+        TABOBL(JGM0+NBR0+8)= 'EKDG'
+        TABOBL(JGM0+NBR0+9)= 'NDCG'
+        NBR0=NBR0+VNMATI(8)  
+c       9- RAG
+        TABOBL(JGM0+NBR0+1)= 'VSI '      
+        TABOBL(JGM0+NBR0+2)= 'VSF '
+        TABOBL(JGM0+NBR0+3)= 'SWSI'
+        TABOBL(JGM0+NBR0+4)= 'TAUS'
+        TABOBL(JGM0+NBR0+5)= 'NRJS'
+        TABOBL(JGM0+NBR0+6)= 'KRSI'
+        TABOBL(JGM0+NBR0+7)= 'HRSI'
+        TABOBL(JGM0+NBR0+8)= 'EKDS'
+        TABOBL(JGM0+NBR0+9)= 'NDCS'
+        NBR0=NBR0+VNMATI(9)   
+
+c       affichage des parametres materiaux facultatifs de FLUISO3D
+        PRINT*,'DS IDVISC POUR FLUISO3D NBROBL=',JGOBL
+        IF(JGOBL.NE.(JGM0+NBR0)) THEN
+            PRINT*,'ERREUR1 FLUISO3D DANS IDVISC.ESO'
+            PRINT*,JGOBL,'.NE.',(JGM0+NBR0)
+        ELSE
+            DO I=1,JGOBL
+                WRITE(*,'(I3,1X,A4)') I,TABOBL(I)
+            END DO
+        ENDIF
+
+c       affichage des parametres facultatifs
+        PRINT*,'DS IDVISC POUR FLUISO3D NBRFAC=',JGFAC
+        IF(JGFAC.GT.0)THEN
+            DO I=1,JGFAC
+                    WRITE(*,'(I3,1X,A4)') I,TABFAC(I)
+            END DO
+        ENDIF
+
+        RETURN 
+
+c ===       
+c    35  FLUORTHO3D Sellier 
+C ===
+      ELSE IF (IPLAC.EQ.35) THEN
+
+c       nombre de parametres obligatoires
+        NBROBL3D=0
+c       nombre de parametres par sous type
+c                   1   2   3   4   5   6  7  
+c                   ELA,MAX,FLU,KEL,TRA,DP,CC
+        DATA VNMATO /8  ,6  ,4  ,2 /
+c        ,5  ,6 ,3 / 
+c       calcul du nombre de parametres obligatoires
+        DO I=1,NSTYPEO
+            NBROBL3D=NBROBL3D+VNMATO(I)
+        END DO 
+        PRINT*,'DS IDVISC POUR FLUORTHO3D NBROBL=',NBROBL3D 
+        JGM0=JGOBL
+        JGOBL=JGM0+NBROBL3D 
+
+c       nom des composantes classees par sous types de modeles
+c       1- Hoocke et parametres communs
+        NBR0=0 
+        TABOBL(JGM0+NBR0+1)= 'DIM3'
+        TABOBL(JGM0+NBR0+2)= 'PORO'      
+        TABOBL(JGM0+NBR0+3)= 'WCAP'
+        TABOBL(JGM0+NBR0+4)= 'BCAP'      
+        TABOBL(JGM0+NBR0+5)= 'MCAP'
+        TABOBL(JGM0+NBR0+6)= 'NCAP'
+        TABOBL(JGM0+NBR0+7)= 'TTCA'
+        TABOBL(JGM0+NBR0+8)= 'INRT'     
+        NBR0=NBR0+VNMATO(1)  
+c       2- Maxwell consolidant
+        TABOBL(JGM0+NBR0+1)= 'TAUM'      
+        TABOBL(JGM0+NBR0+2)= 'KFLU'
+        TABOBL(JGM0+NBR0+3)= 'NRJF' 
+        TABOBL(JGM0+NBR0+4)= 'TTSF' 
+        TABOBL(JGM0+NBR0+5)= 'DT80'
+        TABOBL(JGM0+NBR0+6)= 'XFLU' 
+        NBR0=NBR0+VNMATO(2)       
+c       3- Maxwell transitoire
+        TABOBL(JGM0+NBR0+1)= 'MDTT'      
+        TABOBL(JGM0+NBR0+2)= 'TDTT'        
+        TABOBL(JGM0+NBR0+3)= 'WDTT'
+        TABOBL(JGM0+NBR0+4)= 'PDTT'
+        NBR0=NBR0+VNMATO(3) 
+c       4- Kelvin
+        TABOBL(JGM0+NBR0+1)= 'TAUK'      
+        TABOBL(JGM0+NBR0+2)= 'YKSY'
+        NBR0=NBR0+VNMATO(4) 
+C c       5- Rankine localise
+C         TABOBL(JGM0+NBR0+1)= 'RT  '      
+C         TABOBL(JGM0+NBR0+2)= 'EPT '
+C         TABOBL(JGM0+NBR0+3)= 'GFT '
+C         TABOBL(JGM0+NBR0+4)= 'REF '
+C         TABOBL(JGM0+NBR0+5)= 'GFR '
+C         NBR0=NBR0+VNMATO(5)
+C c       6- Drucker Prager
+C         TABOBL(JGM0+NBR0+1)= 'RC  ' 
+C         TABOBL(JGM0+NBR0+2)= 'EPC ' 
+C         TABOBL(JGM0+NBR0+3)= 'DCPK'    
+C         TABOBL(JGM0+NBR0+4)= 'DELT'
+C         TABOBL(JGM0+NBR0+5)= 'BETA'
+C         TABOBL(JGM0+NBR0+6)= 'EKDC' 
+C         NBR0=NBR0+VNMATO(6) 
+C c       7- Cam Clay
+C         TABOBL(JGM0+NBR0+1)= 'MCC '      
+C         TABOBL(JGM0+NBR0+2)= 'PCCI'
+C         TABOBL(JGM0+NBR0+3)= 'PCCF'
+C         NBR0=NBR0+VNMATO(7)
+
+c       affichage des parametres materiaux obligatoires de FLUORTHO3D
+        IF(JGOBL.NE.(JGM0+NBR0)) THEN
+            PRINT*,'ERREUR1 FLUORTHO3D DANS IDVISC.ESO'
+            PRINT*,JGOBL,'.NE.',(JGM0+NBR0)
+        ELSE
+            DO I=1,JGOBL
+                WRITE(*,'(I3,1X,A4)') I,TABOBL(I)
+            END DO
+        ENDIF  
+
+c       affichage des parametres materiaux facultatifs de FLUORTHO3D
+        IF(JGFAC.NE.0) THEN
+            DO I=1,JGFAC
+                WRITE(*,'(I3,1X,A4)') I,TABFAC(I)
+            END DO
+        ENDIF
+
+       RETURN   
+      ENDIF
+C ==========
+C  ERREUR : modele non reference (IRET=0)
+C ==========
+      IRET=0
+      CALL ERREUR(261)
+
+      RETURN
+      END
+ 
+ 
+ 
+ 

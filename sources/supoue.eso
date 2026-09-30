@@ -1,0 +1,123 @@
+C SUPOUE    SOURCE    GOUNAND   21/06/02    21:17:50     11022          
+      SUBROUTINE SUPOUE(TABGEO,TABVDC,TABMAT,IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : SUPOUE
+C DESCRIPTION : Supprimme les objets de l'include SMTNLIN
+C               (anciennement SMPOUET d'ou le nom de la subroutine)
+C
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          :
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v2, 22/09/03, refonte complète (modif SMTNLIN)
+C VERSION    : v1, 19/12/2002, version initiale
+C HISTORIQUE : v1, 19/12/2002, création
+C HISTORIQUE : v1, 22/08/2003, modif suite chgt SMTNLIN(nls9)
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+* Segments à moi
+-INC TNLIN      
+*-INC SMTNLIN
+*-INC SMCHAEL
+      POINTEUR MYMCHA.MCHAEL
+-INC SMLENTI
+-INC SMLMOTS
+*     
+      INTEGER IMPR,IRET
+*
+      INTEGER IJVC,JVARPR,JVARDU
+*
+* Executable statements
+*
+      IF (IMPR.GT.2) WRITE(IOIMP,*) 'Entrée dans supoue.eso'
+* Destruction de TABGEO
+      IF (TABGEO.NE.0) THEN
+         SEGACT TABGEO*MOD
+         MYMCHA=TABGEO.JGEO
+         CALL SUCAEL(MYMCHA,IMPR,IRET)
+         IF (IRET.NE.0) GOTO 9999
+         SEGSUP TABGEO
+      ENDIF
+* Destruction de TABVDC
+      IF (TABVDC.NE.0) THEN
+         SEGACT TABVDC*MOD
+         JLCOF=TABVDC.VLCOF(/1)
+         DO ILCOF=1,JLCOF
+            MLENTI=TABVDC.VLCOF(ILCOF)
+*     SEGACT MLENTI*MOD
+            SEGSUP MLENTI
+         ENDDO
+         JGCOF=TABVDC.VLDAT(/1)
+         DO IGCOF=1,JGCOF
+            MLENTI=TABVDC.VLDAT(IGCOF)
+*     SEGACT MLENTI*MOD
+            SEGSUP MLENTI
+         ENDDO
+         JGVD=TABVDC.DJSVD(/1)
+         DO IJVD=1,JGVD
+            MLMOTS=TABVDC.NOMVD(IJVD)
+            SEGSUP MLMOTS
+C            MYMCHA=TABVDC.IVD(IJVD)
+C            CALL SUCAEL(MYMCHA,IMPR,IRET)
+C            IF (IRET.NE.0) GOTO 9999
+         ENDDO
+         SEGSUP TABVDC
+      ENDIF
+* Destruction de TABMAT
+      IF (TABMAT.NE.0) THEN
+         SEGACT TABMAT*MOD
+         DO JVARPR=1,TABMAT.VMAT(/2)
+            DO JVARDU=1,TABMAT.VMAT(/1)
+               MYMCHA=TABMAT.VMAT(JVARDU,JVARPR)
+               CALL SUCAEL(MYMCHA,IMPR,IRET)
+               IF (IRET.NE.0) GOTO 9999
+            ENDDO
+         ENDDO
+         SEGSUP TABMAT
+      ENDIF
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine supoue'
+      RETURN
+*
+* End of subroutine SUPOUE
+*
+      END
+
+
+ 
+ 

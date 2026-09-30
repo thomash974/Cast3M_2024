@@ -1,0 +1,221 @@
+C PRPFI0    SOURCE    FD218221  24/02/07    21:15:23     11834          
+      subroutine prpfi0(coeffk1,coeffk2,coeffwp1,
+     # coeffwp2,coefffp,coeffwf,coeffw03,lech,mw,
+     # maxfp,minfp,maxwp1,minwp1,maxwp2,minwp2,maxwf,
+     # minwf,maxw03,minw03,Lf,mu,Td,Tmax,Ef,Hf,Df,sk,
+     # F0,alphad,M0,fu,L0,Rtec,maxk02,mink02,maxk01,mink01,fy,
+     #mwor,nligne,niter,nangl,nlongfi,nrt,nangredu,phit,phicrit)         
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)   
+
+      integer t,nlongfi,nangl,nrt,p,d,e,nangredu
+      parameter (PI=3.141592653589793D0,precision1=1.0d-10)
+      real*8 phicrit,phit,lech,mw
+
+
+c parametres matériaux
+      real*8 mu,Td,Tmax,Ef,Hf,Df,sk,F0,alphad,M0
+      real*8 fy,Rt,fu,L0,Lf,Rtec,Rtmax,Rtmin
+c variables pour la reduction du modele      
+      real*8 coeffk1(10),coeffk2(10),coeffwp1(10),coeffwp2(10)
+      real*8 coefffp(10),coeffwf(10),coeffw03(10)
+      real*8 errmax,errmoy
+      real*8 maxfp,minfp,maxwp,minwp,maxwf,minwf,maxw03,minw03
+      real*8 maxwp2,maxwp1,minwp2,minwp1
+      real*8 maxk02,mink02,maxk01,mink01
+ 
+       SEGMENT MWOR
+           real*8 fel(mligne),ld1(mligne,miter),ld2(mligne,miter)
+           real*8 sp1(mligne),fcrit1(mligne,miter),fcrit2(mligne,miter)        
+           real*8 L1(mligne,miter),L2(mligne,miter),dls1(mligne,miter)
+           real*8 dls2(mligne,miter),ls1(mligne,miter),ls2(mligne,miter)
+           real*8 F(mligne,miter),w1(mligne,miter),w2(mligne,miter)
+           real*8 Fd1(mligne,miter),sd1(mligne,miter),lsf1(mligne)
+           real*8 sel1(mligne,miter),sdf1(mligne)
+           real*8 Fo(mligne,miter),ldf2(mligne),Ffo(mligne)
+           real*8 lsf2(mligne),Lf2(mligne),sdf2(mligne),Fco(mligne)
+           real*8 sd2(mligne,miter),sel2(mligne,miter)
+           real*8 Dwf(mligne),Ff(mligne),Lf1(mligne),ldf1(mligne)   
+           real*8 ffo2(mligne,mangl1,mlongfi)
+           real*8 Ffo1(mligne,mangl1,mlongfi)
+           real*8 FmoyL(mligne,mangl1),wf1(mligne,mangl1,mlongfi)
+           real*8 Fmoylis(mligne),wlist(mligne)                                 
+*                                       
+          real*8 lisRt(mrtang1),lisphid(mrtang1)
+          real*8 lisfp(mrtang1),lisk0m(mrtang1)
+          real*8 liswf(mrtang1)
+          real*8 lisw03(mrtang1)                
+*               
+          real*8 lisrt1(mangnrt),lisphid1(mangnrt)
+          real*8 lisrt2(mangnan)
+          real*8 lisphid2(mangnan)  
+          real*8 liswp1(mangnrt),liswp2(mangnan)     
+          real*8 lisk01(mangnrt),lisk02(mangnan)                
+       ENDSEGMENT
+*         
+c      Rtmax=Rtec*(4*lech/Lf)**(1/mw)
+      Rtmax=Rtec*(4*lech/(Lf*sqrt(3.d0)/2.d0))**(1/mw)
+c Rtmin est calculé avec un lc en (m)...
+      Rtmin=Rtec*(lech/(0.5d0*sqrt(2*pi)))**(1/mw)
+
+c m : nombre de paquets de fibres     
+c t : associé à la discrétisation des Td
+c p : numéro de la ligne des listes (Td,phid,point caractéristique des courbes)
+c nlongfi : nombre de discrétisations de la longueur des fibres
+c nangl +1 : nombre de discrétisation des orientations de fibres
+c nligne : sert à dimensionner des tableaux trop grands pour le nombre de lignes de calcul des forces d'une fibre
+c nfibre : nombre de paquets de fibres
+c nrt : nombre de discrétisations de la contrainte Td
+c incremwlis : incrément d'ouverture de fissure pour le calcul des forces moyennes (m)
+c Lf : Longueur des fibres (m)
+c Df : Diamètre des fibres (m)
+c Em : Module d'Young de la matrice (MPa)
+c Td0 : Contrainte de frottement pour une pression latérale nulle (MPa)
+c precision1 : valeur de la force après wp (MN)
+c phid : angle d'inclinaison fibre-traction (°)
+c lisTd : Liste des Td pour lesquels les forces moyennes ont été calculées (MPa)
+c lisphid : Liste des phid pour lesquels les forces moyennes ont été calculées (MPa)
+c lisfp : Liste des forces moyennes au pic correspondant a Td phid (MN)
+c liswp : Liste des ouvertures de fissures moyennes au pic correspondant a Td phid (m)
+c liswf : Liste des ouvertures de fissures moyennes finales (Fmoy=0) correspondant a Td phid (m)
+c lisw03 : Liste des ouvertures de fissures moyennes pour F=0,3*fp correspondant a Td phid (m)
+c k0m : Valeur de la rigidité initiale pour un couple (Td,phid) donné (MPa/m)
+c wp : Valeur de l'ouverture de fissure au pic pour un couple (Td,phid) donné (m)
+c fp : Valeur de la force au pic pour un couple (Td,phid) donné (MN)
+c f03 : 0.3*fp (MN)
+c w03 Valeur de l'ouverture de fissure pour F=0,3*fp pour un couple (Td,phid) donné (m)
+c wf : Valeur de l'ouverture de fissure finale pour un couple (Td,phid) donné (m)
+c kx,ky : Coefficients pour le calcul de la surface des rigidités initiales moyennes
+c wpx,wpy : Coefficients pour le calcul de la surface des ouvertures au pic moyennes
+c fpx,fpy : Coefficients pour le calcul de la surface des forces au pic moyennes
+c wpx,wpy : Coefficients pour le calcul de la surface des ouvertures finales moyennes
+c w3x,w3y : Coefficients pour le calcul de la surface des ouvertures moyennes à 0.3fp 
+c wlist : Liste d'ouverture de fissure, sert uniquement à tracer la courbe réduite (m)
+c B : Coefficient pour la partie croissante de la force reconstruite
+c f1 : Force reconstruite pour Td,phid actuels (MN)
+c max,min(k0m,fp,...) valeurs mini et maxi des listes des points cara des courbes 
+c servant de bornes lors du calcul des points sur leurs surfaces
+
+
+c initialisation de p pour la reduction de modele   
+c      print*, "Preparation des forces elementaires"
+c      print*, "Ancrage des fibres discretise en",nlongfi," positions"
+c      print*, "Calcul des forces moyennes pour",nangl+1," angles", 
+c     # " allant de 0 degres a",phit,"degres" 
+c      print*, "Calcul des forces moyennes pour",nrt,
+c     # " resistances a la traction du beton allant de",
+c     # Rtmin,"a",
+c     # Rtmax,"MPa"
+
+      
+      p=1
+      d=1
+      e=1
+      do t=1,nrt
+      Rt=rtmin*(nrt-t)/(nrt-1)+rtmax*(t-1)/(nrt-1)
+c
+      call prpfib(p,Lf,mu,
+     # Td,Tmax,Ef,Hf,Df,sk,F0,alphad,M0,Rt,fu,
+     # L0,d,e,fy,mwor,nligne,niter,nangl,nrt,nlongfi,
+     #  nangredu,phit,phicrit)   
+         
+         
+      end do
+
+c      print*,"Approximation des points caracteristiques des courbes"
+
+
+       call amxval(lisfp,lisfp(/1),maxfp)
+           call amnval(lisfp,lisfp(/1),minfp)
+C        call amxval(liswp,liswp(/1),maxwp)
+C          call amnval(liswp,liswp(/1),minwp)     
+
+       call amxval(liswp1,liswp1(/1),maxwp1)
+           call amnval(liswp1,liswp1(/1),minwp1)        
+
+       call amxval(liswp2,liswp2(/1),maxwp2)
+           call amnval(liswp2,liswp2(/1),minwp2)          
+
+       call amxval(lisk01,lisk01(/1),maxk01)
+           call amnval(lisk01,lisk01(/1),mink01)     
+    
+       call amxval(lisk02,lisk02(/1),maxk02)
+           call amnval(lisk02,lisk02(/1),mink02)      
+           
+       call amxval(liswf,liswf(/1),maxwf)
+           call amnval(liswf,liswf(/1),minwf)  
+           
+        call amxval(lisw03,lisw03(/1),maxw03)
+           call amnval(lisw03,lisw03(/1),minw03)
+           
+c calcul des coefficients des polynomes 
+      call xsrfc(lisrt1,lisphid1,lisk01,(nangredu*nrt),
+     # coeffk1,errmax,errmoy) 
+
+c      print*,"Erreur maximale d'approximation rigidite initiale 1 : "
+c     # ,errmax*100,"%"
+     
+c      print*,"Erreur moyenne d'approximation rigidite initiale 1 : "
+c     # ,errmoy*100,"%"
+     
+       call xsrfc(lisrt2,lisphid2,lisk02,((nangl+1-nangredu)*nrt),
+     # coeffk2,errmax,errmoy)     
+     
+c      print*,"Erreur maximale d'approximation rigidite initiale 2 : "
+c     # ,errmax*100,"%"
+     
+c      print*,"Erreur moyenne d'approximation rigidite initiale 2 : "
+c     # ,errmoy*100,"%"    
+
+      call xsrfc(lisrt1,lisphid1,liswp1,(nangredu*nrt),
+     # coeffwp1,errmax,errmoy)
+     
+c      print*,"Erreur maximale d'approximation ouverture de fissure au",
+c     # " pic 1: ",errmax*100,"%"
+     
+c      print*,"Erreur moyenne d'approximation ouverture de fissure au", 
+c     # " pic 1: ",errmoy*100,"%"     
+     
+     
+      call xsrfc(lisrt2,lisphid2,liswp2,((nangl+1-nangredu)*nrt),
+     # coeffwp2,errmax,errmoy)   
+     
+c      print*,"Erreur maximale d'approximation ouverture de fissure au",
+c     # " pic 2: ",errmax*100,"%"
+     
+c      print*,"Erreur moyenne d'approximation ouverture de fissure au", 
+c     # " pic 2: ",errmoy*100,"%"    
+     
+     
+      call xsrfc(lisrt,lisphid,lisfp,((nangl+1)*nrt),
+     # coefffp,errmax,errmoy)     
+     
+c      print*,"Erreur maximale d'approximation de force au pic : "
+c     # ,errmax*100,"%" 
+
+c      print*,"Erreur moyenne d'approximation de force au pic : "
+c     # ,errmoy*100,"%"     
+      
+      call xsrfc(lisrt,lisphid,liswf,((nangl+1)*nrt),
+     # coeffwf,errmax,errmoy)
+     
+c      print*,"Erreur maximale d'approximation ouverture finale : "
+c     # ,(errmax)*100,"%"     
+     
+c      print*,"Erreur moyenne d'approximation ouverture finale : "
+c     # ,(errmoy)*100,"%"     
+                    
+      call xsrfc(lisrt,lisphid,lisw03,((nangl+1)*nrt),
+     # coeffw03,errmax,errmoy)     
+
+c       print*,"Erreur maximale d'approximation ouverture intermediaire", 
+c     # " post pic : " ,(errmax)*100,"%" 
+
+c       print*,"Erreur moyenne d'approximation ouverture intermediaire" 
+c     # ," post pic : " ,(errmoy)*100,"%"     
+ 
+ 
+      end
+ 
+ 

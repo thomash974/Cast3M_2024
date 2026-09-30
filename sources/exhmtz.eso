@@ -1,0 +1,41 @@
+C EXHMTZ    SOURCE    PV090527  23/01/27    21:15:33     11574          
+       subroutine exhmtz(istep,NBVIA3D,INLVIA3D,NB_HELM,
+     # ivari,log_nl,num_nl)
+
+c     teste la necessite de faire un traitement non local de type
+c     helmholtz sur une variable interne
+ 
+c     entree ivari n° de la vari pour laquelle on veut faire un c hamps de phase
+c     sortie num_nl n° de la formulation d Helmholtz gerant cette variable
+c     les vari complementaires seront dans HELM0(num_nl,i) et Helm1(num_nl,i)
+c     respectivement pour le debut et la fin du pas
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      integer istep,NBVIA3D,NB_HELM
+      integer INLVIA3D(NB_HELM)
+      integer ivari,num_nl
+      logical log_nl
+
+      integer i
+
+c     defaut
+      log_nl=.FALSE.
+      num_nl=0
+c     champs de phase
+      if(istep.ne.0) then
+        do i=1,NBVIA3D
+            if (INLVIA3D(i).eq.ivari) then
+c               on fait un calcul non local sur la variable ivari
+                log_nl=.TRUE.
+c               numero de la formulation non locale
+                num_nl=i
+                return
+            end if
+        end do
+      end if
+
+      return
+      end
+ 

@@ -1,0 +1,106 @@
+C MODE18    SOURCE    CB215821  22/04/01    14:03:13     11326          
+
+C=======================================================================
+C=  Objet MODELE  -  Cas de la formulation 'DIFFUSION'                 =
+C=                                                                     =
+C=   Definition des noms de modeles de MATERIAU                        =
+C=           et des noms de types d'ELEMENTS FINIS                     =
+C=======================================================================
+
+      SUBROUTINE MODE18 (LESPRO,NBPRO,LESTEF,NBTEF,N1MAX,N2MAX)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+
+      CHARACTER*16  LESPRO(*)
+      CHARACTER*(*) LESTEF(*)
+
+C  1 - Noms de MODELES
+C ---------------------
+      IF (IDIM.EQ.1) THEN
+        NBPRO=6
+        IF (NBPRO.GT.N1MAX) GOTO 99
+        LESPRO(1)='ISOTROPE        '
+        LESPRO(2)='FICK            '
+        LESPRO(3)='SORET           '
+        LESPRO(4)='UTILISATEUR     '
+        LESPRO(5)='DISSIPATION     '
+        LESPRO(6)='AFFINE          '
+
+      ELSE
+        NBPRO=10
+        IF (NBPRO.GT.N1MAX) GOTO 99
+        LESPRO(1 )='ISOTROPE        '
+        LESPRO(2 )='ORTHOTROPE      '
+        LESPRO(3 )='ANISOTROPE      '
+        LESPRO(4 )='FICK            '
+        LESPRO(5 )='SORET           '
+        LESPRO(6 )='UTILISATEUR     '
+        LESPRO(7 )='DISSIPATION     '
+        LESPRO(8 )='AFFINE          '
+        LESPRO(9 )='VISQUEUSE       '
+        LESPRO(10)='ADVECTION       '
+      ENDIF
+
+C  2 - Noms de types d'ELEMENTS FINIS
+C ------------------------------------
+      IF (IDIM.EQ.1) THEN
+        NBTEF=3
+        IF (NBTEF.GT.N2MAX) GOTO 99
+C* En DIMEnsion 1, on s'appuie sur les elements mecaniques.
+        LESTEF(1)='M1D2'
+        LESTEF(2)='M1D3'
+        LESTEF(3)='POI1'
+
+      ELSEIF (IDIM.EQ.2) THEN
+        NBTEF=12
+        IF (NBTEF.GT.N2MAX) GOTO 99
+        LESTEF(1 )='TRI3'
+        LESTEF(2 )='TRI6'
+        LESTEF(3 )='QUA4'
+        LESTEF(4 )='QUA8'
+        LESTEF(5 )='POLY'
+        LESTEF(6 )='COQ2'
+        LESTEF(7 )='BARR'
+        LESTEF(8 )='BAR3'
+        LESTEF(9 )='TUY2'
+        LESTEF(10)='TUY3'
+        LESTEF(11)='JOI1'
+        LESTEF(12)='POI1'
+
+C*    ELSE IF (IDIM.EQ.3) THEN
+      ELSE
+        NBTEF=18
+        IF (NBTEF.GT.N2MAX) GOTO 99
+        LESTEF(1 )='CUB8'
+        LESTEF(2 )='CU20'
+        LESTEF(3 )='PRI6'
+        LESTEF(4 )='PR15'
+        LESTEF(5 )='TET4'
+        LESTEF(6 )='TE10'
+        LESTEF(7 )='PYR5'
+        LESTEF(8 )='PY13'
+        LESTEF(9 )='COQ3'
+        LESTEF(10)='COQ4'
+        LESTEF(11)='COQ6'
+        LESTEF(12)='COQ8'
+        LESTEF(13)='BARR'
+        LESTEF(14)='BAR3'
+        LESTEF(15)='TUY2'
+        LESTEF(16)='TUY3'
+        LESTEF(17)='JOI1'
+        LESTEF(18)='POI1'
+      ENDIF
+      RETURN
+
+C  3 - Traitement des ERREURS
+C ----------------------------
+ 99   CALL ERREUR(5)
+      RETURN
+
+      END
+ 

@@ -1,0 +1,231 @@
+C BLOPHA    SOURCE    FANDEUR   22/01/19    21:15:03     11256          
+      SUBROUTINE BLOPHA
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+* +------------------------------------------------------------------------+
+* | création des matrices de bloquage pour le modele CHANGEMENT_PHASE      |
+* |    RIGIDITE sont de type 2 avec des 'FLX' a mettre en face             |
+* +------------------------------------------------------------------------+
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMMODEL
+-INC SMRIGID
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMCHAML
+
+* +------------------------------------------------------------------------+
+      call LIROBJ('MMODEL  ',mmodel,1,iretou)
+      call ACTOBJ('MMODEL  ',mmodel,1)
+      if(ierr.ne.0) return
+      nbsou =kmodel(/1)
+      nrigel=0
+      do 100 i=1,nbsou
+        imodel=kmodel(i)
+
+        nfor=imodel.formod(/2)
+        call place(imodel.formod,nfor,iplac,'CHANGEMENT_PHASE')
+        if  (iplac .eq. 0) goto 100
+
+C       RAPPEL : RESO suppose un seul 'LX' par rigidite et il doit etre en premier
+        IF    (imodel.matmod(1)(1:10) .EQ. 'PARFAIT   ')THEN
+C         1 seule RIGIDITE suffit
+          nrigel = nrigel + 1
+        ELSEIF(imodel.matmod(1)(1:10) .EQ. 'SOLUBILITE')THEN
+C         2 RIGIDITES pour les besoins de RESO
+          nrigel = nrigel + 2
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+  100 continue
+
+      segini,mrigid
+      mtymat='BLO_PHAS'
+      iforig = ifour
+
+*     Boucle sur les sous zones du model pour creer les matrices de blocages
+      nrigel = 0
+      do 1 i=1,nbsou
+        imodel=kmodel(i)
+
+        nfor=imodel.formod(/2)
+        call place(imodel.formod,nfor,iplac,'CHANGEMENT_PHASE')
+        if  (iplac .eq. 0) goto 1
+
+        IF    (imodel.matmod(1)(1:10) .EQ. 'PARFAIT   ')THEN
+          ICAS = 1
+          IF(tymode(2) .NE. 'MAILLAGE')THEN
+            CALL ERREUR(5)
+          ENDIF
+          ipt2 = ivamod(2)
+
+        ELSEIF(imodel.matmod(1)(1:10) .EQ. 'SOLUBILITE')THEN
+          ICAS = 2
+          DO ii=1,imodel.tymode(/2) - 1
+            IF(imodel.tymode(ii+1) .NE. 'MAILLAGE')THEN
+              CALL ERREUR(5)
+            ENDIF
+          ENDDO
+          ipt2 = ivamod(2)
+          ipt3 = ivamod(3)
+
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+
+C       Remplissage des objets rigidite
+        IF    (ICAS .EQ. 1)THEN
+          nrigel      = nrigel + 1
+          nelrig      = ipt2.num(/2)
+          nligrp      = 2
+          nligrd      = 2
+          segini,descr,xmatri
+
+          coerig(nrigel)  = 1.D0
+          irigel(1,nrigel)= ipt2
+          irigel(3,nrigel)= descr
+          irigel(4,nrigel)= xmatri
+          irigel(5,nrigel)= nifour
+          irigel(6,nrigel)= 2
+          isym            = 0
+          irigel(7,nrigel)= isym
+          xmatri.SYMRE    = isym
+
+          NOMID=lnomid(1)
+          lisinc(1)='LX'
+          lisinc(2)= nomid.lesobl(1)
+
+          NOMID=lnomid(2)
+          lisdua(1)='FLX'
+          lisdua(2)= nomid.lesobl(1)
+
+          noelep(1)=1
+          noelep(2)=2
+          noeled(1)=1
+          noeled(2)=2
+
+          do iou=1,nelrig
+            re(1,1,iou)= 0.D0
+            re(2,1,iou)= 1.D0
+
+            re(1,2,iou)= 1.D0
+            re(2,2,iou)= 0.D0
+          enddo
+          segdes,descr,xmatri
+
+        ELSEIF(ICAS .EQ. 2)THEN
+C         RIGIDITE n° 1
+C         -------------
+          nrigel      = nrigel + 1
+          nelrig      = ipt2.num(/2)
+          nligrp      = 3
+          nligrd      = 3
+          segini,descr,xmatri
+          coerig(nrigel)  = 1.D0
+          irigel(1,nrigel)= ipt2
+          irigel(3,nrigel)= descr
+          irigel(4,nrigel)= xmatri
+          irigel(5,nrigel)= nifour
+          irigel(6,nrigel)= 1
+          isym            = 2
+          irigel(7,nrigel)= isym
+          xmatri.SYMRE    = isym
+
+          NOMID    = lnomid(1)
+          lisinc(1)='LX'
+          lisinc(2)= nomid.lesobl(1)
+          lisinc(3)= nomid.lesobl(2)
+
+          NOMID    = lnomid(2)
+          lisdua(1)='FLX'
+          lisdua(2)= nomid.lesobl(1)
+          lisdua(3)= nomid.lesobl(2)
+
+          DO iel=1,nligrp
+            noelep(iel)=iel
+            noeled(iel)=iel
+          ENDDO
+
+          do iou=1,nelrig
+            re(1,1,iou)= 0.D0
+            re(2,1,iou)= 1.D0
+            re(3,1,iou)=-1.D0
+
+            re(1,2,iou)= 1.D0
+            re(2,2,iou)= 0.D0
+            re(3,2,iou)= 0.D0
+
+            re(1,3,iou)= 0.D0
+            re(2,3,iou)= 0.D0
+            re(3,3,iou)= 0.D0
+          enddo
+          segdes,descr,xmatri
+
+C         RIGIDITE n° 2
+C         -------------
+          nrigel     = nrigel + 1
+          nelrig2    = ipt3.num(/2)
+          IF(nelrig2 .NE. nelrig)THEN
+            CALL ERREUR(5)
+          ENDIF
+          nelrig     = nelrig2
+          nligrp     = 3
+          nligrd     = 3
+          segini,descr,xmatri
+
+          coerig(nrigel)  = 1.D0
+          irigel(1,nrigel)= ipt3
+          irigel(3,nrigel)= descr
+          irigel(4,nrigel)= xmatri
+          irigel(5,nrigel)= nifour
+          irigel(6,nrigel)=-1
+          isym            = 2
+          irigel(7,nrigel)= isym
+          xmatri.SYMRE    = isym
+
+          NOMID    = lnomid(1)
+          lisinc(1)='LX'
+          lisinc(2)= nomid.lesobl(1)
+          lisinc(3)= nomid.lesobl(2)
+
+          NOMID    = lnomid(2)
+          lisdua(1)='FLX'
+          lisdua(2)= nomid.lesobl(1)
+          lisdua(3)= nomid.lesobl(2)
+
+          DO iel=1,nligrp
+            noelep(iel)=iel
+            noeled(iel)=iel
+          ENDDO
+
+          do iou=1,nelrig
+            re(1,1,iou)= 0.D0
+            re(2,1,iou)=-1.D0
+            re(3,1,iou)= 1.D0
+
+            re(1,2,iou)= 0.D0
+            re(2,2,iou)= 0.D0
+            re(3,2,iou)= 0.D0
+
+            re(1,3,iou)= 1.D0
+            re(2,3,iou)= 0.D0
+            re(3,3,iou)= 0.D0
+          enddo
+          segdes,descr,xmatri
+
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+   1  continue
+      segdes,mrigid
+
+      call ECROBJ('RIGIDITE',mrigid)
+
+      end
+ 
+ 

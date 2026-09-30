@@ -1,0 +1,371 @@
+C DEF3D     SOURCE    FD218221  24/02/07    21:15:09     11834          
+      subroutine def3d(ppas,tdef,nrjd,def0,sr1,srsdef,teta1,teta2,dt,
+     # vdef00,def1,CNa,nrjp,ttrp,tfid,ttdd,tdid,exmd,exnd,cnab,cnak,
+     # ssad,At,St,M1,E1,vdef0,E2,AtF,StF,M1F,E1F,vdeff,E2F,ttdf,nrjf,
+     # nsul,err1,Kb,Kdef,Vvdef,Cdef,Rt,mdef,bdef,dphidef,bs0,bs1)
+
+c      sous programme de calcul de l avancement chimique de def
+c      version de mars 2017 sans possibilite de formation de M2 et
+c      conversion possible de M1 en E2
+
+
+c   ********************************************************************
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+c   ********************************************************************
+      logical ppas
+      real*8 tdef,nrjd,def0,sr1,srsdef,teta1,teta2      
+      real*8 alphadef,Ear, xk,CNamin,CNa,ARNa,CNamin1
+      real*8 nrjp,ttrp,tfid,ttdd
+      real*8 tdid,exmd,exnd,cnab,cnak,ssad,vdef0,vdeff
+      real*8 At,St,M1,E1,E2,AtF,StF,M1F,E1F,E2F,ttdf,nrjf,nsul
+      integer err1
+      real*8 Kb,Kdef,Vvdef,Cdef,Rt,Mdef,Bdef,dphidef,bs0,bs1
+      real*8 Ks1
+      
+      real*8 A1,S1
+      real*8 VMaft,VMafm,Sc,Ac,E21,AT1,ST1
+      real*8 coeff1,taudis,taupre,taufix,kfd,dvdef
+      real*8 CCD,CCF,CCP,CTD,CTF,CTP,CHD,CHF,CHP,CD,CF,CP
+      real*8 vdef1
+      
+      
+c      print*,"tdef,nrjd,def0,sr1,srsdef,teta1,teta2,dt"
+c      print*,tdef,nrjd,def0,sr1,srsdef,teta1,teta2,dt     
+c      print*,"nrjp,ttrp,tfid,ttdd"
+c      print*,nrjp,ttrp,tfid,ttdd      
+c      print*,"tdid,exmd,exnd,cnab,cnak,ssad"
+c      print*,tdid,exmd,exnd,cnab,cnak,ssad
+c      read*
+
+c     **** avancement chimique de la def *******************************
+
+c     cf .Chemical modelling of Delayed Ettringite Formation for assessment
+c     of affected concrete structures (Sellier / Multon)
+c     in  https://doi.org/10.1016/j.cemconres.2018.03.006
+
+      
+c     teneur en aluminium et sulfates en fonction de VDEF et SSAD
+      VMaft=715.d-6
+      VMafm=254.6d-6
+      err1=0     
+      if(ssad.ge.3.d0) then  
+c        assez de sulfates pour ne faire que de la def      
+         Ac=vdef00/VMaft
+         SC=ssad*Ac
+      else
+c        les sulfates limitent la formation de la def      
+         Sc=3.d0*vdef00/VMaft
+         if(ssad.ne.0.) then
+            Ac=Sc/ssad
+         else
+           if (vdef00.eq.0.) then
+             Sc=0.d0
+             Ac=0.d0
+           else
+c            on suppose qu il y a juste assez d aluminium pour ne faire
+c            que de la def           
+             Ac=Sc/3.d0
+           end if
+         end if
+       end if
+       coeff1=1.d0
+       
+       if (nsul.ne.0.) then
+         if (Sc.ne.0.) then
+            if (nsul.le.Sc) then
+c             le volume de def calcule sera apparent( il contient des vides)
+c             le coeff d efficacite est superieur a un pour les AFT         
+              coeff1=Sc/nsul
+c             mais la chimie est conforme a nsul et ssad          
+              Sc=nsul
+              Ac=Sc/ssad
+            else
+              print*,' Donnees NSUL et VDEF incompatibles dans def3d'
+              print*,'NSUL > Sc(VDEF) theoriquement impossible'
+              err1=1
+              return
+            end if
+         else
+c          comme Sc=0 on prend coeff1=0. et Sc=nsul, la chimie tourne
+c          mais la def n est pas efficace
+           Sc=nsul
+           Ac=Sc/ssad  
+           coeff1=0.d0           
+         end if         
+       else
+c        nsul=0 mais vdef ne 0
+c        on suppose que c est vdef qui est la donnee correcte
+         if(vdef.eq.0.) then       
+            print*,'Pb dans les donnees de DEF dans def3d'
+            print*,'nsul=0 et vdef=0 ds vdef3d' 
+            err1=1
+            return
+         end if
+       end if   
+
+c       print*, 'coeff efficacite def dans def3d', coeff1       
+
+c       print*,'Def3d Sc,Ac mol/m3',Sc, AC
+       
+c      initialisation de At,St,M1,E1,vdef0,E2,HG si premier pas
+       if(ppas) then
+c        on surcharge les variables internes pour initialiser
+c        le pr chimique de la def en fonction des donnees materiaux       
+         if(Sc.ge.3.d0*Ac) then
+            E1=Ac
+            M1=0.d0
+            E2=0.d0
+            vdef0=0.d0
+            At=0.d0
+            St=SC-3.d0*E1
+         else if (Sc.le.Ac) then
+            E1=0.d0
+            M1=Sc
+            E2=0.d0
+            vdef0=0.d0
+            At=Ac-M1
+            St=0.d0
+         else
+            E1=(Sc-Ac)/2.d0
+            M1=(3.d0*Ac-Sc)/2.d0
+            E2=0.d0
+            vdef0=0.d0
+            At=0.d0
+            St=0.d0
+         end if
+      end if
+c      print*,'Def3d:At,St,M1,E1,vdef0,E2'
+c      print*,At,St,M1,E1,vdef0,E2
+       
+c     sulfo-aluminates destabilisable en temperature       
+      A1=E1+M1+E2
+      S1=3.d0*(E1+E2)+M1
+
+c     calcul des coeff cinetiques pour la dissolution/ precipitation       
+c     passage des temperatures en Kelvin
+      temp1=0.5d0*(teta1+teta2)+273.15d0
+
+c     temperature seuil de destabilisation fonction de la concentration en Na
+      if(Cna.ge.Cnak) then
+         tempd=273.15d0+ttdd*((Cnak/CNa)**exnd)
+      else
+         tempd=273.15d0+ttdd
+      end if
+c     temperature minimale pour la fixation des alu
+      tempf=273.15d0+ttdf     
+     
+      if(temp1.gt.tempd) then
+c      dissolution des phases sulfo alumineuse
+c      coeff cinetique de dissolution precipitation
+c      influence de la temperature
+       CTD=max((exp(-(nrjd/8.31d0)*(1.d0/temp1-1.d0/tempd)))-1.d0,0.d0)
+c      influence de la temperature sur la fixation des alu       
+       CTF=max((exp(-(nrjf/8.31d0)*(1.d0/temp1-1.d0/tempf)))-1.d0,0.d0)
+c      influence des alcalins sur la dissolution
+       CCD=CNa/Cnak 
+c      influence des alcalins sur la fixation des alu
+       if(CNa.gt.0.) then       
+          CCF=(Cnak/CNa)**exmd
+       else
+c         fixation instantanee
+          CCF=1.d6
+       end if          
+c      influence de l'humidite sur la dissolution
+       CHD=1.d0
+c      influence de l humidite sur la fixation       
+       CHF=1.d0  
+c      influence THC sur dissolution
+       CD=CCD*CTD*CHD
+c      influence THC sur la fixation
+       CF=CCF*CTF*CHF         
+c      actualisation de l aluminium ds les phases sulfates
+       A1F=A1*exp(-dt*CD/tdid)
+c      actualisation de l aluminium libre
+       if(CF.ne.0.) then
+c          la fixation de l alu est possible 
+c          rapport des temps caractéristiques        
+           kfd=(tfid/tdid)*(CD/CF) 
+           if(kfd.eq.1.) then
+                 kfd=1.0001d0
+                 CD=kfd*CD 
+           end if            
+           AtF=At*exp(-dt*CF/tfid)+(A1*kfd/(kfd-1.d0))*
+     #    (exp(-dt*CF/tfid)-exp(-dt*CD/tdid))
+       else
+c          la fixation des alu est impossible, tout l alu dissous reste
+c          disponible pour la reaction secondaire
+           AtF=At+(A1-A1F)
+       end if
+c      actualisation des sulfates libres
+c      toutes les phases disparaissent avec la meme cinetique
+       StF=St+(3.d0*(E1+E2)+M1)*(1.d0-exp(-dt*CD/tdid)) 
+c      actualisation des variables internes
+       if(A1.ne.0.) then
+         cA1=A1F/A1
+       else
+         cA1=1.d0
+       end if         
+       E1F=E1*cA1
+       E2F=E2*cA1
+       M1F=M1*cA1        
+       dvdef=(E2F-E2)*VMaft*coeff1
+      else
+c       precipitation des phases sulfo-alumineuses
+c       temprerature de reference pour la precipitation      
+        tempr=ttrp+273.15d0 
+c       coeff cinetique pour la precipitation
+c       influence de le temperature
+        CTP=((1.d0-exp(-(nrjd/8.31d0)*(1.d0/temp1-1.d0/tempd)))/
+     #  (1.d0-exp(-(nrjd/8.31d0)*(1.d0/tempr-1.d0/tempd))))*
+     #  exp(-(nrjp/8.31d0)*(1.d0/temp1-1.d0/tempr))
+c       influence de l humidite 
+        if(srsdef.lt.1.d0) then    
+           CHP=exp(-(1.d0-Sr1)/(1.d0-srsdef))  
+        else
+           CHP=0.d0
+        end if
+c       influence des alcalins
+        CCP=(1.d0-min(CNa,Cnab)/Cnab)**exmd
+        CP=CTP*CCP*CHP
+        if((CP.gt.0.).and.(St.gt.0.)) then
+c          temps caracteristique de precipitation         
+           taupre=tdef/CP
+           if(M1.gt.0.) then
+c              il faut d abord convertir m1 
+               if (St.gt.(2.d0*M1)) then
+c                  il ya assez de st pour consommer tout m1
+                   dt1=-(taupre/2.d0)*log(1.d0-(2.d0*M1/St))
+c                   print*,'def3d: st>2m1: dt1=',dt1
+                   if (dt1.ge.dt) then
+c                      pas le temps de tout concertir
+                       E2F=E2+(St/2.d0)*(1.d0-exp(-2.d0*dt/taupre))
+                       StF=St-2.d0*(E2F-E2)
+                       AtF=At
+                       M1F=M1-(E2F-E2)
+                       E1F=E1 
+                   else
+c                      on a le temps de consommer tout m1 et une partie de At
+c                      on va jusque a t0+dt1 en consommant m1
+                       E21=E2+(St/2.d0)*(1.d0-exp(-2.d0*dt1/taupre))
+                       St1=St-2.d0*(E21-E2)
+                       At1=At
+                       M1F=M1-(E21-E2)
+                       E1F=E1
+c                      ensuite on crée du E2 a partir de At et St uniquement
+                       if(St1.le.(3.d0*At1)) then
+c                        pas assez de St pour concertir tout At
+                         dt2=dt-dt1
+                         E2F=E21+(St1/3.d0)*(1.d0-exp(-3.d0*dt2/taupre))
+                         StF=St1-3.d0*(E2F-E21)
+                         AtF=At1-(E2F-E21)
+                       else
+c                        pas assez de At pour consommer tout St
+                         dt2=-(taupre/3.d0)*log(1.d0-(3.d0*At1/St1))
+c                         print*,'def3d: temps pour at=0',dt2
+c                         print*,taupre,at1,st1
+                         dt2=min(dt-dt1,dt2)
+                         E2F=E21+(St1/3.d0)*(1.d0-exp(-3.d0*dt2/taupre))
+                         AtF=At1-(E2F-E21) 
+                         StF=St1-3.d0*(E2F-E21)                         
+                       end if                       
+                   end if                       
+               else
+c                  il n y a pas assez de st pour consommer tout m1 
+c                  il faut un temps infini pour consommer m1, les autres cas
+c                  ne sont donc pas à considerer
+                   E2F=E2+(St/2.d0)*(1.d0-exp(-2.d0*dt/taupre))
+                   StF=St-2.d0*(E2F-E2)
+                   AtF=At
+                   M1F=M1-(E2F-E2)
+                   E1F=E1                                
+               end if               
+           else
+c              il n y a plus de m1 a convertir  
+               if(St.le.(3.d0*At)) then
+c                pas assez de St pour concertir tout At
+                 E2F=E2+(St/3.d0)*(1.d0-exp(-3.d0*dt/taupre))
+                 StF=St-3.d0*(E2F-E2)
+                 AtF=At-(E2F-E2)
+                 M1F=0.d0
+                 E1F=E1
+               else
+c                pas assez de At pour consommer tout St
+                 dt2=-(taupre/3.d0)*log(1.d0-(3.d0*At/St))
+c                 print*,'def3d: st<3At et m1=0: dt2=',dt2                 
+                 dt2=min(dt,dt2)
+                 E2F=E2+(St/3.d0)*(1.d0-exp(-3.d0*dt2/taupre))
+                 Stf=St-3.d0*(E2F-E2)
+                 AtF=At-(E2F-E2)
+                 M1F=0.d0
+                 E1F=E1                       
+               end if           
+           end if 
+c          evolution de vdef par precipiatation de phases neoformees
+c          a l endroit d afm1 pour la conversion directe
+c          a un nouvel endroit pour aft2
+           dvdef=(E2F-E2)*VMaft*coeff1+(M1F-M1)*VMafm
+           if (coeff1.eq.0.) then
+             dvdef=0.d0
+           end if
+        else
+           E1F=E1
+           E2F=E2
+           M1F=M1        
+           AtF=At
+           StF=St
+           dvdef=0.d0           
+        end if
+       end if  
+       
+C      calcul du volume des phases neoformees
+       VDEFF=VDEF0+DVDEF 
+c       VDEF1=0.d0       
+       def1=VDEFF/vdef00
+       dphidef=dvdef    
+
+c     **** calcul des coeffs poromécaniques ****************************       
+       
+      if(vdeff.ne.0.) then
+         vdef1=vdeff
+c        volume de gel a considerer
+         bs1=2.d0*vdef1/(1.d0+vdef1)
+         bdef=0.5d0*(bs0+bs1)
+         Ks1=Kb/(1.d0-bdef)         
+         if (vdef1.gt.0.d0) then
+            mdef=((bdef-vdef1)/Ks1+vdef1/Kdef)**(-1)
+         else
+c           pas de def
+            bs1=0.d0
+            bdef=0.5d0*(bs0+bs1)
+            mdef=0.d0
+         end if  
+c        prise en compte du volume des vides connectés         
+         mdef=mdef/(1.0d0+mdef*Vvdef*Cdef/Rt)       
+      else
+c       pas de def donc il ne faur pas generer de pression
+        bdef=0.d0
+        bs1=0.d0
+        mdef=0.d0
+      end if  
+
+      
+c       print*,'e1', E1,E1F
+c       print*,'e2',E2,E2F
+c       print*,'m1',M1,M1F       
+c       print*,'at',At,AtF
+c       print*,'st',St,StF
+c       print*,'vdef',vdef0,vdeff
+c       print*,'adef',def1
+c       read*
+
+c      print*, "vdef00,def1,vdef1"
+c      print*,vdef00,def1,vdef1 
+c      read*      
+
+      return
+      end
+c***********************************************************************      
+      
+ 
+ 

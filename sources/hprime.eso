@@ -1,0 +1,69 @@
+C HPRIME    SOURCE    PV        20/09/15    21:15:02     10713          
+      SUBROUTINE HPRIME(XE,NBNN,IDIM,SHPTOT,IGAU,SHPWRK,DJAC)
+C=======================================================================
+C
+C   ENTREES
+C     XE(3,NBNN)= COORDONNEES DES NOEUDS
+C     NBNN      = NOMBRE DES NOEUDS
+C     IDIM      = DIMENSION DU PROBLEME
+C     SHPTOT(6,NBNO,IGAU)= FONCTIONS DE FORME REDUITES (VIENT DE MINTE
+C     IGAU      =NUMERO DU POINT DE GAUUS
+C  SORTIES
+C     SHPWRK(6,NBNO)= H  H,X   H,Y   H,Z
+C     DJAC      =JACOBIEN
+C
+C=======================================================================
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      DIMENSION XE(3,*),SHPTOT(6,NBNN,*),SHPWRK(6,*)
+      IDIM1=IDIM+1
+      if(idim1.ge.6) then
+      DO  IA=1,NBNN
+      SHPWRK(6,IA)=SHPTOT(6,IA,IGAU)
+      SHPWRK(5,IA)=SHPTOT(5,IA,IGAU)
+      SHPWRK(4,IA)=SHPTOT(4,IA,IGAU)
+      SHPWRK(3,IA)=SHPTOT(3,IA,IGAU)
+      SHPWRK(2,IA)=SHPTOT(2,IA,IGAU)
+      SHPWRK(1,IA)=SHPTOT(1,IA,IGAU)
+      enddo
+      endif
+      if(idim1.eq.5) then
+      DO  IA=1,NBNN
+      SHPWRK(5,IA)=SHPTOT(5,IA,IGAU)
+      SHPWRK(4,IA)=SHPTOT(4,IA,IGAU)
+      SHPWRK(3,IA)=SHPTOT(3,IA,IGAU)
+      SHPWRK(2,IA)=SHPTOT(2,IA,IGAU)
+      SHPWRK(1,IA)=SHPTOT(1,IA,IGAU)
+      enddo
+      endif
+      if(idim1.eq.4) then
+      DO  IA=1,NBNN
+      SHPWRK(4,IA)=SHPTOT(4,IA,IGAU)
+      SHPWRK(3,IA)=SHPTOT(3,IA,IGAU)
+      SHPWRK(2,IA)=SHPTOT(2,IA,IGAU)
+      SHPWRK(1,IA)=SHPTOT(1,IA,IGAU)
+      enddo
+      endif
+      if(idim1.eq.3) then
+      DO  IA=1,NBNN
+      SHPWRK(3,IA)=SHPTOT(3,IA,IGAU)
+      SHPWRK(2,IA)=SHPTOT(2,IA,IGAU)
+      SHPWRK(1,IA)=SHPTOT(1,IA,IGAU)
+      enddo
+      endif
+      if(idim1.eq.2) then
+      DO  IA=1,NBNN
+      SHPWRK(2,IA)=SHPTOT(2,IA,IGAU)
+      SHPWRK(1,IA)=SHPTOT(1,IA,IGAU)
+      enddo
+      endif
+      if(idim1.eq.1) then
+      DO  IA=1,NBNN
+      SHPWRK(1,IA)=SHPTOT(1,IA,IGAU)
+      enddo
+      endif
+      CALL JACOBI(XE,SHPWRK,IDIM,NBNN,DJAC)
+      RETURN
+      END
+
+ 

@@ -1,0 +1,171 @@
+C TOPCLP    SOURCE    GOUNAND   21/04/06    21:15:28     10940          
+      SUBROUTINE TOPCLP(TRAVJ,lchang)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPCLP
+C DESCRIPTION :
+C
+C
+C      
+*     Nettoyage des noeuds qui ne sont plus référencés dans la topologie
+*     mais seulement ceux ajoutés par nous, pas les autres !
+*     (utilise la topologie inverse qui doit donc etre coherente ! :)      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 17/10/2017, version initiale
+C HISTORIQUE : v1, 17/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMLENTI
+      POINTEUR JNNO.MLENTI
+-INC SMELEME
+      POINTEUR JTOPO.MELEME
+-INC SMCOORD
+      POINTEUR JCOORD.MCOORD
+-INC TMATOP1
+*-INC STOPINV
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+*-INC STRAVJ
+*
+      logical lchang
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans topclp.eso'
+*
+* Initialisation et extension des segments JTOPO et JCOORD
+*
+      IDIMP=IDIM+1
+*      if (impr.gt.2) write(ioimp,185) 'npini,npcou,npmax=',npini,npcou
+*     $     ,npmax
+      lchang=.false.
+      IF (npcou.NE.npini) THEN
+*         write(ioimp,185) 'npini,npcou,npmax=',npini,npcou,npmax
+         TOPINV=TRAVJ.TOPI
+         npenle=0
+         DO IP=NPINI+1,NPCOU
+            IF (TDC(IP).LE.0) npenle=npenle+1
+         ENDDO
+         lchang=(npenle.gt.0)
+         if (lchang) then
+            jnno=travj.nno
+            jcoord=travj.coord
+            jcmetr=travj.cmetr
+            JP=NPINI
+* JCOORD et INI JNNO        
+            DO IP=NPINI+1,NPCOU
+               IF (TDC(IP).GT.0) THEN
+                  JP=JP+1
+                  JNNO.LECT(IP-NPINI)=JP
+                  DO IC=1,IDIMP
+                     JCOORD.XCOOR((JP-1)*IDIMP+IC)=
+     $                    JCOORD.XCOOR((IP-1)*IDIMP+IC)
+                  ENDDO
+                  IF (JCMETR.NE.0) THEN
+                     DO ININ=1,JCMETR.XIN(/1)
+                        JCMETR.XIN(ININ,JP)=JCMETR.XIN(ININ,IP)
+                     ENDDO
+                  ENDIF
+               ENDIF
+            ENDDO
+*pascher            if (iveri.ge.2) then
+            if (jp.ne.npcou-npenle) then
+               write(ioimp,185) 'jp,npcou,npenle,npmax=',jp,npcou,npenle
+     $              ,npmax 
+               goto 9999
+            endif
+*pascher            endif
+            if (iveri.ge.1) then   
+               DO IP=NPCOU-NPENLE+1,NPCOU
+                  DO IC=1,IDIMP
+                     JCOORD.XCOOR((IP-1)*IDIMP+IC)=0.D0
+                  ENDDO
+                  IF (JCMETR.NE.0) THEN
+                     DO ININ=1,JCMETR.XIN(/1)
+                        JCMETR.XIN(ININ,IP)=0.D0
+                     ENDDO
+                  ENDIF
+               ENDDO
+            endif
+            jtopo=travj.topo
+* JTOPO         
+            do iel=1,nvcou
+               do ino=1,idimp
+                  inod=jtopo.num(ino,iel)
+                  if (inod.gt.npini) then
+                     jnod=JNNO.LECT(INOD-npini)
+                     jtopo.num(ino,iel)=jnod
+                  endif
+               enddo
+            enddo
+*     TOPINV et SUP JNNO
+            JP=NPINI
+            DO IP=NPINI+1,NPCOU
+               IF (TDC(IP).GT.0) THEN
+                  JP=JP+1
+                  JNNO.LECT(IP-NPINI)=0
+                  TDC(JP)=TDC(IP)
+                  TIC(JP)=TIC(IP)
+               ENDIF
+            ENDDO
+            DO IP=NPCOU-NPENLE+1,NPCOU
+               TDC(IP)=0
+               TIC(IP)=-1
+            ENDDO
+*     dimensions
+            npcou=npcou-npenle
+         endif
+      endif
+*      if (impr.gt.2) then
+         if (lchang) write(ioimp,185) 'topclp : npenle=',npenle
+*         write(ioimp,185) 'topclp : npenle=',npenle
+*      endif         
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 186  FORMAT ('Segment ',A6,' ',A6,' ajusté de ',I6,' à ',I6)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPCLP  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TOPCLP
+*
+      END
+
+ 

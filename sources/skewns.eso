@@ -1,0 +1,210 @@
+C SKEWNS    SOURCE    FD218221  20/06/17    21:15:09     10630          
+      SUBROUTINE SKEWNS(VAL,NUM,NN,NE,ITYP)
+C-----------------------------------------------------------------------
+C     Calcul de la "pointicite" (skewness) des elements d'un maillage elementaire
+C     Fonctionne pour les elements TET4
+C
+C     Le skewness est definit ainsi :
+C     (volume optimal - volume) / volume optimal
+C     le volume optimal est celui du triangle/tetraedre equilateral place
+C     dans la meme sphere circonscrite
+C
+C     Ainsi, pour un triangle/tetraedre equilateral = 0
+C            pour un triangle/tetraedre degenere    = 1
+C            bornes : 0 < SKEW < 1
+C
+C     Entrees :
+C        NUM(NN,NE) : tableau des numeros des elements du maillage
+C        NN         : nombre de noeuds par element
+C        NE         : nombre d'elements
+C        ITYP       : numero indiquant le type d'element
+C     Sorties :
+C        VAL(1,NE) : tableau des valeurs d'aspect ration pour les elements
+C                    du maillage (il s'agit du VELCHE d'un champ par elements)
+C-----------------------------------------------------------------------
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC CCREEL
+C
+      DIMENSION VAL(1,*),NUM(NN,NE)
+C     Quelques nombres constants
+      PARAMETER (UNDEMI=0.5D0,UN=1D0,DEUX=2D0,TROIS=3D0,QUATRE=4D0,
+     &           SIX=6D0,HUIT=8D0,SEIZE=16D0)
+      R8S3=SQRT(HUIT/TROIS)
+      SIXR2=SIX*SQRT(DEUX)
+      R3=SQRT(TROIS)
+C     La dimension de l'espace + 1
+      IDIMP1=IDIM+1
+C     Erreur si type d'element non prevu (normalement impossible de passer ici !)
+      IF ((ITYP.NE.4).AND.(ITYP.NE.23)) THEN
+         CALL ERREUR(16)
+         RETURN
+      ENDIF
+C     Boucle sur les elements du maillage
+      DO I=1,NE
+C        Cas des elements TRI3
+         IF (ITYP.EQ.4) THEN
+C           Numeros des 3 sommets
+            IA=NUM(1,I)
+            IB=NUM(2,I)
+            IC=NUM(3,I)
+C           Coordonnees des 3 sommets
+            XA=XCOOR((IA-1)*IDIMP1+1)
+            YA=XCOOR((IA-1)*IDIMP1+2)
+            XB=XCOOR((IB-1)*IDIMP1+1)
+            YB=XCOOR((IB-1)*IDIMP1+2)
+            XC=XCOOR((IC-1)*IDIMP1+1)
+            YC=XCOOR((IC-1)*IDIMP1+2)
+            IF (IDIM.EQ.3) THEN
+               ZA=XCOOR((IA-1)*IDIMP1+3)
+               ZB=XCOOR((IB-1)*IDIMP1+3)
+               ZC=XCOOR((IC-1)*IDIMP1+3)
+            ENDIF
+C           Tailles des 3 aretes
+            XBA=XB-XA
+            YBA=YB-YA
+            IF (IDIM.EQ.2) THEN
+               AB=SQRT(XBA*XBA+YBA*YBA)
+            ELSEIF (IDIM.EQ.3) THEN
+               ZBA=ZB-ZA
+               AB=SQRT(XBA*XBA+YBA*YBA+ZBA*ZBA)
+            ENDIF
+            XCA=XC-XA
+            YCA=YC-YA
+            IF (IDIM.EQ.2) THEN
+               AC=SQRT(XCA*XCA+YCA*YCA)
+            ELSEIF (IDIM.EQ.3) THEN
+               ZCA=ZC-ZA
+               AC=SQRT(XCA*XCA+YCA*YCA+ZCA*ZCA)
+            ENDIF
+            XCB=XC-XB
+            YCB=YC-YB
+            IF (IDIM.EQ.2) THEN
+               BC=SQRT(XCB*XCB+YCB*YCB)
+            ELSEIF (IDIM.EQ.3) THEN
+               ZCB=ZC-ZB
+               BC=SQRT(XCB*XCB+YCB*YCB+ZCB*ZCB)
+            ENDIF
+C           Aire du triangle (formule de Heron)
+            P=UNDEMI*(AB+AC+BC)
+            H2=P*(P-AB)*(P-AC)*(P-BC)
+            H=SQRT(H2)
+C           Aire du triangle optimal (c'est-a-dire celui regulier avec
+C           le meme cercle circonscrit)
+            RC2=AB*AB*AC*AC*BC*BC/(SEIZE*H2)
+            AOPT=TROIS*R3*RC2/QUATRE
+C           Indicateur SKEW, skewness
+            SKEW=ABS((AOPT-H)/AOPT)
+C        Cas des elements TET4
+         ELSEIF (ITYP.EQ.23) THEN
+C           Numeros des 4 sommets
+            IA=NUM(1,I)
+            IB=NUM(2,I)
+            IC=NUM(3,I)
+            ID=NUM(4,I)
+C           Coordonnees des 4 sommets
+            XA=XCOOR((IA-1)*IDIMP1+1)
+            YA=XCOOR((IA-1)*IDIMP1+2)
+            ZA=XCOOR((IA-1)*IDIMP1+3)
+            XB=XCOOR((IB-1)*IDIMP1+1)
+            YB=XCOOR((IB-1)*IDIMP1+2)
+            ZB=XCOOR((IB-1)*IDIMP1+3)
+            XC=XCOOR((IC-1)*IDIMP1+1)
+            YC=XCOOR((IC-1)*IDIMP1+2)
+            ZC=XCOOR((IC-1)*IDIMP1+3)
+            XD=XCOOR((ID-1)*IDIMP1+1)
+            YD=XCOOR((ID-1)*IDIMP1+2)
+            ZD=XCOOR((ID-1)*IDIMP1+3)
+C           Tailles des aretes AB, AC et AD
+            XBA=XB-XA
+            YBA=YB-YA
+            ZBA=ZB-ZA
+            AB=SQRT(XBA*XBA+YBA*YBA+ZBA*ZBA)
+            XCA=XC-XA
+            YCA=YC-YA
+            ZCA=ZC-ZA
+            AC=SQRT(XCA*XCA+YCA*YCA+ZCA*ZCA)
+            XDA=XD-XA
+            YDA=YD-YA
+            ZDA=ZD-ZA
+            AD=SQRT(XDA*XDA+YDA*YDA+ZDA*ZDA)
+C           Quelques produits vectoriels
+C           --> AB^AC
+            XABAC=YBA*ZCA-ZBA*YCA
+            YABAC=ZBA*XCA-XBA*ZCA
+            ZABAC=XBA*YCA-YBA*XCA
+C           --> AC^AD
+            XACAD=YCA*ZDA-ZCA*YDA
+            YACAD=ZCA*XDA-XCA*ZDA
+            ZACAD=XCA*YDA-YCA*XDA
+C           Normalisation
+            XBAN=XBA/AB
+            YBAN=YBA/AB
+            ZBAN=ZBA/AB
+            XABM=UNDEMI*(XA+XB)
+            YABM=UNDEMI*(YA+YB)
+            ZABM=UNDEMI*(ZA+ZB)
+            XCAN=XCA/AC
+            YCAN=YCA/AC
+            ZCAN=ZCA/AC
+            XACM=UNDEMI*(XA+XC)
+            YACM=UNDEMI*(YA+YC)
+            ZACM=UNDEMI*(ZA+ZC)
+            XDAN=XDA/AD
+            YDAN=YDA/AD
+            ZDAN=ZDA/AD
+            XADM=UNDEMI*(XA+XD)
+            YADM=UNDEMI*(YA+YD)
+            ZADM=UNDEMI*(ZA+ZD)
+C           Point milieu de [AB]
+            XS=XABM
+            YS=YABM
+            ZS=ZABM
+C           Direction perpendiculaire a AB pointant C
+            SCAL=XCA*XBAN+YCA*YBAN+ZCA*ZBAN
+            XN=XCA-SCAL*XBAN
+            YN=YCA-SCAL*YBAN
+            ZN=ZCA-SCAL*ZBAN
+C           Distance au plan mediateur de AC
+            SCAL=(XACM-XS)*XCAN+(YACM-YS)*YCAN+(ZACM-ZS)*ZCAN
+            SCALD=XN*XCAN+YN*YCAN+ZN*ZCAN+XPETIT
+            COEF=SCAL/SCALD
+C           Plan mediateur 1
+            XS=XS+COEF*XN
+            YS=YS+COEF*YN
+            ZS=ZS+COEF*ZN
+C           Direction normale a ABC
+            XN=XABAC
+            YN=YABAC
+            ZN=ZABAC
+C           Distance au plan mediateur de AD
+            SCAL=(XADM-XS)*XDAN+(YADM-YS)*YDAN+(ZADM-ZS)*ZDAN
+            SCALD=XN*XDAN+YN*YDAN+ZN*ZDAN+XPETIT
+            COEF=SCAL/SCALD
+C           Mediateur 2
+            XS=XS+COEF*XN
+            YS=YS+COEF*YN
+            ZS=ZS+COEF*ZN
+C           Rayon de la sphere circonscrite
+            RC=SQRT((XS-XA)*(XS-XA)+(YS-YA)*(YS-YA)+(ZS-ZA)*(ZS-ZA))
+C           Volume du tetraedre optimal (c'est-a-dire celui regulier avec
+C           la meme sphere circonscrite)
+            AOPT=RC*R8S3
+            VOPT=AOPT*AOPT*AOPT/SIXR2
+C           Volume du tetraedre = AB.(AC^AD) / 6
+            PMIX=ABS(XBA*XACAD+YBA*YACAD+ZBA*ZACAD)
+            V=PMIX/SIX
+C           Indicateur SKEW, skewness
+            SKEW=ABS((VOPT-V)/VOPT)
+         ENDIF
+C        Ecriture dans le tableau
+         VAL(1,I)=SKEW
+      ENDDO
+C
+      RETURN
+      END
+ 

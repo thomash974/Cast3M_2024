@@ -1,0 +1,48 @@
+C TOURNE    SOURCE    CB215821  20/11/25    13:41:12     10792          
+
+C  Ce sous-programme prepare la rotation d'un objet
+C  Modif KICH 11/97
+C  10/2003 : cas IDIM=1, operateur indisponible.
+
+      SUBROUTINE TOURNE
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+      COMMON / CTOURN / XPT1,YPT1,ZPT1,XV1,YV1,ZV1,XV2,YV2,ZV2,
+     .                  XVEC,YVEC,ZVEC,ANGLE,ICLE
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+-INC CCGEOME
+-INC SMRIGID
+-INC SMCHPOI
+-INC SMMODEL
+-INC SMCHAML
+
+      IF (IDIM.EQ.1) THEN
+        INTERR(1)=IDIM
+        CALL ERREUR(709)
+        RETURN
+      ENDIF
+
+      CALL PROPER(3)
+
+      RETURN
+      END
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 

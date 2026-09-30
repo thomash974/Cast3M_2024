@@ -1,0 +1,142 @@
+C IMPP1     SOURCE    CB215821  21/10/18    21:15:21     11126          
+      SUBROUTINE IMPP1(MELEME,IPT2,IPT3,MOT1)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+* +--------------------------------------------------------------------+
+* création du maillage support des conditions aux limites de changement
+* de phase: création en vue d'un bloquer mini ou d'un bloque maxi.
+* C'est a dire que pour chaque point on cree un seul multiplicateur
+* les elements crees sont de type 22
+* IPT2 : MAILLAGE unique en cas de 'CHANGEMENT_PHASE' 'PARFAIT   '
+* IPT3 : 2eme MAILLAGE   en cas de 'CHANGEMENT_PHASE' 'SOLUBILITE' (Comme le FROTTEMENT pour le deuxieme LX)
+*
+* +--------------------------------------------------------------------+
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCOORD
+
+      SEGMENT ICPR1(nbpts0)
+
+      CHARACTER*(*)MOT1
+
+* +--------------------------------------------------------------------+
+
+      IPT2 = 0
+      IPT3 = 0
+
+      IDIM1 = IDIM +1
+      segact mcoord
+      nbpts0= nbpts
+
+C     Normalement le MAILLAGE receptionne n'a qu'une seule SOUS-ZONE
+      IF(MELEME.LISOUS(/1) .NE. 0)THEN
+        CALL ERREUR(5)
+      ENDIF
+      SEGINI,ICPR1
+
+C     On procede au comptage
+      NBELEM = 0
+      DO J=1,MELEME.NUM(/2)
+        DO K = 1,MELEME.NUM(/1)
+          inum=MELEME.NUM(K,J)
+          IF(ICPR1(inum) .EQ. 0)THEN
+            NBELEM      = NBELEM + 1
+            ICPR1(inum) = NBELEM
+          ENDIF
+        ENDDO
+      ENDDO
+
+
+      IF    (MOT1(1:10) .EQ. 'PARFAIT   ')THEN
+        ICAS  = 1
+        NBNN  = 2
+        NBEL2 = NBELEM
+      ELSEIF(MOT1(1:10) .EQ. 'SOLUBILITE')THEN
+        ICAS  = 2
+        NBNN  = 3
+        NBEL2 = 2 * NBELEM
+      ELSE
+        CALL ERREUR(5)
+      ENDIF
+
+      NBPTS = nbpts0 + NBEL2
+      SEGADJ,MCOORD
+
+C     Creation et Remplissage du nouveau MAILLAGE (LX en premier, Primales en deuxieme)
+      NBSOUS= 0
+      NBREF = 0
+      IF    (ICAS .EQ. 1)THEN
+        SEGINI,IPT2
+        IPT2.ITYPEL=22
+      ELSEIF(ICAS .EQ. 2)THEN
+        SEGINI,IPT2,IPT3
+        IPT2.ITYPEL=22
+        IPT3.ITYPEL=22
+      ELSE
+        CALL ERREUR(5)
+      ENDIF
+
+      DO 5 i=1,nbpts0
+        i_EL    = ICPR1(i)
+        IF(i_EL .EQ. 0) GOTO 5
+
+        IP_INCO =(i  - 1) * IDIM1 + 1
+
+        IF    (ICAS .EQ. 1)THEN
+C         Noeud 1 : 'LX'
+C         Noeud 2 : 'Inconnues classiques'
+          i_LX            = nbpts0 + i_EL
+          IPT2.NUM(1,i_EL)= i_LX
+          IPT2.NUM(2,i_EL)= i
+          IP_LX           =(i_LX - 1) * IDIM1 + 1
+          DO jj=1,IDIM
+C           Je donne au LX les memes coordonnees que le noeud support de l'inconnue primale
+            XVAL1 = MCOORD.XCOOR(IP_INCO + jj - 1)
+            MCOORD.XCOOR(IP_LX + jj - 1)= XVAL1
+          ENDDO
+
+        ELSEIF(ICAS .EQ. 2)THEN
+C         MAILLAGE n°1 : IPT2
+C         -------------------
+C         Noeud 1 : 'LX' pour         la premiere inconnue PRIMALE
+C         Noeud 2 :  Noeud support de la premiere inconnue PRIMALE
+C         Noeud 3 :  Noeud support de la deuxieme inconnue PRIMALE
+          i_LX1            = nbpts0 + i_EL
+          IPT2.NUM(1,i_EL)= i_LX1
+          IPT2.NUM(2,i_EL)= i
+          IPT2.NUM(3,i_EL)= i
+          IP_LX1          =(i_LX1 - 1) * IDIM1 + 1
+
+C         MAILLAGE n°2 : IPT3
+C         -------------------
+C         Noeud 1 : 'LX' pour la deuxieme         inconnue PRIMALE
+C         Noeud 2 :  Noeud support de la premiere inconnue PRIMALE
+C         Noeud 3 :  Noeud support de la deuxieme inconnue PRIMALE
+          i_LX2            = i_LX1  + NBELEM
+          IPT3.NUM(1,i_EL)= i_LX2
+          IPT3.NUM(2,i_EL)= i
+          IPT3.NUM(3,i_EL)= i
+          IP_LX2          =(i_LX2 - 1) * IDIM1 + 1
+
+          DO jj=1,IDIM1
+C          Je donne aux LX les memes coordonnees que le noeud support des inconnues primales
+            XVAL1 = MCOORD.XCOOR(IP_INCO + jj - 1)
+            MCOORD.XCOOR(IP_LX1 + jj - 1)= XVAL1
+            MCOORD.XCOOR(IP_LX2 + jj - 1)= XVAL1
+          ENDDO
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+    5 continue
+
+      SEGSUP,ICPR1
+      SEGDES,MCOORD
+
+      END
+ 
+ 

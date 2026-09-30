@@ -1,0 +1,108 @@
+C CRIMP     SOURCE    FANDEUR   21/12/15    21:15:01     10824          
+
+C***********************************************************************
+C  OPERATEUR TRANSFORMANT UN OBJET EVOLUTION COMPLEXE
+C            REelleIMaginaire ----> MOPH  OU  MOdulePHase ----> REIM
+C
+C  CREATION    : 15/12/87 - F.ROULLIER
+C  TRANSFORMATION DIRECTIVE EN OPERATEUR : 15/12/2021 FA 10824
+C***********************************************************************
+
+      SUBROUTINE CRIMP
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMEVOLL
+-INC SMLREEL
+      POINTEUR MLREE4.MLREEL
+
+      IEVOS = 0
+
+      CALL LIROBJ('EVOLUTIO',IEVOE,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MEVOL1 = IEVOE
+      SEGINI,MEVOLL=MEVOL1
+
+C  L'OBJET EVOLUTION DOIT ETRE DE SOUS-TYPE COMPLEXE
+      IF (mevoll.ITYEVO(1:8).NE.'COMPLEXE') THEN
+        MOTERR(1:8) = 'EVOLUTIO'
+        CALL ERREUR(302)
+        GOTO 999
+      ENDIF
+
+      NC = mevoll.IEVOLL(/1)
+
+      DO IC = 1, NC
+        KEVOL1 = mevoll.IEVOLL(IC)
+        SEGINI,KEVOLL=KEVOL1
+        mevoll.IEVOLL(IC) = KEVOLL
+      ENDDO
+
+      DO IC = 1, NC, 2
+        KEVOL1 = mevoll.IEVOLL(IC)
+        KEVOL2 = mevoll.IEVOLL(IC+1)
+
+        MLREE1 = KEVOL1.IPROGY
+        MLREE2 = KEVOL2.IPROGY
+        SEGACT,MLREE1,MLREE2
+        NPT1 = MLREE1.PROG(/1)
+        NPT2 = MLREE2.PROG(/1)
+        IF (NPT1.NE.NPT2) THEN
+          CALL ERREUR(217)
+          GOTO 999
+        ENDIF
+        JG = NPT1
+        SEGINI,MLREE3,MLREE4
+
+C     TEST DES SOUS-TYPES
+        IF (KEVOL1.NUMEVY(1:4).EQ.'PREE') THEN
+          IF (KEVOL2.NUMEVY(1:4).NE.'PIMA') THEN
+            MOTERR(1:8) = 'PIMA    '
+            CALL ERREUR(37)
+            GOTO 999
+          ENDIF
+          KEVOL1.NUMEVY = 'MODU'
+          KEVOL2.NUMEVY = 'PHAS'
+          CALL CONVCP(MLREE1.PROG(1),MLREE2.PROG(1),
+     &                MLREE3.PROG(1),MLREE4.PROG(1),
+     &                NPT1,+1)
+        ELSE IF (KEVOL1.NUMEVY(1:4).EQ.'MODU') THEN
+          IF (KEVOL2.NUMEVY(1:4).NE.'PHAS') THEN
+            MOTERR(1:8) = 'PHAS    '
+            CALL ERREUR(37)
+            GOTO 999
+          ENDIF
+          KEVOL1.NUMEVY = 'PREE'
+          KEVOL2.NUMEVY = 'PIMA'
+          CALL CONVCP(MLREE3.PROG(1),MLREE4.PROG(1),
+     &                MLREE1.PROG(1),MLREE2.PROG(1),
+     &                NPT1,-1)
+        ELSE
+          MOTERR(1:8) = 'PREEMODU'
+          CALL ERREUR(37)
+          GOTO 999
+        ENDIF
+        SEGDES,MLREE1,MLREE2
+        SEGDES,MLREE3,MLREE4
+
+        KEVOL1.IPROGY = MLREE3
+        KEVOL2.IPROGY = MLREE4
+        SEGDES,KEVOL1,KEVOL2
+
+      ENDDO
+
+      SEGDES,MEVOLL
+      IEVOS = MEVOLL
+      CALL ECROBJ('EVOLUTIO',IEVOS)
+
+ 999  CONTINUE
+
+C      RETURN
+      END
+
+ 

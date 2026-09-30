@@ -1,0 +1,23 @@
+C MTMT3D    SOURCE    PV090527  23/01/27    21:15:54     11574          
+c***********************************************************************
+      SUBROUTINE mtmt3d(A,B,NL,NC1,NC2,C)                                       
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)                                                 
+*                                                                               
+*  C(NL,NC2)=A(NL,NC1)*B(NC1,NC2)                                               
+*  LE PREMIER INDICE EST DE LIGNE, LE DEUXIEME DE COLONNE                       
+*                                                                               
+      DIMENSION A(NL,nc1),B(NC1,nc2),C(NL,nc2)                                        
+      DO   I=1,NL                                                               
+        DO   J=1,NC2                                                              
+            XX= 0.D0                                                                  
+            DO 2 K=1,NC1                                                              
+                XX = A(I,K)*B(K,J) + XX                                                   
+    2       CONTINUE                                                                  
+            C(I,J)=XX                                                                 
+        enddo                                                                       
+      enddo                                                                       
+      RETURN                                                                    
+      END
+      
+ 

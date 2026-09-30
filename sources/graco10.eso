@@ -1,0 +1,34 @@
+C GRACO10   SOURCE    PV        22/01/20    21:15:02     8699           
+      SUBROUTINE GRACO10(ith,ilideb,posm,valm,vect1,vect2)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      integer ilideb(*),posm(*)
+      real*8 valm(*),vect1(*),vect2(*)
+      common/cgraco9c/ilicre,mvect1l,mvect2l,nbthrl,nbinc
+      nbtr=(nbinc-1)/nbthrl+1
+      do 2 idli=(ith-1)*nbtr+1,min(ith*nbtr,nbinc)
+**      DO 2 idli=ith,nbinc,nbthrl
+*      p=0.d0
+*      do 5 i=ilideb(idli),ilideb(idli+1)-1
+*       inc=posm(i)
+*       p=p+valm(i)*vect2(inc)
+*  5   continue
+*      vect1(idli)=p
+       id=ilideb(idli)
+       if=ilideb(idli+1)-1
+       lon=if-id+1
+       if (lon.gt.0) then
+        vect1(idli)=ddotip(lon,valm(id),posm(id),vect2(1))
+       else
+        vect1(idli)=0.d0
+       endif
+   2  continue
+   1  continue
+      RETURN
+      END
+
+
+
+ 
+ 
+ 

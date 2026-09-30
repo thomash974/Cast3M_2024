@@ -1,0 +1,58 @@
+C MAMU52    SOURCE    PV        20/02/22    21:15:19     10531          
+      subroutine mamu52(long,val11,lpl1,val1,lpl,pt)
+      implicit real*8 (a-h,o-z)
+      real*8 val11(*),val1(*)
+      real*8 pt(36)
+           id12=lpl1
+           id2=lpl
+           id3=lpl+ lpl+1
+           id4=lpl+ lpl+1 +lpl+2
+           id5=lpl+ lpl+1 +lpl+2 +lpl+3
+           pt1=pt(1)
+           pt2=pt(2)
+           pt7=pt(3)
+           pt8=pt(4)
+           pt13=pt(5)
+           pt14=pt(6)
+           pt19=pt(7)
+           pt20=pt(8)
+           pt25=pt(9)
+           pt26=pt(10)
+           do 110 i=1,long
+              xval1=val1(i)
+              xval2=val1(i+id2)
+              xval3=val1(i+id3)
+              xval4=val1(i+id4)
+              xval5=val1(i+id5)
+              xval11=val11(i)
+              xval12=val11(i+id12)
+              pt1=pt1+xval1*xval11
+              pt2=pt2+xval1*xval12
+              pt7=pt7+xval2*xval11
+              pt8=pt8+xval2*xval12
+              pt13=pt13+xval3*xval11
+              pt14=pt14+xval3*xval12
+              pt19=pt19+xval4*xval11
+              pt20=pt20+xval4*xval12
+              pt25=pt25+xval5*xval11
+              pt26=pt26+xval5*xval12
+ 110       continue
+           pt(1)=pt1
+           pt(2)=pt2
+           pt(3)=pt7
+           pt(4)=pt8
+           pt(5)=pt13
+           pt(6)=pt14
+           pt(7)=pt19
+           pt(8)=pt20
+           pt(9)=pt25
+           pt(10)=pt26
+
+           end
+
+ 
+ 
+ 
+ 
+ 
+ 

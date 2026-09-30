@@ -1,0 +1,113 @@
+C MATMU0    SOURCE    BP208322  22/09/21    21:15:02     11463          
+
+*******************************************************************
+*       PRODUIT MATRICE X MATRICE PARALLELISE (THREAD) 
+*       POUR CERTAINES OPERATIONS DANS DYNE
+*       creation : BP, 2022-09-20
+*******************************************************************
+
+        SUBROUTINE MATMU0(ithr,IPOINT)
+
+        IMPLICIT INTEGER(I-N)
+        IMPLICIT REAL*8(A-H,O-Z)
+  
+-INC PPARAM
+-INC CCOPTIO
+-INC CCASSIS
+c     SPARAL : pour la parallelisation
+C     + NBTHRD  : nombre de threads demandes
+C     + ...     : pointeur vers segments utiles
+      SEGMENT SPARAL
+        INTEGER NBTHRD
+        INTEGER IERROR(NBTHR)
+        INTEGER KMTRAV
+        INTEGER KMTFEX
+        INTEGER NDIM1,NDIM2,NDIM3
+      ENDSEGMENT
+      SEGMENT,MTFEX
+         REAL*8  FEXA(NPFEXA,NPC1,2)
+         REAL*8  FEXPSM(NPLB,NPC1,2,IDIMB)
+         REAL*8  FTEXB(NPLB,NPC1,2,IDIM)
+*         INTEGER IFEXA(NPFEXA),IFEXB(NPFEXB)
+      ENDSEGMENT
+      SEGMENT,MTRAV
+         REAL*8 FTCHG(NCHAR,NPC1)
+         REAL*8 XFORCA(NPREF,NCHAR)
+      ENDSEGMENT
+
+
+*******************************************************************
+*     RECUP DES POINTEURS
+*******************************************************************
+
+      SPARAL = IPOINT
+      NBTHR  = SPARAL.NBTHRD
+      MTRAV  = SPARAL.KMTRAV
+      MTFEX  = SPARAL.KMTFEX
+*      NPREF  = XFORCA(/1)
+*      NCHAR  = XFORCA(/2)
+*      NPC1   = FEXA(/2)
+      NPREF = SPARAL.NDIM1  
+      NCHAR = SPARAL.NDIM2  
+      NPC1  = SPARAL.NDIM3 
+
+
+
+*******************************************************************
+C     Decoupage pour le travail d'ecriture en parallele
+*******************************************************************
+
+*     on decoupe le temps (NPC1)
+      IRES=MOD(NPC1,NBTHR)
+      IF (IRES.EQ.0) THEN
+        ILON  = NPC1 / NBTHR
+        IDEB  = (ithr -1)* ILON + 1
+      ELSE
+        IF (ithr .LE. IRES) THEN
+          ILON  = (NPC1 / NBTHR) + 1
+          IDEB  = (ithr -1)* ILON + 1
+        ELSE
+          ILON  = NPC1 / NBTHR
+          IDEB  = (IRES * (ILON+1)) + (ithr-IRES-1)* ILON + 1
+        ENDIF
+      ENDIF
+      IFIN  = IDEB + ILON - 1
+*      PRINT *,"matmu0: #",ithr,"/",NBTHR," traitement de :",IDEB,IFIN
+      
+
+*******************************************************************
+*     CALCUL
+*******************************************************************
+
+*     triple boucle : calcul des efforts en debut de chaque pas
+*//      DO IT=1, NPC1
+      DO IT=IDEB,IFIN
+      DO ICHAR=1,NCHAR
+      DO IPOS=1,NPREF
+              FEXA(IPOS,IT,2) = FEXA(IPOS,IT,2) 
+     &      + (XFORCA(IPOS,ICHAR) * FTCHG(ICHAR,IT  ))
+      ENDDO
+      ENDDO
+      ENDDO
+
+*     double boucle : copie des efforts en fin de chaque pas sauf le dernier (differences centrees)
+*//      DO IT=1, (NPC1 - 1)
+      DO IT=IDEB,MIN(IFIN,(NPC1 - 1))
+      DO IPOS=1,NPREF
+            FEXA(IPOS,IT,1) = FEXA(IPOS,IT+1,2)
+      ENDDO
+      ENDDO
+
+*     double boucle : calcul des efforts a la fin du dernier pas de temps
+      IF(IFIN.EQ.NPC1) THEN
+      DO ICHAR=1,NCHAR
+      DO IPOS=1,NPREF
+            FEXA(IPOS,NPC1,1) = FEXA(IPOS,NPC1,1) 
+     &      + (XFORCA(IPOS,ICHAR) * FTCHG(ICHAR,NPC1))
+      ENDDO
+      ENDDO
+      ENDIF
+
+      END
+ 
+ 

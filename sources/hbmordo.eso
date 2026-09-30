@@ -1,0 +1,41 @@
+C HBMORDO   SOURCE    BP208322  20/09/18    21:16:48     10718          
+
+        SUBROUTINE HBMORDO(NM,NDDL,OMEG,EXPIM,INDEIG) 
+        
+*=======================================================================  
+*  tri des valeurs propres par partie imaginaire croisante en module
+*=======================================================================  
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+        REAL*8 EXPIM(NM),OMEG,EXPIW(NM)
+        INTEGER NM,NDDL,INDEIG(2*NM),MINT,I
+        
+c         DO I=1,2*NDDL
+c             INDEIG(I)=0
+c         ENDDO
+         DO I=1,NM
+           INDEIG(I)=I
+         ENDDO
+c          
+c c  Copier EXPIM dans le tableau de travail EXPIW
+*          DO I = 1,NM
+*            EXPIW(I) = ABS(EXPIM(I))
+*          ENDDO
+c          
+c c    Pour l'instant, on prend simplement les 2*NDDL VP avec les parties 
+c c    imaginaires les plus petites en module
+*          DO I=1,2*NDDL
+*            MINT = MINLOC(EXPIW,DIM=1)
+*            INDEIG(I) = MINT 
+*            EXPIW(MINT) = 1.E6
+*          ENDDO
+         
+c   bp: on remplace ci-dessus par le classement de la liste
+c       on recuperera seulement les 1eres valeurs
+        CALL ORDO13(EXPIM,NM,.TRUE.,INDEIG)
+
+        END
+ 
+ 

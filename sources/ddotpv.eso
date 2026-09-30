@@ -1,0 +1,33 @@
+C DDOTPV    SOURCE    PV090527  23/01/09    21:15:04     11549          
+      function ddotpv(lon,val1,val2)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      dimension val1(*),val2(*)
+      if (lon.eq.0) then
+       ddotpv=0.d0
+       return
+      endif
+      resu1=0.d0
+      resu2=0.d0
+      resu3=0.d0
+      resu4=0.d0
+      do 10 i=0,lon-4,4
+       resu1=resu1+val1(i+1)*val2(i+1)
+       resu2=resu2+val1(i+2)*val2(i+2)
+       resu3=resu3+val1(i+3)*val2(i+3)
+       resu4=resu4+val1(i+4)*val2(i+4)
+  10  continue
+      if (i.le.lon-2) then
+       resu1=resu1+val1(i+1)*val2(i+1)
+       resu2=resu2+val1(i+2)*val2(i+2)
+       i=i+2
+      endif
+      if (i.le.lon-1) then
+       resu1=resu1+val1(i+1)*val2(i+1)
+      endif
+      ddotpv=resu1+resu2+resu3+resu4
+      return
+      end
+
+ 
+ 

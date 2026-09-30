@@ -1,0 +1,54 @@
+C SIGP3D    SOURCE    FD218221  24/02/07    21:15:26     11834          
+       subroutine sigp3d(nstype,var,nvari,vnvari,ndtens,
+     # iso,raideur66,sig3,V33)
+
+c      calcul des contraintes principale a partir des deformations 
+c      elastiques stockees dans les vari
+
+c      declarations externes
+       implicit integer(i-n)
+       implicit real*8(a-h,o-z)
+
+       integer nstype,nvari,ndtens
+       logical iso
+       integer vnvari(nstype,2)
+       real*8 var(nvari)
+       real*8 raideur66(6,6)
+       real*8 sig3(3),V33(3,3)
+
+       real*8 E3(3),E33(3,3),E6(6)
+       real*8 sig6(6),sig33(3,3)
+       integer nprec,i,j,k
+
+c       print*,'ds sigp3d',nstype,nvari,vnvari,ndtens,iso
+
+
+c      recuperation des deformations elastique
+       call tvar3d(E3,V33,nprec,var,nvari,vnvari,nstype,ndtens,1,1)
+
+       if(iso) then
+c           cas des materiaux elastiques isotropes en base principale
+            do i=1,3
+                sig3(i)=0.d0
+                do j=1,3
+                    sig3(i)=sig3(i)+raideur66(i,j)*E3(j)
+                end do
+            end do
+       else
+c           cas d une elasticite non isotrope en base fixe
+c           passage de E en base fixe
+            call x12x6(E3,V33,E6)
+c           calcul du pseudo vecteur des contraintes
+            do i=1,6
+                sig6(i)=0.d0
+                do j=1,6
+                    sig6(i)=sig6(i)+raideur66(i,j)*E6(j)
+                end do
+            end do
+c           valeur principales des contraintes et de la matrice de passage
+            call x6x33(sig6,sig33)
+            call b3_v33(sig33,sig3,V33)
+       end if
+       return
+       end
+ 

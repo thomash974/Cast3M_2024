@@ -1,0 +1,1548 @@
+C COMVAL    SOURCE    MB234859  23/02/03    21:15:08     11581          
+      SUBROUTINE COMVAL(iqmod,indeso,ililuc,iwrk52,iwrk53,ib,igau,iw522)
+C
+C----------------------------------------------------------------------
+C                   SUBROUTINE APPELEE PAR COML6
+C
+C  OBJECTIF : RENSEIGNER LES SEGMENTS WRK52 et WRK522 (include DECHE)
+C             AVEC LES VALEURS AU POINT D'INTEGRATION
+C
+C   ENTREES : 
+C   ---------
+C     IQMOD  : POINTEUR SUR LE SEGMENT IMODEL
+C     INDESO : ENTIER INDIQUANT DEBUT DE PAS (=1) FIN DE PAS (=2) 
+C              OU CHAMP RESULTAT (=3)
+C     ILILUC : POINTEUR SUR LE SEGMENT LILUC (voir comouw)
+C     IWRK53 : POINTEUR SUR LE SEGMENT WRK53
+C     IB     : ELEMENT COURANT
+C     IGAU   : POINT D'INTEGRATION COURANT
+C
+C   SORTIES : 
+C   ---------
+C     IWRK52 : POINTEUR SUR LE SEGMENT WRK52
+C     IW522  : POINTEUR SUR LE SEGMENT WRK522
+C----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMCHAML
+-INC SMELEME
+-INC SMCOORD
+-INC SMMODEL
+-INC SMINTE
+-INC CCHAMP
+-INC SMEVOLL
+-INC SMNUAGE
+* segment deroulant le mcheml
+-INC DECHE
+C
+C     wrk52 contient les valeurs des differents champs
+C     pour les materiaux, on a d'abord les composantes obligatoires 
+C     puis les composantes facultatives.
+C     wrk522 ne sert que dans cette subroutine pour aider au remplissage
+C     de wrk52
+C
+      melval = 0
+      imodel = iqmod
+      liluc  = ililuc
+      nbluc1 = liluc(/1)
+      wrk52  = iwrk52
+      wrk53  = iwrk53
+      wrk522 = iw522
+C
+C     =================================================================
+C     initialisations particulieres
+      N2EL = 0
+      N2PTEL=0
+* tuyaux (attention ajout de caracteristiques facultatives telles que DENS)
+      IF (mfr.eq.13) THEN
+        do ic = 1,5
+          xcarb(ic) = 0.d0
+        enddo
+        do ic=6,10
+          xcarb(ic) = -1.d0
+        enddo
+        do ic=11,xcarb(/1)
+          xcarb(ic) = 0.d0
+        enddo
+      ENDIF
+C
+C     =================================================================
+      IF (ib+igau.ne.2) then
+C
+C       COMPOSANTE SCAL
+        if( mkkalz.EQ.1)then
+          do 701 ma=1,mkkal0(/1)
+            if(mkkal0(ma).eq.0) go to 701
+            deche =mkkal0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              scal0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              scal0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  701     continue
+          do 7011 ma=1,mkklaf(/1)
+            if(mkklaf(ma).eq.0) go to 7011
+            deche =mkklaf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              scalf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              scalf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7011     continue
+        endif
+C
+        if(mkktp0.ne.0) then
+          deche = mkktp0
+          melval=ABS(ieldec)
+          IBMN=MIN(IB,VELCHE(/2))
+          IGMN=MIN(IGAU,VELCHE(/1))
+          temp0=VELCHE(IGMN,IBMN)
+        endif
+C
+        if(mkktpf.ne.0) then
+          deche = mkktpf
+          melval=ABS(ieldec)
+          IBMN=MIN(IB,VELCHE(/2))
+          IGMN=MIN(IGAU,VELCHE(/1))
+          tempf=VELCHE(IGMN,IBMN)
+        endif
+C
+C       COMPOSANTES PRIMALES
+        if( mkkplz.EQ.1)then
+          do 706 ma=1,mkkpl0(/1)
+            if(mkkpl0(ma).eq.0) go to 706
+            deche =mkkpl0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              depl0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              depl0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  706     continue
+          do 7061 ma=1,mkkplf(/1)
+            if(mkkplf(ma).eq.0) go to 7061
+            deche =mkkplf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              deplf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              deplf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7061     continue
+        endif
+C
+C       COMPOSANTES DUALES
+        if(mkkrcz.eq.1) then
+          do 707 ma=1,mkkrc0(/1)
+            if(mkkrc0(ma).eq.0) go to 707
+            deche =mkkrc0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              forc0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              forc0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  707     continue
+          do 7071 ma=1,mkkrcf(/1)
+            if(mkkrcf(ma).eq.0) go to 7071
+            deche =mkkrcf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              forcf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              forcf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7071     continue
+        endif
+C
+C       COMPOSANTES GRADIENTS
+        if(mkkadz.eq.1) then
+          do 710 ma=1,mkkad0(/1)
+            if(mkkad0(ma).eq.0) go to 710
+            deche =mkkad0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              grad0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              grad0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  710     continue
+          do 7101 ma=1,mkkadf(/1)
+            if(mkkadf(ma).eq.0) go to 7101
+            deche =mkkadf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              gradf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              gradf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7101     continue
+        endif
+C
+C       COMPOSANTES CONTRAINTES
+        if(mkkigz.eq.1) then
+          do 711 ma=1,mkkig0(/1)
+            if(mkkig0(ma).eq.0) go to 711
+            deche =mkkig0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              sig0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              sig0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  711     continue
+          do 7111 ma=1,mkkigf(/1)
+            if(mkkigf(ma).eq.0) go to 7111
+            deche =mkkigf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              sigf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              sigf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7111     continue
+        endif
+C
+C       COMPOSANTES DEFORMATIONS
+        if(mkkstz.eq.1) then
+          do 712 ma=1,mkkst0(/1)
+            if(mkkst0(ma).eq.0) go to 712
+            deche =mkkst0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              epst0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              epst0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  712     continue
+          do 7121 ma=1,mkkstf(/1)
+            if(mkkstf(ma).eq.0) go to 7121
+            deche =mkkstf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              epstf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              epstf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7121     continue
+        endif
+C
+C       COMPOSANTES TEMPERATURES
+        if( mkkrez.eq.1) then
+          do 715 ma=1,mkkre0(/1)
+            if(mkkre0(ma).eq.0) go to 715
+            deche =mkkre0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              ture0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              ture0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  715     continue
+          do 7151 ma=1,mkkref(/1)
+            if(mkkref(ma).eq.0) go to 7151
+            deche =mkkref(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              turef(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              turef(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7151     continue
+        endif
+C
+C       COMPOSANTES CONTRAINTES PRINCIPALES
+        if( mkkinz.eq.1) then
+          do 716 ma=1,mkkin0(/1)
+            if(mkkin0(ma).eq.0) go to 716
+            deche =mkkin0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              prin0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              prin0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  716     continue
+          do 7161 ma=1,mkkinf(/1)
+            if(mkkinf(ma).eq.0) go to 7161
+            deche =mkkinf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              prinf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              prinf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7161     continue
+        endif
+C
+C       COMPOSANTE MAHO
+        if(mkkhoz.eq.1) then
+          do 717 ma=1,mkkho0(/1)
+            if(mkkho0(ma).eq.0) go to 717
+            deche =mkkho0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              maho0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              maho0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  717     continue
+          do 7171 ma=1,mkkhof(/1)
+            if(mkkhof(ma).eq.0) go to 7171
+            deche =mkkhof(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              mahof(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              mahof(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7171     continue
+        endif
+C
+C       COMPOSANTE MAHT
+        if(mkktaz.eq.1) then
+          do 718 ma=1,mkkta0(/1)
+            if(mkkta0(ma).eq.0) go to 718
+            deche =mkkta0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              hota0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              hota0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  718     continue
+          do 7181 ma=1,mkktaf(/1)
+            if(mkktaf(ma).eq.0) go to 7181
+            deche =mkktaf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              hotaf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              hotaf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7181     continue
+        endif
+C
+C       COMPOSANTES VARIABLES INTERNES
+        if(mkkvrz.eq.1) then
+          do 720 ma=1,mkkvr0(/1)
+            if(mkkvr0(ma).eq.0) go to 720
+            deche =mkkvr0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              var0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              var0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  720     continue
+          do 7201 ma=1,mkkvrf(/1)
+            if(mkkvrf(ma).eq.0) go to 7201
+            deche =mkkvrf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              varf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              varf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7201     continue
+        endif
+C
+C       COMPOSANTES GRADIENTS FLEXION
+        if( mkkafz.eq.1) then
+          do 721 ma=1,mkkaf0(/1)
+            if(mkkaf0(ma).eq.0) go to 721
+            deche =mkkaf0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              graf0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              graf0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  721     continue
+          do 7211 ma=1,mkkaff(/1)
+            if(mkkaff(ma).eq.0) go to 7211
+            deche =mkkaff(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              graff(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              graff(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7211     continue
+        endif
+C
+C       COMPOSANTES VARIABLES MICROSTRUCTURES
+        if(mkkasz.eq.1) then
+          do 723 ma=1,mkkas0(/1)
+            if(mkkas0(ma).eq.0) go to 723
+            deche =mkkas0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              rhas0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              rhas0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  723     continue
+          do 7231 ma=1,mkkasf(/1)
+            if(mkkasf(ma).eq.0) go to 7231
+            deche =mkkasf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              rhasf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              rhasf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7231     continue
+        endif
+C
+C       COMPOSANTES DEFORMATIONS INELASTIQUES
+        if(mkkpnz.eq.1) then
+          do 724 ma=1,mkkpn0(/1)
+            if(mkkpn0(ma).eq.0) go to 724
+            deche =mkkpn0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              epin0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              epin0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  724     continue
+          do 7241 ma=1,mkkpnf(/1)
+            if(mkkpnf(ma).eq.0) go to 7241
+            deche =mkkpnf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              epinf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              epinf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7241     continue
+        endif
+C-
+        if (mkkexz.eq.1) then
+          do 725 ma=1,mkkex0(/1)
+            if(mkkex0(ma).eq.0) go to 725
+            deche =mkkex0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              parex0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              parex0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  725     continue
+          do 7251 ma=1,mkkexf(/1)
+            if(mkkexf(ma).eq.0) go to 7251
+            deche =mkkexf(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              parexf(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              parexf(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7251     continue
+        endif
+C-
+        if(mkkvxz.eq.1) then
+          do 726 ma=1,mkkvx0(/1)
+            if(mkkvx0(ma).eq.0) go to 726
+            deche =mkkvx0(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              exova0(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              exova0(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+  726     continue
+          do 7261 ma=1,mkkvx1(/1)
+            if(mkkvx1(ma).eq.0) go to 7261
+            deche =mkkvx1(ma)
+            melval=ABS(ieldec)
+            if (typree) then
+              IBMN=MIN(IB,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              exova1(ma)=VELCHE(IGMN,IBMN)
+            else
+              IBMN=MIN(IB,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              exova1(ma)=DBLE(IELCHE(IGMN,IBMN))
+            endif
+ 7261     continue
+        endif
+C-
+      endif
+C     =================================================================
+C     =================================================================
+      if( ib+IGAu.eq.2) THEN
+        idepup=1
+        ifinup=nbluc1
+      else
+        idepup=13
+        ifinup=14
+      endif
+C
+C     -------------------------------------------
+C     Boucle (1000) sur les composantes a traiter
+C     -------------------------------------------
+      DO 1000 INO = IDEPUP,IFINUP
+C
+        nomid  = liluc(ino,1)
+        pilnec = liluc(ino,2)
+        if (pilnec.le.0) goto 1000
+C
+        mran = pilobl(/2)
+        mobl = pilobl(/1)
+        mfac = pilfac(/1)
+        if (mran.le.0) goto 1000
+C
+        DO 3000 IR = 1,MRAN
+          deche=0
+C
+C         ++++++++++++++++++++++++
+C         COMPOSANTES OBLIGATOIRES
+C         ++++++++++++++++++++++++
+          if (mobl.le.0) goto 101
+          DO 100 IC = 1,MOBL
+            passe1= 0.d0
+            ipilo1 = pilobl(ic,ir)
+* attention les valeurs induites par deche (nomdec, typdec)ne sont pas effacees
+            if (pilobl(ic,ir).gt.0) then
+              deche = pilobl(ic,ir)
+* on evite les deche crees pour le modele
+*          write(6,*) ino,ir,ic,deche,nomdec,typdec,condec
+              if (ir.eq.indeso.and.condec(1:24).eq.conmod(1:24))goto 100
+              melval = ABS(ieldec)
+              if (typree) then
+                IBMN=MIN(IB,VELCHE(/2))
+                IGMN=MIN(IGAU,VELCHE(/1))
+                passe1=VELCHE(IGMN,IBMN)
+              else
+                IBMN=MIN(IB,IELCHE(/2))
+                IGMN=MIN(IGAU,IELCHE(/1))
+                passe1=DBLE(IELCHE(IGMN,IBMN))
+              endif
+            endif
+C
+C           AIGUILLAGE SUIVANT MOT CLE
+C
+            if (ino.gt.nmot) goto 98
+        GOTO ( 1, 2, 99, 99, 99, 6, 7,99,99,10,11,12,13,14,15,16, 17,18,
+     &        99,20,21,99,23,24,25) ino
+C
+  99        CONTINUE
+C
+C           PAS DE COMPOSANTES POUR CE CHAMP
+            RETURN
+C
+C           COMPOSANTE SCAL
+   1        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              scal0(ic) = passe1
+              mkkal0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              scalf(ic) = passe1
+              mkklaf(ic)=deche
+            endif
+            if(deche.ne.0) mkkalz=1
+            GOTO 120
+C
+C           COMPOSANTE TEMP
+   2        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              temp0 = passe1
+              mkktp0=deche
+            else if (ir.ge.(mran -1)) then
+              tempf = passe1
+              mkktpf=deche
+            endif
+            GOTO 120
+C
+C           COMPOSANTES PRIMALES
+   6        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              depl0(ic) = passe1
+              mkkpl0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              deplf(ic) = passe1
+              mkkplf(ic)=deche
+            endif
+            if(deche.ne.0) mkkplz=1
+            GOTO 120
+C
+C           COMPOSANTES DUALES
+   7        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              forc0(ic) = passe1
+              mkkrc0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              forcf(ic) = passe1
+              mkkrcf(ic)=deche
+            endif
+            if(deche.ne.0) mkkrcz=1
+            GOTO 120
+C
+C           COMPOSANTES GRADIENTS
+  10        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              grad0(ic) = passe1
+              mkkad0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              gradf(ic) = passe1
+              mkkadf(ic)=deche
+            endif
+            if(deche.ne.0) mkkadz=1
+            GOTO 120
+C
+C           COMPOSANTES CONTRAINTES
+  11        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              SIG0(ic) = passe1
+              mkkig0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              SIGF(ic) = passe1
+              mkkigf(ic)=deche
+            endif
+            if(deche.ne.0) mkkigz=1
+            GOTO 120
+C
+C           COMPOSANTES DEFORMATIONS
+  12        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              epst0(ic) = passe1
+              mkkst0(ic) =deche
+            else if (ir.gt.1.and.ir.le.mran) then
+              epstf(ic) = passe1
+              mkkstf(ic) = deche
+            endif
+            if(deche.ne.0) mkkstz=1
+            GOTO 120
+C
+C           COMPOSANTES MATERIAUX
+  13        CONTINUE
+            if (igau.eq.1.and.ib.eq.1.and.ir.eq.1) then
+              commat(ic) = lesobl(ic)
+              tyval(ic) = 'REAL*8  '
+            endif
+            if (ir.gt.1) then
+              ivalma(ic) = 0
+              if (ipilo1.gt.0) ivalma(ic) = ABS(ieldec)
+            endif
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              valma0(ic) = passe1
+              mkkva0(ic)=deche
+            elseif (ir.gt.1.and.ir.le.(mran -1)) then
+              VALMAT(ic) = passe1
+              mkkvat(ic)=deche
+              if (deche.eq.0) then
+                call erreur(1073)
+                return
+              endif
+              tyval (ic)= typdec
+              xmatf(ic) = passe1
+              mkkatf(ic)=deche
+            else if (ir.eq.mran ) then
+              xmatf(ic) = passe1
+              mkkatf(ic)=deche
+            endif
+            if (igau.eq.1.and.ib.eq.1) then
+              IF (CMATE.EQ.'SECTION ') THEN
+                N2PTEL=MAX(N2PTEL,IELCHE(/1))
+                N2EL  =MAX(N2EL  ,IELCHE(/2))
+              ELSE
+                N2PTEL=MAX(N2PTEL,VELCHE(/1))
+                N2EL  =MAX(N2EL  ,VELCHE(/2))
+              ENDIF
+            endif
+            GOTO 120
+C
+C           COMPOSANTES CARACTERISTIQUES
+  14        CONTINUE
+            if (igau.eq.1.and.ib.eq.1.and.ir.eq.1) then
+              comcar(ic) = lesobl(ic)
+              tycar(ic) = 'REAL*8  '
+            endif
+            mblcar=mobl
+            if (ipilo1.le.0.and.mfr.ne.9.and.mfr.ne.3) goto 100
+            if (ir.eq.1) then
+              xcar0(ic) = passe1
+              mkkar0(ic)=deche
+            elseif (ir.gt.1.and.ir.le.(mran-1)) then
+              if (deche.eq.0) then
+                call erreur(1073)
+                return
+              endif
+              tycar(ic) = typdec
+              XCARB(ic) = passe1
+              mkkarb(ic)=deche
+              xcarbf(ic) = passe1
+              mkkrbf(ic)=deche
+*
+* tuyaux
+*
+              IF (mfr.eq.13) THEN
+C
+C Poutre 3D
+C
+              ELSE IF(mfr.EQ.7.AND.IDIM.EQ.3)THEN
+C
+C Poutre 2D
+C
+              ELSEIF(IDIM.EQ.2) THEN
+                if (ipilo1.le.0.and.ic.eq.2) then
+                  IF(mfr.EQ.3.OR.mfr.EQ.9) THEN
+                    XCARB(IC)=0.66666666666666D0
+                  ENDIF
+                endif
+              ELSE
+*    cas des coques minces : défaut de alfah
+                IF (ipilo1.le.0.and.IC.EQ.2.AND.
+     &                     (mfr.EQ.3.OR.mfr.EQ.9)) THEN
+                  XCARB(IC)=0.666666666666666D0
+                ENDIF
+C
+              ENDIF
+
+            else if (ir.eq.mran) then
+              xcarbf(ic) = passe1
+              mkkrbf(ic)=deche
+            endif
+            if(deche.ne.0) mkkarz=1
+            GOTO 120
+C
+C           COMPOSANTES TEMPERATURES
+  15        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              ture0(ic) = passe1
+              mkkre0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              turef(ic) = passe1
+              mkkref(ic)=deche
+            endif
+            if(deche.ne.0) mkkrez=1
+            GOTO 120
+C
+C           COMPOSANTES CONTRAINTES PRINCIPALES
+  16        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              prin0(ic) = passe1
+              mkkin0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              prinf(ic) = passe1
+              mkkinf(ic)=deche
+            endif
+            if(deche.ne.0) mkkinz=1
+            GOTO 120
+C
+C           COMPOSANTE MAHO
+  17        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              maho0(ic) = passe1
+              mkkho0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              mahof(ic) = passe1
+              mkkhof(ic)=deche
+            endif
+            if(deche.ne.0) mkkhoz=1
+            GOTO 120
+C
+C           COMPOSANTE MAHT
+  18        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              hota0(ic) = passe1
+              mkkta0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              hotaf(ic) = passe1
+              mkktaf(ic)=deche
+            endif
+            if(deche.ne.0) mkktaz=1
+            GOTO 120
+C
+C           COMPOSANTES VARIABLES INTERNES
+  20        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              VAR0(ic) = passe1
+*             write(6,*) 'var0 ', passe1
+              mkkvr0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              VARF(ic) = passe1
+              mkkvrf(ic)=deche
+            endif
+            if(deche.ne.0) mkkvrz=1
+            GOTO 120
+C
+C           COMPOSANTES GRADIENTS FLEXION
+  21        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              graf0(ic) = passe1
+              mkkaf0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              graff(ic) = passe1
+              mkkaff(ic)=deche
+            endif
+            if(deche.ne.0) mkkafz=1
+            GOTO 120
+C
+C           COMPOSANTES VARIABLES MICROSTRUCTURES
+  23        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              rhas0(ic) = passe1
+              mkkas0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              rhasf(ic) = passe1
+              mkkasf(ic)=deche
+            endif
+            if(deche.ne.0) mkkasz=1
+            GOTO 120
+C
+C           COMPOSANTES DEFORMATIONS INELASTIQUES
+  24        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              EPIN0(ic) = passe1
+              mkkpn0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              EPINF(ic) = passe1
+              mkkpnf(ic)=deche
+            endif
+            if(deche.ne.0) mkkpnz=1
+            GOTO 120
+C
+  25        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              PAREX0(ic) = passe1
+              mkkex0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              PAREXF(ic) = passe1
+              mkkexf(ic)=deche
+            endif
+            if(deche.ne.0) mkkexz=1
+            GOTO 120
+C
+  98        CONTINUE
+            if (ipilo1.le.0) goto 100
+            if (ir.eq.1) then
+              exova0(ic) = passe1
+              mkkvx0(ic)=deche
+            else if (ir.ge.(mran -1)) then
+              exova1(ic) = passe1
+              mkkvx1(ic)=deche
+            endif
+            if (nomexo(ic).eq.'STEP    ') istep = int(exova0(ic))
+            if(deche.ne.0) mkkvxz=1
+            GOTO 120
+C
+ 120        CONTINUE
+ 100      CONTINUE
+C
+ 101      CONTINUE
+C
+C         ++++++++++++++++++++++++
+C         COMPOSANTES FACULTATIVES
+C         ++++++++++++++++++++++++
+C         if (mfac.le.0) goto 301
+          DO 200 IC = 1,MFAC
+            passe1= 0.d0
+            ipilo2 = pilfac(ic,ir)
+            if (pilfac(ic,ir).gt.0) then
+              deche = pilfac(ic,ir)
+* on evite les deche crees pour le modele
+*           if (ib.eq.1.and.igau.eq.1)
+*    &     write(6,*) ino,ir,ic,deche,nomdec,typdec,condec
+              if (ir.eq.indeso.and.condec(1:24).eq.conmod(1:24))goto 200
+              melval = ABS(ieldec)
+c              segact melval
+              if (typree) then
+                IBMN=MIN(IB,VELCHE(/2))
+                IGMN=MIN(IGAU,VELCHE(/1))
+                passe1=VELCHE(IGMN,IBMN)
+              else
+                IBMN=MIN(IB,IELCHE(/2))
+                IGMN=MIN(IGAU,IELCHE(/1))
+                passe1=DBLE(IELCHE(IGMN,IBMN))
+              endif
+            endif
+C
+C           AIGUILLAGE SUIVANT MOT CLE
+C
+            if (ino.gt.nmot) goto 298
+        GOTO ( 201,202,299,299,299,206, 207,299,299,210,211,
+     & 212,213,214,215,216, 217,218,299,220,221,299,223,224,299) ino
+*
+ 299        CONTINUE
+C
+C           PAS DE COMPOSANTES POUR CE CHAMP
+            RETURN
+C
+C           COMPOSANTE SCAL
+  201       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              scal0(mobl+ic) = passe1
+              mkkal0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              scalf(mobl+ic) = passe1
+              mkklaf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkalz=1
+            GOTO 320
+C
+C           COMPOSANTE TEMP
+  202       CONTINUE
+            if (ipilo2.le.0) goto 200
+* bizarre de passer la ...
+            GOTO 320
+C
+C           COMPOSANTES PRIMALES
+  206       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              depl0(mobl+ic) = passe1
+              mkkpl0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              deplf(mobl+ic) = passe1
+              mkkplf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkplz=1
+            GOTO 320
+C
+C           COMPOSANTES DUALES
+  207       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              forc0(mobl+ic) = passe1
+              mkkrc0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              forcf(mobl+ic) = passe1
+              mkkrcf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkrcz=1
+            GOTO 320
+C
+C           COMPOSANTES GRADIENTS
+  210       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              grad0(mobl+ic) = passe1
+              mkkad0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              gradf(mobl+ic) = passe1
+              mkkadf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkadz=1
+            GOTO 320
+C
+C           COMPOSANTES CONTRAINTES
+  211       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              SIG0(mobl+ic) = passe1
+              mkkig0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              SIGF(mobl+ic) = passe1
+              mkkigf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkigz=1
+            GOTO 320
+C
+C           COMPOSANTES DEFORMATIONS
+  212       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              epst0(mobl+ic) = passe1
+              mkkst0(ic+mobl) =deche
+            else if (ir.gt.1.and.ir.le.mran) then
+              epstf(mobl+ic) = passe1
+              mkkstf(ic+mobl) = deche
+            endif
+            if(deche.ne.0) mkkstz=1
+            GOTO 320
+C
+C           COMPOSANTES MATERIAUX
+  213       CONTINUE
+            if (igau.eq.1.and.ib.eq.1.and.ir.eq.1) then
+              commat(mobl+ic) = lesfac(ic)
+              tyval(mobl+ic) = 'REAL*8  '
+            endif
+            if (ir.gt.1) then
+              ivalma(mobl+ic) = 0
+              if (ipilo2.gt.0) ivalma(mobl+ic) = ABS(ieldec)
+            endif
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              valma0(mobl+ic) = passe1
+              mkkva0(ic+mobl)=deche
+            elseif (ir.gt.1.and.ir.le.(mran - 1)) then
+              VALMAT(mobl+ic) = passe1
+              mkkvat(ic+mobl)=deche
+              if (deche.eq.0) then
+                call erreur(1073)
+                return
+              endif
+              tyval(mobl+ic) = typdec
+              xmatf(mobl+ic) = passe1
+              mkkatf(ic+mobl)=deche
+              if ((inplas.eq.26.or.inplas.eq.29.or.inplas.eq.142)
+     &    .and.nomdec(1:4).eq.'ALPH') then
+**          if (typdec(1:8).eq.'REAL*8  '.or.typdec(1:8).eq.'POINTEUR')
+            if (typree                   .or.typdec(1:8).eq.'POINTEUR')
+     &      ITHHER=1
+              endif
+            else if (ir.eq.mran) then
+              xmatf(mobl+ic) = passe1
+              mkkatf(ic+mobl)=deche
+            endif
+C
+            if (igau.eq.1.and.ib.eq.1) then
+              IF (CMATE.EQ.'SECTION ') THEN
+                N2PTEL=MAX(N2PTEL,IELCHE(/1))
+                N2EL  =MAX(N2EL  ,IELCHE(/2))
+              ELSE
+                N2PTEL=MAX(N2PTEL,VELCHE(/1))
+                N2EL  =MAX(N2EL  ,VELCHE(/2))
+              ENDIF
+            endif
+            GOTO 320
+C
+C           COMPOSANTES CARACTERISTIQUES
+  214       CONTINUE
+            if (ib.eq.1.and.igau.eq.1.and.ir.eq.1) then
+              comcar(mobl+ic)=lesfac(ic)
+              tycar(mobl+ic)='REAL*8  '
+            endif
+            if (ipilo2.le.0.and.mfr.ne.9.and.mfr.ne.3) goto 200
+            if (ir.eq.1) then
+              xcar0(mobl+ic) = passe1
+              mkkar0(ic+mobl)=deche
+            else if (ir.gt.1.and.ir.le.(mran -1)) then
+              XCARB(mobl+ic) = passe1
+              mkkarb(ic+mobl)=deche
+              xcarbf(mobl+ic) = passe1
+              if (deche.eq.0) then
+                call erreur(1073)
+                return
+              endif
+              tycar(mobl+ic) = typdec
+*
+* tuyaux
+*
+              IF (mfr.eq.13) THEN
+* composante VECT
+          if (ipilo2.ne.0.and.comcar(mobl+ic).eq.'VECT    ') then
+            ip = int(passe1)
+            mkkarb(ic+mobl)=deche
+            IREF=(IP-1)*(IDIM+1)
+* on range les coordonnees en fin de tableau <> pas comme dans DEFCAR
+            DO 3208 IC2=1,IDIM
+             XCARB(ncarr+IC2)=XCOOR(IREF+IC2)
+3208        continue
+          else
+            DO 3209 IC2=1,IDIM
+             XCARB(ncarr+IC2)=0.d0
+3209        continue
+          endif
+C
+C Poutre 3D
+C
+              ELSE IF(mfr.EQ.7.AND.IDIM.EQ.3)THEN
+* composante VECT
+          if (ipilo2.ne.0.and.comcar(mobl+ic).eq.'VECT    ') then
+             IP=int(passe1)
+            mkkarb(ic+mobl)=deche
+             IREF=(IP-1)*(IDIM+1)
+* on range les coordonnees en fin de tableau <> pas comme dans DEFCAR
+             DO 4208 IC2=1,IDIM
+               XCARB(ncarr+IC2)=XCOOR(IREF+IC2)
+4208         continue
+          else
+             DO 4209 IC2=1,IDIM
+               XCARB(ncarr+IC2)=0.D0
+4209         continue
+          endif
+C
+C Poutre 2D
+C
+              ELSEIF(IDIM.EQ.2) THEN
+                if (ipilo2.le.0.and.mobl+ic.eq.2) then
+                  IF(mfr.EQ.3.OR.mfr.EQ.9) THEN
+                    XCARB(mobl+IC)=0.66666666666666D0
+                  ENDIF
+                endif
+              ELSE
+*    cas des coques minces : défaut de alfah
+                IF (ipilo2.le.0.and.mobl+IC.EQ.2.AND.
+     &                        (mfr.EQ.3.OR.mfr.EQ.9)) THEN
+                  XCARB(mobl+IC)=0.666666666666666D0
+                ENDIF
+              ENDIF
+            else if (ir.ge.mran) then
+              xcarbf(mobl+ic) = passe1
+              mkkrbf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkarz=1
+            GOTO 320
+C
+C           COMPOSANTES TEMPERATURES
+  215       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              ture0(mobl+ic) = passe1
+              mkkre0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              turef(mobl+ic) = passe1
+              mkkref(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkrez=1
+            GOTO 320
+C
+C           COMPOSANTES CONTRAINTES PRINCIPALES
+  216       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              prin0(mobl+ic) = passe1
+              mkkin0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              prinf(mobl+ic) = passe1
+              mkkinf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkinz=1
+            GOTO 320
+C
+C           COMPOSANTE MAHO
+  217       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              maho0(mobl+ic) = passe1
+              mkkho0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              mahof(mobl+ic) = passe1
+              mkkhof(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkhoz=1
+            GOTO 320
+C
+C           COMPOSANTE MAHT
+  218       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              hota0(mobl+ic) = passe1
+              mkkta0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              hotaf(mobl+ic) = passe1
+              mkktaf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkktaz=1
+            GOTO 320
+C
+C           COMPOSANTES VARIABLES INTERNES
+  220       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              VAR0(mobl+ic) = passe1
+              mkkvr0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              VARF(mobl+ic) = passe1
+              mkkvrf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkvrz=1
+            GOTO 320
+C
+C           COMPOSANTES GRADIENTS FLEXION
+  221       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              graf0(mobl+ic) = passe1
+              mkkaf0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              graff(mobl+ic) = passe1
+              mkkaff(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkafz=1
+            GOTO 320
+C
+C           COMPOSANTES VARIABLES MICROSTRUCTURES
+  223       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              rhas0(mobl+ic) = passe1
+              mkkas0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+              rhasf(mobl+ic) = passe1
+              mkkasf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkasz=1
+            GOTO 320
+C
+C           COMPOSANTES DEFORMATIONS INELASTIQUES
+  224       CONTINUE
+            if (ipilo2.le.0) goto 200
+            if (ir.eq.1) then
+              EPIN0(mobl+ic) = passe1
+              mkkpn0(ic+mobl)=deche
+            else if (ir.ge.(mran -1)) then
+             EPINF(mobl+ic) = passe1
+             mkkpnf(ic+mobl)=deche
+            endif
+            if(deche.ne.0) mkkpnz=1
+            GOTO 320
+C
+  298       CONTINUE
+            if (ipilo2.le.0) goto 200
+            exova0(mobl + ic) = passe1
+            mkkvx0(ic+mobl)=deche
+            if(deche.ne.0) mkkvxz=1
+            GOTO 320
+C
+  320       CONTINUE
+ 200      CONTINUE
+C
+ 301      CONTINUE
+C
+ 3000   CONTINUE
+ 1000 CONTINUE
+C     ------------------------------------------------------------
+C
+      IF (IGAU.EQ.1.AND.IB.EQ.1) THEN
+        IF (N2PTEL.EQ.1.OR.NBG.EQ.1) THEN
+          N2PTEL=1
+        ELSE
+          N2PTEL=NBG
+        ENDIF
+      ENDIF
+C
+C     Increment de deformations
+      DO IG = 1, DEPST(/1)
+        DEPST(ig)= epstf(ig) - epst0(ig)
+      ENDDO
+C
+      nucar = xcarb(/1)
+      IF((mfr.EQ.7.OR.mfr.EQ.13.OR.mfr.EQ.15.OR.mfr.EQ.17)
+     &                .AND.  CMATE.NE.'SECTION ') THEN
+*
+        IF (mfr.EQ.15) THEN
+          NUCAR=NUCAR/2
+          IE=1
+          pilnec = liluc(14,2)
+c         segact pilnec*nomod
+          mobl = pilobl(/1)
+          mfac = pilfac(/1)
+          DO 1007 IC=1,3,2
+             DO 1107 ICOMP=1,min(NUCAR,mobl)
+              deche = pilobl(icomp,2)
+              if (deche.gt.0) then
+c              segact deche
+               melval = ABS(ieldec)
+c               segact melval
+               IAUX=MELVAL
+               IF (IAUX.NE.0) THEN
+                 IGMN=MIN(IC,VELCHE(/1))
+                 IBMN=MIN(IB,VELCHE(/2))
+                 VALCAR(IE)=VELCHE(IGMN,IBMN)
+               ELSE
+                 VALCAR(IE)=0.D0
+               ENDIF
+              else
+               VALCAR(IE)=0.D0
+              endif
+              IE=IE+1
+ 1107        CONTINUE
+ 1007     CONTINUE
+          DO 1009 IC=1,3,2
+             DO 1109 ICOMP=1,mfac
+              deche = pilfac(icomp,2)
+              if (deche.gt.0) then
+c               segact deche
+               melval = ABS(ieldec)
+c               segact melval
+               IAUX=MELVAL
+               IF (IAUX.NE.0) THEN
+                 IGMN=MIN(IC,VELCHE(/1))
+                 IBMN=MIN(IB,VELCHE(/2))
+                 VALCAR(IE)=VELCHE(IGMN,IBMN)
+               ELSE
+                 VALCAR(IE)=0.D0
+               ENDIF
+              else
+               VALCAR(IE)=0.D0
+              endif
+              IE=IE+1
+ 1109       CONTINUE
+ 1009     CONTINUE
+*
+        ELSE if (inplas.ne.73) then
+* pour la loi de cisaillement 73, valcar ne sert a rien
+          pilnec = liluc(14,2)
+c         segact pilnec*nomod
+          mobl = pilobl(/1)
+          mfac = pilfac(/1)
+          DO 1010 ICOMP=1,pilobl(/1)
+             VALCAR(ICOMP)=0.D0
+             deche = pilobl(icomp,2)
+              if (deche.gt.0) then
+c              segact deche
+              melval = ABS(ieldec)
+c              segact melval
+              IAUX=MELVAL
+             DO 1008 IAUX1=1,NBPTEL
+               IF (IAUX.NE.0) THEN
+                 IBMN=MIN(IB  ,VELCHE(/2))
+                 IGMN=MIN(IAUX1,VELCHE(/1))
+                 VALCAR(ICOMP)=VALCAR(ICOMP)+VELCHE(IGMN,IBMN)
+               ENDIF
+               IF(IAUX1.EQ.NBPTEL) VALCAR(ICOMP)=VALCAR(ICOMP)/NBPTEL
+ 1008        CONTINUE
+             endif
+ 1010     CONTINUE
+          DO 1012 ICOMP=1,pilfac(/1)
+             VALCAR(mobl+ICOMP)=0.D0
+             deche = pilfac(icomp,2)
+              if (deche.gt.0) then
+c              segact deche
+              melval = ABS(ieldec)
+c              segact melval
+              IAUX=MELVAL
+             DO 1011 IAUX1=1,NBPTEL
+               IF (IAUX.NE.0) THEN
+                 IF (ielche(/2).ne.0)  THEN
+                   IBMN=MIN(IB  ,IELCHE(/2))
+                   IGMN=MIN(IAUX1,IELCHE(/1))
+         VALCAR(mobl+ICOMP)=VALCAR(mobl+ICOMP)+IELCHE(IGMN,IBMN)
+                 ELSE
+                   IBMN=MIN(IB  ,VELCHE(/2))
+                   IGMN=MIN(IAUX1,VELCHE(/1))
+         VALCAR(mobl+ICOMP)=VALCAR(mobl+ICOMP)+VELCHE(IGMN,IBMN)
+                 ENDIF
+               ENDIF
+        IF(IAUX1.EQ.NBPTEL) VALCAR(mobl+ICOMP)=VALCAR(mobl+ICOMP)/NBPTEL
+ 1011        CONTINUE
+             endif
+ 1012     CONTINUE
+        ENDIF
+
+      else
+        if (nucar.gt.0) then
+          do ip = 1,nucar
+            valcar(ip) = xcarb(ip)
+          enddo
+        endif
+      ENDIF
+*
+*  prise en compte de l'epaisseur et de l'excentrement
+*  dans le cas des coques minces avec ou sans cisaillement
+*  transverse
+*
+      IF (mfr.EQ.3.OR.mfr.EQ.9) THEN
+        IF (CMATE.EQ.'ISOTROPE'.OR.CMATE.EQ.'ORTHOTRO'.OR.
+     1      CMATE.EQ.'UNIDIREC') THEN
+          pilnec = liluc(14,2)
+*         segact pilnec
+          deche = pilobl(1,2)
+c         segact deche
+          deche=0
+          if (pilobl(/2).ge.2.and.pilobl(/1).ge.1) deche = pilobl(1,2)
+          melval = ABS(ieldec)
+c         segact melval
+          IAUX=MELVAL
+          IF (IAUX.NE.0) THEN
+            IBMN=MIN(IB  ,VELCHE(/2))
+            IGMN=MIN(IGAU,VELCHE(/1))
+            EPAIST=VELCHE(IGMN,IBMN)
+          ELSE
+            EPAIST=0.D0
+          ENDIF
+        ENDIF
+      ENDIF
+**
+* on traite le materiau dependant de la temperature pour lemaitre endommageable
+      if (inplas.eq.26.or.inplas.eq.29.or.inplas.eq.142) then
+        do ic = 1,tyval(/2)
+         if (tyval(ic)(9:16).EQ.'EVOLUTIO') then
+           MEVOLL=nint(valmat(ic))
+           IF(MEVOLL.EQ.0) THEN
+           KERRE=37
+           RETURN
+           ENDIF
+C           SEGACT MEVOLL
+           KEVOLL=IEVOLL(1)
+C           SEGACT KEVOLL
+           if (nomevx(1:4).eq.'T   ') ITHHER = 2
+*  on ne desactive pas les segments pour reduire la contention sur esope en //
+***        segdes kevoll,mevoll
+           if (ithher.eq.2) goto 4010
+         endif
+         if (tyval(ic)(9:16).EQ.'NUAGE   ') then
+            MNUAGE=nint(valmat(ic))
+C            SEGACT MNUAGE
+            IF(MNUAGE.EQ.0) THEN
+              MOTERR(1:8)='NUAGE   '
+              CALL ERREUR(37)
+              KERRE=37
+              RETURN
+           ENDIF
+           NVAR=NUANOM(/2)
+           IF(NVAR.LE.1) THEN
+*  on ne desactive pas les segments pour reduire la contention sur esope en //
+***          SEGDES MNUAGE
+             INTERR(1)=MNUAGE
+             INTERR(2)=2
+             INTERR(3)=2
+             CALL ERREUR(628)
+             KERRE=628
+             RETURN
+           ENDIF
+           if (nuanom(1).eq.'T       ')  ITHHER = 2
+*  on ne desactive pas les segments pour reduire la contention sur esope en //
+***        segdes mnuage
+           if (ithher.eq.2) goto 4010
+         endif
+        enddo
+ 4010  continue
+      endif
+C
+      RETURN
+      END
+ 

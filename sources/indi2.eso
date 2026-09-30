@@ -1,0 +1,189 @@
+C INDI2     SOURCE    PV        22/04/26    21:15:04     11344          
+      SUBROUTINE INDI2(IMAIL)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : INDI2
+C DESCRIPTION : Indicateur de qualite du mailleur topologique
+C
+C
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stephane GOUNAND (CEA/DES/ISAS/DM2S/SEMT/LTA)
+C               mel : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            : IMAIL
+C ENTREES/SORTIES    :
+C SORTIES            : ICHA
+C***********************************************************************
+C VERSION    : v1, 31/03/2021, version initiale
+C HISTORIQUE : v1, 31/03/2021, creation
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM      
+-INC CCOPTIO
+-INC SMLREEL
+-INC SMLMOTS      
+-INC SMELEME
+-INC SMCHAML
+*
+      CHARACTER*8 MOLREE(1)
+      DATA MOLREE/'LISTREEL'/
+*     
+      logical lmet
+*     
+* Executable statements
+*
+      MELEME=IMAIL
+*     Initialisation des données dans le common CCMATOP     
+*     Attention, il faut mettre les mêmes valeurs par défaut
+*     que dans proptt et prtopv
+      xvtol=1.D-11
+      ipvirt=0
+      imet=0
+      xdens=0.d0
+      icmetr=0
+      imomet=0
+      impr=0
+      iveri=2
+* 2020/05/02
+      call lirmot(MOLREE,1,ilistr,0)
+      if (ierr.ne.0) return
+* 2020/04/29 SG         
+*     Pas de gestion du noeud virtuel car cela n'est pas compatible
+*     avec la transformation du MLREEL en CHAMELEM         
+c$$$* Mot-clé VIRT pour gérer le noeud virtuel         
+c$$$         call lirmot(mcle,ncle,imot,0)
+c$$$         IF (IERR.NE.0) RETURN
+c$$$         if (imot.eq.1) then
+c$$$            CALL LIROBJ('POINT',IPVIRT,0,IRET)
+c$$$            IF (IERR.NE.0) RETURN
+c$$$            IF (IRET.EQ.0) THEN 
+c$$$               CALL LIRENT(IPVIRT,1,IRET)
+c$$$               IF (IERR.NE.0) RETURN
+c$$$               IF (IPVIRT.NE.0) THEN
+c$$$                  write(ioimp,*)
+c$$$     $                 'On voulait lire un point ou un entier nul'
+c$$$                  goto 9999
+c$$$               ENDIF
+c$$$            ENDIF
+c$$$         endif
+*
+*     Lecture de la métrique voulue :
+c     LOG1  : pas de métrique,
+c     FLOT1 : taille de maille ;
+C     CHPO1 : inverse de la métrique isotrope, nom de composante G ou
+C     anisotrope, noms de composante G11, G21, G22, (G31, G32, G33 en
+C     3D) 
+*       
+      imet=0
+      call lirlog(lmet,0,IRET)
+      IF (IERR.NE.0) RETURN
+      if (iret.eq.0) then 
+         call lirree(XDENS,0,IRET)
+         IF (IERR.NE.0) RETURN
+         if (iret.eq.1) then
+            imet=2
+         else
+            CALL LIROBJ('CHPOINT',ICMETR,0,IRET)
+            IF (IERR.NE.0) RETURN
+            if (iret.eq.1) then
+               call extr11(icmetr,mlmots)
+               if (ierr.ne.0) return
+               segact mlmots
+               CALL PLACE(MOTS,MOTS(/2),iplac,'G   ')
+               if (iplac.ne.0) then
+                  imet=3
+               else
+                  imet=4
+               endif
+               segsup mlmots
+            endif
+         endif
+      else
+        if(lmet) imet=1
+      endif
+*      write(ioimp,*) 'imet=',imet
+      CALL QUALI7(MELEME,IPVIRT,IMET,IMOMET,XDENS,ICMETR,XVTOL,MLREEL
+     $     ,IMPR,IVERI) 
+      IF (IERR.NE.0) RETURN
+      if (ilistr.eq.1) then
+         CALL ECROBJ('LISTREEL',MLREEL)
+      else
+*
+*     Transformation du MLREEL en MCHAML
+*
+         SEGACT MELEME
+         NBSOUS=LISOUS(/1)
+         IF (NBSOUS.NE.0) THEN
+            CALL ERREUR(25)
+            RETURN
+         ENDIF
+         NBELEM=NUM(/2)
+         SEGACT MLREEL
+         JG=PROG(/1)         
+         IF (JG.NE.NBELEM) THEN
+            CALL ERREUR(5)
+            RETURN
+         ENDIF
+*     Création du CHAMELEM
+         N1PTEL=1
+         N1EL=NBELEM
+         N2PTEL=0
+         N2EL=0
+         SEGINI,MELVAL
+         DO IELEM=1,NBELEM
+            VELCHE(1,IELEM)=PROG(IELEM)
+         ENDDO
+*     
+         N2=1
+         SEGINI,MCHAML
+*     NOMCHE(1)='QUALTOPO'
+*     Eviter les problèmes dans certains opérateurs avec les noms de 4
+*     lettres ?            
+         NOMCHE(1)='TOPO'
+         TYPCHE(1)='REAL*8'
+*
+         IELVAL(1)=MELVAL
+*         
+         L1=7
+         N1=1
+         N3=6
+         SEGINI,MCHELM
+         TITCHE='QUALITE'
+         CONCHE(1)='                '
+         INFCHE(1,1)=0
+         INFCHE(1,2)=0
+         INFCHE(1,3)=NIFOUR
+         INFCHE(1,4)=0
+         INFCHE(1,5)=0
+         INFCHE(1,6)=0
+         IFOCHE=IFOUR
+*     
+         IMACHE(1)=MELEME
+         ICHAML(1)=MCHAML
+* Sortie         
+         SEGSUP MLREEL
+         CALL ACTOBJ('MCHAML',MCHELM,1)
+         CALL ECROBJ('MCHAML',MCHELM)
+      ENDIF
+*     
+* Normal termination
+*
+      RETURN
+*
+* End of subroutine INDI2
+*
+      END
+
+ 
+ 
+ 

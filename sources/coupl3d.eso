@@ -1,0 +1,766 @@
+C COUPL3D   SOURCE    FD218221  24/02/07    21:15:07     11834          
+        subroutine coupl3d(ann,xn,bn,ngf,err1,deps3,vp33,vp33t,dt,cc3,
+     #  taum,taumdtt,tauk,psi,epse06,epsk06,raideur66,Mg,bg,dphig,Cg,Hg,
+     #  Md,bd,dphid,Cd,Hd,Mw,bw,dphiw,Cw,alphadp,betadp,actif,factif,
+     #  nc,dsigef6,depse6,depsk6,depsm6,depspc6,depspt6,depsvt6,depspg6,
+     #  depsps6,tirve,ipzero,dpg,dps,dpw,epspt6p,refermtl,complet,na,CM)
+
+c       Calcul des increments de deformations et de contraintes
+c       construction de la mattrice de couplage
+c       entre les fluages de Kelvin et de Maxwell, les deformations
+c       elastiques, totales, plastiques et les contraintes, les contraintes
+c       equivalentes et les multiplicateurs plastiques
+
+c   ********************************************************************
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+       
+        integer ngf,err1
+        real*8 ann(ngf,ngf+1),bn(ngf),xn(ngf)
+        integer ipzero(ngf)   
+        
+        real*8 deps3(3),dt
+        real*8 taukref,CM
+        
+        real*8 tauk,psi,taum,taumdtt,Mg,bg,Cg,Hg,dphig,Md,bd,dphid
+        real*8 Cd,Hd,Mw,bw,dphiw,Cw,dpg,dps,dpw
+        real*8 epse06(6),epsk06(6),raideur66(6,6),alphadp(3),betadp(3)
+        real*8 epspt6p(6)
+        integer nc
+        logical actif(nc),refermtl,complet(nc)
+        real*8 factif(nc)
+        real*8 vp33(3,3),vp33t(3,3),cc3(3)
+        logical tirve
+
+
+        
+        real*8 Jf(3,3),epse16(6),epsk16(6)
+        real*8 denomm,denomd,coeffm,coeffd,coeffg,coeffw  
+        integer errgauss
+        real*8 depse6p(6),depse6(6)
+        real*8 depsk6p(6),depsk6(6) 
+        real*8 depsm6p(6),depsm6(6)
+        real*8 depspc6p(6),depspc6(6)           
+        real*8 depspt6p(6),depspt6(6) 
+        real*8 depsvt6p(6),depsvt6(6)
+        real*8 depspg6p(6),depspg6(6)
+        real*8 depsps6p(6),depsps6(6) 
+        real*8 dsigef6p(6),dsigef6(6)  
+        integer i,j,k,l
+        integer ni,ncal,nmax,na       
+        logical reduc,recal
+        real*8 coeff
+c       compteur et numero des criteres tronquets en raison du seuil en contrainte        
+        integer nbrincg,numincg(3)
+        integer nbrincd,numincd(3)
+        integer nbrincw,numincw(3)
+        real*8 dx6(6),dx16(6)
+        
+c        print*,'verif coupl3d'
+c        if(actif(13)) then
+c         do i=1,3
+c          print*,alphadp(i),betadp(i)
+c         end do
+c        end if        
+        ncal=1
+        nmax=nc
+c       initialisation des tableaux pour la resolution
+10      recal=.false.
+c       remise a zero de la matrice de couplage globale
+        do i=1,ngf
+            do j=1,(ngf+1)
+                ann(i,j)=0.d0
+            end do
+            bn(i)=0.d0
+            xn(i)=0.d0
+        end do  
+
+c       mise a zero des compteurs de criteres tronquets
+        nbrincg=0
+        nbrincd=0
+        nbrincw=0        
+        
+c       *** ordre des inconnues *(a partir de 25r suppression depsw)****
+c       v*=(deps-depspl)/dt 1-3  (si dt=0 on suppose v*=depsimp-depspl)
+c       et on imposse depsk=0,depse=v*dt, depsm=0)
+c       depse               4-6
+c       depsk               7-9
+c       depsm*              10-12
+c       depsm               13-15
+c       depstt              16-18
+c       dsigef              19-21
+c       dpg                 22
+c       dps                 23
+c       dpw                 24
+c       dsigm               25-27       criteres: 10-12
+c       dscrg               28-30       criteres: 1-3
+c       dscrs               31-33       criteres: 4-6
+c       dscrw               34-36       criteres: 7-9
+c       dsDP                37          critere : 13
+c       depsg               38-40
+c       depss               41-43
+c       depst               44-46
+c       depsc               47-49
+c       dlambdag            50-52       criteres: 1-3
+c       dlambdas            53-55       criteres: 4-6
+c       dlambdat            56-58       criteres: 10-12
+c       dlambdac            59          critere : 13
+c       ****************************************************************
+               
+c       passage des deformation initiales dans la base d increment
+        call chrep6(epse06,vp33,.false.,epse16)
+        call chrep6(epsk06,vp33,.false.,epsk16)
+c        print*,'coupl3d'
+c        do i=1,6
+c           print*,'epse16',i,epse16(i)
+c        end do
+c        do i=1,6
+c           print*,'epsk16',i,epsk16(i)
+c        end do
+        
+c       remplissage de la matrice de couplage dans une base principale
+c       bouclage sur les 3 directions principales de l increment
+        do i=1,3
+        
+c           *** vitesses virtuelles de deformations visco elastique ****
+             l=i   
+c            inconnues v*
+             k=l 
+             if(dt.gt.0.) then             
+                 ann(l,k)=dt
+             else
+                 ann(l,k)=1.d0
+             end if
+c            deformations imposees
+             bn(l)=deps3(i)
+c            couplage avec depsg
+             k=37+i
+             ann(l,k)=1.d0
+c            couplage avec depss
+             k=40+i
+             ann(l,k)=1.d0 
+c            couplage avec depst
+             k=43+i
+             ann(l,k)=1.d0 
+c            couplage avec depsc
+             k=46+i
+             ann(l,k)=1.d0 
+
+c           *** deformations elastiques ********************************
+            l=3+i
+c           inconnues depse
+            k=l
+            ann(l,k)=1.d0 
+            if(dt.gt.0.) then
+c               couplage avec v*
+c               preparation du couplage visco elastique
+c               print*,tauk,psi,taum*cc3(i),taumdtt*cc3(i),dt,Jf
+                call jacobflu3d(tauk,psi,taum*cc3(i),taumdtt*cc3(i),
+     #          CM,dt,Jf,err1)
+                if(err1.eq.1) then
+                    print*,'Pb lors du calcul de Jf dans coupl3d'
+                    return
+                end if
+c               couplage avec inconnues v*
+                k=i            
+                ann(l,k)=-Jf(1,1)
+c               couplage avec connues epse0 epsk0
+                bn(l)=Jf(1,2)*epse16(i)+Jf(1,3)*epsk16(i)
+            else
+c               le pas de temps est nul la def virtuelle=elastique
+                bn(l)=0.d0  
+c               couplage avec la deformation virtuelle
+                k=i
+                ann(l,k)=-1.d0
+            end if
+
+c           *** deformations de Kelvin *********************************
+            l=6+i
+c           inconnues depsk
+            k=l
+            ann(l,k)=1.d0
+            if(dt.gt.0.) then
+c             couplages avec v*            
+              k=i            
+              ann(l,k)=-Jf(2,1)
+c             couplage avec  epse0 epsk0
+              bn(l)=Jf(2,2)*epse16(i)+Jf(2,3)*epsk16(i) 
+            else
+c             l increment de Kelvin est nul            
+              bn(l)=0.d0
+            end if              
+            
+c           *** deformation virtuelle de maxwell (em+edtt) *************
+            l=9+i
+c           inconnue depsm*
+            k=l
+            ann(l,k)=1.d0
+            if(dt.gt.0.) then
+c             couplages avec v*            
+              k=i            
+              ann(l,k)=-Jf(3,1)
+c             couplage avec  epse0 epsk0
+              bn(l)=Jf(3,2)*epse16(i)+Jf(3,3)*epsk16(i) 
+            else
+c             l increment de Kelvin est nul            
+              bn(l)=0.d0
+            end if 
+c            if(dt.gt.0.) then
+cc                couplage avec v*
+c                 k=i            
+c                 ann(l,k)=-dt
+cc                couplage avec depse
+c                 k=3+i
+c                 ann(l,k)=1.d0
+cc                couplage avec depsk
+c                 k=6+i
+c                 ann(l,k)=1.d0
+cc                second membre
+c                 bn(l)=0.d0                 
+cc           else
+cc                second membre
+c c                bn(l)=0.d0                  
+c            end if
+          
+c           *** deformation consolidante de Maxwell ********************
+            l=12+i
+            k=l
+            ann(l,k)=1.d0
+            bn(l)=0.d0            
+            if(dt.gt.0.) then
+                denomm=(taum*cc3(i))**(-1)
+                denomd=(taumdtt*cc3(i))**(-1)
+                coeffm=denomm/(denomm+denomd)
+c               couplage avec depsm*
+                k=9+i
+                ann(l,k)=-coeffm
+            end if
+
+c           *** deformation thermique transitoire **********************
+            l=15+i
+c           inconnue depsdtt            
+            k=l
+            ann(l,k)=1.d0
+            bn(l)=0.d0
+            if(dt.gt.0.) then
+                coeffd=1.d0-coeffm
+c               couplage avec depsm*
+                k=9+i
+                ann(l,k)=-coeffd
+            end if              
+
+c           *** contrainte effective dans la matrice *******************
+c           inconnue dsigp
+            l=18+i
+            k=l
+            ann(l,k)=1.d0
+c           couplage avec les def elastiques
+            do j=1,3
+                 k=3+j
+                 ann(l,k)=-raideur66(i,j) 
+            end do
+            
+c           *** PRESSIONS **********************************************
+
+c           elles n ont pas d indice de direction donc on passe une 
+c           seule fois par ces lignes
+            if(i.eq.1) then            
+
+c            *** pression de gel ***************************************
+c            inconnue dPg
+             l=22
+             k=l
+             ann(l,k)=1.d0
+c            couplage avec production gel
+             bn(l)=Mg*dphig
+             coeffg=Mg*bg
+c             print*,'coupl3d rag',Mg,bg,dphig,coeffg
+c             read*
+c            couplage avec les deformations
+             do j=1,3
+c                couplage avec depse            
+                 k=3+j                 
+                 ann(l,k)=coeffg
+c                couplage avec depsk
+                 k=6+j                 
+                 ann(l,k)=coeffg
+c                couplage avec depsm
+                 k=12+j
+                 ann(l,k)=coeffg
+c                couplage avec la depsdtt
+                 k=15+j
+                 ann(l,k)=coeffg
+c                couplage avec depsg
+                 k=37+j
+                 ann(l,k)=Mg
+c                couplage avec depss
+                 k=40+j                 
+                 ann(l,k)=coeffg
+c                couplage avec depst
+                 k=43+j                 
+                 ann(l,k)=0.d0
+c                couplage avec depsc
+                 k=46+j                 
+                 ann(l,k)=0.d0
+             end do 
+
+c            *** pression de def ***************************************
+c            inconnue
+             l=23
+             k=l
+             ann(l,k)=1.d0
+c            couplage avec production gel
+             bn(l)=Md*dphid
+c            couplage avec les deformations
+             coeffd=Md*bd
+c             print*,'coupl3d def',Md,bd,dphid,coeffd             
+             do j=1,3
+c                couplage avec depse            
+                 k=3+j               
+                 ann(l,k)=coeffd
+c                couplage avec depsk
+                 k=6+j                 
+                 ann(l,k)=coeffd
+c                couplage avec depsm
+                 k=12+j
+                 ann(l,k)=coeffd
+c                couplage avec la dtt
+                 k=15+j
+                 ann(l,k)=coeffd
+c                couplage avec depsg
+                 k=37+j
+                 ann(l,k)=0.d0
+c                couplage avec depss
+                 k=40+j                 
+                 ann(l,k)=Md
+c                couplage avec depst
+                 k=43+j                 
+                 ann(l,k)=0.d0
+c                couplage avec depsc
+                 k=46+j                 
+                 ann(l,k)=0.d0
+             end do  
+
+c            *** pression d'eau  ***************************************
+c            inconnue
+             l=24
+             k=l
+             ann(l,k)=1.d0
+c            evolution su le pas
+             bn(l)=Mw*dphiw
+c            pas de couplage avec les deformations
+            
+c            *** fin de calcul des PRESSIONS ***************************   
+         
+            end if
+
+            if(.not.tirve) then
+            
+c            *** contraintes totales dans la matrice *******************
+             l=24+i
+c            inconnue dsigm
+             k=l
+             ann(l,k)=1.d0
+c            couplage avec contrainte effective
+             k=18+i
+             ann(l,k)=-1.d0
+c            couplage avec pression de gel
+             k=22
+             ann(l,k)=bg
+c            couplage avec pression de def
+             k=23
+             ann(l,k)=bd
+c            couplage avec la pression d eau
+             k=24
+             ann(l,k)=bw
+
+c            *** contrainte critique pour le gel ***********************
+             l=27+i 
+             k=l
+             ann(l,k)=1.d0
+c            couplage avec la pression de gel
+             k=22
+             ann(l,k)=-Cg
+c            couplage avec la contrainte totale 
+             if(complet(i)) then
+c                si le critere est complet
+                 k=24+i            
+                 ann(l,k)=-1.d0
+             end if                           
+
+c            *** contrainte critique pour la def ***********************
+             l=30+i 
+             k=l
+             ann(l,k)=1.d0
+c            couplage avec la pression de def
+             k=23
+             ann(l,k)=-Cd
+c            couplage avec la contrainte totale
+             if(complet(3+i)) then
+c                si le critere est complet              
+                 k=24+i
+                 ann(l,k)=-1.d0
+            end if            
+
+c           *** contrainte critique pour l eau  ************************
+            l=33+i 
+            k=l
+            ann(l,k)=1.d0
+c           couplage avec la pression d eau
+            k=24
+            ann(l,k)=Cw
+c           couplage avec la contrainte totale
+            if(complet(6+i)) then
+c                si le critere est complet
+                 k=24+i
+                 ann(l,k)=-1.d0
+            end if 
+
+c           *** contrainte critique de Drucker Prager ******************
+            if(i.eq.1) then
+             l=37
+             k=l
+             ann(l,k)=1.d0
+c            couplage avec les contraintes dans la matrice (totale)
+             do j=1,3
+                 k=24+j      
+c                si le critere est complet                  
+                 ann(l,k)=-alphadp(j)
+             end do
+            end if            
+
+c           *** deformations plastiques pour le gel ********************
+            l=37+i
+            k=l
+            ann(l,k)=1.0d0
+c           couplage avec les multiplicateurs plastiques
+            k=49+i
+            ann(l,k)=-1.0d0
+            
+
+c           *** deformations plastique pour la def *********************
+            l=40+i
+            k=l
+            ann(l,k)=1.0d0
+c           couplage avec les multiplicateurs plastiques
+            k=52+i
+            ann(l,k)=-1.0d0
+
+c           *** deformation plastique de traction **********************
+            l=43+i
+            k=l
+            ann(l,k)=1.0d0
+c           couplage avec les multiplicateurs plastiques
+            k=55+i
+            ann(l,k)=-1.0d0
+
+c           *** deformation plastique de compression *******************
+            l=46+i
+            k=l
+            ann(l,k)=1.0d0
+c           couplage avec le multiplicateur plastique de DP
+            k=59
+            ann(l,k)=-betadp(i)
+            
+c           ci-dessous le nbr de multiplicateurs doit être égal à nc            
+
+c           *** multiplicateurs plastique pour le gel ******************
+            l=49+i
+            if(.not.actif(i)) then
+c                le multiplicateur plastique est mis a zero            
+                 k=l
+                 ann(l,k)=1.0d0
+                 bn(l)=0.d0
+            else
+c                la ligne est utilisee pour annuler le critere,
+c                le multiplicateur n intervient plus sur la ligne 
+c                prise en compte de la contrainte critique du gel                
+                 k=27+i
+                 ann(l,k)=1.0d0
+c                valeur du critere a annuler                     
+                 bn(l)=-factif(i)
+c                prise en compte de l ecrouissage
+                 k=37+i
+                 ann(l,k)=-Hg                                  
+            end if            
+            
+c           *** multiplicateurs plastiques pour la def *****************
+            l=52+i
+            if(.not.actif(3+i)) then
+c                le multiplicateur plastique est mis a zero            
+                 k=l
+                 ann(l,k)=1.0d0
+                 bn(l)=0.d0
+            else
+c                la ligne est utilisee pour annuler le critere
+c                le multiplicateur n intervient plus sur la ligne
+c                prise en compte de la contrainte critique de def                
+                 k=30+i
+                 ann(l,k)=1.0d0
+c                valeur du critere a annuler                     
+                 bn(l)=-factif(3+i)
+c                prise en compte de l ecrouissage
+                 k=40+i
+                 ann(l,k)=-Hd                                    
+            end if                            
+
+c           *** multiplicateurs plastiques pour la traction ************
+            l=55+i
+            if(.not.actif(9+i)) then
+c               le multiplicateur plastique est mis a zero            
+                k=l
+                ann(l,k)=1.0d0
+                bn(l)=0.d0
+            else
+c               la ligne est utilisee pour annuler le critere
+c               le multiplicateur n intervient plus sur la ligne            
+                k=24+i
+                ann(l,k)=1.0d0
+                bn(l)=-factif(9+i)                
+            end if
+
+c           *** multiplicateur plastique pour drucker Prager ***********
+            if(i.eq.1) then
+              l=59
+              if(.not.actif(13)) then
+c                le multiplicateur plastique est mis a zero                
+                 k=l
+                 ann(l,k)=1.0d0
+                 bn(l)=0.d0
+              else
+c                la ligne est utilisee pour annuler le critere
+c                le multiplicateur n intervient plus sur la ligne
+                 k=37              
+                 ann(l,k)=1.0d0
+                 bn(l)=-factif(13)
+              end if
+            end if
+
+c           ************************************************************
+            
+          end if
+c         fin de l ecoulement plastique          
+            
+        end do
+c       fin du tir visco elastique        
+        
+c***********************************************************************
+c       resolution 
+c***********************************************************************
+
+        if(tirve) then
+            ni=24
+        else
+            ni=59
+        end if        
+        call gaus3d(ni,ANN,XN,BN,ngf,errgauss,ipzero)
+        
+        goto 20
+c       ********* affichages eventuels *********************************        
+        if(.not.tirve) then
+          if(actif(13))then        
+           do i=1,ni
+             print*,'coupl3d :xn(',i,')=',xn(i)
+             print*,'coupl3d :bn(',i,')=',bn(i)
+             do j=1,ni
+               print*,'ann(',i,j,')=',ann(i,j)
+             end do
+             read*
+           end do
+           read*
+          end if
+        end if
+        
+c       ******** traitement des erreurs eventuelles ********************        
+20      if(errgauss.eq.1) then
+             err1=1
+             print*,'Pb avec gaus3d dans couplagf3d'
+             do i=1,3
+              print*,'coupl3d direction:',i,'cc',cc3(i)
+              call jacobflu3d(tauk,psi,taum*cc3(i),taumdtt*cc3(i),
+     #        CM,dt,Jf,err1)     
+              print*,tauk,psi,taum*cc3(i),taumdtt*cc3(i),CM,dt,Jf
+             end do
+             return
+        end if 
+        
+c       *** reduction eventuelle de l amplitude du retour radial *******
+        if(.not.tirve) then
+             reduc=.false.
+             coeff=1.d0
+             do j=1,3
+               if(actif(9+j)) then
+                if( (epspt6p(j)+xn(43+j)).lt.0.d0) then
+                   if(factif(9+j).lt.0.) then
+c                    on est bien dans un cas de refermeture  
+c                    on reduit le pas de retour radial                 
+                     reduc=.true.
+                     coeff=min(epspt6p(j)/abs(xn(43+j)),coeff)
+                   else
+c                    comme on est dans un cas d ouverture
+c                    on supprime ce critere et on recalcule depuis t0
+                     actif(9+j)=.false.
+                     recal=.true.
+                   end if                     
+                end if
+              end if
+              if((coeff.le.0.d0).or.(coeff.gt.1.)) then
+                 err1=1
+                 print*,'Pb avec gaus3d dans couplagf3d'
+                 print*,'Coeff inconsistant dans coupl3d'
+                 print*,'lors des refermetures de fissures'
+                 print*,actif(9+j),j,epspt6p(j),xn(43+j),coeff
+                 return
+              end if
+            end do
+            if(reduc) then 
+c                 print*,'Ds coupl3d reduction du retour:',coeff
+                 do i=1,ni
+                     xn(i)=coeff*xn(i)
+                 end do
+            end if
+c           positivite des multiplicateurs plastiques de traction diffuse
+            do i=1,6
+                if(xn(49+i).lt.0.d0) then
+                    actif(i)=.false.
+                    recal=.true.
+                end if
+            end do
+        end if 
+        if (recal) then
+           if (ncal.le.nmax) then
+c              print*,'Reduction nbre de criteres actifs dans coupl3d'
+c              nombre de criteres actifs residuels
+               na=0               
+               do i=1,nc
+                 if(actif(i)) then
+                     na=na+1
+                 end if
+               end do
+               if(na.eq.0) then
+                 print*,'Pb tous les criteres ont ete deactives'
+                 err1=1
+                 return
+               else
+c                il reste des criteres a verifier              
+                 ncal=ncal+1
+                 goto 10
+               end if
+           else
+               print*,'Pb avec gaus3d dans couplagf3d'
+               print*,'Nmax atteint par annulation de criteres'
+               err1=1
+               return  
+           end if               
+        end if           
+
+c***********************************************************************
+c       recuperation des increments
+c***********************************************************************
+
+        dpg=xn(22)
+        dps=xn(23)
+        dpw=xn(24)
+c        print*,'coupl3d:',dpg,dps,dpw
+        do i=1,3
+             depse6p(i)=xn(3+i)
+             depse6p(3+i)=0.d0
+             depsk6p(i)=xn(6+i)
+             depsk6p(3+i)=0.d0
+             depsm6p(i)=xn(12+i)
+             depsm6p(3+i)=0.d0
+             depsvt6p(i)=xn(15+i)
+             depsvt6p(3+i)=0.d0
+             dsigef6p(i)=xn(18+i)
+             dsigef6p(3+i)=0.d0
+             if(.not.tirve) then   
+                 depspg6p(i)=xn(37+i)
+                 depspg6p(3+i)=0.d0  
+                 depsps6p(i)=xn(40+i)
+                 depsps6p(3+i)=0.d0 
+                 depspt6p(i)=xn(43+i)
+                 depspt6p(3+i)=0.d0                 
+                 depspc6p(i)=xn(46+i)
+                 depspc6p(3+i)=0.d0
+            else
+                 depspg6p(i)=0.d0
+                 depspg6p(3+i)=0.d0  
+                 depsps6p(i)=0.d0
+                 depsps6p(3+i)=0.d0    
+                 depspt6p(i)=0.d0
+                 depspt6p(3+i)=0.d0                 
+                 depspc6p(i)=0.d0
+                 depspc6p(3+i)=0.d0      
+            end if
+        end do
+               
+c       *** retour des increments de deformation dans la base fixe *****
+     
+        call chrep6(depse6p,vp33t,.false.,depse6) 
+        call chrep6(dsigef6p,vp33t,.false.,dsigef6) 
+        if(dt.gt.0.) then        
+            call chrep6(depsk6p,vp33t,.false.,depsk6) 
+            call chrep6(depsm6p,vp33t,.false.,depsm6)
+            call chrep6(depsvt6p,vp33t,.false.,depsvt6)
+        else
+c           en cas d increment a pas nul on ne fait pas
+c           le changement de base sur la visco elasticite
+c           car les increments sont nuls        
+            do i=1,6
+                depsk6(i)=0.d0
+                depsm6(i)=0.d0
+                depsvt6(i)=0.d0
+            end do
+        end if        
+     
+        if(.not.tirve) then
+             call chrep6(depspg6p,vp33t,.false.,depspg6) 
+             call chrep6(depsps6p,vp33t,.false.,depsps6)  
+             call chrep6(depspt6p,vp33t,.false.,depspt6)             
+             call chrep6(depspc6p,vp33t,.false.,depspc6)           
+        else
+c            cas du tir VE
+             do i=1,6
+                 depspg6(i)=0.d0             
+                 depsps6(i)=0.d0  
+                 depspt6(i)=0.d0                 
+                 depspc6(i)=0.d0
+             end do
+        end if
+c       fin        
+        goto 100
+        
+        if(dt.eq.0.) then 
+         do i=1,3
+             dx6(i)=deps3(i)
+             dx6(i+3)=0.d0
+         end do
+         call chrep6(dx6,vp33t,.false.,dx16)
+         print*,'dans coupl3d dt=0'
+         print*,'mettre la convergence forcee a faux pour pasapas'
+         do i=1,6
+           print*,'deps6(',i,')=',dx16(i)
+         end do         
+         do i=1,6
+           print*,'depse6(',i,')=',depse6(i)
+         end do
+         do i=1,6
+           print*,'depsk6(',i,')=',depsk6(i)
+         end do
+         do i=1,6
+           print*,'depsm6(',i,')=',depsm6(i)
+         end do  
+         do i=1,6
+           print*,'depsvt6(',i,')=',depsvt6(i)
+         end do 
+         do i=1,6
+           print*,'dsigef6(',i,')=',dsigef6(i)
+         end do  
+         read*
+        end if         
+100     return
+        end
+
+      
+ 
+ 

@@ -1,0 +1,108 @@
+C REMPL3    SOURCE    BP208322  23/03/13    21:15:02     11627          
+*
+      SUBROUTINE REMPL3 (IPOINT,IEME,LEMOT,IPLISM,IPOS)
+************************************************************************
+*
+*                             R E M P L 3
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     REMPLACER LE I-EME ELEMENT D'UN OBJET DE TYPE 'LISTMOTS'.
+*
+* MODE D'APPEL:
+* -------------
+*
+*     CALL REMPL3 (IPOINT,IEME,LEMOT)
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPOINT  ENTIER    (E)  POINTEUR DE L'OBJET DE TYPE "LISTMOTS".
+*     IEME    ENTIER    (E)  NUMERO D'ORDRE DE L'ELEMENT A REMPLACER
+*                            DANS L'OBJET DE TYPE "LISTMOTS".
+*     LEMOT   ENTIER    (E)  ELEMENT REMPLACANT (CONTIENT UNE CHAINE DE
+*                            CARACTERES).
+*     IPLISM  ENTIER    (E)  POINTEUR VERS UN "LISTMOTS" DE REMPLACANTS
+*     IPOS    ENTIER    (E)  SI NEGATIF, IEME EST UN POINTEUR "LISTENTI"
+*
+* SOUS-PROGRAMMES APPELES:
+* ------------------------
+*
+*     ERREUR
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL MANIGOT     5 DECEMBRE 1984
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE + FORTRAN77 + EXTENSION: CARACTERES MIS DANS DES ENTIERS
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLENTI
+-INC SMLMOTS
+*
+      EXTERNAL LONG
+      CHARACTER*(LOCHAI) LEMOT
+*
+      MLMOTS=IPOINT
+      SEGACT,MLMOTS*MOD
+      JGN=MOTS(/1)
+*
+*     Y a-t-il plusieurs remplacements a faire ?
+      NBRMPL=1
+      IF (IPOS.LT.0) THEN
+          MLENT1=IEME
+          SEGACT,MLENT1
+          NBRMPL=MLENT1.LECT(/1)
+*
+*         Y a-t-il des valeurs de remplacement distinctes ?
+          IF (IPLISM.NE.0) THEN
+              MLMOT1=IPLISM
+              SEGACT,MLMOT1
+              IF (MLMOT1.MOTS(/2).NE.NBRMPL) THEN
+                  MOTERR(1:8)='LISTxxxx'
+                  CALL ERREUR(1015)
+                  RETURN
+              ENDIF
+          ENDIF
+      ENDIF
+*
+*     Mise a jour du LISTMOTS
+      DO II=1,NBRMPL
+          IF (IPOS.LT.0) IEME=MLENT1.LECT(II)
+          IF (IPLISM.NE.0) LEMOT=MLMOT1.MOTS(II)
+          IF (0.LT.IEME.AND.IEME.LE.MOTS(/2)) THEN
+              NCHARii = LONG(LEMOT)
+              IF(NCHARii.GT.JGN) THEN
+                JGN=NCHARii
+                SEGADJ,MLMOTS
+              ENDIF
+              MOTS(IEME)=LEMOT
+          ELSE
+              INTERR(1)=IEME
+              CALL ERREUR(36)
+          ENDIF
+      ENDDO
+*     bp: on pourrait aussi vérifier que JGN n'a pas diminué et faire un segadj
+*         mais cela en vaut-il vraiment la peine ? (qui peut le + peut le -)
+*
+      SEGDES,MLMOTS
+      IF (IPOS.LT.0) SEGDES,MLENT1
+      IF (IPLISM.NE.0) SEGDES,MLMOT1
+*
+      END
+
+
+
+ 

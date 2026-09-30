@@ -1,0 +1,396 @@
+C KEND3D    SOURCE    PV090527  23/01/27    21:15:46     11574          
+      subroutine kend3d(wpl3,vwpl33,vwpl33t,wplx3,vwplx33,vwplx33t,
+     # gft_app,gfr,iso,sigf6,sigf6d,err1,reft,young,nu,souplesse66,
+     # xmt,dtiso,dtr,dt3,dr3,dct3,dcdp,dcc3,nc3,nc33,epict,errgf1,
+     # errgf0,epspc6,epeqpc,ekdc,epspg6,ekdg,alphag,dgt3,dgc3,fshr6,
+     # dwt3,dwc3,skdw,alphaw,epsps6,dst3,dsc3,ekds,alphas,rteff_app,
+     # A,B,X,ipzero,ngf,tau_trac,xmc,dciso,dcpp,taudp,taudpmax,
+     # XE3D,NBNMAX3D,NBNB3D,IDIMB3D,altc,epssr,Method_H,Method_N,LcH)
+      
+c      calcul de l endommagement cf. :
+C      A. Sellier, G. Casaux-Ginestet, L. Buffo-Lacarrière, X. Bourbon,
+C      Orthotropic damage coupled with localized crack reclosure processing. Part I: Constitutive laws,
+C      Engineering Fracture Mechanics,
+C      Volume 97, 2013, Pages 148-167, ISSN 0013-7944,
+C      https://doi.org/10.1016/j.engfracmech.2012.10.012.
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+c     calcul des tailles   
+      logical Method_H,Method_N 
+      real*8 LcH
+      integer NBNMAX3D,NBNB3D,IDIMB3D
+      real*8 XE3D(3,NBNMAX3D)
+c     etat du materiau
+      real*8 sigf6(6),sigf6d(6),reft,rteff_app
+      real*8 wpl3(3),vwpl33(3,3),vwpl33t(3,3)
+      real*8 wplx3(3),vwplx33(3,3),vwplx33t(3,3)
+      real*8 dt66p(6,6),dr66p(6,6),gft_app,long3(3)
+      real*8 souplesse66(6,6),epspg6(6),gfr
+      real*8 epspc6(6)
+      real*8 fshr6(6),dwt3(3),dwc3(3)
+      real*8 epsps6(6),dst3(3),dsc3(3)
+      real*8 ekdc,epeqpc,young,nu,tau_trac
+      real*8 xmt,epc,xmc,dcpp,dcpp1,dcdp
+      logical dciso
+      logical iso,dtiso
+      integer err1,i,j,k,l
+      real*8 ekdg,dtr,alphag,skdw,alphaw,ekds,alphas,epssr
+      
+      real*8 dt3(3),dr3(3),dct3(3),dcc3(3)    
+      real*8 sigf3(3),vsigf33(3,3),vsigf33t(3,3)
+      real*8 sigft6(6),sigfc6(6),sigfc3(3),sigft3(3)
+      
+      real*8 rt331(3,3),ref331(3,3)
+      
+      real*8 sigft6p(6),sigft6d(6),sigfc6p(6),sigfc6r(6),sigfc6ct(6)
+      real*8 sigft61(6),sigfc61(6)
+      
+      real*8 epspg33(3,3),epspg3(3),vepspg33(3,3),vepspg33t(3,3)
+      real*8 dgt3(3),dgc3(3),sigfc6d(6)
+      
+      real*8 epspt6d(6)
+      real*8 ekt3(3),ekr3(3)
+      real*8 gf1,gf2,gfrmin,gfreff
+      
+      real*8 umdtr,xx,altc
+      real*8 dt03(3)
+      
+c     seuil init d endo par rgi      
+      real*8 epsseuil0
+      parameter (epsseuil0=0.d0)
+      
+c     endo de refermeture de fissure      
+      logical endor
+      
+c     matrice des endo de traction      
+      real*8 umdt66(6,6),umdr66(6,6),umdct66(6,6)
+      integer errg
+      
+c     matrice pour methode e Gauss      
+      integer ngf
+      real*8 X(ngf),B(ngf),A(ngf,(ngf+1))
+      integer ipzero(ngf)
+      
+c     deformation equivalente pour endo grand lors de la reouverture 
+c     de fissure (lorsque la fissure se reouvre on a 2*epsmt6    
+      real*8 epseq3(3)
+      
+c     endo maxi et precision 
+      real*8 dmaxi,drgimaxi,xngf,precision1
+      parameter (precision1=0.d0)
+      parameter (dmaxi=1.d0-precision1,drgimaxi=1.0d0-precision1)
+      parameter (xngf=6.d0) 
+      
+c     declaration complementaires juillet 2015
+      real*8 wkt,sigefft,beta1,dt1,wkr,xx1,trepsdc 
+
+c     anisotropie eventuelle de Gf en presence de multifissuration
+      real*8 nc33(3,3),nc331(3,3),nc3(3)
+c     endommagement isotrope au pic de traction
+      real*8 dtisopic 
+      
+c     direction dans laquelle est calculee la taille de l element
+      real*8 dir3(3)
+
+c     longueur de l element dans chaque direction
+      real*8 longr(3)
+
+c     energie de fissuration recuperee dans la decharge elastique
+      real*8 gfmin,gfpp,errgf,errgf1,errgf0,gfap 
+c     deformation au pic de traction
+      real*8 epict  
+
+c     volume de fissure de traction
+      real*8 trepst,dx  
+
+c     contrainte apres endo de traction
+      real*8 sigf61(6)
+
+c     endo de compression orthotrope
+      real*8 epspc33(3,3),epspc3(3),vepspc33(3,3),vepspc33t(3,3)
+
+c     correpsondance avec numero non local
+      integer NL1,ID1 
+
+c     deformation fictive pour imposer un endo initial
+      real*8 test6(6)     
+
+c    initialisation de l erreur  d energir pour eviter snap back      
+      errgf1=errgf0
+
+c***********************************************************************
+c     prise en compte de l endommagement de traction
+c*********************************************************************** 
+c     endo iso max au pic de traction
+      if(dtiso) then
+c         l endommagement isotrope conduit a utiliser rteff_app=rt_app/(1-dtpic)>rt_app
+          dtisopic=1.d0-exp(-1.d0/xmt)
+      else
+          dtisopic=0.d0
+      end if     
+       
+c     passage de Gf dans la base principale des ouvertures maxi
+      call chre3(nc331,nc33,vwplx33) 
+     
+      do i=1,3
+c       energie elastique consommee au pic dans cette direction
+        do j=1,3
+            dir3(j)=vwplx33(j,i)
+        end do
+c       taille dans cette direction 
+C         print*, longr(i),dir3,Method_N,XE3D,NBNMAX3D,
+C      #  NBNB3D,IDIMB3D,Method_H,LcH,err1  
+        call tail1d(longr(i),dir3,Method_N,XE3D,NBNMAX3D,
+     #  NBNB3D,IDIMB3D,Method_H,LcH,err1)
+C         write(*,'(A3,I2,1x,A6,e10.3)') 'dir',i,'longr:',longr(i)
+C         print*, longr(i),dir3,Method_N,XE3D,NBNMAX3D,
+C      #  NBNB3D,IDIMB3D,Method_H,LcH,err1
+        if(err1.eq.1)then
+          print*,'Pb lors du calcul de taille1 dans kend3d'
+          return
+        end if
+c       print*,'------------------------------------------'
+c       print*,'direction',dir3,' taille',longr(i),'epict' ,epict           
+c       gfmin=0.5d0*(rteff_app*(1.d0-dtisopic))*epict*longr(i)
+c       gf mini pour controler l ecrouissage negatif post pic
+        gfmin=longr(i)*((rteff_app*(1.d0-dtisopic))**2)/young*
+     #  (4.d0/xngf+1.d0/(1.d0-dtisopic) )/2.d0 
+c       gf pre pic     
+        gfap= longr(i)*(rteff_app*(1.d0-dtisopic))*epict/2.d0  
+c        print*,'gfmin',gfmin
+        if(gfmin.lt.(nc331(i,i)*gft_app)) then
+c          le controle de l energie de fissuration sans snap back local est possible
+           gfpp=nc331(i,i)*gft_app-gfap
+c           print*,'kend3d gfpp cas1',gfpp
+        else
+c          un snap back local est necessaire on calcule l erreur comise
+c          en preservant une decroissance post pic correspondant à gft_app/xngf
+           gfpp=gfmin-gfap
+c           print*,'kend3d gfpp cas2',gfpp
+c          erreur max comise           
+           errgf=(gfmin-nc331(i,i)*gft_app)/(nc331(i,i)*gft_app)
+c           print*,'dans kend3d erreur gf maxi',errgf
+        end if                           
+c       ouverture caracteristique ds cette direction  
+        wkt=gfpp/(rteff_app*(1.d0-dtisopic))
+c       endo localise        
+        dt3(i)=wplx3(i)*(wplx3(i)+2.d0*wkt)/(wkt+wplx3(i))**2
+c       borne de dt a dmaxi
+        dt3(i)=min(dmaxi,dt3(i)) 
+c        print*,'kend3d dt(',i,')=',dt3(i)  
+c       erreur relative effective        
+        errgf1=max(errgf1*dt3(i),errgf1)
+      end do
+c     calcul de la matrice d endommagement de traction
+c      print*,'ngf dans endo3d',ngf
+c      print*,'endo3d umdt'
+      call umdt3d(young,nu,souplesse66,dt3,umdt66,
+     # a,b,x,ipzero,ngf,errg,iso) 
+
+     
+c***********************************************************************
+c     appli de l endo de traction aux contraintes positives
+c***********************************************************************
+
+c     partition du tenseur des contraintes
+      call prtt3d(sigf6,sigf3,vsigf33,vsigf33t,
+     #sigft6,sigfc6,sigfc3,sigft3) 
+c     ******************************************************************
+c     traitement de l endo isotrope de traction pre pic si necessaire
+c     contrainte effective maxi      
+      sigefft=max(sigft3(1),sigft3(2),sigft3(3)) 
+c     partie elastique de l ouverture de fissure
+      tau_trac=sigefft/rteff_app
+      if(dtiso) then
+c       a positionner ici si utile        
+        beta1=(tau_trac**xmt)/xmt
+c       endommagement        
+        dt1=1.d0-dexp(-beta1)
+c       borne de dtiso
+        dt1=min(dmaxi,dt1)       
+c       actualisation de l endommagement iso de traction
+        dtr=max(dt1,dtr) 
+c        print*,'kend3d:',sigefft,rteff_app,xmt,beta1,dtr        
+      else
+        dtr=0.d0
+      end if
+      umdtr=1.d0-dtr
+c     ******************************************************************             
+c     passage  des contraintes effectives dans la base prin des endo
+      call chrep6(sigft6,vwplx33,.false.,sigft6p)  
+c     application du tenseur d endommagement aux contraintes de tractions
+      do i=1,6
+        sigft6d(i)=0.d0
+        do j=1,6
+             sigft6d(i)=sigft6d(i)+umdt66(i,j)*sigft6p(j)
+        end do
+c       application endo trac iso pre pic le cas echeant        
+        if(dtiso) then
+c         application de l endo iso prepic
+          sigft6d(i)=sigft6d(i)*umdtr
+        end if          
+      end do
+c     retour des contraintes positives en base fixe
+      call chrep6(sigft6d,vwplx33t,.false.,sigft61)  
+
+c***********************************************************************
+c    reconstruction du tenseur des contraintes
+c***********************************************************************
+      do i=1,6
+         sigf61(i)=sigfc6(i)+sigft61(i)
+      end do
+c     Nouvelle partition du tenseur des contraintes endommagés par les Dt
+      call prtt3d(sigf61,sigf3,vsigf33,vsigf33t,
+     #sigft61,sigfc6,sigfc3,sigft3) 
+     
+c***********************************************************************
+c     calcul de la fonction de refermeture de fissure
+c***********************************************************************
+
+c     materiaux et geometrie
+      do i=1,3
+c       resistance a la refermeture anisotrope
+        do j=1,3
+            if(i.eq.j) then
+                ref331(i,i)=reft
+            else
+                ref331(i,j)=0.d0
+            end if
+        end do
+      end do
+c     calcul des indicateur de refermetures 
+c     tailles des elements dans les directions de refermeture      
+      call tail3d(long3,vwpl33,Method_N,Method_H,
+     # XE3D,NBNMAX3D,NBNB3D,IDIMB3D,LcH,err1)
+      if(err1.eq.1) then
+         print*,'Pb lors du calcul de tail3d dans endo3d'
+         return
+      end if
+c     nombre  de fissures dans cette direction obtenu
+c     par intrpoation entre les nombres de fissure localisees
+      call chre3(nc331,nc33,vwpl33)      
+      do i=1,3
+          gfrmin=2.d0*(ref331(i,i)**2/young)*long3(i)
+          if(gfr*nc331(i,i).lt.gfrmin) then
+c             on adopte le gfr mini necessaire
+              gfreff=gfrmin
+c             mais on conserve le nombre de fissures             
+              nc3(i)=nc331(i,i)
+          else
+              gfreff=gfr*nc331(i,i)
+c             nombre de fissure dans l element dans cette direction              
+              nc3(i)=nc331(i,i)
+          end if          
+          wkr=gfreff/ref331(i,i)     
+c         nouvelles valeurs          
+          dr3(i)=wpl3(i)*(wpl3(i)+2.d0*wkr)/(wkr+wpl3(i))**2
+c         borne de dr3
+          dr3(i)=max(min(dmaxi,dr3(i)),0.d0)      
+c          print*,'kend3d wpl3(',i,')=',wpl3(i),'dr3(',i,')=',dr3(i)
+      end do
+c      print*,'endo3d umdr'
+      call umdt3d(young,nu,souplesse66,dr3,umdr66,
+     # a,b,x,ipzero,ngf,errg,iso)
+      
+c***********************************************************************
+c     application de la fonction de refermetures aux contraintes negatives
+c***********************************************************************
+      
+c     passage  des contraintes effectives dans la base prin des endo actuels
+      call chrep6(sigfc6,vwpl33,.false.,sigfc6p)  
+c     application du tenseur d endommagement aux contraintes de tractions
+      do i=1,6
+         sigfc6r(i)=0.d0
+         do j=1,6
+            sigfc6r(i)=sigfc6r(i)+umdr66(i,j)*sigfc6p(j)
+         end do            
+      end do
+c     retour des contraintes negatives en base fixe
+      call chrep6(sigfc6r,vwpl33t,.false.,sigfc61)
+      
+c***********************************************************************
+c     endommagement de couplage traction directe sur compression
+c***********************************************************************
+      call buck3d(altc,dr3,dct3,vwpl33,vwpl33t,sigfc61)
+      
+c***********************************************************************
+c     prise en compte de l endommagement du a la pression capillaire
+      call endort(fshr6,dwt3,dwc3,dmaxi,drgimaxi,skdw,
+     #alphaw,0.d0,sigft61,sigfc61)
+c***********************************************************************      
+
+c***********************************************************************
+c     prise en compte de l endommagement du  a la rag
+c      do i=1,3
+c         test6(i)=0.003d0
+c         test6(3+i)=0.d0
+c      end do
+c      call endort(test6,dgt3,dgc3,dmaxi,drgimaxi,0.003d0,
+c     # 0.15d0,0.d0,sigft61,sigfc61)      
+      call endort(epspg6,dgt3,dgc3,dmaxi,drgimaxi,ekdg,
+     #alphag,epssr,sigft61,sigfc61)
+c*********************************************************************** 
+
+c***********************************************************************
+c     prise en compte de l endommagement du  a la def
+      call endort(epsps6,dst3,dsc3,dmaxi,drgimaxi,ekds,
+     #alphas,epsseuil0,sigft61,sigfc61)
+c***********************************************************************     
+
+c***********************************************************************
+c     variation de raideur due aux dilatations transverses
+c     induites par le cisaillement 
+c***********************************************************************
+      call damdp3d(precision1,ekdc,0.d0,epspc6,dcc3,sigfc61,sigft61,
+     #dcdp,.true.)     
+       
+c***********************************************************************
+c    endommagement pre pic par cisaillement applicable en compression
+c***********************************************************************
+100   if(dciso) then
+          xcpp=max(taudp,0.d0)/taudpmax
+          xcpp=(xcpp**xmc)/xmc
+          dcpp1=1.d0-exp(-xcpp)
+          dcpp=max(dcpp,dcpp1)
+          do i=1,6
+             sigf6d(i)=sigfc61(i)*(1.d0-dcpp)+sigft61(i)
+          end do          
+      else
+          dcpp=0.d0
+          do i=1,6
+            sigf6d(i)=sigfc61(i)+sigft61(i)
+c           print*,'endo3d',sigf6(i),sigf6d(i)
+          end do 
+      end if
+c      print*,'ds endo3d perte de rigidite isotrope comp :',dcpp 
+c      print*,xmc,taudp,taudpmax,dcpp1 
+       
+c***********************************************************************   
+c     traitement des erreurs et sortie
+c***********************************************************************
+      goto 1000 
+      print*,'dans endo3d long3:',long3      
+999   do i=1,6
+         sigf6d(i)=sigf6(i)
+      end do
+      print*,'dcpp',dcpp
+      print*,'dcdp',dcdp
+998   do i=1,3
+        print*,'dt3(',i,')=',dt3(i)
+        print*,'dr3(',i,')=',dr3(i)
+        print*,'dwt3(',i,')=',dwt3(i)
+        print*,'dwc3(',i,')=',dwc3(i)
+        print*,'dgt3(',i,')=',dgt3(i)
+        print*,'dgc3(',i,')=',dgc3(i)
+        print*,'dst3(',i,')=',dst3(i)
+        print*,'dsc3(',i,')=',dsc3(i)
+        print*,'dcc3(',i,')=',dcc3(i)
+        print*,'dct3(',i,')=',dct3(i)
+      end do
+      read*
+       
+1000  return
+      end      
+ 

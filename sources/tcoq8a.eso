@@ -1,0 +1,14 @@
+C TCOQ8A    SOURCE    OF166741  23/12/04    21:15:09     11800          
+C
+C ===>  SOUS-PROGRAMME  TCOQ8A  PLUS UTILISE    <===
+C ===>  SUBROUTINE              NO LONGER USED  <===
+C
+      SUBROUTINE TCOQ8A
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      RETURN
+      END
+
+ 

@@ -1,0 +1,12 @@
+C AFIC6     SOURCE    PV090527  23/01/27    21:15:04     11574          
+c***************************************************************************
+      subroutine afic6(v)
+      real*8 v(6)
+      integer i
+      do i=1,6
+         write(*,'(1x,1e10.3)') v(i)
+      end do
+      return
+      end
+      
+ 

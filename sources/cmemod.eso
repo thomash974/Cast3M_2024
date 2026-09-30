@@ -1,0 +1,65 @@
+C CMEMOD    SOURCE    OF166741  23/06/19    21:15:03     11680          
+      subroutine cmemod(pModel,nbInt,nbFloa,nbChar)
+C=======================================================================
+C     COLlaborateur MEsure MODele
+C     Mesure de la taille d'un modele en nombre d'entiers, de flottants
+C     et de caracteres
+C=======================================================================
+      integer nbInt,nbFloa,nbChar
+      integer nImode,iMode,iNomid
+      integer lconmo
+      integer mn3,nlconm,nfor,nmat,nobmod,nbrobl,nbrfac,ntyp
+-INC SMMODEL
+      pointeur pNomid.NOMID
+      pointeur pModel.MMODEL
+      pointeur modele.IMODEL
+
+C      write(ioimp,*) 'Entree dans CMEMOD'
+      nbInt=0
+      nbFloa=0
+      nbChar=0
+
+      if (pModel.lt.0) then
+C        write(ioimp,*) 'Pointeur modele nul'
+        return
+      endif
+
+      segact pModel
+      nbInt=nbInt+1
+      nImode=pModel.kmodel(/1)
+      do iMode=1,nImode
+         modele=pModel.kmodel(iMode)
+         segact modele
+         mn3 = modele.infmod(/1)
+         nlconm = modele.conmod(/1)
+         nfor = modele.formod(/2)
+         nmat = modele.matmod(/2)
+         nobmod  = modele.ivamod(/1)
+C            write(ioimp,*) 'Taille du modele',mn3, nlconm, nfor,nmat,nObMod
+         nbInt=nbInt+3+mn3+4+16+nobmod+4
+         nbChar=nbChar+8+16*(nfor+nmat)+8*nobmod+nlconm
+C Traitement des Nomid :
+         ntyp= modele.lnomid(/1)
+         nbInt=nbInt+1
+         do iNomid=1,ntyp
+            nbInt=nbInt+2
+            pNomid = modele.lnomid(iNomid)
+C            write(ioimp,*) 'nomid',iNomid,'sur ',ntyp
+            if(pNomid.ne.0) then
+               segact pNomid
+               nbrobl=pNomid.lesobl(/2)
+               nbrfac=pNomid.lesfac(/2)
+C               write(ioimp,*) 'obl / fac',nbrobl,nbrfac
+               nbChar=nbChar+8*(nbrobl+nbrfac)
+               segdes pNomid
+            endif
+         enddo
+         segdes modele
+      enddo
+      segdes pModel
+
+C      write(ioimp,*) 'Sortie de CMEMOD'
+c      return
+      end
+
+ 

@@ -1,0 +1,22 @@
+C EPLD3D    SOURCE    PV090527  23/01/27    21:15:32     11574          
+      SUBROUTINE EPLD3D(s1,s2,s3,b,ldp,Vdep)
+c     Ecoulement plastique Drucker Prager (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      real*8 s1,s2,s3,b,ldp,Vdep(3)
+     
+      t4 = s1 ** 2
+      t7 = s2 ** 2
+      t9 = s3 ** 2
+      t12 = sqrt(0.3D1) * (-s1 * s2 - s1 * s3 - s2 * s3 + t4 + t7 + t9) 
+     #** (-0.1D1 / 0.2D1) / 0.3D1
+      t15 = b / 0.3D1
+      Vdep(1) = (t12 * (0.2D1 * s1 - s2 - s3) / 0.2D1 + t15) * ldp
+      Vdep(2) = (-t12 * (s1 - 0.2D1 * s2 + s3) / 0.2D1 + t15) * ldp
+      Vdep(3) = (-t12 * (s1 + s2 - 0.2D1 * s3) / 0.2D1 + t15) * ldp
+      
+      return
+      end
+      
+ 

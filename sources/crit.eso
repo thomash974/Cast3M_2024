@@ -1,0 +1,87 @@
+C CRIT      SOURCE    JB251061  23/05/10    21:15:08     11667          
+      SUBROUTINE CRIT
+C=======================================================================
+C
+C            OPERATEUR CRITERE
+C
+C      SCA = CRIT MODL SIG  VAR  CAR
+C
+C  MMODEL     |    MODL    OBJET MODELE
+C
+C             |    SIG     CONTRAINTES
+C  MCHAMLS    |    VAR     VARIABLES INTERNES
+C             |    CAR     CONSTANTES DU MATERIAU  ET CARACTERISTIQUES
+C             |            GEOMETRIQUES ( SELON LES ELEMENTS )
+C             |    SCA     CRITERE RESULTAT
+C
+C=======================================================================
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+*
+       IPCHE1=0
+       IPCHE2=0
+       IPCAR=0
+*
+*     LECTURE D'UN MODEL
+*
+      CALL LIROBJ('MMODEL  ',IPMODL,1,IRT)
+      CALL ACTOBJ('MMODEL  ',IPMODL,1)
+      IF(IERR.NE.0)RETURN
+*
+          CALL LIROBJ('MCHAML  ',IPIN,1,IRT)
+          CALL ACTOBJ('MCHAML  ',IPIN,1)
+          IF(IERR.NE.0)RETURN
+          CALL REDUAF(IPIN,IPMODL,IPCHE1,0,IR,KER)
+          IF(IR   .NE. 1) CALL ERREUR(KER)
+          IF(IERR .NE. 0) RETURN
+          
+          MCHELM=IPCHE1
+          IF(TITCHE.NE.'CONTRAINTES')THEN
+            MOTERR(1:32)='CONTRAIN'
+            CALL ERREUR(565)
+            RETURN
+          ENDIF
+*
+          CALL LIROBJ('MCHAML  ',IPIN,1,IRT)
+          CALL ACTOBJ('MCHAML  ',IPIN,1)
+          IF(IERR.NE.0)RETURN
+          CALL REDUAF(IPIN,IPMODL,IPCHE2,0,IR,KER)
+          IF(IR   .NE. 1) CALL ERREUR(KER)
+          IF(IERR .NE. 0) RETURN
+          
+          MCHELM=IPCHE2
+          IF(TITCHE.NE.'VARIABLES INTERNES')THEN
+            MOTERR(1:32)='VARINTER'
+            CALL ERREUR(565)
+            RETURN
+          ENDIF
+*
+          CALL LIROBJ('MCHAML  ',IPIN,1,IRT)
+          CALL ACTOBJ('MCHAML  ',IPIN,1)
+          IF(IERR.NE.0)RETURN
+          CALL REDUAF(IPIN,IPMODL,IPCAR,0,IR,KER)
+          IF(IR   .NE. 1) CALL ERREUR(KER)
+          IF(IERR .NE. 0) RETURN
+          
+          MCHELM=IPCAR
+          IF(TITCHE.NE.'CARACTERISTIQUES')THEN
+             MOTERR(1:32)='CARACTER'
+             CALL ERREUR(565)
+             RETURN
+          ENDIF
+*
+      CALL CRITP(IPMODL,IPCHE1,IPCHE2,IPCAR,IPCHES)
+      IF(IERR .NE. 0) RETURN
+      
+      CALL ACTOBJ('MCHAML  ',IPCHES,1)
+      CALL ECROBJ('MCHAML  ',IPCHES)
+
+      END
+
+ 
+ 

@@ -1,0 +1,123 @@
+C WL2D3D    SOURCE    FD218221  24/02/07    21:15:30     11834          
+      subroutine wl2d3d(istep,vmax,vref,sig3p,eweb,rt,cwrt,
+     # xwl2,tau_trac_wl2,dtl0,dtl1,mxwl,tau_trac_wl2_max,bw,pw,kwrt)
+      
+c     traitement de rt par methode wl2
+      
+c     tables de dimension fixe pour resolution des sytemes lineaires 
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+c     variables externes      
+      integer istep
+      real*8 vmax,vref,eweb,rtref,cwrt,xwl2,tau_trac_wl2
+      real*8 dtm,mxwl
+      real*8 sig3p(3),cwrtmin,bw,pw,kwrt,cwrt0,cwrt1,dtl0,dtl1
+
+c     variables locales
+      real*8 precs,dtm_seuil
+c     dtm_seuil : seuil d endo localise mini pour fixer cwrt      
+      parameter(precs=1.0d-5,dtm_seuil=1.0d-3)
+      real*8 spetit,rt_reff,rpetit,tau_trac_wl2_max
+      real*8 tau_trac_wl2_eff,tpetit,coef_nl
+
+      
+c     resistance de reference isotrope
+      rt_reff=rt/cwrt
+c     coeff non local pour le tau de chragement
+      coef_nl=rt_reff/rt      
+c     valeur minimales par défaut
+      rpetit=precs*rt_reff
+      spetit=rpetit
+      tpetit=precs
+      xpetit=vmax*(precs**eweb)
+      
+      if((istep.eq.1).or.(istep.eq.3)) then
+c       1er etape non locale : preparation xwl2 a moyenner
+c            rt(i) est ramené à sa valeur de reference pour la recherche
+c            du taux de chragement le plus grand de façon à faire
+c            abstraction du cwrt precedent mais pas des dependances 
+c            physico-chimiques  
+             tau_trac_wl2=tau_trac_wl2/coef_nl
+c            variable à moyenner en non local   
+c            (1-dtm) permet d integrer proportionnellement à la zone 
+c            saine residuelle associee au point de Gauss
+             xwl2=vmax*(tau_trac_wl2**eweb)*(1.d0-dtl1)
+c            print*,istep,tau_trac_wl2,xwl2,cwrt
+        
+      else if( istep.ge.2) then
+c       2eme etape non locale si les donnees sont coherentes      
+        if((vref.ne.0.).and.(vmax.ne.0.).and.(eweb.ne.0.)) then
+c            2eme etape non locale : calcul de cwrt
+c            ----- hypothese du tau de traction local -------------------            
+c            tau_trac_wl2_eff=tau_trac_wl2
+c            ----- hypothese du taux de traction maximum de la structure-
+             tau_trac_wl2_eff=tau_trac_wl2_max
+c            ------------------------------------------------------------
+c            xm inverse du module de Weibull 1/m (eweb=exp de Weibull)
+             xm=1.d0/eweb
+c            calcul de l effet d echelle extreme pour wl2               
+             cwrtmin=(vref/vmax)**xm
+c            calcul de rt effectif suivant methode Wl2                
+             if((xwl2.ge.xpetit).and.
+     #               (tau_trac_wl2_eff.ge.tpetit)) then
+c                     cas normal, structure significativement chargee                    
+c                     print*,'ds wl2d3d xwl2:',xwl2
+c                     rt estime avec formule de Weibull                
+                      cwrt1=tau_trac_wl2_eff*(vref/xwl2)**xm
+c                     print*,'evaluation cwrt istep2',cwrt                   
+             else if ((xwl2.ge.xpetit).and.
+     #                (tau_trac_wl2_eff.lt.tpetit)) then
+c                     la structure est faiblement chargee                 
+                      cwrt1=tpetit*(vref/xwl2)**xm 
+             else if ((xwl2.lt.xpetit).and.
+     #                (tau_trac_wl2_eff.ge.tpetit)) then
+c                     la zone chargee est tres petite par rapport a vmax                    
+                      cwrt1=tau_trac_wl2_eff*(vref/xpetit)**xm                    
+             else 
+c                     la structure n est pas chargee, elle est 
+c                     alors consideree uniformement chargee
+                      cwrt1=cwrtmin 
+             end if
+c            calcul du cwrt du point de gauss en ponderant  par l endo
+c            ancien cwrt
+             cwrt0=cwrt
+c            nouveau cwrt actualise
+             if(dtl1.gt.dtl0) then            
+                cwrt=(dtl0*cwrt0+(dtl1-dtl0)*cwrt1)/dtl1
+             else
+                if(dtl0.gt.dtm_seuil) then 
+c                  en l abscence d evolution de dt on conserve la valeur                
+                   cwrt=cwrt0
+                else
+c                  point non endommage on actualise                
+                   cwrt=cwrt1
+                end if
+             end if 
+             if(cwrt.gt.10.) then
+                   print*,'xwl2',xwl2
+                   print*,'mxwl',mxwl                       
+                   print*,'tau_trac_wl2',tau_trac_wl2
+                   print*,'tau_trac_wl2_eff',tau_trac_wl2_eff
+                   print*,'cwrt min',tpetit*(vref/xpetit)**xm
+                   print*,'cwrt',cwrt1
+c                   read*  
+             end if             
+         else
+c           les donnees sont incoherentes on ne prend pas
+c           d effet d echelle
+            cwrt=1.d0            
+         end if
+c        stockage du taux de chargement non local            
+         tau_trac_wl2=tau_trac_wl2_eff
+c        verif que cwrt n est pas nul            
+         cwrt=max(cwrtmin,cwrt)
+      else
+c        istep=0 : pas d effet d echelle
+         cwrt=1.d0
+      end if         
+      return
+      end
+      
+ 
+ 

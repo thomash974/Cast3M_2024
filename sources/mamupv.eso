@@ -1,0 +1,273 @@
+C MAMUPV    SOURCE    PV        22/04/15    17:10:53     11344          
+      subroutine mamupv(ideb,ifin,val,iposrb,lpl,val1,ilpos1b,lpl1,
+     >      imasq,imb,pt,na,na1,nbo)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+-INC CCHOLE
+      logical nul
+      DIMENSION VAL(*),VAL1(*)
+      dimension imasq(*)
+      real*8 pt(36)
+           do i=1,min(6,na) * min(6,na1)
+           pt(i)=0.d0
+           enddo
+        if (ideb.gt.ifin) goto 999
+        jini=(ideb+imb)/masdim
+   5    continue
+        jinii=jini
+        nul=.false.
+   6    continue
+        j=jini
+        do 10 j=jini,(ifin+imb)/masdim
+          jm=imasq(j+1)
+          if (jm.gt.0) goto 20
+          if (jm.eq.0) goto 10
+          jinio=-jm/masdim+1
+          if (jinio.gt.j+jacc) then
+           jini=jinio
+           goto 6
+          endif
+  10    continue
+        nul=.true.
+  20    continue
+        nmasq=min(imasq(j-1+1),-(j-1)*masdim)
+        do jj=jinii,j-1
+          if (imasq(jj+1).le.nmasq) goto 22
+          imasq(jj+1)=nmasq
+        enddo
+  22    continue
+  21    continue
+        if (nul) goto 999
+        jini=j
+        jfines=jini+1
+        jfin=jfines
+        if (jfines.gt.(ifin+imb)/masdim) goto 32
+  31    continue
+        jfin=jfines
+        do 30 jfin=jfines,(ifin+imb)/masdim
+           jm=imasq(jfin+1)
+           if (jm.le.0) goto 40
+           if (jm.eq.1) goto 30
+           jfineo=jm/masdim+1
+           if (jfineo.gt.jfin+jacc) then
+             jfines=jfineo
+             goto 31
+           endif
+  30    continue
+  40    continue
+        nmasq=max(imasq(jfin-1+1),(jfin-1)*masdim)
+        do jj=jini,jfin-1
+            if (imasq(jj+1).ge.nmasq) goto 33
+            imasq(jj+1)=nmasq
+        enddo
+  33    continue
+  32    continue
+        jfin=jfin-1
+        idebn=max((ideb+imb),jini*masdim)-imb
+        ifinn=min((jfin+1)*masdim-1,ifin+imb)-imb
+ 998    continue
+**       idebn=ideb
+**       ifinn=ifin
+      lon = ifinn-idebn+1
+      if (lon.le.0) goto 997
+**    if (idebn.gt.ifinn+100000) write (6,*) ' mamupv idebn ifinn ',
+**   >      idebn,ifinn
+              ilpos1=ilpos1b+idebn
+              iposr1=iposrb+idebn
+**        if (na.gt.3.or.na1.gt.3) write(6,*) ' mamupv na na1 ',na,na1
+           if (na.ge.6) then
+            if (na1.ge.6) then
+      nbo=nbo+lon*36
+      call mamu66(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.5) then
+      nbo=nbo+lon*30
+      call mamu65(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.4) then
+      nbo=nbo+lon*24
+      call mamu64(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.3) then
+      nbo=nbo+lon*18
+      call mamu63(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.2) then
+      nbo=nbo+lon*12
+      call mamu62(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.1) then
+      nbo=nbo+lon*6
+      call mamu61(lon,val1(ilpos1),     val(iposr1),lpl,pt)
+            endif
+           elseif (na.ge.5) then
+            if (na1.ge.6) then
+      nbo=nbo+lon*30
+      call mamu56(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.5) then
+      nbo=nbo+lon*25
+      call mamu55(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.4) then
+      nbo=nbo+lon*20
+      call mamu54(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.3) then
+      nbo=nbo+lon*15
+      call mamu53(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.2) then
+      nbo=nbo+lon*10
+      call mamu52(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.1) then
+      nbo=nbo+lon*5
+      call mamu51(lon,val1(ilpos1),     val(iposr1),lpl,pt)
+            endif
+           elseif (na.ge.4) then
+            if (na1.ge.6) then
+      nbo=nbo+lon*24
+      call mamu46(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.5) then
+      nbo=nbo+lon*20
+      call mamu45(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.4) then
+      nbo=nbo+lon*16
+      call mamu44(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.3) then
+      nbo=nbo+lon*12
+      call mamu43(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.2) then
+      nbo=nbo+lon*8
+      call mamu42(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.1) then
+      nbo=nbo+lon*4
+      call mamu41(lon,val1(ilpos1),     val(iposr1),lpl,pt)
+            endif
+           elseif (na.ge.3) then
+            if (na1.ge.6) then
+      nbo=nbo+lon*18
+      call mamu36(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.5) then
+      nbo=nbo+lon*15
+      call mamu35(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.4) then
+      nbo=nbo+lon*12
+      call mamu34(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.3) then
+      nbo=nbo+lon*9
+      call mamu33(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.2) then
+      nbo=nbo+lon*6
+      call mamu32(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.1) then
+      nbo=nbo+lon*3
+      call mamu31(lon,val1(ilpos1),     val(iposr1),lpl,pt)
+            endif
+           elseif (na.ge.2) then
+            if (na1.ge.6) then
+      nbo=nbo+lon*12
+      call mamu26(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.5) then
+      nbo=nbo+lon*10
+      call mamu25(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.4) then
+      nbo=nbo+lon*8
+      call mamu24(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+            elseif (na1.ge.3) then
+      nbo=nbo+lon*6
+      call mamu23(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+           elseif (na1.ge.2) then
+      nbo=nbo+lon*4
+      call mamu22(lon,val1(ilpos1),lpl1,val(iposr1),lpl,pt)
+           elseif (na1.ge.1) then
+      nbo=nbo+lon*2
+      call mamu21(lon,val1(ilpos1),     val(iposr1),lpl,pt)
+            endif
+           elseif (na.ge.1) then
+            if (na1.ge.6) then
+      nbo=nbo+lon*6
+      call mamu16(lon,val1(ilpos1),lpl1,val(iposr1),    pt)
+            elseif (na1.ge.5) then
+      nbo=nbo+lon*5
+      call mamu15(lon,val1(ilpos1),lpl1,val(iposr1),    pt)
+            elseif (na1.ge.4) then
+      nbo=nbo+lon*4
+      call mamu14(lon,val1(ilpos1),lpl1,val(iposr1),    pt)
+            elseif (na1.ge.3) then
+      nbo=nbo+lon*3
+      call mamu13(lon,val1(ilpos1),lpl1,val(iposr1),    pt)
+            elseif (na1.ge.2) then
+      nbo=nbo+lon*2
+      call mamu12(lon,val1(ilpos1),lpl1,val(iposr1),    pt)
+            elseif (na1.ge.1) then
+      nbo=nbo+lon
+      pt(1)=pt(1)+ddotpv((lon),val1(ilpos1),val(iposr1))
+            endif
+*           else
+*              ilpos2=ilpos1+lpl1
+*              ilpos3=ilpos2+lpl1+1
+*              iposr2=iposr1+lpl
+*              iposr3=iposr2+lpl+1
+*           do 101 ipos=idebn,ifinn
+*
+*              xval1=val(iposr1)
+*              iposr1= iposr1+1
+*              if (na.ge.2) then
+*               xval2=val(iposr2)
+*               iposr2= iposr2+1
+*              endif
+*              if (na.ge.3) then
+*               xval3=val(iposr3)
+*               iposr3=iposr3+1
+*              endif
+*
+*              xval11=val1(ilpos1)
+*              ilpos1=ilpos1+1
+*              pt(1)=pt(1)+xval1*xval11
+*              if (na.ge.2) pt(4)=pt(4)+xval2*xval11
+*              if (na.ge.3) pt(7)=pt(7)+xval3*xval11
+*              if (na1.ge.2) then
+*               xval12=val1(ilpos2)
+*               ilpos2=ilpos2+1
+*               pt(2)=pt(2)+xval1*xval12
+*               if (na.ge.2) pt(5)=pt(5)+xval2*xval12
+*               if (na.ge.3) pt(8)=pt(8)+xval3*xval12
+*              endif
+*              if (na1.ge.3) then
+*               xval13=val1(ilpos3)
+*               ilpos3=ilpos3+1
+*               pt(3)=pt(3)+xval1*xval13
+*               if (na.ge.2) pt(6)=pt(6)+xval2*xval13
+*               if (na.ge.3) pt(9)=pt(9)+xval3*xval13
+*              endif
+* 101       continue
+*         if (ifinn-idebn.ge.0) nbo=nbo+(ifinn-idebn+1)*na*na1
+
+           endif
+ 997  continue
+       if (ifinn.ge.ifin) goto 999
+       jini=jfin+1
+       goto 5
+ 999       continue
+      RETURN
+      END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

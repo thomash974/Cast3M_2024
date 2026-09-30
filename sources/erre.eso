@@ -1,0 +1,383 @@
+C ERRE      SOURCE    FANDEUR   22/06/30    21:15:01     11390          
+      SUBROUTINE ERRE
+C_______________________________________________________________________
+C
+C                 OPERATEUR ERRE
+C                 --------------
+C
+C  PASSAGE AUX NOUVEAUX MCHAMLS PAR JM CAMPENON LE 02/91
+C
+C_______________________________________________________________________
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+
+-INC SMLREEL
+-INC SMLENTI
+-INC SMLMOTS
+-INC SMLCHPO
+
+      CHARACTER*(LOCHAI) AUX
+      CHARACTER*(8)      CTYP
+      CHARACTER*(1000)   CHLU(2)
+      CHARACTER*(2000)   CHLUS
+      CHARACTER*(1)      CH1
+      CHARACTER*(11)     DIGIT
+
+      LOGICAL ZAVEC,BOOL
+      SEGMENT,IPODEB(0),IPOFIN(0)
+
+      DATA DIGIT/'1234567890:'/
+
+      CHARACTER*(1)  CFMT0
+      CHARACTER*(4)  CFMT1
+      CHARACTER*(9)  CFMT2
+      CHARACTER*(21) CFMT3
+
+      EXTERNAL LONG
+
+      MOTERR = ' '
+
+      AUX = ' '
+      ZAVEC = .FALSE.
+
+C     ==========================
+C     DECLENCHEMENT D'UNE ERREUR
+C     ==========================
+
+C     SYNTAXE1 => on fournit un message que l'on affiche juste avant
+C                 de declencher l'erreur 308
+      CALL LIRCHA(AUX,0,IRETOU)
+      IF (IRETOU.EQ.0) GOTO 250
+      CALL LENCHA(AUX,LAUX)
+      ZAVEC = AUX(1:LAUX).EQ.'AVEC'
+      if (laux.ne.4) zavec=.false.
+      IF (ZAVEC) GOTO 250
+
+ 100  CONTINUE
+C     Determination du FORMAT d'affichage exact
+      IVAL=INT(LOG10(REAL(LAUX)))+1
+      IVAL=MAX(1,IVAL)
+      WRITE(CFMT0,'(I1)')IVAL
+      CFMT1='(I'//CFMT0//')'
+      WRITE(CFMT2,CFMT1) MAX(1,LAUX)
+      CFMT3='(/,(1X,A'//CFMT2(1:IVAL)//'),/)'
+      WRITE(IOIMP,CFMT3) AUX
+      CALL ERREUR(308)
+      RETURN
+C
+C     SYNTAXE2 => on remplit MOTERR, INTERR, REAERR et BOOERR avant
+C                 de declencher une erreur quelconque de GIBI.ERREUR
+ 250  CONTINUE
+C
+      CALL LIRENT (KENT,0,IRETOU)
+      IF (IRETOU.EQ.0) THEN
+        IF (ZAVEC) GOTO 100
+        GOTO 255
+      END IF
+
+      MOTERR = ' '
+      IF (ZAVEC) THEN
+
+C         -------------------------------------------------------------
+C         EN PREAMBULE : ON VA REMPLIR IPODEB ET IPOFIN AVEC LES BORNES
+C         (DANS MOTERR) DE CHACUN DES MOTIFS %m OU %M
+C         -------------------------------------------------------------
+
+C         ON PLACE DANS CHLU(1) ET CHLU(2) LE CONTENU DU MESSAGE D'ERREUR
+          CALL ERREU1(KENT,CHLU,NIVEAU,NBL)
+          IF (IERR.NE.0) RETURN
+          II=0
+          CHLUS(1:1000)=CHLU(1)
+          IF (NBL.EQ.1) THEN
+              CHLUS(1001:2000)=' '
+          ELSE
+              CHLUS(1001:2000)=CHLU(2)
+          ENDIF
+          IIMAX=LONG(CHLUS)
+          SEGINI,IPODEB,IPOFIN
+
+C         BOUCLE 2501 => ON CHERCHE UN MOTIF %m OU %M
+ 2501     II=II+1
+          IF (II.GT.IIMAX) GOTO 2504
+          CH1=CHLUS(II:II)
+          IF (CH1.NE.'%') GOTO 2501
+          II=II+1
+          CH1=CHLUS(II:II)
+          IF (CH1.NE.'m'.AND.CH1.NE.'M') GOTO 2501
+          IPOS=0
+          ICOM=0
+
+C         BOUCLE 2502 => ON CHERCHE LES BORNES DU MOTIF
+ 2502     II=II+1
+          CH1=CHLUS(II:II)
+          IPO=INDEX(DIGIT,CH1)
+          IF (IPO.GE.1.AND.IPO.LE.10) THEN
+              IPOS=IPOS*10
+              IF (IPO.LT.10) IPOS=IPOS+IPO
+          ELSEIF (IPO.EQ.11) THEN
+              IF (ICOM.EQ.0) THEN
+                  IF (IPOS.EQ.0) GOTO 2501
+                  IDEB=IPOS
+                  IPOS=0
+                  ICOM=1
+                  GOTO 2502
+              ELSE
+                  GOTO 2503
+              ENDIF
+          ELSE
+              IF (ICOM.EQ.0.OR.IPOS.EQ.0) GOTO 2501
+              GOTO 2503
+          ENDIF
+          GOTO 2502
+
+C         ETIQUETTE 2503 => ON A BIEN LU DEUX NOMBRES ENTIERS NON NULS
+ 2503     IFIN=IPOS
+          CALL AJOU(IPODEB,IDEB)
+          CALL AJOU(IPOFIN,IFIN)
+          II=II-1
+          GOTO 2501
+ 2504     CONTINUE
+
+          NBMOT=IPODEB(/1)
+
+C         ----------------------------------------------------------
+C         ON PEUT DESORMAIS REMPLIR MOTERR, INTERR, REAERR ET BOOERR
+C         ----------------------------------------------------------
+          MOTERR = ' '
+          DO ii = 1, 11
+            INTERR(ii) = 0
+          END DO
+          DO ii = 1, 10
+            REAERR(ii) = 0.D0
+          END DO
+          DO ii = 1, 10
+            BOOERR(ii) = .FALSE.
+          END DO
+
+          IMOT=0
+          IENT=0
+          IFLO=0
+          ILOG=0
+
+C Cas particulier erreur 308
+          IF (KENT.EQ.308) THEN
+            CALL LIRCHA(AUX,0,IRETOU)
+            IF (IRETOU.EQ.0) GOTO 252
+            CALL LENCHA(AUX,LAUX)
+            SEGSUP,IPODEB,IPOFIN
+            GOTO 100
+          END IF
+
+C Boucle de lecture des elements du message %_
+ 251      CALL QUETYP(CTYP,0,IRET)
+          IF (IRET.EQ.0) GOTO 252
+
+C         MOT ---> MOTERR
+          IF (CTYP.EQ.'MOT') THEN
+              CALL LIRCHA(AUX,1,LCH)
+              IF (IERR.NE.0) RETURN
+              IF (IMOT.LT.NBMOT) THEN
+                  IMOT=IMOT+1
+                  IDEB=IPODEB(IMOT)
+                  IFIN=IPOFIN(IMOT)
+                  LON=MIN(IFIN-IDEB+1,LCH)
+                  MOTERR(IDEB:IFIN)=AUX(1:LON)
+              ENDIF
+
+C         LISTMOTS ---> MOTERR
+          ELSEIF (CTYP.EQ.'LISTMOTS') THEN
+              CALL LIROBJ('LISTMOTS',IOB,1,IRET)
+              IF (IERR.NE.0) RETURN
+              MLMOT1=IOB
+              SEGACT,MLMOT1
+              JGN=MLMOT1.MOTS(/1)
+              JGM=MLMOT1.MOTS(/2)
+              DO K=1,JGM
+                  AUX=MLMOT1.MOTS(K)
+                  LCH=LONG(AUX)
+                  IF (IMOT.LT.NBMOT) THEN
+                      IMOT=IMOT+1
+                      IDEB=IPODEB(IMOT)
+                      IFIN=IPOFIN(IMOT)
+                      LON=MIN(IFIN-IDEB+1,LCH)
+                      MOTERR(IDEB:IFIN)=AUX(1:LON)
+                  ENDIF
+              ENDDO
+
+C         ENTIER ---> INTERR
+          ELSEIF (CTYP.EQ.'ENTIER') THEN
+              CALL LIRENT(IVAL,1,IRET)
+              IF (IERR.NE.0) RETURN
+              IF (IENT.LT.9) THEN
+                  IENT=IENT+1
+                  INTERR(IENT)=IVAL
+              ENDIF
+
+C         LISTENTI ---> INTERR
+          ELSEIF (CTYP.EQ.'LISTENTI') THEN
+              CALL LIROBJ('LISTENTI',IOB,1,IRET)
+              IF (IERR.NE.0) RETURN
+              MLENT1=IOB
+              SEGACT,MLENT1
+              JG=MLENT1.LECT(/1)
+              DO K=1,JG
+                  IF (IENT.LT.9) THEN
+                      IENT=IENT+1
+                      INTERR(IENT)=MLENT1.LECT(K)
+                  ENDIF
+              ENDDO
+
+C         FLOTTANT ---> REAERR
+          ELSEIF (CTYP.EQ.'FLOTTANT') THEN
+              CALL LIRREE(XVAL,1,IRET)
+              IF (IERR.NE.0) RETURN
+              IF (IFLO.LT.9) THEN
+                  IFLO=IFLO+1
+                  REAERR(IFLO)=XVAL
+              ENDIF
+
+C         LISTREEL ---> REAERR
+          ELSEIF (CTYP.EQ.'LISTREEL') THEN
+              CALL LIROBJ('LISTREEL',IOB,1,IRET)
+              IF (IERR.NE.0) RETURN
+              MLREE1=IOB
+              SEGACT,MLREE1
+              JG=MLREE1.PROG(/1)
+              DO K=1,JG
+                  IF (IFLO.LE.9) THEN
+                      IFLO=IFLO+1
+                      REAERR(IFLO)=MLREE1.PROG(K)
+                  ENDIF
+              ENDDO
+
+C         LOGIQUE ---> BOOERR
+          ELSEIF (CTYP.EQ.'LOGIQUE') THEN
+              CALL LIRLOG(BOOL,1,IRET)
+              IF (IERR.NE.0) RETURN
+              IF (ILOG.LT.9) THEN
+                  ILOG=ILOG+1
+                  BOOERR(ILOG)=BOOL
+              ENDIF
+
+C         Objet de type incorrect
+          ELSE
+              MOTERR = ' '
+              MOTERR(1:8)=CTYP
+              CALL ERREUR(39)
+              RETURN
+          ENDIF
+
+          GOTO 251
+
+ 252      CONTINUE
+          SEGSUP,IPODEB,IPOFIN
+          IF (IMOT.EQ.0.AND.IENT.EQ.0.AND.IFLO.EQ.0.AND.ILOG.EQ.0) THEN
+            MOTERR = ' '
+            MOTERR(1:4)='AVEC'
+            CALL ERREUR(166)
+            RETURN
+          ENDIF
+
+      ENDIF
+
+      CALL ERREUR(KENT)
+      RETURN
+
+C     ===============
+C     CALCUL D'ERREUR
+C     ===============
+
+ 255  CALL LIROBJ('CHPOINT ',IPO1,0,IRETOU)
+      IF (IRETOU.EQ.0) GOTO 256
+      CALL LIROBJ('CHPOINT ',IPO2,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ADCHPO(IPO1,IPO2,IRET,1D0,-1D0)
+      IF (IRET.EQ.0) RETURN
+      call ecrCHA('ABS')
+      CALL ECROBJ('CHPOINT ',IRET)
+      CALL MAXIMU(1)
+      RETURN
+
+ 256  CALL LIROBJ('LISTCHPO',IPO1,0,IRETOU)
+      IF (IRETOU.EQ.0) GOTO 260
+      CALL LIROBJ('LISTCHPO',IPO2,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      mlchp1 = ipo1
+      mlchp2 = ipo2
+      segact mlchp1, mlchp2
+      if (mlchp1.ichpoi(/1).ne.mlchp2.ichpoi(/1)) then
+        call erreur(3)
+        return
+      end if
+      JG = mlchp1.ichpoi(/1)
+      segini mlreel
+      do ii = 1 ,jg
+        ipo1 = mlchp1.ichpoi(ii)
+        ipo2 = mlchp2.ichpoi(ii)
+        CALL ADCHPO(IPO1,IPO2,IRET,1D0,-1D0)
+        IF (IRET.EQ.0) RETURN
+        call ecrCHA('ABS')
+        CALL ECROBJ('CHPOINT ',IRET)
+        CALL MAXIMU(1)
+        call lirree(xx,1,iretou)
+        if (ierr.ne.0) return
+        prog(ii) = xx
+      enddo
+
+      call ECROBJ('LISTREEL',mlreel)
+      RETURN
+
+C_______________________________________________________________________
+C
+C  CALCUL D'ERREUR   ( VERSION BARZIC ET RICHARD )
+C_______________________________________________________________________
+C
+ 260  CONTINUE
+      CALL LIROBJ('MMODEL  ',IPMODL,1,IRETM)
+      CALL ACTOBJ('MMODEL  ',IPMODL,1)
+      IF (IERR.NE.0) RETURN
+C
+      CALL LIROBJ('MCHAML',IPIN,1,IRETOU)
+      CALL ACTOBJ('MCHAML',IPIN,1)
+      IF (IERR.NE.0)RETURN
+      CALL REDUAF(IPIN,IPMODL,IPCHE1,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+
+      CALL LIROBJ('MCHAML',IPIN,1,IRETOU)
+      CALL ACTOBJ('MCHAML',IPIN,1)
+      IF (IERR.NE.0) RETURN
+      CALL REDUAF(IPIN,IPMODL,IPCHE2,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+C
+      CALL RNGCHA (IPCHE1,IPCHE2,'CONTRAINTES','CARACTERISTIQUES'
+     1                   ,IPCH1,IPCH2)
+      IF(IPCH1.EQ.0.OR.IPCH2.EQ.0)THEN
+         IF(IPCH1.EQ.0)THEN
+             MOTERR(1:16)='CONTRAINTES     '
+         ELSE
+             MOTERR(1:16)='CARACTERISTIQUES'
+         ENDIF
+         CALL ERREUR(565)
+         RETURN
+      ENDIF
+C
+      CALL ERRARE(IPMODL,IPCH1,IPCH2,XERR,IPCHRR)
+C
+      IF (IPCHRR.NE.0) THEN
+         CALL ACTOBJ('MCHAML  ',IPCHRR,1)
+         CALL ECROBJ('MCHAML  ',IPCHRR)
+         CALL ECRREE(XERR)
+      ENDIF
+
+      RETURN
+      END
+
+ 

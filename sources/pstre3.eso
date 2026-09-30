@@ -1,0 +1,36 @@
+C PSTRE3    SOURCE    PV        22/04/25    21:15:10     11344          
+c---------------------------------------------------------------------
+c
+      SUBROUTINE PSTRE3 (SIGMA, SGPRI)
+c
+c=====================================================================
+c                                                                    =
+c   This routine calculates the eigen stress values of 3D            =
+c   'sigma (6)' and puts the results in 'sgpri (3)'.                 =
+c                                                                    =
+c    Note:   sigma = (Sxx, Syy, Szz, Sxy, Sxz, Syz)                  =
+c            sgpri = (S11, S22, S33)                                 =
+c                                                                    =
+c=====================================================================
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER(I-N)
+      real*8    sigma (6), sgpri (3)
+c
+      c2=-SIGMA(1)-SIGMA(2)-SIGMA(3)
+      c1= (SIGMA(1)*SIGMA(2)+SIGMA(2)*SIGMA(3)+SIGMA(3)*SIGMA(1))
+     &   - SIGMA(5)**2 - SIGMA(4)**2 - SIGMA(6)**2
+      c0=-2.*SIGMA(4)*SIGMA(5)*SIGMA(6) + SIGMA(1)*SIGMA(6)**2
+     &   + SIGMA(2)*SIGMA(5)**2 + SIGMA(3)*SIGMA(4)**2
+     &   - SIGMA(1)*SIGMA(2)*SIGMA(3)
+      call degre3(c0,c1,c2,d1,XI1,d2,XI2,d3,XI3)
+
+      sgpri (1) = D1
+      sgpri (2) = D2
+      sgpri (3) = D3
+
+      return
+      end
+
+ 
+ 
+ 

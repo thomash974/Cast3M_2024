@@ -1,0 +1,104 @@
+C INTRIG    SOURCE    PASCAL    20/12/02    21:15:11     10798          
+      SUBROUTINE INTRIG(IPRIG1,IPRIG2)
+C----------------------------------------------------------------------C
+C    INTERSECTION DEUX RIGIDITES
+C
+C    SYNTAXE : RIG1 = INTE RIG2 RIG3
+
+C    Rq. : l'operation est faite sur les sous-zones
+C
+C    ENTREES :
+C      - IPRIG1 = RIG2
+C      - IPRIG2 = RIG3 
+
+C    SORTIE : le resultat est renvoye dans la pile.
+C
+C----------------------------------------------------------------------C
+
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMRIGID
+
+C Activation de l'objet :
+      RI1 = IPRIG1
+      RI2 = IPRIG2
+      SEGACT, RI1, RI2
+
+C---- CAS RIGIDITE VIDE EN ARGUMENT ----C
+
+      NRE1 = RI1.IRIGEL(/2)
+      IF (NRE1.EQ.0) THEN
+        CALL ECROBJ('RIGIDITE',IPRIG1)
+        RETURN
+      ENDIF
+
+      NRE2 = RI2.IRIGEL(/2)
+      IF (NRE2.EQ.0) THEN
+        CALL ECROBJ('RIGIDITE',IPRIG2)
+        RETURN
+      ENDIF
+
+C---- CAS GENERAL ----C
+
+C Identification des rigidites elementaires communes (INTERI(i) = 1)
+C Deux rigidites sont communes si COERIG et tableau IRIGEL identiques
+      NRIGEL = NRE1 + NRE2
+      SEGINI, MRIGID
+      IF (RI1.MTYMAT.EQ.RI2.MTYMAT) MTYMAT = RI1.MTYMAT
+      NRI1   = 0
+      DO 100 I1=1,NRE1
+        COERI1 = RI1.COERIG(I1)
+        IRIG11 = RI1.IRIGEL(1,I1)
+        IRIG21 = RI1.IRIGEL(2,I1)
+        IRIG31 = RI1.IRIGEL(3,I1)
+        IRIG41 = RI1.IRIGEL(4,I1)
+        IRIG51 = RI1.IRIGEL(5,I1)
+        IRIG61 = RI1.IRIGEL(6,I1)
+        IRIG71 = RI1.IRIGEL(7,I1)
+        DO 110 I2=1,NRE2
+*          write(6,*) ' rigidites I1, I2', I1, I2
+          COERI2 = RI2.COERIG(I2)
+          IF (COERI1.NE.COERI2) GOTO 110
+          IRIG12 = RI2.IRIGEL(1,I2)
+          IF (IRIG11.NE.IRIG12) GOTO 110
+          IRIG22 = RI2.IRIGEL(2,I2)
+          IF (IRIG21.NE.IRIG22) GOTO 110
+          IRIG32 = RI2.IRIGEL(3,I2)
+          IF (IRIG31.NE.IRIG32) GOTO 110
+          IRIG42 = RI2.IRIGEL(4,I2)
+          IF (IRIG41.NE.IRIG42) GOTO 110
+          IRIG52 = RI2.IRIGEL(5,I2)
+          IF (IRIG51.NE.IRIG52) GOTO 110
+          IRIG62 = RI2.IRIGEL(6,I2)
+          IF (IRIG61.NE.IRIG62) GOTO 110
+          IRIG72 = RI2.IRIGEL(7,I2)
+          IF (IRIG71.NE.IRIG72) GOTO 110
+          NRI1 = NRI1 + 1
+          COERIG(NRI1)   = COERI1
+          IRIGEL(1,NRI1) = IRIG11
+          IRIGEL(2,NRI1) = IRIG21
+          IRIGEL(3,NRI1) = IRIG31
+          IRIGEL(4,NRI1) = IRIG41
+          IRIGEL(5,NRI1) = IRIG51
+          IRIGEL(6,NRI1) = IRIG61
+          IRIGEL(7,NRI1) = IRIG71
+          GOTO 100
+ 110    CONTINUE
+ 100  CONTINUE
+      IF (NRIGEL.NE.NRI1) THEN
+        NRIGEL = NRI1
+        SEGADJ, MRIGID
+      ENDIF
+
+C Ecriture resultat dans la pile :
+      CALL ECROBJ('RIGIDITE',MRIGID)
+
+      RETURN
+      END
+
+ 
+ 
+ 
+ 

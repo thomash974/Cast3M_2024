@@ -1,0 +1,71 @@
+C HOO03D    SOURCE    FD218221  24/02/07    21:15:13     11834          
+      subroutine hoo03d(iso,young,nu,kb,mub,ierr1,raideur66,souplesse66)
+
+c     actualisation des matrices d elasticite isotrope
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      logical iso
+      real*8 young,nu
+      integer ierr1
+      real*8 lambda,Mub,Kb
+      real*8 raideur66(6,6),souplesse66(6,6)
+
+      integer i,j
+c     real*8 verif66(6,6)      
+
+
+      if (iso) then
+c     Coefficients de Lame 
+        if(nu.eq.0.5) then
+             print*,'Pb avec valeur de nu dans hydm3d nu=',nu
+             ierr1=1
+             return
+        end if 
+        Kb=young/3.d0/(1.d0-2.d0*nu)        
+        lambda=young*nu/(1.d0+nu)/(1.d0-2.d0*nu)
+        Mub=young/2.d0/(1.d0+nu)
+c       tenseurs de la loi de comportement en base fixe      
+        do i=1,6
+             do j=1,6
+                 if (i.eq.j) then
+                     if(i.le.3) then
+                         raideur66(i,j)=lambda+2.d0*Mub
+                         souplesse66(i,j)=1.d0/young
+                     else
+                         raideur66(i,j)=2.d0*Mub
+                         souplesse66(i,j)=(raideur66(i,j))**(-1)
+                     end if
+                 else
+                    if ((j.le.3).and.(i.le.3)) then
+                         raideur66(i,j)=lambda                    
+                         souplesse66(i,j)=-nu/young
+                    else
+                         raideur66(i,j)=0.d0                    
+                         souplesse66(i,j)=0.d0
+                    end if
+                 end if
+             end do
+         end do
+c         print*,'dans hoo03d'
+c         call afic66(raideur66)
+c         call afic66(souplesse66)         
+cc        test inverse
+c         do i=1,6
+c            do j=1,6
+c                verif66(i,j)=0.d0
+c                do k=1,6
+c              verif66(i,j)=verif66(i,j)+raideur66(i,k)*souplesse66(k,j)
+c                enddo
+c            enddo
+c         enddo
+c         call afic66(verif66)
+c         read*
+      else
+         print*,'ERREUR dans hoo03d.eso'
+         print*,'programmer autres matrices d elasticite'
+         print*,'pour continuer en anisotrope'
+         ierr1=1
+      end if
+      return
+      end 

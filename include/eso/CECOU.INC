@@ -1,0 +1,30 @@
+*
+*  Commun NECOU utilisé dans ECOINC
+*
+      COMMON/NECOU/NCOURB,IPLAST,IT,IMAPLA,ISOTRO,
+     . ITYP,IFOURB,IFLUAG,
+     . ICINE,ITHER,IFLUPL,ICYCL,IBI,
+     . JFLUAG,KFLUAG,LFLUAG,
+     . IRELAX,JNTRIN,MFLUAG,JSOUFL,JGRDEF
+!$OMP THREADPRIVATE(/NECOU/)
+*
+*  Commun IECOU: sert de fourre-tout pour les initialisations
+*  d'entiers
+*
+      COMMON/IECOU/NYOG,NYNU,NYALFA,NYSMAX,NYN,NYM,NYKK,
+     .  NYALF1,NYBET1,NYR,NYA,NYRHO,NSIGY,NNKX,NYKX,IND,
+     .  NSOM,NINV,NINCMA,NCOMP,JELEM,LEGAUS,INAT,NCXMAT,
+     .  LTRAC,MFR,IELE,NHRM,NBNN,NBELEM,ICARA,
+     .  LW2,NDEF,NSTRSS,MFR1,NBGMAT,NELMAT,MSOUPA,
+     .  NUMAT1,LENDO,NBBB,NNVARI,KERR1,MELEME,
+     .  icou45,icou46,icou47,icou48,icou49,icou50,
+     .  Icow51,icou52,icou53,icou54,icou55,icou56
+     .  icou57,icou58
+!$OMP THREADPRIVATE(/IECOU/)
+*
+*  Commun XECOU: sert de fourre-tout pour les initialisations
+*  de réels
+*
+      COMMON/XECOU/DTOPTI,TSOM,TCAR,DTT,DT,TREFA,TEMP0
+!$OMP THREADPRIVATE(/XECOU/)
+*

@@ -1,0 +1,463 @@
+C DEPIMP    SOURCE    PV        21/03/04    21:15:05     10913          
+      SUBROUTINE DEPIMP
+
+************************************************************************
+*     CE SUBROUTINE SERT A IMPOSER DES VALEURS DE DEPLACEMENTS
+*     IMPOSES NON NULS.
+*
+*  SYNTAXE  TOTO = DEPIMPOSE   BRIG  FLOT
+*     OU    TOTO = DEPIMPOSE   BRIG  CHPOI ( COMPOSANTES PRIMALES)
+*     OU    TOTO = DEPIMPOSE   BRIG  'RELA' CHPSCAL
+*
+*  ENTREE : BRIG = OBJET RIGIDITE DE TYPE  BLOQUAGE
+*           FLOT = VALEUR DU DEPLACEMENT A IMPOSER
+*           CHPOI   = chpoint AVEC LES DDLS PRIMALS
+*           CHPSCAL = CHPOINT DE SCALAIRE QUI PRECISE LA
+*                     VALEUR A IMPOSER EN CHAQUE POINT.
+*
+*  SORTIE : TOTO = OBJET DE TYPE CHPOINT (FLX)
+*
+************************************************************************
+
+************************************************************************
+*     DECLARATIONS ET INITIALISATIONS
+************************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      CHARACTER*4 charm,charre
+      REAL*8 XXA,vval,X0,X1
+      LOGICAL ISCALA
+      PARAMETER(NCLE=1)
+      CHARACTER*4 MOCLE(NCLE)
+      DATA MOCLE  /'RELA'/
+      
+-INC SMRIGID
+-INC SMCHPOI
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCOORD
+-INC SMTABLE
+
+      character*4 cnoha
+      integer*4 inoha
+      data cnoha/'NOHA'/
+      equivalence(inoha,cnoha)
+
+      SEGMENT SCOLOR
+       CHARACTER*(LOCOMP) COLOR(NBELEM)
+      ENDSEGMENT
+      POINTEUR SCOL1.SCOLOR,SCOL2.SCOLOR,SCOL3.SCOLOR
+      SEGMENT ICPR(NNN)
+      segment irelat
+         logical lrelat(nnn)
+      end segment
+      logical lllblo,lllrel
+
+C     INITIALISATIONS
+      ISCALA = .FALSE.
+
+      
+************************************************************************
+*     LECTURES ET TESTS PRELIMINAIRES DES ENTREES
+************************************************************************
+     
+C  ****  LECTURE TABLE LIAISONS STATIQUES
+      CALL LIRTAB('LIAISONS_STATIQUES',ipt,0,iretou)
+      IF (IRETOU.NE.0) THEN
+        CALL DEPIM2(IPT)
+        RETURN
+      ENDIF
+C
+C  ****  LECTURE D'UN OBJET DE TYPE RIGIDITE
+C
+      CALL LIROBJ('RIGIDITE',IPOIRI,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+C
+C  ****  LECTURE D'UN FLOTTANT OU D'UN CHPOINT
+C
+C     LECTURE D'UNE VALEUR 
+      CALL LIRREE(XXA,0,IREVAL)
+      VVAL=XXA
+c     SI ECHEC LECTURE D'UN CHPOINT DE SCALAIRES OU DE DDL PRIMAL
+      IF(IREVAL.EQ.0) THEN
+      
+*         mot-cle 'RELA' ? ==> ISCALA
+          CALL LIRMOT(MOCLE,NCLE,ICLE,0)
+          IF(IERR.NE.0) RETURN
+          IF(ICLE.EQ.1) ISCALA=.TRUE.
+      
+          CALL LIROBJ('CHPOINT ',ISCA,1,IRETOU)
+          IF(IERR.NE.0) RETURN
+          MCHPO1=ISCA
+c           SEGACT MCHPO1
+          CALL ACTOBJ('CHPOINT ',MCHPO1,1)
+C         Si le CHPOINT n'a aucune sous-zone, il est vide, alors erreur
+          NBSZCH=MCHPO1.IPCHP(/1)
+          IF(NBSZCH.LT.1) THEN
+             MOTERR(1:8)='CHPOINT '
+             INTERR(1)=ISCA
+             CALL ERREUR(356)
+             RETURN
+          ENDIF
+
+c         RELA => cas SCALAIRE : 1 zone et 1 composante nommee 'SCAL'
+          IF(ISCALA) THEN
+c           verif : 1 seule zone
+            IF(NBSZCH.NE.1) THEN
+              MOTERR(1:8)='CHPOINT '
+              INTERR(1)=ISCA
+c             Le %m1:8 de pointeur %i1 n'est pas elementaire (n<>1)
+              CALL ERREUR(110)
+              RETURN
+            ENDIF          
+            MSOUP1 = MCHPO1.IPCHP(1)
+c           segact MSOUP1
+c           verif : 1 seule composante
+            NBCOMP = MSOUP1.NOHARM(/1)
+            IF(NBCOMP.NE.1) THEN
+c             Il faut specifier un champ par point avec une seule composante
+              CALL ERREUR(180)
+              RETURN
+            ENDIF           
+            IF(MSOUP1.NOCOMP(1).NE.'SCAL') THEN
+              MOTERR(1:4)='SCAL'
+c             La composante %m1:4 ne peut etre extraite du champ par point specifie
+c             car elle en est absente
+              CALL ERREUR(181)
+              RETURN
+            ENDIF
+c           ici ISCALA=TRUE et tout va bien !
+          ENDIF
+          
+      ENDIF
+c
+c  ... test si la RIGIDITE n'est pas vide, si OUI on cree un CHPOINT
+c      vide puis on s'en va ...
+c
+      MRIGID=IPOIRI
+      SEGACT,MRIGID
+      NNN=IRIGEL(/2)
+      IF (NNN.EQ.0) THEN
+         NSOUPO=0
+         NAT=1
+         SEGINI MCHPOI
+         MTYPOI='FLX'
+         JATTRI(1) = 2
+      MOCHDE=' CE CHAMP PAR POINTS A ETE CREE PAR LE SOUS-PROGRAMME'//
+     #  ' DEPIMP'
+         IFOPOI = IFOUR
+         GO TO 252
+      ENDIF
+      
+      
+************************************************************************
+*    TRAVAIL
+************************************************************************
+
+      IPT2=0
+      NOHA=0
+C
+************************************************************************
+C BOUCLE SUR LES SOUS RIGIDITES . ON VERIFIE QUE LAMBDA EXISTE ET ON
+C CONSTRUIT LE SEGMENT GEOMETRIE LX1 LX2 NNOE, DANS scol1.COLOR ON MET LE
+C NOM DE L'INCONNUE
+************************************************************************
+C
+      segini,irelat
+      DO 1 NN=1,NNN
+         DESCR=IRIGEL(3,NN)
+         MELEME=IRIGEL(1,NN)
+         NOHAR=IRIGEL(5,NN)
+         IF(NOHA.NE.0.AND.NOHA.NE.NOHAR) THEN
+            CALL ERREUR ( 25 )
+            RETURN
+         ENDIF
+         lrelat(nn) = .false.
+c    ... on va chercher les multiplicateurs dans DESCR ...
+         SEGACT,DESCR
+         IA=LISINC(/2)
+         if (ia.ne.noelep(/1)) then
+          write(6,*) ' descr longueur ',descr,ia
+          call erreur(5)
+         endif
+         DO 2 I=1,IA
+            IF(LISINC(I).EQ.'LX  ') GO TO 3
+    2    CONTINUE
+c    ... on n'a pas trouve de multiplicateurs, donc bye ...
+         SEGDES,DESCR
+         CALL ERREUR(245)
+         RETURN
+c    ... on a trouve les multiplicateurs ...
+   3     CONTINUE
+         SEGACT,MELEME
+         NBNN=2
+         NBELEM=NUM(/2)
+         NBREF=0
+         NBSOUS=0
+         SEGINI,IPT1,SCOL1
+c    ... boucle sur les elements de blocage ...
+         DO J=1,NUM(/2)
+            JB=0
+c       ... JA sert a compter les multiplicateurs dans chaque
+c           element, un seul est permis
+            JA=0
+c       ... boucle sur les noeuds de ces elements ...
+            DO K=1,NOELEP(/1)
+c          ... si c'est un support de multiplicateur, on met son n°
+c              dans IPT1 (position 1 ) ...
+               IF(LISINC(K).EQ.'LX  ') THEN
+                  JA=JA+1
+                  if (ja.gt.1) then
+                   write(6,*) ' plus que 1 LX dans la matrice ',descr
+                   call erreur(5)
+                  endif
+                  IPT1.NUM(JA,J)=NUM(NOELEP(K),J)
+c          ... sinon ...
+               ELSE
+c             ... on teste si c'est le premier DDL <<physique>>, si OUI ...
+                  IF(JB.EQ.0) THEN
+c                ... on met son n° dans IPT1 (position 2) ...
+                     JB=2
+                     IPT1.NUM(JB,J)=NUM(NOELEP(K),J)
+C                ... et le nom du DDL dans SCOL1.COLOR ...
+                     SCOL1.COLOR(J)=LISINC(K)
+c             ... sinon (c.a d. ceci est une relation et non un blocage) ...
+                  ELSE
+c                ... on teste si le support n'est pas le même que
+c                    celui du premier DDL <<physique>> ...
+                     IF(IPT1.NUM(JB,J).NE.NUM(NOELEP(K),J)) THEN
+c                   ... si c'est le cas on sert une ERREUR en cas de lecture d'un CHPOINT ...
+                        IF(IREVAL.ne.1) then
+                           CALL ERREUR(794)
+                           RETURN
+                        endif
+                     ENDIF
+c                ... et de toute façon on efface le nom du DDL de SCOL1.COLOR ...
+                     SCOL1.COLOR(J)=' '
+                     lrelat(nn) = .true.
+                  ENDIF
+               ENDIF
+            ENDDO
+         ENDDO
+
+C
+C  SI NN= 1 IPT2 = IPT1; SINON IPT3 = IPT2 + IPT1, PUIS IPT2 = IPT3
+C
+         SEGDES,DESCR
+         IF(IPT2.NE.0) GO TO 5
+         IPT2=IPT1
+         SCOL2=SCOL1
+         GO TO 1
+    5    CONTINUE
+         NA=IPT1.NUM(/2)
+         NB=IPT2.NUM(/2)
+         NBELEM=NA+NB
+         SEGINI,IPT3,SCOL3
+         DO 71 I=1,NA
+            SCOL3.COLOR(I)=SCOL1.COLOR(I)
+            DO 72 J=1,2
+               IPT3.NUM(J,I)=IPT1.NUM(J,I)
+   72       CONTINUE
+   71    CONTINUE
+         DO 8 I=1,NB
+            SCOL3.COLOR(I+NA)=SCOL2.COLOR(I)
+            DO 9 J=1,2
+               IPT3.NUM(J,I+NA)=IPT2.NUM(J,I)
+    9       CONTINUE
+    8    CONTINUE
+         SEGSUP IPT1,SCOL1
+         SEGSUP,IPT2,SCOL2
+         IPT2=IPT3
+         SCOL2=SCOL3
+    1 CONTINUE
+      SEGDES,MRIGID
+c
+c ... on va verifier si la matrice contient seulement les blocages, ou seulement
+c     les relations (on en a seulement besoin en cas de lecture d'un CHPOINT) ...
+c
+      if(ireval.eq.0) then
+         lllblo = .true.
+         lllrel = .true.
+         do 77 i=1,nnn
+            lllblo = lllblo .and. (.not.lrelat(i))
+            lllrel = lllrel .and.       lrelat(i)
+ 77      continue
+         segsup,irelat
+c    ... si les deux sont faux, on a un melange de blocages et de relations ...
+         if(.not.lllblo .and. .not.lllrel) then
+            call erreur(795)
+            return
+         endif
+c    ... si on n'a que des relations, le CHPOINT doit être scalaire ...
+         if(lllrel .and. .not.iscala) then
+c           ERREUR : "Impossible d'imposer les valeurs aux relations 
+c                     avec un champ non scalaire"
+            call erreur(796)
+            return
+         endif
+      else
+         segsup,irelat
+      endif
+C
+C ON VIENT DE CREER IPT2 CONTENANT DES ELEMENTS COMPOSES DE LX1  NOE
+C DANS COLOR ON A LE NOM DE L'INCONNUE A METTRE EN FACE DE NNOE
+C
+      NSOUPO=1
+      NAT=1
+      SEGINI,MCHPOI
+      MTYPOI='FLX'
+      JATTRI(1) = 2
+      MOCHDE=' CE CHAMP PAR POINTS A ETE CREE PAR LE SOUS-PROGRAMME'//
+     #  ' DEPIMP'
+      IFOPOI=IFOUR
+
+      NC=1
+      SEGINI,MSOUPO
+      IPCHP(1)=MSOUPO
+      NOCOMP(1)='FLX'
+      NOHARM(1)=NOHAR
+      write (charm,fmt='(A4)') nohar
+      if (nohar.eq.inoha) noharm(1)=nifour
+C
+************************************************************************
+C  CREATION DE L'ELEMENT SUPPORT GEOMETRIQUE ET EN MEME TEMPS DES
+C  VALEURS VPOCHA
+************************************************************************
+C
+      NBNN=1
+      NBELEM=IPT2.NUM(/2)
+      SEGINI MELEME
+      IGEOC=MELEME
+      ITYPEL=1
+
+      N=IPT2.NUM(/2)
+      SEGINI,MPOVAL
+      IPOVAL=MPOVAL
+
+c ... Si on a lu un reel, il n'y a pas grand chose a faire ...
+      IF(IREVAL.NE.0) GO TO 250
+C
+c   
+C   + CAS DU CHPOINT SCALAIRE ------------------------------------------
+c     (on teste seulement ISCALA car on a deja verifie que cela va 
+c      ensemble avec LLLREL)
+      IF(ISCALA) THEN
+c           write(*,*) '>>> DEPI d un chpoint SCALAIRE <<<'
+          MSOUP1=MCHPO1.IPCHP(1)
+          SEGACT MSOUP1
+          MPOVA1=MSOUP1.IPOVAL
+          SEGACT MPOVA1
+          NNN=nbpts
+          SEGINI ICPR
+          IPT3=MSOUP1.IGEOC
+          SEGACT IPT3
+          NNU=IPT3.NUM(/2)
+c         numerotation locale
+          DO 25 IUY=1,NNU
+             ICPR(IPT3.NUM(1,IUY))=IUY
+  25      CONTINUE
+          DO 26 IU=1,IPT2.NUM(/2)
+             NUM(1,IU)=IPT2.NUM(1,IU)
+             INOD2=IPT2.NUM(2,IU)
+             ID=ICPR(INOD2)
+             IF(ID.EQ.0) THEN
+c              ERREUR : "Un point de l'objet rigidite n'est pas  
+c                        inclus dans le champ de scalaire"
+               CALL ERREUR(244)
+               RETURN               
+             ELSEIF(ID.EQ.-1) THEN
+c              Le noeud apparait dans plusieurs relations --> ERREUR :
+c              "On ne peut avoir 2 relations sur un meme ddl  noeud %i1"
+               INTERR(1)=INOD2
+               CALL ERREUR(886) 
+               RETURN 
+             ELSE
+               XXA=MPOVA1.VPOCHA(ID,1)
+               VPOCHA(IU,1)=XXA
+               ICPR(INOD2)=-1
+             ENDIF
+   26     CONTINUE
+          SEGSUP ICPR          
+C
+C    + CAS DU CHPOINT D'INCONNUES PRIMALES -----------------------------
+       ELSE
+       
+         NNN=nbpts
+         SEGINI ICPR
+         JB=1
+         DO 36 J=1,IPT2.NUM(/2)
+            NUM(1,JB)=IPT2.NUM(1,J)
+            JB=JB+1
+   36    CONTINUE
+         DO 31 I=1,MCHPO1.IPCHP(/1)
+            DO 40 J=1,NNN
+               ICPR(J)=0
+   40       CONTINUE
+            MSOUP1=MCHPO1.IPCHP(I)
+            SEGACT MSOUP1
+            MPOVA1=MSOUP1.IPOVAL
+            SEGACT MPOVA1
+            IPT1=MSOUP1.IGEOC
+            SEGACT IPT1
+            IA=0
+            DO 32 J=1,IPT1.NUM(/2)
+               ID=IPT1.NUM(1,J)
+               IF(ICPR(ID).EQ.0) THEN
+                  IA=IA+1
+                  ICPR(ID)=IA
+               ELSE
+                  CALL ERREUR(245)
+                  RETURN
+               ENDIF
+  32        CONTINUE
+            DO 33 J=1,IPT2.NUM(/2)
+               ID=IPT2.NUM(2,J)
+               JB=JB+2
+               IF(ICPR(ID).EQ.0) GO TO 33
+               DO 34 K=1,MSOUP1.NOCOMP(/2)
+                  IF(MSOUP1.NOCOMP(K).EQ.SCOL2.COLOR(J)) GO TO 35
+   34          CONTINUE
+               GO TO 33
+   35          CONTINUE
+               JD=ICPR(ID)
+               XXA=MPOVA1.VPOCHA(JD,K)
+               JA=J
+               VPOCHA(JA,1)=XXA
+   33       CONTINUE
+   31    CONTINUE
+         SEGSUP ICPR
+         
+      ENDIF
+C   + FIN CAS DES CHPOINTS SCALAIRE OU PAS -----------------------------
+c     le chpoint d'entree est inutile -> segdes
+      CALL ACTOBJ('CHPOINT ',MCHPO1,0)
+      GO TO 251
+      
+
+C     CAS DU FLOTTANT --------------------------------------------------
+C ... En cas de lecture d'un reel le remplissage du segment MPOVAL est assez simple ...
+  250 CONTINUE
+      DO 10 I=1,N
+         VPOCHA(I,1)=VVAL
+   10 CONTINUE
+c ... celui du segment MELEME n'est pas plus complique ...
+      DO 11 I=1,IPT2.NUM(/2)
+         NUM(1,I)=IPT2.NUM(1,I)
+   11 CONTINUE
+
+   
+c     TOUS LES CAS -----------------------------------------------------
+  251 CONTINUE
+      SEGSUP IPT2,SCOL2
+  252 CONTINUE
+c     chpoint de sortie -> segact
+      CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+      CALL ECROBJ('CHPOINT ',MCHPOI)
+      
+      END
+ 
+ 
+ 
+ 

@@ -1,0 +1,83 @@
+C MULMEL    SOURCE    CB215821  23/05/02    21:15:04     11662          
+C     
+      SUBROUTINE MULMEL(IPMELV,XX,TYPCH1)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+*_______________________________________________________________________
+*
+*  ROUTINE MULTIPLIANT un MELVAL IPMELV par un FLOTTTANT XX
+*
+*  IPMELV : (E/S) POINTEUR SUR UN SEGMENT MELVAL SUPPOSE ACTIF ET EN ECRITURE
+*  XX     : (E)   COEFFICIENT MULTIPLICATEUR 
+*_______________________________________________________________________
+*
+-INC SMCHAML
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+      CHARACTER*(*) TYPCH1
+
+      MELVAL=IPMELV
+      N1PTEL=MELVAL.VELCHE(/1)
+      
+      IF(N1PTEL .NE. 0) THEN
+C       Cas REAL*8
+        N1EL  =MELVAL.VELCHE(/2)
+        DO IGAU=1,N1PTEL
+          DO IB=1,N1EL
+            MELVAL.VELCHE(IGAU,IB)=MELVAL.VELCHE(IGAU,IB) * XX
+          ENDDO
+        ENDDO
+
+      ELSE
+C       Cas POINTEUR
+        N2PTEL=IELCHE(/1)
+        N2EL  =IELCHE(/2)
+        IF      (TYPCH1.EQ.'POINTEURLISTREEL') THEN
+          DO IGAU=1,N2PTEL
+            DO IB=1,N2EL
+              ILREE1=IELCHE(IGAU,IB)
+              CALL MUFLIR(ILREE1,XX,ILREEL,1)
+              IELCHE(IGAU,IB)=ILREEL
+            ENDDO
+          ENDDO
+
+        ELSE IF (TYPCH1.EQ.'POINTEURPOINT   ') THEN
+          SEGACT,MCOORD*mod
+          NBNO=nbpts
+          NBNOI=NBNO
+          NBPTS=NBNO+(N2PTEL*N2EL)
+          SEGADJ,MCOORD
+          DO IGAU=1,N2PTEL
+            DO IB=1,N2EL
+              IP  =IELCHE(IGAU,IB)
+              IREF=(IP-1)*(IDIM+1)
+C
+              DO IC=1,IDIM
+                XCOOR(NBNOI*(IDIM+1)+IC)=XCOOR(IREF+IC)*XX
+              ENDDO
+             XCOOR(NBNOI*(IDIM+1)+(IDIM+1))=XCOOR(IREF+(IDIM+1))
+              IELCHE(IGAU,IB)=NBNOI+1
+              NBNOI=NBNOI+1
+            ENDDO
+          ENDDO
+          SEGDES,MCOORD
+
+        ELSE IF (TYPCH1.EQ.'POINTEUREVOLUTIO') THEN
+          DO IGAU=1,N2PTEL
+            DO IB=1,N2EL
+              IEVOL1=IELCHE(IGAU,IB)
+              CALL MUFLEV(IEVOL1,XX,IEVOL2,IEPS)
+              IELCHE(IGAU,IB)=IEVOL2
+            ENDDO
+          ENDDO
+
+        ELSE
+          MOTERR = TYPCH1
+          CALL ERREUR(552)
+          RETURN
+        ENDIF
+      ENDIF
+      END 
+ 

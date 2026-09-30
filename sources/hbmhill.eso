@@ -1,0 +1,208 @@
+C HBMHILL   SOURCE    BP208322  20/09/18    21:16:44     10718          
+
+      SUBROUTINE HBMHILL(NT,NHBM,NDDL,OMEG,Q1,RX,XM,XASM,dv0,dv1,ZINIT,
+     &                  LHILL,ZSTABN,CPOSRE,FLAG,ZSTAB)
+     
+*=======================================================================
+*                          Calcul de stabilite                             
+*=======================================================================        
+* On utilise la methode de Hill (domaine frequentiel) pour une solution 
+* periodique (Q1,OMEG) des equations d'equilibre dynamique R(X,w) = 0.
+*
+*                      (Rx + µ*D1 + µ**2*D2)*Phi = 0 
+* µ : valeurs propres
+* Phi: vecteurs propres 
+* ==> 2*n*(2*H+1) paires (µ,Phi) pour H harmoniques et n ddl, dont 2*n
+*     correspondent aux exposants de Floquet.
+* Dans cette sous-routine, on utilise une procedure simplifiee pour 
+* la caracterisation des bifurcations. 
+* -----------
+*   Entrees
+* -----------
+*         OMEG       : frequence du cycle
+*     NT,NHBM,NDDL   : taille du systeme, # d'harmoniques, # de DDL
+*        XM,XASM     : matrices de masse, amortissement 
+*          RX        : matrice Jacobienne
+*       dv0,dv1      : variations dans le parametre de continuation
+*                      aux pas precedent et actuel, respectivement
+*        CPOSRE      : indicateur de bifurcation au pas precedent
+*        ZSTAB       : stabilite du pas precedent (0 si initialisation)
+* -----------
+*   Sorties
+* -----------
+*        CPOSRE      : indicateurs de bifurcation au pas actuel
+*         FLAG       : caracterise le type de bifurcation
+*       ZSTABN=ZSTAB : stabilite de la solution (Q1,OMEG)
+*=======================================================================  
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+       INTEGER NT,NHBM,NDDL,INFO,INDEIG(2*NT),INDM,I,J,CPOSRE,CPOSREN
+       REAL*8 OMEG,RX(NT,NT),XM(NDDL,1),XASM(NDDL,1)
+       REAL*8 Rw(NT),MATJ(NT+1,NT+1),t0(NT+1),Q1(NT)
+       REAL*8 EXPIM(2*NT),EXPRE(2*NT)
+       REAL*8 VR(2*NT,2*NT),VL(2*NT,2*NT),WORK(8*NT),BB
+       REAL*8 DEL1(NT,NT),DEL2(NT),Mi,Ci,JJ(2*NT,2*NT)
+       REAL*8 LHILL(2,2*NDDL)
+cbp        REAL*8 XPI,mumx(2*NDDL),ZR(2*NDDL),ZI(2*NDDL),dv0,dv1    
+       REAL*8 mumx(2*NDDL),ZIINDM,dv0,dv1    
+       CHARACTER*8 FLAG
+       LOGICAL ZSTABN,ZSTAB,ZINIT      
+
+       REAL*8 ZERO,ONE,XTOL,DEUXPI
+       PARAMETER (ZERO=0.D0,ONE=1.D0,XTOL=1.D-8,
+     &            DEUXPI=6.28318530717958648)
+
+       
+*-----------------------------------------------------------------------      
+*  1. Construction de la matrice de Hill 
+       DO I = 1,NT
+          DO J = 1,NT
+            DEL1(I,J)=ZERO   
+          ENDDO
+       ENDDO
+*     DEL2
+      DO I=1,2*NHBM+1
+         DO J=1,NDDL
+            DEL2(NDDL*(I-1)+J) = ONE/XM(J,1)
+         ENDDO
+      ENDDO
+*     DEL1       
+       DO I=1,NDDL
+             DEL1(I,I) = XASM(I,1)          
+       ENDDO       
+       DO J = 2,2*NHBM,2
+         DO I=1,NDDL
+             Ci = XASM(I,1)
+             Mi = XM(I,1)
+             BB = OMEG*J*Mi              
+             DEL1(NDDL*(1+(J-2))+I,NDDL*(1+(J-2))+I) = Ci
+             DEL1(NDDL*(1+(J-2))+I,NDDL*(1+(J-1))+I) = BB
+             DEL1(NDDL*(1+(J-1))+I,NDDL*(1+(J-2))+I) = -BB
+             DEL1(NDDL*(1+(J-1))+I,NDDL*(1+(J-1))+I) = Ci
+         ENDDO             
+       ENDDO
+       
+*-----------------------------------------------------------------------
+*  2. Assemblage de JJ
+*
+*     JJ = [DEL2\DEL1   DEL2\Rx]
+*          [     -I         0  ] 
+* 
+       DO  I=1,NT
+         DO  J=1,NT
+*  JJ_11 = DEL2\DEL1
+            JJ(I,J) = -DEL1(I,J)*DEL2(J) 
+*  JJ_12 = DEL2\Rx 
+           JJ(I,NT+J) = -RX(I,J)*DEL2(J)           
+*  JJ_21 = [I]           
+           IF (I.EQ.J) THEN
+             JJ(NT+I,J) = ONE
+           ELSE
+             JJ(NT+I,J) = ZERO
+           ENDIF
+*  JJ_22 = [0]
+           JJ(NT+I,NT+J) = ZERO         
+         ENDDO
+       ENDDO
+       
+*-----------------------------------------------------------------------
+*  3. Calcul des valeurs/vecteurs propres de JJ
+      CALL DGEEV('N','V',2*NT,JJ,2*NT,EXPRE,EXPIM,VL,1,VR,2*NT,
+     &                                             WORK,8*NT,INFO)
+     
+*-----------------------------------------------------------------------   
+*  4. Tri des valeurs propres 
+      CALL HBMORDO(2*NT,NDDL,OMEG,EXPIM,INDEIG)
+      
+*-----------------------------------------------------------------------       
+*  5. Evaluation de stabilite 
+*     On recupere les exposants de Floquet
+      ZSTABN=.TRUE.
+      DO  I=1,2*NDDL
+cbp : TRIVALS a permute les elements de EXPIM, mais pas EXPRE
+         LHILL(1,I) = EXPRE(INDEIG(I))
+         LHILL(2,I) = EXPIM(I)
+         IF (LHILL(1,I).GT.ZERO) THEN
+            ZSTABN=.FALSE.
+         ENDIF
+*        calcul des Multiplicateurs de Floquet --> deplace par bp
+      ENDDO   
+      
+*-----------------------------------------------------------------------
+*  6. Detection des bifurcations  
+* On utilise comme indicateur le nombre d'exposants de Floquet dont la 
+* partie reelle est positive.
+
+*      COMPTAGE -> CPOSREN=?
+       CPOSREN = 0
+       DO I = 1,2*NDDL
+c          IF (LHILL(1,I).LT.ZERO)THEN
+         IF (LHILL(1,I).GE.ZERO)THEN
+           CPOSREN = CPOSREN+1
+         ENDIF
+       ENDDO
+       
+       FLAG = 'S'       
+       IF (.NOT.ZINIT) THEN
+*        WRITE(*,*) 'FTEST=',ABS(CPOSREN-CPOSRE)
+
+*         Bifurcations statiques: 
+*         un seul exposant traverse l'axe imaginaire
+          IF (ABS(CPOSREN-CPOSRE).EQ.1) THEN
+          
+            IF (dv0*dv1.LT.ZERO) THEN 
+*             Point Limite            
+              FLAG = 'L' 
+            ELSE
+*             Branchement
+              FLAG = 'B'
+            ENDIF
+            
+*         Bifurcations dynamiques: 
+*         une paire d'exposants traversent l'axe imaginaire
+          ELSEIF (ABS(CPOSREN-CPOSRE).EQ.2) THEN
+          
+c *           Multiplicateurs de Floquet 
+c             DO I=1,2*NDDL
+c cbp           ZR(I) = EXP(DEUXPI*LHILL(1,I)/OMEG)*COS(DEUXPI*LHILL(2,I)/OMEG)
+c cbp           ZI(I) = EXP(DEUXPI*LHILL(1,I)/OMEG)*SIN(DEUXPI*LHILL(2,I)/OMEG)
+c               mumx(I) = EXP(2.D0*XPI*LHILL(1,I)/OMEG)
+c             ENDDO
+c             INDM = MAXLOC(mumx,2*NDDL)
+cbp: ci-dessus, remplace par (car EXP est une fonction croissante) :
+            INDM=1
+            XINDM=LHILL(1,INDM)
+            DO I=1,2*NDDL
+              IF(LHILL(1,I).GT.XINDM) THEN
+                INDM=I
+                XINDM=LHILL(1,I)
+              ENDIF
+            ENDDO            
+cbp: calcul de INDM douteux si ce n'est pas la 1ere instabilite -> a verifier + tard
+            ZIINDM = EXP(DEUXPI*LHILL(1,INDM)/OMEG)
+     &             * SIN(DEUXPI*LHILL(2,INDM)/OMEG)
+cbp            IF (ABS(ZI(INDM)).LT.1.E-8) THEN 
+            IF (ABS(ZIINDM).LT.XTOL) THEN 
+*             Doublement de periode
+              FLAG = 'P' 
+            ELSE
+*             Neimark-Sacker (Hopf secondaire)
+              FLAG = 'N' 
+            END IF
+            
+          ELSE
+c           cas non traite
+          ENDIF
+          
+       ENDIF
+       
+*-----------------------------------------------------------------------
+* 7.  enregistrement pour le pas suivant
+      CPOSRE = CPOSREN
+      ZSTAB = ZSTABN
+      
+      END
+ 
+ 

@@ -1,0 +1,1073 @@
+C SCND2     SOURCE    PV090527  23/02/15    21:15:11     11569          
+*
+      subroutine scnd2(mrigid,ri1,ri4)
+*
+*    entree
+*         mrigid rigidité  sans sous matrices de dependances
+*         ri1 rigidite  de dependance
+*
+*    sortie
+*         ri4     rigidite condensee les noeuds dependants sont
+*                 elimines
+*
+*    on suppose que la premiere inconnue de la raideur de dependance
+*    (celle qu'on elimine) n'apparait que dans cette dependance
+*    Cela va permettre de constituer les tableau :
+*    noeu-inconnue (primale ou duale) ==> numéro raideur de dépendance
+*    au moment de la création des matrices, on va s'efforcer de factoriser
+*    les descripteurs
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+*
+-INC SMRIGID
+-INC SMELEME
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC CCHAMP
+-INC CCREEL
+      segment icpr(nbno)
+      segment trav1
+      character*4 compd(nbincl),compdd(nbincl)
+      endsegment
+      segment trav2
+      integer irigd(nbnoc,nbincd),nelrigd(nbnoc,nbincd)
+      endsegment
+      segment trav3
+      integer cor1p(nligrp),cor1d(nligrd)
+      integer imatt(nelrig)
+      endsegment
+      segment trav4
+      integer lisdes(klisd)
+      endsegment
+      segment trav5
+      real*8 xmatmpv(nligpv)
+      integer imatpv(nligpv)
+      endsegment
+      segment imatno(lmatno)
+      segment idesno(ldesno)
+      segment igeomno(lgeomno)
+      segment coerno(lcoerno)
+      segment irg7no(lrg7no)
+      segment irg6no(lrg6no)
+      segment irg5no(lrg5no)
+      segment irg2no(lrg2no)
+      logical dupli,descar,dupli4
+      character*4 co1,co1d
+      segment svu
+      logical vu(lrvu)
+      endsegment
+      integer lvu,symr
+*
+*      write (6,*) ' raideur initiale '
+*      call prrigi(mrigid,0)
+*      write (6,*) ' raideur dependance '
+*      call prrigi(ri1,1)
+
+*  meme valeur de test que dans chole
+      xzref=5.d-12        
+      lrvu=100
+      lmatno=1000
+      ldesno=1000
+      lgeomno=1000
+      lcoerno=1000
+      lrg7no=1000
+      lrg6no=1000
+      lrg5no=1000
+      lrg2no=1000
+      kmatno=0
+      kdesno=0
+      kgeomno=0
+      kcoerno=0
+      krg7no=0
+      krg6no=0
+      krg5no=0
+      krg2no=0
+      segini imatno,idesno,igeomno,coerno,irg7no,irg5no,svu
+      lvu=0
+      segini irg2no,irg6no
+      nbdeg=0
+*  remplissage du segment trav1 (liste des noms de composantes)
+      nbincd=0
+      nbincl=16
+      segini trav1
+      nbno=nbpts
+      segact ri1
+      do 10 irig=1,ri1.irigel(/2)
+         descr=ri1.irigel(3,irig)
+         segact descr
+         do 40 nligrd=1,lisdua(/2)
+            do 50 inc=1,nbincd
+               if (compd(inc).eq.lisdua(nligrd)) goto 40
+ 50         continue
+            nbincd=nbincd+1
+            if(nbincd.gt.nbincl) then
+             nbincl=2*nbincd
+             segadj trav1
+            endif
+            compd(nbincd)=lisdua(nligrd)
+            compdd(nbincd)=' '
+**          write(6,*) 'inc-1 compdd ',inc,compd(inc),compdd(inc)
+ 40      continue
+         ldua=lisdua(/2)
+         do 45 nligrd=1,lisinc(/2)
+            do 55 inc=1,nbincd
+               if (compd(inc).eq.lisinc(nligrd)) goto 46
+ 55         continue
+            nbincd=nbincd+1
+            inc=nbincd
+            if(nbincd.gt.nbincl) then
+             nbincl=2*nbincd
+             segadj trav1
+            endif
+            compd(nbincd)=lisinc(nligrd)
+ 46      continue
+
+** si la matrice n'est pas carre, avec quoi on rempli?
+            compdd(inc)=lisdua(min(ldua,nligrd))
+**          write(6,*) 'inc-2 compdd ',inc,compd(inc),compdd(inc)
+ 45      continue
+ 10   continue
+*      write (6,*) ' scnd2 - 1 ',(compd(i),i=1,nbincd)
+      segact mrigid
+      do 110 irig=1,irigel(/2)
+         descr=irigel(3,irig)
+         segact descr
+**       write(6,*) 'nligrp,nligrd ',lisinc(/2),lisdua(/2)
+         ldua=lisdua(/2)
+         do 140 nligrd=1,lisinc(/2)
+            do 150 inc=1,nbincd
+               if (compd(inc).eq.lisinc(nligrd)) goto 141
+ 150        continue
+            nbincd=nbincd+1
+            inc=nbincd
+            if(nbincd.gt.nbincl) then
+             nbincl=2*nbincd
+             segadj trav1
+            endif
+            compd(nbincd)=lisinc(nligrd)
+ 141     continue
+*  au  cas ou la primale n'est pas dans nomdd, on sauve la duale
+**            write(6,*) 'inc lisdua descr',inc,lisdua(nligrd),descr
+** si la matrice n'est pas carre, avec quoi on rempli la duale?
+            compdd(inc)=lisdua(min(ldua,nligrd))
+**          write(6,*) 'inc-3 compdd ',inc,compd(inc),compdd(inc)
+ 140     continue
+ 110  continue
+*      write (6,*) ' scnd2 - 2 ',(compd(i),i=1,nbincd)
+*  au tour de trav2 (inconnue => raideur de dépendance)
+*  mais d'abord icpr
+      segini icpr
+      nbnoc=0
+      do irig=1,ri1.irigel(/2)
+         meleme=ri1.irigel(1,irig)
+         descr=ri1.irigel(3,irig)
+         segact meleme,descr
+         do  j=1,num(/2)
+            ip=num(noeled(1),j)
+            if(icpr(ip).eq.0) then
+              nbnoc=nbnoc+1
+              icpr(ip)=nbnoc
+            endif
+         enddo
+      enddo
+      do irig=1,irigel(/2)
+         meleme=irigel(1,irig)
+         segact meleme
+         do  j=1,num(/2)
+         do  i=1,num(/1)
+            ip=num(i,j) 
+            if(icpr(ip).eq.0) then
+              nbnoc=nbnoc+1
+              icpr(ip)=nbnoc
+            endif
+         enddo
+         enddo
+      enddo
+      segini trav2
+      do 200 irig=1,ri1.irigel(/2)
+         meleme=ri1.irigel(1,irig)
+         descr=ri1.irigel(3,irig)
+         xmatri=ri1.irigel(4,irig)
+         segact xmatri
+         do 250 incd=1,nbincd
+            if (compd(incd).eq.lisdua(1)) goto 260
+ 250     continue
+         call erreur(5)
+ 260     continue
+         do 240 i=1,num(/2)
+            ip=num(noeled(1),i)
+            irigd(icpr(ip),incd)=irig
+            nelrigd(icpr(ip),incd)=i
+ 240     continue
+ 200  continue
+*  rechercher les noms d'inconnues duales
+      do 300 i=1,compd(/2)
+         do 310 j=1,lnomdd
+            if (compd(i).eq.nomdd(j)) goto 320
+ 310     continue
+**          write (6,*) ' pas de nom dual trouvé ',compd(i),compdd(i)
+         goto 300
+ 320     continue
+            compdd(i)=nomdu(j)
+**        write (6,*) ' correspondance ', compd(i), compdd(i)
+ 300  continue
+*        write (6,*) ' scnd2 - 3 ',compdd(/2),(compdd(i),i=1,compdd(/2))
+*
+*  maintenant, on balaye les raideurs. Pour chacune d'entre elle, on
+*  balaye les inconnues pour trouver une dépendance. Si oui on construit
+*  le résultat de l'opération
+      segini,ri4=mrigid
+*     write(6,*) 'ri4 mrigid ',ri4,mrigid
+      ri4.ichole=0
+      ri4.imgeo1=0
+      ri4.imgeo2=0
+      ri4.isupeq=0
+*  boucle raideur en cours de condensation
+*  on range dans des2 le descripteur precedent pour le reutiliser si possible
+      des2=0
+      isup=0
+      klisd=100
+      llisd=0
+      segini trav4
+*     call prrigi(ri4,1)
+      do 1000 irig=1,ri4.irigel(/2)
+*         write(ioimp,*) 'Balayage raideur ',irig
+** on ne dupliquera meleme et xmatri que si necessaire
+         meleme=ri4.irigel(1,irig)
+         ipt4=meleme
+         dupli4=.false.
+         ri4.irigel(1,irig)=ipt4
+         des4=ri4.irigel(3,irig)
+         segact des4
+         Xmatri=ri4.irigel(4,irig)
+         segact xmatri
+*  au cas ou symre ait ete oublie
+         if (symre.ne.ri4.irigel(7,irig)) then
+           write(6,*) 'incoherence symre irigel(7) pour ',ri4,xmatri
+           segact xmatri*mod
+           symre = max(symre,ri4.irigel(7,irig))
+           ri4.irigel(7,irig)=symre
+         endif
+         Xmatr4=Xmatri
+*        write(6,*) 'scnd2 xmatri xmatr4 dims ',xmatri,xmatr4,
+*    >     xmatr4.re(/1),xmatr4.re(/2),xmatr4.re(/3)
+         nelrig=xmatr4.re(/3)
+         ri4.irigel(4,irig)=Xmatr4
+* On regarde le descripteur. S'il est symétrique, on pourra
+* faire le travail en une passe sinon deux.
+*   Correspondance lisinc, lisdua, numéro incd dans trav1
+         nligrp=des4.lisinc(/2)
+         nligrd=des4.lisdua(/2)
+         segini trav3
+         nligpv=nligrp*2+256
+         segini trav5
+         do 410 iligrp=1,nligrp
+            do 420 incd=1,nbincd
+               if (compd(incd).eq.des4.lisinc(iligrp)) then
+                  cor1p(iligrp)=incd
+                  goto 410
+               endif
+ 420        continue
+**          write(6,*) 'cor1p pas de correspondance'
+**          call erreur(5)
+ 410     continue
+         do 510 iligrd=1,nligrd
+            do 520 incd=1,nbincd
+**             write(6,*) 'compdd ',compdd(incd),des4.lisdua(iligrd)
+               if (compdd(incd).eq.des4.lisdua(iligrd)) then
+                  cor1d(iligrd)=incd
+                  goto 510
+               endif
+ 520        continue
+**          write(6,*) 'cor1d pas de correspondance descar',descar
+**          call erreur(5)
+ 510     continue
+*         write(ioimp,*) 'nligrp=',nligrp
+*         write(ioimp,*) 'nligrd=',nligrd
+         descar=.false.
+         if (nligrp.ne.nligrd) goto 600
+         do iligr=1,nligrp
+            if (cor1p(iligr).ne.cor1d(iligr)) goto 600
+            if (des4.noelep(iligr).ne.des4.noeled(iligr)) goto 600
+         enddo
+         if (xmatr4.symre.eq.0) descar=.true.
+ 600     continue
+*         WRITE(IOIMP,194)(des4.NOELEP(J),des4.LISINC(J),cor1p(j),J=1
+*     $        ,nligrp)
+*         WRITE(IOIMP,194)(des4.NOELED(J),des4.LISDUA(J),cor1d(j),J=1
+*     $        ,nligrd)
+*  194     FORMAT( I6,9X,A4,9X,I6)
+*         if (descar) then
+*            write(ioimp,*) 'le descripteur est carre'
+*         else
+*            write(ioimp,*) 'le descripteur n''est pas carre'
+*         endif
+         npass=2
+         idsup=0
+         do 1040 i=1,ipt4.num(/2)
+            dupli=.false.
+            renorm=0.d0
+*    On fait deux passes : une pour la primale et une pour la duale
+            do 1045 ipass=1,npass
+               if (ipass.eq.1) then
+                  nligr4=des4.lisinc(/2)
+               else
+                  nligr4=des4.lisdua(/2)
+               endif
+               do 1010 nligri=1,nligr4
+                  if (ipass.eq.1) then
+                     incd=cor1p(nligri)
+                  else
+                     incd=cor1d(nligri)
+                  endif
+***               write(6,*) 'ipass incd ',ipass,incd
+                  if (incd.eq.0) goto 1010
+                  if (ipass.eq.1) then
+                     ip=ipt4.num(des4.noelep(nligri),i)
+                  else
+                     ip=ipt4.num(des4.noeled(nligri),i)
+                  endif
+*  y a t'il une dependance concernant ce noeud
+*        write(6,*) ' descar',descar
+***                 write(6,*) 'ipass ip icpr incd nelrig',ipass,ip,
+**   >              icpr(ip),incd,nelrigd(icpr(ip),incd)
+                  if (nelrigd(icpr(ip),incd).eq.0) then
+                    goto 1010
+                  endif
+*  ici il faut eliminer l'inconnue
+*  on commence par dupliquer la la matrice si ce n'est pas deja fait
+                  if (.not.dupli) then
+                     ird=irigel(/1)
+                     krg7no=krg7no+1
+                     if (krg7no.gt.irg7no(/1)) then
+                       lrg7no=irg7no(/1)+1000
+                       segadj irg7no
+                     endif
+                     if (ird.ge.7) then
+                        irg7no(krg7no)=ri4.irigel(7,irig)
+                     else
+                        irg7no(krg7no)=0
+                     endif
+                     krg6no=krg6no+1
+                     if (krg6no.gt.irg6no(/1)) then
+                       lrg6no=irg6no(/1)+1000
+                       segadj irg6no
+                     endif
+                     if (ird.ge.6) then
+                        irg6no(krg6no)=ri4.irigel(6,irig)
+                     else
+                        irg6no(krg6no)=0
+                     endif
+                     krg5no=krg5no+1
+                     if (krg5no.gt.irg5no(/1)) then
+                       lrg5no=irg5no(/1)+1000
+                       segadj irg5no
+                     endif
+                     if (ird.ge.5) then
+                        irg5no(krg5no)=ri4.irigel(5,irig)
+                     else
+                        irg5no(krg5no)=0
+                     endif
+                     krg2no=krg2no+1
+                     if (krg2no.gt.irg2no(/1)) then
+                       lrg2no=irg2no(/1)+1000
+                       segadj irg2no
+                     endif
+                     irg2no(krg2no)=ri4.irigel(2,irig)
+                     kdesno=kdesno+1
+                     if (kdesno.gt.idesno(/1)) then
+                       ldesno=idesno(/1)+1000
+                       segadj idesno
+                     endif
+                     nbnn=ipt4.num(/1)
+                     nbelem=1
+                     nbref=0
+                     nbsous=0
+                     segini meleme
+                     itypel=28
+*  si c'est une matrice de relation, il faut garder l'attribut
+**                   if(ipt4.itypel.eq.49) write(6,*)
+**   >                  'ipt4 dans scnd2 ',ipt4
+                     if (ipt4.itypel.eq.49) itypel=49
+                     if (ipt4.itypel.eq.22) itypel=22
+                     do i1=1,nbnn
+                        num(i1,1)=ipt4.num(i1,i)
+                     enddo
+                     kgeomno=kgeomno+1
+                     if (kgeomno.gt.igeomno(/1)) then
+                       lgeomno=igeomno(/1)+1000
+                       segadj igeomno
+                     endif
+                     igeomno(kgeomno)=meleme
+                     kligrp=xmatr4.re(/2)
+                     kligrd=xmatr4.re(/1)
+                  irig1=irigd(icpr(ip),incd)
+                  des1=ri1.irigel(3,irig1)
+                  segact des1
+*  on agrandit xmatri du nb d'inc. primales presentent dans la relation
+                  nligrp1=max(des1.lisinc(/2),0)
+                     nligrp=kligrp+nligrp1
+                     nligrd=kligrd+nligrp1
+                     nelrig=1
+                     segini xmatri
+                     xmatri.symre=xmatr4.symre
+*  re est plus grand que xmatr4.re donc pas d'appel a scndc possible
+                     renorm=0.d0
+                     ii=1
+                     if(itypel.eq.22) ii=2
+                     if(itypel.eq.49) ii=3
+                     do io=1,kligrp
+                        do iu=1,kligrd
+                           retmp=xmatr4.re(iu,io,i)
+                           re(iu,io,1)=retmp
+                           if (io.ge.ii.or.iu.ge.ii) renorm=renorm+
+     >                                                abs(retmp)
+                        enddo
+                     enddo
+                     renorm=max(xpetit,renorm*xzref)
+                     segini,descr
+                     idesno(kdesno)=descr
+                     do io=1,des4.noelep(/1)
+                        noelep(io)=des4.noelep(io)
+                        lisinc(io)=des4.lisinc(io)
+                     enddo
+                     do io=1,des4.noeled(/1)
+                        noeled(io)=des4.noeled(io)
+                        lisdua(io)=des4.lisdua(io)
+                     enddo
+
+                     kmatno=kmatno+1
+                     if (kmatno.gt.imatno(/1))then
+                       lmatno=imatno(/1)+1000
+                       segadj imatno
+                     endif
+                     imatno(kmatno)=xmatri
+                     kcoerno=kcoerno+1
+                     if (kcoerno.gt.coerno(/1))then
+                       lcoerno=coerno(/1)+1000
+                       segadj coerno
+                     endif
+                     coerno(kcoerno)=ri4.coerig(irig)
+                     dupli=.true.
+                     imatt(i)=1
+                  endif
+*  on elimine dans la matrice dupliquee
+                  irig1=irigd(icpr(ip),incd)
+                  i1=nelrigd(icpr(ip),incd)
+                  ipt1=ri1.irigel(1,irig1)
+                  des1=ri1.irigel(3,irig1)
+                  xmatr1=ri1.irigel(4,irig1)
+                  segact ipt1,des1,xmatr1
+*          nligrd1 =des1.lisdua(/2)
+*   nligrd1=1 est l'inconnue à éliminer (de la matrice de dependance)
+                  nligrd1=1
+                  nligrp1=des1.lisinc(/2)
+*          write (6,*) ' scnd2  nligrp1  nligrd1 i1 ',nligrp1,nligrd1,i1,
+*     > ip,incp
+*  nlig1 : inconnue primale à remettre dans la matrice (comme primale)
+                  ipvm=0
+                  do 1050 nlig1=1,nligrp1
+                     xmatmp = xmatr1.re(1,nlig1,i1)
+                     ip1=ipt1.num(des1.noelep(nlig1),i1)
+                     co1=des1.lisinc(nlig1)
+                     if (ipass.eq.2.or.descar) then
+                        do  incd=1,nbincd
+                           if (compd(incd).eq.co1) then
+                              co1d=compdd(incd)
+                              goto 1055
+                           endif
+                        enddo
+                        write (6,*) ' scnd2 2 pas de correspondance '
+     $                       ,co1
+                        call erreur(5)
+                        return
+ 1055                   continue
+                     endif
+*           write (6,*) ' ip1 co1 nligrpi ',ip1,co1,nligrpi
+*  le ddl est il deja dans la raideur
+                     nbno=0
+                     if (ipass.eq.1) then
+                        do 1060 nligr=1,kligrp
+                           if (noelep(nligr).eq.0) goto 1060
+                           if (num(noelep(nligr),1).ne.ip1) goto 1060
+* on note le numéro local du noeud pour le reutiliser
+                           nbno=noelep(nligr)
+                           if (lisinc(nligr).ne.co1) goto 1060
+                           goto 1070
+ 1060                   continue
+                     else
+                        do 2060 nligr=1,kligrd
+                           if (num(noeled(nligr),1).ne.ip1) goto 2060
+                           if (noeled(nligr).eq.0) goto 2060
+* on note le numéro local du noeud pour le reutiliser
+                           nbno=noeled(nligr)
+                           if (lisdua(nligr).ne.co1d) goto 2060
+                           goto 1070
+ 2060                   continue
+                     endif
+*  on n'a pas trouve le ddl, on le rajoute
+*            write (6,*) ' ajout de ddl'
+                     if (descar) then
+                        nligr =kligrp+1
+                        kligrp=kligrp+1
+                        kligrd=kligrd+1
+                     else
+                        if (ipass.eq.1) then
+                           nligr =kligrp+1
+                           kligrp=kligrp+1
+                           kligrd=kligrd
+                           xmatri.symre=2
+                        else
+                           nligr =kligrd+1
+                           kligrp=kligrp
+                           kligrd=kligrd+1
+                           xmatri.symre=2
+                        endif
+                     endif
+                     nligrp=lisinc(/2)
+                     nligrd=lisdua(/2)
+                     if (kligrp.gt.nligrp.or.kligrd.gt.nligrd) then
+                       nligrd=kligrd+max(1,nligrp1)
+                       nligrp=kligrp+max(1,nligrp1)
+*                      write(6,*) ' premier adj xmatri '
+                       segadj xmatri
+                       segadj descr
+                     endif
+                     if (nbno.eq.0) then
+                        nbsous=0
+                        nbelem=1
+                        nbnn=num(/1)+1
+                        nbref=0
+                        segadj meleme
+                        nbno=nbnn
+                     endif
+                     num(nbno,1)=ip1
+                     if (ipass.eq.1.or.descar) then
+                        noelep(kligrp)=nbno
+                        lisinc(kligrp)=co1
+                     endif
+                     if (ipass.eq.2.or.descar) then
+                        lisdua(kligrd)=co1d
+                        noeled(kligrd)=nbno
+                     endif
+ 1070                continue
+*  on met a jour la raideur
+                     nligrp=kligrp
+                     nligrd=kligrd
+*            segact xmatr1
+                        if(nligr.gt.nligpv) then
+                          nligpv=nligr*2
+                          segadj trav5
+**                        write(6,*) 'agrandissement trav5 ',nligpv
+                        endif
+                     if (ipass.eq.2) then
+                        ipvm=ipvm+1
+                        imatpv(ipvm)=nligr
+                        xmatmpv(ipvm)=xmatmp
+                     endif
+                     if (ipass.eq.1) then
+*  unrolling sur 2
+                        do j=1,nligrd-1,2
+                           retmp1=re(j,nligr,1)+re(j,nligri,1)
+     $                          *xmatmp
+                           re(j,nligr,1)=retmp1
+                           retmp2=re(j+1,nligr,1)+re(j+1,nligri,1)
+     $                          *xmatmp
+                           re(j+1,nligr,1)=retmp2
+                        enddo
+                        if (j.eq.nligrd) then
+                           retmp1=re(j,nligr,1)+re(j,nligri,1)
+     $                          *xmatmp
+                           re(j,nligr,1)=retmp1
+                        endif
+                     endif
+*    la mise a jour est sorti de la boucle pour ppouvoir l'effectuer dans l'ordre efficace pour le cache
+***                  if (ipass.eq.2) then
+***                     do j=1,nligrp
+***                        re(nligr,j,1)=re(nligr,j,1)+re(nligri,j,1)
+***  $                          *xmatmp
+***                   enddo
+***                endif
+*              segdes xmatr1,des1
+ 1050             continue
+*  mise a jour transferee ici
+                 if(ipass.eq.2) then
+*  unrolling sur 2
+                  do j=1,nligrp
+                   retmp=re(nligri,j,1)
+                   do ipv=1,ipvm-1,2    
+                    nligr1=imatpv(ipv)
+                    re(nligr1,j,1)=re(nligr1,j,1)+retmp*xmatmpv(ipv)
+                    nligr2=imatpv(ipv+1)
+                    re(nligr2,j,1)=re(nligr2,j,1)+retmp*xmatmpv(ipv+1)
+                   enddo
+                   if (ipv.eq.ipvm) then
+                       nligr=imatpv(ipv)
+                       re(nligr,j,1)=re(nligr,j,1)+retmp*xmatmpv(ipv)
+                   endif
+                  enddo
+                 endif
+*  on note les inconnues à supprimer (primale et duale)
+*           if (ipass.eq.2.or.descar)
+*    >      write (6,*) ' il faut eliminer ',nligri,lisdua(nligri)
+*      write (6,*) ' lisinc contient ',(lisinc(iou),iou=1,lisinc(/2))
+                  if (ipass.eq.1.or.descar) noelep(nligri)=0
+                  if (ipass.eq.2.or.descar) noeled(nligri)=0
+ 1010          continue
+*
+*            write(ioimp,*) 'Avant suppression des inconnues flaguees'
+*          WRITE(IOIMP,194)(NOELEP(J),LISINC(J),J=1,LISINC(/2))
+*          WRITE(IOIMP,194)(NOELED(J),LISDUA(J),J=1,LISDUA(/2))
+*  194     FORMAT( I6,9X,A4)
+*          WRITE(IOIMP,195) ((RE(L,K,1),K=1,RE(/2)),L=1,RE(/1))
+* 195      FORMAT(1X,6E12.5)
+*  on supprime les inconnues flaguées
+ 1045       continue
+            if (dupli) then
+               nligrd=kligrd
+               nligrp=kligrp
+               idecp=0
+               do 1080 nligr=1,nligrp
+                  if (noelep(nligr).eq.0) then
+                     idecp=idecp+1
+                  elseif (idecp.ne.0) then
+                     lisinc(nligr-idecp)=lisinc(nligr)
+                     noelep(nligr-idecp)=noelep(nligr)
+                     do nligd=1,nligrd
+                        if (noeled(nligd).ne.0)
+     >                  re(nligd,nligr-idecp,1)=re(nligd,nligr,1)
+                     enddo
+                  endif
+ 1080          continue
+*pv  on imbrique la boucle 1093 dans ce sens pour minimiser l'utilisation du cache
+               nligrp=nligrp-idecp
+             do 1093 nligr=1,nligrp
+               idecd=0
+                   do nligd=1,nligrd
+                if (noeled(nligd).eq.0) then
+                   idecd=idecd+1
+                elseif (idecd.ne.0) then
+                      re(nligd-idecd,nligr,1)=re(nligd,nligr,1)
+                endif
+                   enddo
+1093          continue
+             idecd=0
+             do 1092 nligd=1,nligrd
+                if (noeled(nligd).eq.0) then
+                   idecd=idecd+1
+                elseif (idecd.ne.0) then
+                   lisdua(nligd-idecd)=lisdua(nligd)
+                   noeled(nligd-idecd)=noeled(nligd)
+                endif
+1092         continue
+               nligrd=nligrd-idecd
+*            write (6,*) ' scnd2 avant apres   ',lisinc(/2),nligrp
+          if(descar.and..true.) then
+*  symetriser xmatri
+          ninc=32
+          do ib=1,nligrd,ninc
+            do jr=1,nligrd 
+              do ir=ib,min(jr-1,ib+ninc-1)
+                re1=re(ir,jr,1)
+                re2=re(jr,ir,1)
+                   rem=(re1+re2)/2.d0
+                   re(ir,jr,1)=rem
+                   re(jr,ir,1)=rem
+              enddo
+            enddo
+          enddo
+          endif
+
+*  on elimine les matrices ne contenant que les multiplicateurs de Lagrange
+*  ou les autres termes non significatifs  
+*  la verif du second membre nul est faite dans vechpo
+*
+**             if(itypel.eq.49) write(6,*) 'scnd2 49 ',meleme
+               if (itypel.eq.49.or.itypel.eq.22) then
+***          write (6,*)  (lisinc(iou),iou=1,lisinc(/2))
+                   iid=2
+                   if (itypel.eq.49) iid=3
+*  suppression des termes negligeables de la relation
+                   idec=0
+*  on utilise une valeur absolu car la relation initiale est supposee normalisee a 1
+                   do ii=iid,nligrd
+                     if (abs(re(ii,1,1)).lt.renorm.and.
+     >                   abs(re(1,ii,1)).lt.renorm) then
+                      idec=idec+1
+                     elseif(idec.ne.0) then
+                        re(ii-idec,1,1)=re(ii,1,1)
+                        if(iid.eq.3) re(ii-idec,2,1)=re(ii,2,1)
+                        re(1,ii-idec,1)=re(1,ii,1)
+                        if(iid.eq.3) re(2,ii-idec,1)=re(2,ii,1)
+                        lisinc(ii-idec)=lisinc(ii)
+                        lisdua(ii-idec)=lisdua(ii)
+                        noelep(ii-idec)=noelep(ii)
+                        noeled(ii-idec)=noeled(ii)
+                     endif
+                   enddo
+                   nligrp=nligrp-idec
+                   nligrd=nligrd-idec
+                   if(nligrd.lt.iid) then
+**           write (6,*) 'scnd2 matrice supprimee LX',
+**   >       nligrd,itypel,meleme
+                     nligrd=0
+                     nligrp=0
+                     nbdeg=nbdeg+1
+                   endif
+               endif
+               if (re(/1).ne.nligrd.or.re(/2).ne.nligrp) then
+**             write(6,*) ' ajustement final xmatri ',re(/1),re(/2),
+**   >         nligrd,nligrp
+               segadj xmatri
+               else
+**              write(6,*) ' pas d ajustement xmatri '
+               endif
+               if (nligrp.ne.nligrd.or..not.descar) then
+                 xmatri.symre=2
+               else
+               endif
+               segdes xmatri
+               segadj descr
+* la matrice est fabriquée, on elimine maintenant les noeuds
+* non references
+               lvu=num(/1)
+               if (lvu.gt.lrvu) then
+                lrvu=lvu+100
+                segadj svu
+               endif
+               do in=1,lvu
+                  vu(in)=.false.
+               enddo
+               do in=1,nligrp
+                  vu(noelep(in))=.true.
+               enddo
+               if (.not.descar) then
+                  do in=1,nligrd
+                     vu(noeled(in))=.true.
+                  enddo
+               endif
+               idec=0
+               do 1095 in=1,num(/1)
+                  if (.not.vu(in)) then
+*  noeud a eliminer
+                     idec=idec+1
+                  elseif (idec.ne.0) then
+                     do no=1,nligrp
+                        if (noelep(no).eq.in) then
+                           noelep(no)=noelep(no)-idec
+                           if (descar) noeled(no)=noeled(no)-idec
+                        endif
+                     enddo
+                     if (.not.descar) then
+                        do no=1,nligrd
+                           if (noeled(no).eq.in) then
+                              noeled(no)=noeled(no)-idec
+                           endif
+                        enddo
+                     endif
+                     num(in-idec,1)=num(in,1)
+                  endif
+ 1095          continue
+               nbnn=num(/1)-idec
+               nbelem=1
+               nbsous=0
+               nbref=0
+               segadj meleme
+               if (nbnn.eq.0) imatno(kmatno)=0
+*  recyclage eventuel du descripteur
+               do 4032 ides=llisd,1,-1
+               des2=lisdes(ides)
+               segact des2
+         if (nligrd.ne.des2.noeled(/1)) goto 4030
+         if (nligrp.ne.des2.noelep(/1)) goto 4030
+         do id1=1,nligrd
+           if (noeled(id1).ne.des2.noeled(id1)) goto 4030
+           if (lisdua(id1).ne.des2.lisdua(id1)) goto 4030
+         enddo
+         do id1=1,nligrp
+           if (noelep(id1).ne.des2.noelep(id1)) goto 4030
+           if (lisinc(id1).ne.des2.lisinc(id1)) goto 4030
+         enddo
+         segsup descr
+         idsup=idsup+1
+         descr=des2
+         idesno(kdesno)=descr
+         goto 4031
+ 4030    continue
+ 4032    continue
+                llisd=llisd+1
+                if (llisd.gt.klisd) then
+                  klisd=llisd+100
+                  segadj trav4
+                endif
+                lisdes(llisd)=descr
+*               write(6,*) ' nouveau descripteur ',nligrp,nligrd
+**              segdes des2
+ 4031    continue
+**             endif
+               if (nligrp.ne.noelep(/1).or.nligrd.ne.noeled(/1))
+     >             segadj descr
+            endif
+ 1040    continue
+*  compression de ipt4 et imatr4
+         idec=0
+         ipt5=ipt4
+         xmatr5=xmatr4
+         nligrp=xmatr5.re(/2)
+         nligrd=xmatr5.re(/1)
+         nelrig=xmatr5.re(/3)
+         nbnn=ipt5.num(/1)
+         nbelem=ipt5.num(/2)
+         idec=0
+         do i=1,xmatr4.re(/3)
+           if (imatt(i).ne.0) idec=idec+1
+         enddo
+*  on duplique systematiquement pour pouvoir detruire dans resouc
+         if (idec.ne.0.or..true.) then
+                 nbelem=nbelem-idec
+                 nbsous=0
+                 nbref=ipt5.lisref(/1)
+                 segini,ipt4
+                 ipt4.itypel=ipt5.itypel
+                 do ir=1,ipt4.lisref(/1)
+                  ipt4.lisref(ir)=ipt5.lisref(ir)
+                 enddo
+                 ri4.irigel(1,irig)=ipt4
+                 nelrig=nelrig-idec
+                 segini,xmatr4
+                 ri4.irigel(4,irig)=Xmatr4
+                 xmatr4.symre=xmatr5.symre
+                 idec=0
+         endif
+         do 2000 i=1,xmatr5.re(/3)
+            if(imatt(i).ne.0) then
+               idec=idec+1
+            elseif (xmatr4.ne.xmatr5) then
+**             do io=1,nligrp
+**                do iu=1,nligrd
+**                   xmatr4.re(iu,io,i-idec)=xmatr5.re(iu,io,i)
+**                enddo
+**             enddo
+                     call scndc(nligrp*nligrd,xmatr5.re(1,1,i),
+     >               xmatr4.re(1,1,i-idec))
+               do in=1,nbnn
+                   ipt4.num(in,i-idec)=ipt5.num(in,i)
+               enddo
+            endif
+ 2000    continue
+         segdes xmatr4
+*        write (6,*) ' nelrig dans scnd2 ',nelrig
+         if (nelrig.eq.0) ri4.irigel(4,irig)=0
+         segsup trav3
+         segsup trav5
+**       segdes descr
+ 1000 continue
+
+*
+*  compression des xmatri suivant les descripteurs
+*
+       isup=0
+       id=0
+       is=1
+       nid=1
+       nrigf=0
+ 4100  id=nid
+       if (id.gt.kdesno) goto 4120
+       xmatri=imatno(id)
+       if (xmatri.eq.0) then
+*        write(6,*) ' xmatri 0',id
+         isup=isup+1
+         nid=id+1
+         goto 4100
+       endif
+       meleme=igeomno(id)
+       segact meleme
+       des4=idesno(id)
+       nid=0
+       nelrig=num(/2) 
+*      if (num(/2).ne.1) write(6,*) 'nelrig-1',nelrig
+       nelrii=nelrig
+       nrigf=nrigf+1
+       lis=id
+       do is=id+1,kdesno
+         if (idesno(is).ne.des4) goto 4110
+         if (imatno(is).eq.0) goto 4110
+         if (irg2no(is).ne.irg2no(id)) goto 4110
+         if (irg5no(is).ne.irg5no(id)) goto 4110
+         if (irg6no(is).ne.irg6no(id)) goto 4110
+         if (irg7no(is).ne.irg7no(id)) goto 4110
+         lis=is
+         meleme=igeomno(is)
+         segact meleme
+         nelrig=nelrig+num(/2)
+*      if (num(/2).ne.1) write(6,*) 'nelrig-2',num(/2)
+         goto 4112
+ 4110   continue
+        if (nid.eq.0) nid=is
+ 4112   continue
+       enddo
+       if (nid.eq.0) nid=is
+       if (nelrig.eq.nelrii) goto 4100
+       xmatri=imatno(id)
+       segact xmatri
+       symr=symre
+       nligrd=re(/1)
+       nligrp=re(/2)
+       segini xmatri
+       symre=symr
+       meleme=igeomno(id)
+       segact meleme
+       nbnn=num(/1)
+       nbelem=nelrig
+       nbsous=0
+       nbref=0
+       itype=itypel
+       segini meleme
+       itypel=itype
+       nelrig=0
+       do is=id,lis
+        coeref=1.d0
+        if (is.ne.id) then
+         if (idesno(is).ne.des4) goto 4111
+         if (imatno(is).eq.0) goto 4111
+         if (irg2no(is).ne.irg2no(id)) goto 4111
+         if (irg5no(is).ne.irg5no(id)) goto 4111
+         if (irg6no(is).ne.irg6no(id)) goto 4111
+         if (irg7no(is).ne.irg7no(id)) goto 4111
+         coeref=coerno(is)/coerno(id)
+        endif
+         xmatr1=imatno(is)
+         ipt1=igeomno(is)
+         segact xmatr1,ipt1
+         symre=max(symre,xmatr1.symre)
+         do nel=1,xmatr1.re(/3)
+          nelrig=nelrig+1
+          do irp=1,nligrp
+          do ird=1,nligrd
+           re(ird,irp,nelrig)=xmatr1.re(ird,irp,nel)*coeref
+          enddo
+          enddo
+          do ip=1,nbnn
+           num(ip,nelrig)=ipt1.num(ip,nel)
+          enddo
+          imatno(is)=0
+         enddo
+        segsup xmatr1,ipt1
+        isup=isup+1
+ 4111   continue
+       enddo
+       imatno(id)=xmatri
+       igeomno(id)=meleme
+       segdes xmatri
+
+       goto 4100
+ 4120  continue
+*      write(6,*) ' suppression de raideurs et descr ',isup,idsup
+*      write(6,*) ' nb desc          ',llisd
+**     write(6,*) ' lisdes ',(lisdes(il),il=1,lisdes(/1))
+         segsup trav4
+*  compression de irigel
+      idec=0
+
+      do 2100 irig=1,ri4.irigel(/2)
+         if (ri4.irigel(4,irig).eq.0.or.abs(coerig(irig)).lt.xpetit) 
+     >      then
+            idec=idec+1
+         elseif (idec.ne.0) then
+            do in=1,ri4.irigel(/1)
+               ri4.irigel(in,irig-idec)=ri4.irigel(in,irig)
+            enddo
+            ri4.coerig(irig-idec)=ri4.coerig(irig)
+         endif
+ 2100 continue
+      nrigeo=ri4.irigel(/2)-idec
+*  il ne reste plus qu'a ranger dans ri4 les nouvelles raideurs engendrées
+      nrigel=nrigf+nrigeo
+      segadj ri4
+      ir=nrigeo
+      do 3000 irig=1,kmatno
+         if (imatno(irig).eq.0) goto 3000
+         if (abs(coerno(irig)).lt.xpetit) goto 3000
+         ir=ir+1
+         ri4.coerig(ir)=coerno(irig)
+         ri4.irigel(1,ir)=igeomno(irig)
+         ri4.irigel(3,ir)=idesno(irig)
+         ri4.irigel(7,ir)=irg7no(irig)
+         ri4.irigel(5,ir)=irg5no(irig)
+         ri4.irigel(2,ir)=irg2no(irig)
+         ri4.irigel(6,ir)=irg6no(irig)
+         ri4.irigel(4,ir)=imatno(irig)
+ 3000 continue
+*     write(6,*) ' ir nrigel ',ir,nrigel,nrigeo
+*  il peut y avoir des imatri nul a enlever
+      if (ir.lt.nrigel) then
+       nrigel=ir
+       segadj ri4
+      endif
+      if (ir.ne.nrigel) call erreur(5)
+*     write (6,*) ' raideur resultante '
+*       call prrigi(ri4,0)
+      segsup trav1,trav2,imatno,idesno,igeomno,coerno,irg7no,icpr
+     $     ,irg5no,irg2no,irg6no,svu
+*  desactivation generale
+      segact mrigid
+      do irig=1,irigel(/2)
+         xmatri=irigel(4,irig)
+         meleme=irigel(1,irig)
+         descr=irigel(3,irig)
+         segdes xmatri,descr
+      enddo
+      segact ri4
+      do irig=1,ri4.irigel(/2)
+         xmatri=ri4.irigel(4,irig)
+         meleme=ri4.irigel(1,irig)
+         descr=ri4.irigel(3,irig)
+         segdes xmatri,descr
+      enddo
+      segact ri1
+      do irig=1,ri1.irigel(/2)
+         xmatri=ri1.irigel(4,irig)
+         meleme=ri1.irigel(1,irig)
+         descr=ri1.irigel(3,irig)
+         segdes xmatri,descr
+      enddo
+      if(iimpi.ne.0.and.nbdeg.ne.0)
+     >  write (6,*) ' nombre de relations degenerees'//
+     >  ' apres elimination ',nbdeg
+      end
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

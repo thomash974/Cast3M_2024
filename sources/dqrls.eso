@@ -1,0 +1,155 @@
+C DQRLS     SOURCE    PV090527  23/02/07    11:58:37     11592          
+      subroutine dqrls ( a, lda, m, n, tol, kr, b, x,r,jpvt,qraux,work,
+     #  itask, ind )
+      
+c*****************************************************************************80
+c
+c! DQRLS factors and solves a linear system in the least squares sense.
+c
+c  Discussion:
+c
+c    The linear system may be overdetermined, underdetermined or singular.
+c    The solution is obtained using a QR factorization of the
+c    coefficient matrix.
+c
+c    DQRLS can be efficiently used to solve several least squares
+c    problems with the same matrix A.  The first system is solved
+c    with ITASK = 1.  The subsequent systems are solved with
+c    ITASK = 2, to avoid the recomputation of the matrix factors.
+c    The parameters KR, JPVT, and QRAUX must not be modified
+c    between calls to DQRLS.
+c
+c    DQRLS is used to solve in a least squares sense
+c    overdetermined, underdetermined and singular linear systems.
+c    The system is A*X approximates B where A is M by N.
+c    B is a given M-vector, and X is the N-vector to be computed.
+c    A solution X is found which minimimzes the sum of squares (2-norm)
+c    of the residual,  A*X - B.
+c
+c    The numerical rank of A is determined using the tolerance TOL.
+c
+c    DQRLS uses the LINPACK subroutine DQRDC to compute the QR
+c    factorization, with column pivoting, of an M by N matrix A.
+c
+c  Modified:
+c
+c    15 April 2012
+c
+c  Reference:
+c
+c    David Kahaner, Cleve Moler, Steven Nash,
+c    Numerical Methods and Software,
+c    Prentice Hall, 1989,
+c    ISBN: 0-13-627258-4,
+c    LC: TA345.K34.
+c
+c  Parameters:
+c
+c    Input/output, real*8 A(LDA,N), an M by N matrix.
+c    On input, the matrix whose decomposition is to be computed.
+c    In a least squares data fitting problem, A(I,J) is the
+c    value of the J-th basis (model) function at the I-th data point.
+c    On output, A contains the output from DQRDC.  The triangular matrix R
+c    of the QR factorization is contained in the upper triangle and
+c    information needed to recover the orthogonal matrix Q is stored
+c    below the diagonal in A and in the vector QRAUX.
+c
+c    Input, integer LDA, the leading dimension of A.
+c
+c    Input, integer M, the number of rows of A.
+c
+c    Input, integer N, the number of columns of A.
+c
+c    Input, real*8 TOL, a relative tolerance used to determine the
+c    numerical rank.  The problem should be scaled so that all the elements
+c    of A have roughly the same absolute accuracy EPS.  Then a reasonable
+c    value for TOL is roughly EPS divided by the magnitude of the largest
+c    element.
+c
+c    Output, integer KR, the numerical rank.
+c
+c    Input, real*8 B(M), the right hand side of the linear system.
+c
+c    Output, real*8 X(N), a least squares solution to the linear
+c    system.
+c
+c    Output, real*8 R(M), the residual, B - A*X.  R may
+c    overwrite B.
+c
+c    Workspace, integer JPVT(N), required if ITASK = 1.
+c    Columns JPVT(1), ..., JPVT(KR) of the original matrix are linearly
+c    independent to within the tolerance TOL and the remaining columns
+c    are linearly dependent.  ABS ( A(1,1) ) / ABS ( A(KR,KR) ) is an estimate
+c    of the condition number of the matrix of independent columns,
+c    and of R.  This estimate will be .le. 1/TOL.
+c
+c    Workspace, real*8 QRAUX(N), required if ITASK = 1.
+c
+c    Workspace, real*8 WORK(N), required if ITASK = 1.
+c
+c    Input, integer ITASK.
+c    1, DQRLS factors the matrix A and solves the least squares problem.
+c    2, DQRLS assumes that the matrix A was factored with an earlier
+c       call to DQRLS, and only solves the least squares problem.
+c
+c    Output, integer IND, error code.
+c    0:  no error
+c    -1: LDA .lt. M   (fatal error)
+c    -2: N .lt. 1     (fatal error)
+c    -3: ITASK .lt. 1 (fatal error)
+c
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+        integer lda
+        integer m
+        integer n
+      
+        real*8 a(lda,n)
+        real*8 b(m)
+        integer ind
+        integer itask
+        integer jpvt(n)
+        integer kr
+        real*8 qraux(n)
+        real*8 r(m)
+        real*8 tol
+        real*8 work(n)
+        real*8 x(n)
+      
+        if ( lda .lt. m ) then
+          write ( *, '(a)' ) ' '
+          write ( *, '(a)' ) 'DQRLS - Fatal error!'
+          write ( *, '(a)' ) '  LDA .lt. M.'
+          stop
+        end if
+      
+        if ( n .le. 0 ) then
+          write ( *, '(a)' ) ' '
+          write ( *, '(a)' ) 'DQRLS - Fatal error!'
+          write ( *, '(a)' ) '  N .le. 0.'
+          stop
+        end if
+      
+        if ( itask .lt. 1 ) then
+          write ( *, '(a)' ) ' '
+          write ( *, '(a)' ) 'DQRLS - Fatal error!'
+          write ( *, '(a)' ) '  ITASK .lt. 1.'
+          stop
+        end if
+      
+        ind = 0
+
+c  Factor the matrix.
+
+        if ( itask .eq. 1 ) then
+          call dqrank ( a, lda, m, n, tol, kr, jpvt, qraux, work )
+        end if
+
+c  Solve the least-squares problem.
+
+        call dqrlss ( a, lda, m, n, kr, b, x, r, jpvt, qraux )
+      
+        return
+      end
+ 

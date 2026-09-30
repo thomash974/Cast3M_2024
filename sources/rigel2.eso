@@ -1,0 +1,28 @@
+C RIGEL2    SOURCE    PB245956  20/12/21    21:15:14     10747          
+      SUBROUTINE RIGEL2(MRIGID,RI1)
+      
+      IMPLICIT INTEGER(I-N)
+
+*     Condensation eventuelle d'une matrice auxiliaire 
+*     apres elimination sur une matrice de rigidite
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMRIGID
+
+      IF (RI1.NE.0) THEN                
+         SEGACT MRIGID
+         RI2=JRDEPP 
+         CALL SCND2 (RI1,RI2,RI3) 
+         IF(IERR.NE.0) RETURN             
+         CALL DTRIGI(RI1)
+         IF(IERR.NE.0) RETURN
+         SEGACT RI3*MOD
+         RI3.MTYMAT='TEMPORAI'    
+         RI1=RI3
+      ENDIF
+
+      END
+
+
+ 

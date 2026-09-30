@@ -1,0 +1,17 @@
+C SSCAL1    SOURCE    FANDEUR   22/05/02    21:15:30     11359          
+
+      SUBROUTINE SSCAL1 (F,T,IN,SC,L)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION F(L,*),T(*)
+
+      SC=0.D0
+      DO I=1,L
+        SC=SC+T(I)*F(I,IN)
+      ENDDO
+
+C      RETURN
+      END
+
+ 

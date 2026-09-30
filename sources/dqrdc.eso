@@ -1,0 +1,245 @@
+C DQRDC     SOURCE    PV090527  23/02/07    11:58:36     11592          
+      subroutine dqrdc ( a, lda, n, p, qraux, jpvt, work, job )
+      
+c*****************************************************************************80
+c
+c! DQRDC computes the QR factorization of a real rectangular matrix.
+c
+c  Discussion:
+c
+c    DQRDC uses Householder transformations.
+c
+c    Column pivoting based on the 2-norms of the reduced columns may be
+c    performed at the user's option.
+c
+c  Reference:
+c
+c    Jack Dongarra, Cleve Moler, Jim Bunch, Pete Stewart,
+c    LINPACK User's Guide,
+c    SIAM, 1979,
+c    ISBN13: 978-0-898711-72-1,
+c    LC: QA214.L56.
+c
+c  Parameters:
+c
+c    Input/output, real*8 A(LDA,P).  On input, the N by P matrix
+c    whose decomposition is to be computed.  On output, A contains in
+c    its upper triangle the upper triangular matrix R of the QR
+c    factorization.  Below its diagonal A contains information from
+c    which the orthogonal part of the decomposition can be recovered.
+c    Note that if pivoting has been requested, the decomposition is not that
+c    of the original matrix A but that of A with its columns permuted
+c    as described by JPVT.
+c
+c    Input, integer LDA, the leading dimension of the array A.
+c    LDA must be at least N.
+c
+c    Input, integer N, the number of rows of the matrix A.
+c
+c    Input, integer P, the number of columns of the matrix A.
+c
+c    Output, real*8 QRAUX(P), contains further information required
+c    to recover the orthogonal part of the decomposition.
+c
+c    Input/output, integer JPVT(P).  On input, JPVT contains
+c    integers that control the selection of the pivot columns.  The K-th
+c    column A(*,K) of A is placed in one of three classes according to the
+c    value of JPVT(K).
+c      .gt. 0, then A(K) is an initial column.
+c      = 0, then A(K) is a free column.
+c      .lt. 0, then A(K) is a final column.
+c    Before the decomposition is computed, initial columns are moved to
+c    the beginning of the array A and final columns to the end.  Both
+c    initial and final columns are frozen in place during the computation
+c    and only free columns are moved.  At the K-th stage of the
+c    reduction, if A(*,K) is occupied by a free column it is interchanged
+c    with the free column of largest reduced norm.  JPVT is not referenced
+c    if JOB .eq. 0.  On output, JPVT(K) contains the index of the column of the
+c    original matrix that has been interchanged into the K-th column, if
+c    pivoting was requested.
+c
+c    Workspace, real*8 WORK(P).  WORK is not referenced if JOB .eq. 0.
+c
+c    Input, integer JOB, initiates column pivoting.
+c    0, no pivoting is done.
+c    nonzero, pivoting is done.
+c
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+        integer lda
+        integer n
+        integer p
+      
+        real*8 a(lda,p)
+        integer jpvt(p)
+        real*8 qraux(p)
+        real*8 work(p)
+        integer j
+        integer job
+        integer jp
+        integer l
+        integer lup
+        integer maxj
+        real*8 maxnrm
+        real*8 nrmxl
+        integer pl
+        integer pu
+        real*8 ddot
+        real*8 dnrm2
+        logical swapj
+        real*8 t
+        real*8 tt
+      
+        pl = 1
+        pu = 0
+
+c  If pivoting is requested, rearrange the columns.
+
+        if ( job /= 0 ) then
+      
+          do j = 1, p
+      
+            swapj = 0 .lt. jpvt(j)
+      
+            if ( jpvt(j) .lt. 0 ) then
+              jpvt(j) = - j
+            else
+              jpvt(j) = j
+            end if
+      
+            if ( swapj ) then
+      
+              if ( j /= pl ) then
+                call dswap ( n, a(1,pl), 1, a(1,j), 1 )
+              end if
+      
+              jpvt(j) = jpvt(pl)
+              jpvt(pl) = j
+              pl = pl + 1
+      
+            end if
+      
+          end do
+      
+          pu = p
+      
+          do j = p, 1, -1
+      
+            if ( jpvt(j) .lt. 0 ) then
+      
+              jpvt(j) = - jpvt(j)
+      
+              if ( j /= pu ) then
+                call dswap ( n, a(1,pu), 1, a(1,j), 1 )
+                jp = jpvt(pu)
+                jpvt(pu) = jpvt(j)
+                jpvt(j) = jp
+              end if
+      
+              pu = pu - 1
+      
+            end if
+      
+          end do
+      
+        end if
+
+c  Compute the norms of the free columns.
+
+        do j = pl, pu
+          qraux(j) = dnrm2 ( n, a(1,j), 1 )
+        end do
+      
+        work(pl:pu) = qraux(pl:pu)
+
+c  Perform the Householder reduction of A.
+
+        lup = min ( n, p )
+      
+        do l = 1, lup
+
+c  Bring the column of largest norm into the pivot position.
+
+          if ( (pl .le. l) .and. (l .lt. pu) ) then
+      
+            maxnrm = 0.0D+00
+            maxj = l
+            do j = l, pu
+              if ( maxnrm .lt. qraux(j) ) then
+                maxnrm = qraux(j)
+                maxj = j
+              end if
+            end do
+      
+            if ( maxj /= l ) then
+              call dswap ( n, a(1,l), 1, a(1,maxj), 1 )
+              qraux(maxj) = qraux(l)
+              work(maxj) = work(l)
+              jp = jpvt(maxj)
+              jpvt(maxj) = jpvt(l)
+              jpvt(l) = jp
+            end if
+      
+          end if
+
+c  Compute the Householder transformation for column L.
+
+          qraux(l) = 0.0D+00
+      
+          if ( l /= n ) then
+      
+            nrmxl = dnrm2 ( n-l+1, a(l,l), 1 )
+      
+            if ( nrmxl /= 0.0D+00 ) then
+      
+              if ( a(l,l) /= 0.0D+00 ) then
+                nrmxl = sign ( nrmxl, a(l,l) )
+              end if
+      
+              call dscal ( n-l+1, 1.0D+00 / nrmxl, a(l,l), 1 )
+              a(l,l) = 1.0D+00 + a(l,l)
+
+c  Apply the transformation to the remaining columns, updating the norms.
+
+              do j = l + 1, p
+      
+                t = - ddot ( n-l+1, a(l,l), 1, a(l,j), 1 ) / a(l,l)
+                call daxpy ( n-l+1, t, a(l,l), 1, a(l,j), 1 )
+      
+                if ( (pl .le. j) .and. (j .le. pu) ) then
+      
+                  if ( qraux(j) /= 0.0D+00 ) then
+      
+                    tt = 1.0D+00 - ( abs ( a(l,j) ) / qraux(j) )**2
+                    tt = max ( tt, 0.0D+00 )
+                    t = tt
+                    tt = 1.0D+00 + 0.05D+00 * tt * (qraux(j)/work(j))**2
+      
+                    if ( tt /= 1.0D+00 ) then
+                      qraux(j) = qraux(j) * sqrt ( t )
+                    else
+                      qraux(j) = dnrm2 ( n-l, a(l+1,j), 1 )
+                      work(j) = qraux(j)
+                    end if
+      
+                  end if
+      
+                end if
+      
+              end do
+
+c  Save the transformation.
+
+              qraux(l) = a(l,l)
+              a(l,l) = - nrmxl
+      
+            end if
+      
+          end if
+      
+        end do
+      
+        return
+      end
+ 

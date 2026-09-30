@@ -1,0 +1,92 @@
+C MAMU54    SOURCE    PV        20/02/22    21:15:20     10531          
+      subroutine mamu54(long,val11,lpl1,val1,lpl,pt)
+      implicit real*8 (a-h,o-z)
+      real*8 val11(*),val1(*)
+      real*8 pt(36)
+           id12=lpl1
+           id13=lpl1+ lpl1+1
+           id14=lpl1+ lpl1+1+ lpl1+2
+           id2=lpl
+           id3=lpl+ lpl+1
+           id4=lpl+ lpl+1 +lpl+2
+           id5=lpl+ lpl+1 +lpl+2 +lpl+3
+           pt1=pt(1)
+           pt2=pt(2)
+           pt3=pt(3)
+           pt4=pt(4)
+           pt7=pt(5)
+           pt8=pt(6)
+           pt9=pt(7)
+           pt10=pt(8)
+           pt13=pt(9)
+           pt14=pt(10)
+           pt15=pt(11)
+           pt16=pt(12)
+           pt19=pt(13)
+           pt20=pt(14)
+           pt21=pt(15)
+           pt22=pt(16)
+           pt25=pt(17)
+           pt26=pt(18)
+           pt27=pt(19)
+           pt28=pt(20)
+           do 110 i=1,long
+              xval1=val1(i)
+              xval2=val1(i+id2)
+              xval3=val1(i+id3)
+              xval4=val1(i+id4)
+              xval5=val1(i+id5)
+              xval11=val11(i)
+              xval12=val11(i+id12)
+              xval13=val11(i+id13)
+              xval14=val11(i+id14)
+              pt1=pt1+xval1*xval11
+              pt2=pt2+xval1*xval12
+              pt3=pt3+xval1*xval13
+              pt4=pt4+xval1*xval14
+              pt7=pt7+xval2*xval11
+              pt8=pt8+xval2*xval12
+              pt9=pt9+xval2*xval13
+              pt10=pt10+xval2*xval14
+              pt13=pt13+xval3*xval11
+              pt14=pt14+xval3*xval12
+              pt15=pt15+xval3*xval13
+              pt16=pt16+xval3*xval14
+              pt19=pt19+xval4*xval11
+              pt20=pt20+xval4*xval12
+              pt21=pt21+xval4*xval13
+              pt22=pt22+xval4*xval14
+              pt25=pt25+xval5*xval11
+              pt26=pt26+xval5*xval12
+              pt27=pt27+xval5*xval13
+              pt28=pt28+xval5*xval14
+ 110       continue
+           pt(1)=pt1
+           pt(2)=pt2
+           pt(3)=pt3
+           pt(4)=pt4
+           pt(5)=pt7
+           pt(6)=pt8
+           pt(7)=pt9
+           pt(8)=pt10
+           pt(9)=pt13
+           pt(10)=pt14
+           pt(11)=pt15
+           pt(12)=pt16
+           pt(13)=pt19
+           pt(14)=pt20
+           pt(15)=pt21
+           pt(16)=pt22
+           pt(17)=pt25
+           pt(18)=pt26
+           pt(19)=pt27
+           pt(20)=pt28
+
+           end
+
+ 
+ 
+ 
+ 
+ 
+ 

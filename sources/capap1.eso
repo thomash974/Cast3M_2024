@@ -1,0 +1,63 @@
+C CAPAP1    SOURCE    CB215821  21/03/03    21:15:07     10910          
+      SUBROUTINE CAPAP1(IPMAIL,IVAMAT,IPMATR,INFOR)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+C=======================================================================
+C=                            C A P A P 1                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=  Calcul de la matrice de CAPACITE CALORIFIQUE d'un element POI1     =
+C=                                                                     =
+C=  Clement BERTHINIER, le 23 fevrier 2021.                            =
+C=======================================================================
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMRIGID
+-INC SMCHAML
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS),IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      MELEME = IPMAIL
+      NBELEM = NUM(/2)
+
+      XMATRI = IPMATR
+      MPTVAL = IVAMAT
+
+
+C     BOUCLE SUR LES ELEMENTS DU MAILLAGE ELEMENTAIRE IPMAIL
+C     ======================================================
+      DO iElt = 1, NBELEM
+        IF    (INFOR .EQ. 1)THEN
+C         Cas THERMIQUE : Calcul du terme M * Cp
+          MELVAL = MPTVAL.IVAL(1)
+          IEMN   = MIN(iElt,MELVAL.VELCHE(/2))
+          XM     = MELVAL.VELCHE(1,IEMN)
+
+          MELVAL = MPTVAL.IVAL(2)
+          IEMN   = MIN(iElt,MELVAL.VELCHE(/2))
+          XC     = MELVAL.VELCHE(1,IEMN)
+
+          XRIG = XM * XC
+
+        ELSEIF(INFOR .EQ. 2)THEN
+C         Cas DIFFUSION : Directement le CDG (CD généralise)
+          MELVAL = MPTVAL.IVAL(1)
+          IEMN   = MIN(iElt,MELVAL.VELCHE(/2))
+          XRIG   = MELVAL.VELCHE(1,IEMN)
+        ENDIF
+
+C       Remplissage direct de la matrice
+        RE(1,1,iElt) = XRIG
+      ENDDO
+
+      END
+ 

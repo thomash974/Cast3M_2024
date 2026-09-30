@@ -1,0 +1,168 @@
+C TRQUAF    SOURCE    GOUNAND   21/06/02    21:18:02     11022          
+      SUBROUTINE TRQUAF(CGEOME,
+     $     MYFALS,
+     $     IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TRQUAF
+C PROJET      : Noyau linéaire NLIN
+C DESCRIPTION : Transformation de CGEOME en QUAF si ça n'est pas le
+C               cas. On utilise pour cela les éléments de référence 
+C               QUAI ou LINE
+C               ATTENTION : les éléments QUAF créés ont des noeuds nuls
+C               Vérifier que cela ne posera pas problème est fait dans
+C               KECOM6 appelé par PRLIN3
+C
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DRN/DMT/SEMT/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : KEEF (recherche de l'élément fini)
+C APPELE PAR       :
+C***********************************************************************
+C ENTREES            :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 27/05/2021, version initiale
+C HISTORIQUE : v1, 27/05/2021, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMELEME
+      POINTEUR CGEOME.MELEME
+      POINTEUR SOUGEO.MELEME
+-INC SMLMOTS
+      POINTEUR MYLMOT.MLMOTS
+* Mes includes persos
+-INC TNLIN      
+*-INC SFALRF
+      POINTEUR MYFALS.FALRFS
+*-INC SELREF
+      POINTEUR MYLRF.ELREF
+*
+      CHARACTER*4 MYDISC,NMELEM,NMELEQ
+      PARAMETER (NQUAF=7)
+      CHARACTER*4 NMQUAF(NQUAF)
+      CHARACTER*4 NMQUAI(NQUAF)
+      CHARACTER*4 NMLINE(NQUAF)
+      INTEGER IMPR,IRET
+*
+* Fonctions appelées
+*
+      INTEGER IMAX
+*
+      INTEGER ICOMP ,ISOUS            ,MAXISO
+      INTEGER        NSOUS,NDDL,ITQUAF,MAXCMP
+*
+      DATA NMQUAF/'SEG3','TRI7','QUA9','CU27','PR21','TE15','PY19'/
+      DATA NMQUAI/'SEG3','TRI6','QUA8','CU20','PR15','TE10','PY13'/
+      DATA NMLINE/'SEG2','TRI3','QUA4','CUB8','PRI6','TET4','PYR5'/
+*
+* Executable statements
+*
+      IF (IMPR.GT.1) WRITE(IOIMP,*) 'Entrée dans trquaf'
+*
+      SEGACT CGEOME*MOD
+      NSOUS=CGEOME.LISOUS(/1)
+      DO 3 ISOUS=1,NSOUS
+         SOUGEO=CGEOME.LISOUS(ISOUS)
+         SEGACT SOUGEO
+         ITELEM=SOUGEO.ITYPEL
+* Est-ce un QUAF ?
+         NMELEM=NOMS(ITELEM)
+         CALL PLACE5(NMQUAF,NQUAF,IQUAF,NMELEM)
+         IF (IQUAF.EQ.0) THEN
+            CALL PLACE5(NMLINE,NQUAF,ILINE,NMELEM)
+            IF (ILINE.EQ.0) THEN 
+               CALL PLACE5(NMQUAI,NQUAF,IQUAI,NMELEM)
+               IF (IQUAI.EQ.0) THEN
+                  MOTERR(1:8)=NMELEM//'    '
+* Le type d'element fini %m1:8 ne convient pas.
+                  CALL ERREUR(926)
+                  GOTO 9999
+               ELSE
+                  MYDISC='QUAI'
+                  IDISC=2
+                  NMELEQ=NMQUAF(IQUAI)
+               ENDIF
+            ELSE
+               MYDISC='LINE'
+               IDISC=1
+               NMELEQ=NMQUAF(ILINE)
+            ENDIF               
+            CALL PLACE5(NOMS,NOMBR,ITQUAF,NMELEQ)
+            NBNN=NBNNE(ITQUAF)
+            NBELEM=SOUGEO.NUM(/2)
+            NBSOUS=0
+            NBREF=0
+*            write(ioimp,*) 'nmelem,nmeleq=',nmelem,nmeleq
+*            write(ioimp,*) 'nbnn,nbelem=',nbnn,nbelem
+            SEGINI MELEME
+            ITYPEL=ITQUAF
+            CALL KEEF(ITQUAF,MYDISC,
+     $           MYFALS,
+     $           MYLRF,
+     $           IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+*            JG=NBNN
+            SEGACT MYLRF
+*            segprt,mylrf
+*            stop 16
+            NDDL=MYLRF.NPQUAF(/1)
+            DO IBELEM=1,NBELEM
+               DO IDDL=1,NDDL
+                  NNQUA=MYLRF.NPQUAF(IDDL)
+                  NNGLO=SOUGEO.NUM(IDDL,IBELEM)
+                  NUM(NNQUA,IBELEM)=NNGLO
+               ENDDO
+            ENDDO
+* On stocke dans la couleur du 1er element le type de discretisation
+* du maillage source : cela servira pour un meilleur message d'erreur            
+            ICOLOR(1)=IDISC
+            SEGDES MYLRF
+* Osons            
+            SEGSUP SOUGEO
+            CGEOME.LISOUS(ISOUS)=MELEME
+         ELSE
+            SEGDES SOUGEO
+         ENDIF
+ 3    CONTINUE
+      SEGDES CGEOME
+*      CALL ECROBJ('MAILLAGE',CGEOME)
+*      CALL PRLIST
+*      stop 16
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine trquaf'
+      RETURN
+*
+* End of subroutine TRQUAF
+*
+      END
+
+
+
+
+ 

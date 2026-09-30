@@ -1,0 +1,69 @@
+C PRFORM    SOURCE    PV        20/04/02    21:15:34     10567          
+      subroutine prform
+      implicit real*8(a-h,o-z)
+      implicit integer(i-n)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC SMCHAML
+-INC SMCOORD
+      segment itrav(nmod)
+      call LIROBJ('MMODEL  ',mmodel,1,iretou)
+      CALL ACTOBJ('MMODEL  ',mmodel,1)
+      call LIROBJ('MCHAML  ',mchel1,1,iretou)
+      CALL ACTOBJ('MCHAML  ',mchel1,1)
+      if(ierr.ne.0) return
+ 
+      call reduaf ( mchel1,mmodel,mchel2,1,iretr,kerre)
+      if( iretr.ne.1) then
+        call erreur (kerre)
+        return
+      endif
+
+      segact mcoord
+      segact mmodel
+      nmod=kmodel(/1)
+
+      segini itrav
+      iresu=0
+      do io=1,nmod
+        if(itrav(io).eq.0) then
+          n1=nmod
+         imodel=kmodel(io)
+         segact imodel
+         itrav(io)=1
+         segini mmode2
+         ia=1
+         mmode2.kmodel(ia)=imodel
+         do 1 iy=io+1,kmodel(/1)
+            if(itrav(iy).ne.0) go to 1
+            imode2=kmodel(iy)
+            segact imode2
+            if(conmod.eq.imode2.conmod) then
+              itrav(iy)=1
+              ia=ia+1
+              mmode2.kmodel(ia)=imode2
+            endif
+    1    continue
+         n1=ia
+         if( n1.ne.mmode2.kmodel(/1)) segadj mmode2
+         call fform1(mmode2,mchel2,ifact)
+         if(iresu.eq.0) then
+            iresu=ifact
+         else
+            call fuschl(iresu,ifact,ires)
+            iresu=ires
+         endif
+         segsup mmode2
+        endif
+      enddo
+      segsup itrav
+      if( iresu.ne.0) then
+        call ACTOBJ('MCHAML  ',iresu,1)
+        call ECROBJ('MCHAML  ',iresu)
+      endif
+      end
+
+ 
+ 

@@ -1,0 +1,49 @@
+C HHONOB    SOURCE    OF166741  24/05/06    21:15:12     11082          
+C HHONOB    SOURCE                                                      
+
+      SUBROUTINE HHONOB (modHHO, nobHHO, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+c*-INC CCOPTIO
+-INC CCHHOPA
+
+-INC SMMODEL
+
+      CHARACTER*(LOCHAI) motHHO
+      LOGICAL b_z
+
+      iret = 0
+      nobHHO = 0
+
+      imodel = modHHO
+c*      segact,imodel*nomod (segment actif en entree)
+
+      MELE = imodel.NEFMOD
+      IF (MELE .NE. HHO_NUM_ELEMENT) RETURN
+
+      MFR = NUMMFR(MELE)
+      IF (MFR.NE.HHO_MFR_ELEMENT) THEN
+        nobHHO = -3
+        iret = 5
+        RETURN
+      END IF
+
+      nobMOD = imodel.IVAMOD(/1)
+      DO in = 1, nobMOD
+        IF (imodel.TYMODE(in) .EQ. 'MOT   ')THEN
+          iva = imodel.IVAMOD(in)
+          CALL QUEVAL(iva,'MOT     ',iret,lgmot,r_z,motHHO,b_z,i_z)
+          if (iret .NE. 0) CALL ERREUR(5)
+          IF (motHHO(1:4) .EQ. 'hho_') THEN
+            nobHHO = in
+          END IF
+        END IF
+      END DO
+
+      RETURN
+      END
+
+ 

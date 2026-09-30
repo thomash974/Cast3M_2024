@@ -1,0 +1,141 @@
+C LCCL3D    SOURCE    PV090527  23/02/13    21:15:09     11592          
+      SUBROUTINE LCCL3D(M,K,G,b,d,pt0,pc0,s1,s2,s3,dcc,Hdp,
+     # lcc,ldp,fc1,fd2,precision3d,log_err)
+c     Multiplicateur plastique CamClay et Drucker Prager couples
+c     (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      real*8 M,K,G,b,d,pt0,pc0,s1,s2,s3,dcc,Hdp,lcc,ldp
+      real*8 BB(2,2),denom
+      real*8 precision3d
+      logical log_err
+      
+      log_err=.false.
+
+C       t1 = M ** 2
+C       t2 = t1 ** 2
+C       t3 = t2 * K
+C       t4 = pc0 ** 2
+C       t5 = t4 ** 2
+C       t18 = pt0 ** 2
+C       t21 = s1 + s2 + s3
+C       t25 = t21 ** 2
+C       t28 = K * t25 * t2 / 0.3D1
+C       t29 = s1 ** 2
+C       t30 = -s2 - s3
+C       t32 = s2 ** 2
+C       t33 = s2 * s3
+C       t34 = s3 ** 2
+C       t35 = s1 * t30 + t29 + t32 - t33 + t34
+C       t36 = G * t35
+C       t40 = t18 * pt0
+C       t46 = -t28 + t36
+C       t50 = t4 * pc0
+C       t53 = t18 ** 2
+C       t54 = t53 * t3
+C       t57 = t40 * t21 * t3
+C       t59 = t28 + t36
+C       t87 = (0.3D1 * s1 * t30 + 0.3D1 * t29 + 0.3D1 * t32 - 0.3D1 * 
+C      #t33 + 0.3D1 * t34)
+C       if(t87.gt.0.d0) then
+C         t87=sqrt(t87)
+C       else
+C         log_err=.true.
+C         goto 10
+C       end if
+C       t89 = t1 * K
+C       t94 = b * pt0 * t89
+C       t96 = t21 * b
+C       t97 = t96 * t89
+C       t115 = (pc0 - pt0) ** 2
+C       t130 = (pc0 + pt0) ** 2
+C       BB(1,1) = -t5 * t4 * t3 / 0.16D2 - 0.3D1 / 0.8D1 * t5 * pc0 * K * 
+C      #(pt0 + 0.2D1 / 0.9D1 * s1 + 0.2D1 / 0.9D1 * s2 + 0.2D1 / 0.9D1 * s
+C      #3) * t2 - t5 * (0.45D2 / 0.4D1 * t18 * t3 + 0.5D1 * pt0 * t21 * t3
+C      # + t28 + t36) / 0.12D2 - t50 * (0.5D1 / 0.2D1 * t40 * t3 + 0.5D1 /
+C      # 0.3D1 * t18 * t21 * t3 - 0.2D1 / 0.3D1 * pt0 * t46) / 0.2D1 - t4 
+C      #* (0.15D2 / 0.8D1 * t54 + 0.5D1 / 0.3D1 * t57 + t18 * t59) / 0.2D1
+C      # + pc0 * (-0.9D1 / 0.8D1 * t54 - 0.5D1 / 0.4D1 * t57 + t18 * t46) 
+C      #* pt0 / 0.3D1 - t53 * t18 * t3 / 0.16D2 - t53 * pt0 * t21 * t3 / 0
+C      #.12D2 - t53 * t59 / 0.12D2 + dcc
+C       BB(1,2) = -(t87 * (t50 * b * t89 / 0.2D1 + t4 * (0.3D1 / 0.2D1 * t
+C      #94 + t97 / 0.3D1) - 0.2D1 / 0.3D1 * pc0 * (-0.9D1 / 0.4D1 * t94 - 
+C      #t97) * pt0 + t40 * b * t89 / 0.2D1 + t18 * t96 * t89 / 0.3D1) + G 
+C      #* t115 * t35) / t87 / 0.2D1
+C       BB(2,1) = -t87 * t115 * G / 0.6D1 - K * d * t130 * (pc0 + pt0 + 0.
+C      #2D1 / 0.3D1 * s1 + 0.2D1 / 0.3D1 * s2 + 0.2D1 / 0.3D1 * s3) * t1 /
+C      # 0.4D1
+C       BB(2,2) = -K * b * d - G - Hdp
+      
+      t1 = s1 ** 2
+      t3 = -s2 - s3
+      t5 = s2 ** 2
+      t7 = s2 * s3
+      t9 = s3 ** 2
+      t12 = sqrt(0.3D1 * s1 * t3 + 0.3D1 * t1 + 0.3D1 * t5 - 0.3D1 * t7 
+     #+ 0.3D1 * t9)
+      t14 = sqrt(0.4D1)
+      t16 = (pc0 - pt0) ** 2
+      t17 = t16 ** 2
+      t21 = (s1 + s2 + s3 + 0.3D1 / 0.2D1 * pc0 + 0.3D1 / 0.2D1 * pt0) *
+     #* 2
+      t22 = M ** 2
+      t23 = t22 ** 2
+      t32 = sqrt((t23 * t21 + 0.81D2 / 0.2D1 * t1 + 0.81D2 / 0.2D1 * s1 
+     #* t3 + 0.81D2 / 0.2D1 * t5 - 0.81D2 / 0.2D1 * t7 + 0.81D2 / 0.2D1 
+     #* t9) * t17)
+      t36 = sqrt(0.3D1)
+      t38 = t23 * K
+      t39 = pc0 ** 2
+      t42 = 0.2D1 / 0.3D1 * s1
+      t43 = 0.2D1 / 0.3D1 * s2
+      t44 = 0.2D1 / 0.3D1 * s3
+      t50 = pt0 ** 2
+      t54 = s1 + s2 + s3
+      t58 = t54 ** 2
+      t63 = s1 * t3 + t1 + t5 - t7 + t9
+      t71 = 0.1D1 / t32
+      t72 = 0.1D1 / t12
+      t76 = t22 * K
+      t81 = K * b
+      BB(1,1) = -t72 * t71 * t14 * (-0.2D1 * t32 * t14 * t12 * dcc + 0.6
+     #D1 * t12 * (t39 * t38 / 0.12D2 + pc0 * t23 * K * (pt0 + t42 + t43 
+     #+ t44) / 0.6D1 + t23 * K * t50 / 0.12D2 + pt0 * t54 * t38 / 0.9D1 
+     #+ K * t58 * t23 / 0.27D2 + G * t63) * t36 * t17) / 0.8D1
+      BB(1,2) = -t72 * (t12 * (t39 * pc0 * b * t76 / 0.6D1 - t39 * t22 *
+     # (pt0 - t42 - t43 - t44) * t81 / 0.6D1 - pc0 * t22 * b * K * pt0 *
+     # (0.4D1 / 0.3D1 * s1 + 0.4D1 / 0.3D1 * s2 + 0.4D1 / 0.3D1 * s3 + p
+     #t0) / 0.6D1 + t50 * pt0 * b * t76 / 0.6D1 + t50 * t54 * b * t76 / 
+     #0.9D1) + G * t16 * t63) / 0.2D1
+      BB(2,1) = -0.3D1 / 0.2D1 * t16 * t36 * (t12 * G + (pc0 + pt0 + t42
+     # + t43 + t44) * t22 * d * K / 0.2D1) * t71 * t14
+      BB(2,2) = -d * t81 - G - Hdp
+
+
+
+      
+
+
+      denom=BB(1,1) * BB(2,2) - BB(1,2) * BB(2,1) 
+      
+      if((abs(denom).gt.precision3d).or.(88.ne.t88)) then
+        lcc = (BB(1,2) * fd2 - BB(2,2) * fc1) / denom
+        ldp = -(BB(1,1) * fd2 - BB(2,1) * fc1) / denom
+      else 
+        log_err=.true.
+      end if
+      
+10    if(log_err.or.lcc.ne.lcc.or.ldp.ne.ldp) then
+        print*,'Pb dans lccldp3d'
+        lcc=0.d0
+        ldp=0.d0
+        log_err=.true.
+      end if
+     
+      return
+      end
+      
+
+ 
+ 

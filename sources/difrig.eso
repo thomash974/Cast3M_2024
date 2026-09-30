@@ -1,0 +1,177 @@
+C DIFRIG    SOURCE    FANDEUR   22/01/19    21:15:04     11256          
+      SUBROUTINE DIFRIG(IPRIG1,IPRIG2)
+C----------------------------------------------------------------------C
+C    DIFFERENCE SYMETRIQUE ENTRE DEUX RIGIDITES.
+C
+C    SYNTAXE : RIG1 = DIFF RIG2 RIG3
+
+C    Rq. : l'operation est faite sur les pointeurs des rigidites elem.
+C
+C    ENTREES :
+C      - IPRIG1 = RIG2
+C      - IPRIG2 = RIG3 
+
+C    SORTIE : le resultat est renvoye dans la pile.
+C
+C----------------------------------------------------------------------C
+
+      IMPLICIT INTEGER(I-N)
+
+      SEGMENT INTERI(NRI1)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMRIGID
+
+C Activation de l'objet :
+      RI1 = IPRIG1
+      RI2 = IPRIG2
+      SEGACT, RI1, RI2
+
+C---- CAS RIGELE VIDE EN ARGUMENT ----C
+
+      NRE1 = RI1.IRIGEL(/2)
+      IF (NRE1.EQ.0) THEN
+        CALL ECROBJ('RIGIDITE',IPRIG2)
+        RETURN
+      ENDIF
+
+      NRE2 = RI2.IRIGEL(/2)
+      IF (NRE2.EQ.0) THEN
+        CALL ECROBJ('RIGIDITE',IPRIG1)
+        RETURN
+      ENDIF
+
+C---- CAS GENERAL ----C
+
+C Identification des rigidites elementaires communes (INTERI(i) = 1)
+C Deux rigidites sont communes si COERIG et tableau IRIGEL identiques
+      NRC1 = 0
+      NRI1 = NRE1 + NRE2
+      SEGINI, INTERI
+      DO 100 I1=1,NRE1
+        COERI1 = RI1.COERIG(I1)
+        IRIG11 = RI1.IRIGEL(1,I1)
+        IRIG21 = RI1.IRIGEL(2,I1)
+        IRIG31 = RI1.IRIGEL(3,I1)
+        IRIG41 = RI1.IRIGEL(4,I1)
+        IRIG51 = RI1.IRIGEL(5,I1)
+        IRIG61 = RI1.IRIGEL(6,I1)
+        IRIG71 = RI1.IRIGEL(7,I1)
+        DO 110 I2=1,NRE2
+*          write(6,*) ' rigidites I1, I2', I1, I2
+          IF (INTERI(I1).NE.0) GOTO 100
+          COERI2 = RI2.COERIG(I2)
+          IF (COERI1.NE.COERI2) GOTO 111
+          IRIG12 = RI2.IRIGEL(1,I2)
+          IF (IRIG11.NE.IRIG12) GOTO 112
+          IRIG22 = RI2.IRIGEL(2,I2)
+          IF (IRIG21.NE.IRIG22) GOTO 113
+          IRIG32 = RI2.IRIGEL(3,I2)
+          IF (IRIG31.NE.IRIG32) GOTO 114
+          IRIG42 = RI2.IRIGEL(4,I2)
+          IF (IRIG41.NE.IRIG42) GOTO 115
+          IRIG52 = RI2.IRIGEL(5,I2)
+          IF (IRIG51.NE.IRIG52) GOTO 116
+          IRIG62 = RI2.IRIGEL(6,I2)
+          IF (IRIG61.NE.IRIG62) GOTO 117
+          IRIG72 = RI2.IRIGEL(7,I2)
+          IF (IRIG71.NE.IRIG72) GOTO 118
+          INTERI(I1) = 1
+          INTERI(NRE1+I2) = 1
+          NRC1 = NRC1 + 1
+          GOTO 110
+ 111      CONTINUE
+*          WRITE(6,*) 'COERIG' 
+          GOTO 110
+ 112      CONTINUE
+*          WRITE(6,*) 'IRIGEL 1' 
+          GOTO 110
+ 113      CONTINUE
+*          WRITE(6,*) 'IRIGEL 2' 
+          GOTO 110
+ 114      CONTINUE
+*          WRITE(6,*) 'IRIGEL 3' 
+          GOTO 110
+ 115      CONTINUE
+*          WRITE(6,*) 'IRIGEL 4' 
+          GOTO 110
+ 116      CONTINUE
+*          WRITE(6,*) 'IRIGEL 5' 
+          GOTO 110
+ 117      CONTINUE
+*          WRITE(6,*) 'IRIGEL 6' 
+          GOTO 110
+ 118      CONTINUE
+*          WRITE(6,*) 'IRIGEL 7' 
+ 110    CONTINUE
+ 100  CONTINUE
+
+*      write(6,*) 'INTERI =',(INTERI(ii),ii=1,NRI1)
+
+C Copie des parties non communes de chaque rigidite :
+C Copie 1ere rigidite
+      IF (NRC1.EQ.0) THEN
+        IPRIG3 = IPRIG1
+      ELSE
+        NRE3 = 0
+        NRIGEL = NRE1
+        SEGINI, RI3
+        RI3.MTYMAT = RI1.MTYMAT
+        RI3.IFORIG = RI1.IFORIG
+        DO 200 I1=1,NRE1
+          IF (INTERI(I1).EQ.1) GOTO 200
+          NRE3 = NRE3 + 1
+          RI3.COERIG(NRE3) = RI1.COERIG(I1)
+          RI3.IRIGEL(1,NRE3) = RI1.IRIGEL(1,I1)
+          RI3.IRIGEL(2,NRE3) = RI1.IRIGEL(2,I1)
+          RI3.IRIGEL(3,NRE3) = RI1.IRIGEL(3,I1)
+          RI3.IRIGEL(4,NRE3) = RI1.IRIGEL(4,I1)
+          RI3.IRIGEL(5,NRE3) = RI1.IRIGEL(5,I1)
+          RI3.IRIGEL(6,NRE3) = RI1.IRIGEL(6,I1)
+          RI3.IRIGEL(7,NRE3) = RI1.IRIGEL(7,I1)
+ 200    CONTINUE
+*        write(6,*) '  ***** NRE3 =',NRE3
+        NRIGEL = NRE3
+        SEGADJ, RI3
+        IPRIG3 = RI3
+      ENDIF
+C Copie 2e rigidite
+      IF (NRC1.EQ.0) THEN
+        IPRIG4 = IPRIG2
+      ELSE
+        NRE4 = 0
+        NRIGEL = NRE2
+        SEGINI, RI4
+        RI4.MTYMAT = RI2.MTYMAT
+        RI4.IFORIG = RI2.IFORIG
+        DO 210 I2=1,NRE2
+          IF (INTERI(NRE1+I2).EQ.1) GOTO 210
+          NRE4 = NRE4 + 1
+          RI4.COERIG(NRE4)   = RI2.COERIG(I2)
+          RI4.IRIGEL(1,NRE4) = RI2.IRIGEL(1,I2)
+          RI4.IRIGEL(2,NRE4) = RI2.IRIGEL(2,I2)
+          RI4.IRIGEL(3,NRE4) = RI2.IRIGEL(3,I2)
+          RI4.IRIGEL(4,NRE4) = RI2.IRIGEL(4,I2)
+          RI4.IRIGEL(5,NRE4) = RI2.IRIGEL(5,I2)
+          RI4.IRIGEL(6,NRE4) = RI2.IRIGEL(6,I2)
+          RI4.IRIGEL(7,NRE4) = RI2.IRIGEL(7,I2)
+ 210    CONTINUE
+*        write(6,*) '  ***** NRE4 =',NRE4
+        NRIGEL = NRE4
+        SEGADJ, RI4
+        IPRIG4 = RI4
+      ENDIF
+
+C Fusion des 2 copies :
+      CALL FUSRIG(IPRIG3,IPRIG4,IPRIG0)
+      IF (IERR.NE.0) RETURN
+
+C Ecriture resultat dans la pile :
+      CALL ECROBJ('RIGIDITE',IPRIG0)
+
+      RETURN
+      END
+
+ 

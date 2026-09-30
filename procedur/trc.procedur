@@ -1,0 +1,262 @@
+$$$$ TRC
+* TRC       PROCEDUR  SP204843  22/12/19    21:15:08     11531          
+'DEBP' TRC      MODCP1*'MMODEL' MATCP1*'MCHAML'
+                TINI*FLOTTANT TFIN*FLOTTANT LISTREF*LISTREEL MOT1*'MOT' FLOT1/'FLOTTANT' ;
+************************************************************************
+* PROCEDURE TRC (voir TRC.notice)
+* - Permet de tracer un diagramme T.R.C. a partir d'un modele de
+*   changement de phase metallurgique.
+*
+*   En entrée :
+*  ------------
+*   MODCP1 : Modele METALLURGIQUE
+*   MATCP1 : Caracteristiques du Modele METALLURGIQUE
+*   TINI   : FLOTTANT donnant la temperature haute de depart
+*   TFIN   : FLOTTANT donnant la temperature basse de fin
+*   LISTREF: LISTREEL donnant les vitesses de refroidissement a simuler
+************************************************************************
+
+* Seuil detection phases :
+  Seuil1 = 5.D-3 ;
+  si (exis FLOT1) ; Seuil1 = flot1 ; fins ;
+
+************************************************************************
+*  Pour faire des beaux DESSINS
+************************************************************************
+*  LISTMOTS contenant les couleurs
+   LESCOUL='MOTS' 'VIOL' 'VERT' 'CYAN' 'BRIQ' 'BOUT' 'JAUN' 'OLIV'
+                  'ORAN' 'ROUG' 'BLEU' 'BRUN' 'CARA' 'GRIS' 'NOIR' ;
+   NBCOUL ='DIME' LESCOUL ;
+
+*  LISTMOTS contenant les marques dans DESS
+   LESMARQ='MOTS' 'CROI' 'PLUS' 'MOIN' 'BARR' 'ETOI' 'CARR'
+                  'LOSA' 'ROND' 'TRID' 'TRIU' 'TRIL' 'TRIR' ;
+   NBMARQ ='DIME' LESMARQ ;
+************************************************************************
+
+   LISTPHA='EXTR' MODCP1 'VARI';
+   NBPHA  ='DIME' LISTPHA      ;
+   NBTREF ='DIME' LISTREF      ;
+
+*  On met le nom de la phase consommee en tete de liste :
+   MOTPHA1  = extr LISTPHA 1 ;
+   si (neg MOTPHA1 MOT1) ;
+     LISTPHA2 = mots MOT1 ;
+     repe bpha1 (dime LISTPHA) ;
+       phai1    = extr LISTPHA &bpha1 ;
+       si (ega phai1 MOT1) ; iter bpha1 ; fins ;
+       LISTPHA2 = LISTPHA2 et phai1 ;
+     fin bpha1 ;
+     LISTPHA = LISTPHA2 ;
+   fins ;
+
+*  Initialisation des TABLES
+   EVO_TAB ='TABL'           ;
+   TSEUIL  ='TABL'           ;
+   EVOT_TAB='TABL'           ;
+   PROP    ='TABL'           ;
+   TRC     ='VIDE' 'EVOLUTIO';
+  'REPE' BOUP NBPHA ;
+     EVO_TAB. &BOUP         ='TABL' ;
+     TSEUIL . &BOUP         ='TABL' ;
+     TSEUIL . &BOUP .'tpsS1'='PROG' ;
+     TSEUIL . &BOUP .'tpsS2'='PROG' ;
+     TSEUIL . &BOUP .'TS1'  ='PROG' ;
+     TSEUIL . &BOUP .'TS2'  ='PROG' ;
+  'FIN' BOUP ;
+
+*  Par defaut la premiere phase est a 100% au debut des calculs
+   PROPini ='CHAN' 'NOEUD' MODCP1 ('ZERO' MODCP1 'VARINTER');
+   MOPHA   ='EXTR'  LISTPHA 1;
+   PROPini = PROPini '+' ('EXCO' PROPini MOPHA MOPHA + 1.D0) ;
+
+  'REPE' BOU_VIT NBTREF ;
+     vit = &BOU_VIT;
+
+*    Declaration de la vitesse de refroidissement : en Degres/s
+     DT_vit = -1. * ('EXTR' LISTREF vit ) ;
+     MCHTPOI='MANU' 'CHML' MODCP1 'TPOI' DT_vit 'TYPE' 'SCALAIRE' 'NOEUD';
+
+*    Calcul de la duree du refroidissement :
+     DUREE  = -1. * (TINI - TFIN) / DT_vit ;
+
+*    Declaration du Temps initial :
+     TEMPINI= 1. ;
+
+*    Calcul du Temps final :
+     TEMPFIN= TEMPINI + DUREE ;
+
+*    Calcul du pas de temps en fonction de la vitesse de refroidissement :
+     DTPS   = -20. / DT_vit ;
+
+     LTCAL  = 'PROG' TEMPINI 'PAS' DTPS TEMPFIN ;
+     T      =  TINI + (DT_vit * (LTCAL - TEMPINI));
+     nbpas  =('DIME' LTCAL) - 1 ;
+
+*    Initialisation de CHE1 : prop de phases initiales :
+     CHE1        = PROPini ;
+
+*    Extraction des proportions de phase au Pt de Gauss :
+    'REPE' SURPHA NBPHA;
+       MOPHA      ='EXTR' LISTPHA &SURPHA  ;
+       Pi         ='EXCO' CHE1 MOPHA MOPHA ;
+       PiVal      ='EXTR' Pi   MOPHA 1 1 1 ;
+       PROP.MOPHA ='PROG' PiVal ;
+    'FIN' SURPHA;
+
+    'REPE' CTEMP nbpas;
+*      On recupere le temps debut de pas et le temps fin de pas :
+       temp0   ='EXTR'  LTCAL  &CTEMP     ;
+       temp1   ='EXTR'  LTCAL (&CTEMP + 1);
+       CHETPS0 ='MANU' 'CHML' MODCP1 'TEMP' temp0 'TYPE' 'SCALAIRE' 'NOEUD';
+       CHETPS1 ='MANU' 'CHML' MODCP1 'TEMP' temp1 'TYPE' 'SCALAIRE' 'NOEUD';
+
+*      On calcule la temperature debut de pas et la temperature fin de pas :
+       T0      ='EXTR'  T  &CTEMP     ;
+       T1      ='EXTR'  T (&CTEMP + 1);
+       CHT0    ='MANU' 'CHML' MODCP1 'T' T0 'TYPE' 'SCALAIRE' 'NOEUD';
+       CHT1    ='MANU' 'CHML' MODCP1 'T' T1 'TYPE' 'SCALAIRE' 'NOEUD';
+
+       ETAT1   = CHT0 'ET' MCHTPOI ;
+       ETAT2   = CHT1 'ET' MCHTPOI ;
+
+       MATCPa  ='VARI' 'NUAG' MODCP1 MATCP1 ETAT1 ;
+       MATCPb  ='VARI' 'NUAG' MODCP1 MATCP1 ETAT2 ;
+
+       CHE1    ='COMP' MODCP1 (CHE1 'ET' CHETPS0 'ET' CHT0 'ET' MATCPa) (CHETPS1 'ET' CHT1 'ET' MATCPb) ;
+
+*      Extraction des proportions de phase au Pt de Gauss :
+      'REPE' BOUP NBPHA;
+         MOPHA      ='EXTR' LISTPHA &BOUP    ;
+         Pi         ='EXCO' CHE1 MOPHA MOPHA ;
+         PiVal      ='EXTR' Pi   MOPHA 1 1 1 ;
+         PROP.MOPHA = PROP.MOPHA 'ET'  PiVal ;
+      'FIN' BOUP;
+    'FIN' CTEMP;
+
+    'REPE' BOUP NBPHA;
+       MOPHA               ='EXTR' LISTPHA &BOUP ;
+       COULEUR             ='EXTR' LESCOUL &BOUP ;
+       EVO_TAB. &BOUP .vit ='EVOL' COULEUR 'MANU' 'TEMP' LTCAL 'PROP' PROP.MOPHA;
+    'FIN' BOUP;
+
+     COULEUR               ='EXTR' LESCOUL (NBPHA + 1);
+     EVOT                  ='EVOL' COULEUR 'MANU' 'TEMP' LTCAL 'T'    T;
+     EVOT_TAB.vit          = EVOT ;
+
+     LTCAL = LTCAL '+'  ('VALE' 'PREC') ;
+     TRC   = TRC   'ET' ('EVOL' 'NOIR' 'MANU' 'TEMP' LTCAL 'T' T) ;
+  'FIN' BOU_VIT ;
+
+*  PostTraitement :
+  'REPE' BOU_VIT NBTREF ;
+     vit    = &BOU_VIT ;
+     DT_vit = -1 * ('EXTR' LISTREF vit) ;
+
+     EVO ='VIDE' 'EVOLUTIO' ;
+     TL            ='TABL' ;
+     TL.'TITRE'    ='TABL' ;
+    'REPE' BOUP NBPHA;
+       EVO                 = EVO 'ET' (EVO_TAB. &BOUP .vit) ;
+       MOPHA               ='EXTR' LISTPHA &BOUP ;
+       IMARQ               = @MOD  &BOUP NBMARQ  ;
+       LAMARQ              ='EXTR' LESMARQ IMARQ ;
+       TL. &BOUP           ='CHAI' 'MARQ' ' ' LAMARQ ' ' 'REGU';
+       TL.'TITRE'. &BOUP   ='CHAI' &BOUP '-' MOPHA ;
+    'FIN' BOUP;
+
+     TITRE ='CHAI' 'Vitesse :' ('ENTI' 'PROC' DT_vit) ' Deg.s^{-1}' ;
+*    'DESS' EVO 'GRIL' 'TIRC' 'GRIS' 'LEGE' TL 'TITR' TITRE ;
+
+     EVOT = EVOT_TAB.vit ;
+     T    ='EXTR' EVOT 'ORDO' 1;
+
+    'REPE' BOUP NBPHA ;
+       NumPROP = &BOUP ;
+       EVO     = EVO_TAB.NumPROP.vit ;
+
+*      Traitement de EVO
+       TEMPS   ='EXTR' EVO 'ABSC' 1 ;
+       PROP    ='EXTR' EVO 'ORDO' 1 ;
+
+      'SI' (('MAXI' PROP) '>' Seuil1);
+        'SI' (NumPROP 'EGA' 1);
+*          tpsS1 : temps debut disparition de PROP
+           Seuil1 = 1.D0 - Seuil1 ;
+           tpsS1  = 'IPOL' Seuil1 ('ORDO' PROP 'DECR') TEMPS ;
+        'SINO';
+*          tpsS1 : temps debut apparition  de PROP
+           tpsS1  = 'IPOL' Seuil1 ('ORDO' PROP 'CROI') TEMPS ;
+        'FINS';
+*        TS1 : T°C correspondant à tpsS1
+         TS1 ='IPOL' tpsS1 TEMPS T ;
+
+        'SI' (TS1 '>' TFIN);
+          'SI' (NumPROP 'EGA' 1);
+             Seuil2 = 0.5 ;
+*            tpsS2 : temps 50% de la PROP
+             tpsS2  = 'IPOL' Seuil2 ('ORDO' PROP 'DECR') TEMPS ;
+          'SINO';
+             Seuil2 = ('MAXI' PROP) - Seuil1 ;
+*            tpsS2 : temps fin apparition de PROP
+             tpsS2  = 'IPOL' Seuil2 ('ORDO' PROP 'CROI') TEMPS ;
+          'FINS';
+*          TS2 : T°C correspondant à tpsS2
+           TS2  ='IPOL' tpsS2 TEMPS T ;
+
+          'SI' (TS2 '<' TS1);
+             TSEUIL.NumPROP.'tpsS1'= TSEUIL.NumPROP.'tpsS1' 'ET' tpsS1 ;
+             TSEUIL.NumPROP.'tpsS2'= TSEUIL.NumPROP.'tpsS2' 'ET' tpsS2 ;
+             TSEUIL.NumPROP.'TS1'  = TSEUIL.NumPROP.'TS1'   'ET' TS1   ;
+             TSEUIL.NumPROP.'TS2'  = TSEUIL.NumPROP.'TS2'   'ET' TS2   ;
+          'FINS' ;
+        'FINS' ;
+      'FINS' ;
+    'FIN' BOUP ;
+  'FIN' BOU_VIT ;
+
+*  Diagramme TRC avec les courbes de vitesse
+   EVO ='VIDE' 'EVOLUTIO' ;
+  'REPE' BOUP NBPHA ;
+     COULEUR ='EXTR' LESCOUL &BOUP ;
+    'SI' (&BOUP 'EGA' 1);
+       EVO     = EVO 'ET' ('EVOL' COULEUR 'MANU' 'TEMP' (TSEUIL. &BOUP .'tpsS2') 'T' (TSEUIL. &BOUP .'TS2')) ;
+    'SINO';
+       EVO     = EVO 'ET' ('EVOL' COULEUR 'MANU' 'TEMP' (TSEUIL. &BOUP .'tpsS1') 'T' (TSEUIL. &BOUP .'TS1'))
+                     'ET' ('EVOL' COULEUR 'MANU' 'TEMP' (TSEUIL. &BOUP .'tpsS2') 'T' (TSEUIL. &BOUP .'TS2')) ;
+    'FINS';
+  'FIN' BOUP ;
+
+   TL         ='TABL';
+   TL.'TITRE' ='TABL';
+  'REPE' BOU_VIT NBTREF ;
+     vit           = &BOU_VIT ;
+     DT_vit        =-1 * ('EXTR' LISTREF vit) ;
+     TL.'TITRE'.vit='CHAI' ('ENTI' 'PROC' DT_vit) ' Deg.s^{-1}' ;
+     TL.vit        ='TIRR' ;
+  'FIN' BOU_VIT ;
+   TITRE ='CHAI' 'Diagramme TRC' ;
+*  'DESS' (TRC 'ET' EVO ) 'LOGX' 'XBOR' 1. 1E3 'GRIL' 'TIRC' 'GRIS' 'LEGE' TL 'TITR' TITRE ;
+*  'DESS' (TRC 'ET' EVO ) 'LOGX' 'GRIL' 'TIRC' 'GRIS' 'LEGE' TL 'TITR' TITRE ;
+
+*  Diagramme TRC sans les courbes de vitesse
+   TL         ='TABL' ;
+   TL.'TITRE' ='TABL' ;
+   IA = 0 ;
+  'REPE' BOUP NBPHA ;
+     MOPHA        ='EXTR' LISTPHA &BOUP ;
+    'SI' (&BOUP 'EGA' 1);
+       IA           = IA + 1 ;
+       TL.'TITRE'.IA='CHAI' MOPHA ' 50%';
+    'SINO';
+       IA           = IA + 1 ;
+       TL.'TITRE'.IA='CHAI' MOPHA ' debut';
+       IA           = IA + 1 ;
+       TL.'TITRE'.IA='CHAI' MOPHA ' fin'  ;
+    'FINS';
+  'FIN' BOUP ;
+   TITRE = 'CHAI' 'Diagramme TRC' ;
+*  'DESS' EVO 'LOGX' 'XBOR' 1. 1E3 'GRIL' 'TIRC' 'GRIS' 'LEGE' TL 'TITR' TITRE ;
+  'DESS' EVO 'LOGX' 'YBOR' TFIN TINI 'YGRA' 100. 'GRIL' 'TIRC' 'GRIS' 'LEGE' TL 'TITR' TITRE ;
+'FINP' ;
+ 

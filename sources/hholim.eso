@@ -1,0 +1,294 @@
+C HHOLIM    SOURCE    OF166741  24/05/06    21:15:11     11082          
+C HHOLIM    SOURCE    FANDEUR                                           
+C
+      SUBROUTINE HHOLIM (chopt,IPGEO,lentHHO,iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMELEME
+-INC SMLENTI
+
+      SEGMENT ipos(nbpt)
+      SEGMENT inds(mm)
+
+      CHARACTER*(*) chopt
+
+      iret = 0
+
+c*      IF (IDIM.EQ.3) THEN
+c*        iret = 21
+c*        RETURN
+c*      END IF
+      IF ((chopt(1:4).NE.'CELL') .AND.
+     &    (chopt(1:4).NE.'FAEL') .AND.
+     &    (chopt(1:4).NE.'FACE')) THEN
+        write(ioimp,*) 'HHOLIM: incorrect keyword ',chopt(1:4)
+        iret = 5
+        RETURN
+      END IF
+
+C= Les elements geometriques (cellules/faces) autorises :
+      IF (IDIM.EQ.3) THEN
+        indc = IC3MAX+1
+        lonc = NC3MAX
+        indf = IF3MAX+1
+        lonf = NF3MAX
+      ELSE IF (IDIM.EQ.2) THEN
+        indc = IC2MAX+1
+        lonc = NC2MAX
+        indf = IF2MAX+1
+        lonf = NF2MAX
+*      ELSE IF (IDIM.EQ.1) THEN
+      ELSE
+        indc = IC1MAX+1
+        lonc = NC1MAX
+        indf = IF1MAX+1
+        lonf = NF1MAX
+      END IF
+
+      meleme = IPGEO
+C*      SEGACT,meleme <- Segment actif en Entree
+      nbsou = meleme.lisous(/1)
+      IF (nbsou.NE.0) THEN
+        write(ioimp,*) 'HHOLIM: IPGEO not simple'
+        iret = 21
+        RETURN
+      END IF
+
+      IF (chopt(1:4).EQ.'FACE') THEN
+        ity = meleme.itypel
+c*face3Dpoly : inconnu a ce jour       if (ity.eq.  ) ity = formule a ecrire si necessaire
+        ityf = 0
+        CALL PLACE2(LIFHHO(indf),lonf,ityf,ity)
+        IF (ityf.EQ.0) THEN
+          write(ioimp,*) 'HHOLIM: IPFAC not implemented'
+          iret = 5
+          RETURN
+        END IF
+c*        ipt1 = MSQHHO
+        indli1 = meleme.num(/1)
+        ipt1 = MAFHHO(indli1)
+c-dbg      write(ioimp,*) chopt(1:4),'-',itypel,ityf,indli1,ipt1,MSQHHO
+      END IF
+
+      IF (chopt(1:4).EQ.'CELL') THEN
+        ity = meleme.itypel
+        if (ity.eq.32) ity = ity * 100 + meleme.num(/1)
+c*poly3D : inconnu a ce jour       if (ity.eq.  ) ity = formule a ecrire si necessaire
+        ityc = 0
+        CALL PLACE2(LICHHO(indc),lonc,ityc,ity)
+        IF (ityc.EQ.0) THEN
+          write(ioimp,*) 'HHOLIM: IPCEL not implemented'
+          iret = 5
+          RETURN
+        END IF
+c*        ipt1 = MCEHHO
+        indli1 = ityc
+        ipt1 = MACHHO(indli1)
+        segact,ipt1
+c-dbg      write(ioimp,*) chopt(1:4),'-',itypel,ity,indli1,ipt1,MCEHHO
+      END IF
+
+      IF (chopt(1:4).EQ.'FAEL') THEN
+        if (idim.eq.2) ity = 2
+c* on suppose que les faces sont d'un seul type pour l'instant !
+c* A FAIRE EN 3D en plus il y a des types differents !
+        ityf = 0
+        CALL PLACE2(LIFHHO(indf),lonf,ityf,ity)
+        IF (ityf.EQ.0) THEN
+          write(ioimp,*) 'HHOLIM: IPFAE not implemented'
+          iret = 5
+          RETURN
+        END IF
+c*        ipt1 = MSQHHO
+        indli1 = ity
+        ipt1 = MAFHHO(indli1)
+        segact,ipt1
+c-dbg      write(ioimp,*) chopt(1:4),'-',meleme.itypel,ityf,ipt1,MSQHHO
+      END IF
+
+      nbno1 = ipt1.num(/1)
+      nbel1 = ipt1.num(/2)
+      ityp1 = ipt1.itypel
+c-dbg      write(ioimp,*) chopt(1:4),'IPT1=',ityp1,nbno1,nbel1,ipt1
+
+C Le maillage ipt1 n'est pas simple :
+      if (nbno1.eq.0) then
+        write(ioimp,*) 'HHOLIM: TEST (1) incorrect'
+        iret = 5
+        return
+      end if
+
+      mlenti = lentHHO
+C*      SEGACT,mlenti <- Segment actif en Entree
+
+C Segments IPOS/INDS : 
+      ipos = mlenti.lect(6)
+      inds = mlenti.lect(7)
+c*      SEGACT,ipos*MOD
+c*      SEGACT,inds*MOD
+
+      CALL HHOLI2('REMP_TOUS',ipt1,ipos,inds,iret)
+      IF (iret.NE.0) THEN
+        write(ioimp,*) 'HHOLIM-HHOLI2: inconsistent ipos/inds'
+        RETURN
+      END IF
+
+C* Dresse la liste des faces des elements
+      IF (chopt(1:4).EQ.'FAEL') THEN
+      END IF
+
+      meleme = IPGEO
+C*      SEGACT,meleme <- Segment actif en Entree
+      ipt2 = meleme
+      nbso2 = ipt2.lisous(/1)
+      nbno2 = ipt2.num(/1)
+      nbel2 = ipt2.num(/2)
+      ityp2 = ipt2.itypel
+
+C Le maillage ipt2 n'est pas simple :
+      if (nbno2.eq.0) then
+        write(ioimp,*) 'HHOLIM: TEST (2) incorrect'
+        iret = 5
+        return
+      end if
+
+c-dbg      write(ioimp,*) 'HHOLIM: ',chopt(1:4),' ',nbso2,ipt2,nbno2,nbel2
+      jg = 0
+      nbsou = MAX(1,nbso2)
+      DO i = 1, nbsou
+        IF (nbso2.NE.0) ipt2 = meleme.lisous(/1)
+        jg2 = 2 * ipt2.num(/2)
+c*        IF (chopt(1:4).EQ.'CELL') THEN
+c*        END IF
+c*        IF (chopt(1:4).EQ.'FACE') THEN
+c*        END IF
+        IF (chopt(1:4).EQ.'FAEL') THEN
+C= EN 2D : nb_faces = nbno2 en 3D a recuperer car un element peut avoir plusieurs types de faces
+          jg2 = jg2 * ipt2.num(/1)
+        END IF
+        jg = jg + jg2
+      END DO
+c-dbg      write(ioimp,*) 'HHOLIM: ',chopt(1:4),' NBJG',jg/2
+      SEGINI,mlent1
+
+      IF (chopt(1:4).EQ.'FACE') THEN
+C Les maillages ne sont pas du meme type :
+        if ((ityp1.ne.ityp2) .or. (nbno1.ne.nbno2)) then
+          write(ioimp,*) 'HHOLIM : TEST (2) incorrect'
+          iret = 5
+          return
+        end if
+      END IF
+ 
+      nbel2 = ipt2.num(/2)
+      IF (chopt(1:4).EQ.'FAEL') THEN
+        nbel2 = nbel2 * nbno2
+C= On doit avoir 2 en 2D, 3 ou 4 en 3D !
+      END IF
+
+c-dbg      write(ioimp,*)
+      n_z = 0
+      DO jg2 = 1, nbel2
+        IF (chopt(1:4).EQ.'CELL') THEN
+          iel2 = jg2
+          ia = ipt2.num(1,iel2)
+          ib = ipt2.num(2,iel2)
+c-dbg      write(ioimp,*) 'CELL',iel2,ia,ib
+        END IF
+        IF (chopt(1:4).EQ.'FACE') THEN
+          iel2 = jg2
+          ia = ipt2.num(1,iel2)
+          ib = ipt2.num(2,iel2)
+c-dbg      write(ioimp,*) 'Element',iel2,chopt(1:4),ia,ib
+        END IF
+        IF (chopt(1:4).EQ.'FAEL') THEN
+          i_z = (jg2-1) / nbno2
+          iel2 = i_z + 1
+          in21 = jg2 - (i_z * nbno2)
+          in22 = MOD(in21,nbno2) + 1
+          ia = ipt2.num(in21,iel2)
+          ib = ipt2.num(in22,iel2)
+        END IF
+        
+        ideb = ipos(ia)+1
+        ifin = ipos(ia+1)
+        iel1 = 0
+        DO ie = ideb, ifin
+          ielz = inds(ie)
+C* On garde la position du 1er noeud pour le signe de la "face"
+          in21 = 0
+          DO in1 = 1, nbno1
+            IF (ipt1.num(in1,ielz).EQ.ia) THEN 
+              in21 = in1
+              GOTO 101
+            END IF
+          END DO
+          GOTO 110
+ 101      CONTINUE
+          DO in1 = 1, nbno1
+            IF (ipt1.num(in1,ielz).EQ.ib) GOTO 102
+          END DO
+          GOTO 110
+ 102      CONTINUE
+          IF (chopt(1:4).EQ.'CELL') THEN
+            DO inc = 3, nbno1
+              ic = ipt2.num(inc,iel2)
+              DO in1 = 1, nbno1
+                IF (ipt1.num(in1,ielz).EQ.ic) GOTO 103
+              END DO
+              GOTO 110
+ 103          CONTINUE
+            END DO
+          END IF
+C       OK pour cet element
+          iel1 = ielz
+C Face dans le meme sens ou non :
+          IF (chopt(1:2).EQ.'FA') THEN
+            IF (NBNO1.EQ.2) THEN
+              IF (in21.EQ.2) iel1 = -ielz
+            ELSE
+              in22 = MOD(in21,NBNO1) + 1
+              IF (ipt1.num(in22,ielz).EQ.ib) iel1 = -ielz
+            END IF
+          END IF
+          GOTO 1
+ 110      CONTINUE
+        END DO
+ 1      CONTINUE
+        mlent1.lect(2*jg2-1) = indli1
+        mlent1.lect(2*jg2  ) = iel1
+        IF (iel1.EQ.0) n_z = n_z + 1
+c-dbg      write(ioimp,*) '       EL1',iel1,ityp1,nbno1,indli1,'POUR jg2=',
+c-dbg     &               jg2,iel2
+      END DO
+
+      IF (n_z.GT.0) THEN
+        write(ioimp,*) 'HHOLIM : FACES unreferenced',n_z
+        iret = 5
+      END IF
+
+      IF (chopt(1:4).EQ.'FACE') THEN
+        mlenti.lect( 8) = mlent1
+      END IF
+      IF (chopt(1:4).EQ.'FAEL') THEN
+        mlenti.lect( 9) = mlent1
+      END IF
+      IF (chopt(1:4).EQ.'CELL') THEN
+        mlenti.lect(10) = mlent1
+      END IF
+
+C*      SEGDES,...... <- On laisse les Segments actifs en Sortie
+
+C      RETURN
+      END
+
+ 

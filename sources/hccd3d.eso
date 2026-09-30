@@ -1,0 +1,41 @@
+C HCCD3D    SOURCE    PV090527  23/01/27    21:15:36     11574          
+      SUBROUTINE HCCD3D(pfcc,ppcc,poro0,epccv,Hcc)
+c     Module d ecrouissage plastique tangent pour CamClay 
+c     hcc=-dpc/depccv
+c     (A.Sellier 2021/04/23)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 pfcc,ppcc,poro0,epccv,Hcc
+
+c     module de depart
+C       t2 = pfcc / ppcc
+C       t3 = 0.1D1 / poro0
+C       t5 = -0.1D1 + poro0 + epccv
+C       t8 = t2 ** (0.1D1 / t5 * t3 * epccv)
+C       t12 = t5 ** 2
+C       t14 = log(t2)
+C       Hcc = -ppcc * t14 / t12 * t3 * (-0.1D1 + poro0) * t8
+      
+      t2 = pfcc / ppcc
+      t3 = -0.1D1 + poro0 + epccv
+      t6 = 0.1D1 / poro0
+      t8 = t2 ** (t6 / t3 * epccv)
+      t11 = t3 ** 2
+      t14 = log(t2)
+      Hcc = -ppcc * t14 * t6 / t11 * (-0.1D1 + poro0) * t8
+
+c     on test l ecoulement avec le module le plus elevé pour ne jamais passer sous la courbe
+c      t6 = log(pfcc / ppcc)
+c      Hcc = -t6 / poro0 * pfcc * (-0.1D1 + poro0)
+      
+
+         
+c      print*,'Hcc=',hcc      
+
+      return
+      end
+      
+
+
+ 

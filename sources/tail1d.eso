@@ -1,0 +1,47 @@
+C TAIL1D    SOURCE    PV090527  23/01/27    21:16:03     11574          
+c***********************************************************************
+c  calcul de la taille associee au point de gauss dans la direction dir3
+c      A Sellier sept. 2022
+       subroutine tail1d(long,dir3,Method_N,XE3D,NBNMAX3D,
+     # NBNB3D,IDIMB3D,Method_H,LcH,err1)
+
+c     declaration externes      
+      real*8 long,dir3(3)
+      logical Method_N,Method_H
+      integer NB_HELM,Num_H
+      real*8 LcH
+      integer NBNMAX3D,NBNB3D,IDIMB3D
+      real*8 xe3d(3,NBNMAX3D)
+      integer err1
+
+c     declaration locale      
+      real*8 x(3),sn
+      integer i,j
+
+C       print*,'dans tail1d'
+C       print*, long,dir3,Method_N,XE3D,NBNMAX3D,
+C      # NBNB3D,IDIMB3D,Method_H,LcH,err1
+
+      err1=0
+      if (Method_N) then
+c           calcul de la taille associee au point de gauss dans la direction
+c       suivant methode des projections (cf Thèse P.Morenon)
+        call LNUD3D(long,xe3d,NBNMAX3D,NBNB3D,dir3)
+c       print*,'long ds tail1d',long
+      else if (Method_H) then
+C       print*,'dir3',dir3 
+C       print*,'LcH',LcH    
+        long=LcH
+c       print*,'long ds tail1d',long
+      else
+        print*,'Dans Tail1D il faut preciser la methode de calcul'
+        err1=1
+        return
+      end if 
+
+  
+      return
+      end
+      
+      
+ 

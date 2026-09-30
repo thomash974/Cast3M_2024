@@ -1,0 +1,102 @@
+C OTTVAB    SOURCE    FD218221  21/06/10    21:15:45     11030          
+      SUBROUTINE OTTVAB(SS1,VV1,XVAL,NDEF,MCN,MCO,SS2,VV2,
+     &       OO,TOL,RCZ,KR1,KR2,KR3,QV1,QV2,QV3,PWX,XC,IERUT)
+*  
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION SS1(*),VV1(*),XVAL(*),SS2(*),VV2(*)
+      DIMENSION RCZ(*),QV1(MCN,*),QV2(MCN,*),QV3(*),PWX(*)
+      DIMENSION KR1(*),KR2(*),KR3(*),XC(*)
+      DIMENSION OO(3,3),KR4(10)
+      DATA KR4/1,0,0,2,0,0,3,0,0,0/
+*
+      MCO=0
+      DO I=1,MCN
+        KR1(I)=0
+        KR2(I)=0 
+        KR3(I)=0
+      ENDDO
+      DO 100 KV0=1,MCN
+        KV1=0
+        CALL OTTVAC(SS1,VV1,XVAL,NDEF,VV2,OO,
+     &       XC,RCZ,KV0,KV1,TOL,IERUT)
+        IF(IERUT.NE.0) RETURN
+        IF(RCZ(KV0).GT.TOL) THEN
+           IERUT=2
+           GO TO 99
+        ENDIF
+        IF(ABS(RCZ(KV0)).GT.TOL) THEN
+          GO TO 100
+        ENDIF
+        CALL OTTVAI(VV1,XVAL,VV2,SCRI,KV0,IERUT)
+        IF(IERUT.NE.0) RETURN
+        IF(KV0.NE.1.AND.KV0.NE.4.AND.KV0.NE.7) THEN
+          IF(SCRI.GT.0.) THEN
+             KR1(KV0)=1
+          ENDIF
+        ELSE
+          IF(SCRI.GT.-TOL) THEN
+             KR1(KV0)=1
+          ENDIF
+        ENDIF
+        IF(KV0.EQ.2.OR.KV0.EQ.3.OR.KV0.EQ.5.OR.KV0.EQ.6
+     &                       .OR.KV0.EQ.8.OR.KV0.EQ.9) THEN
+          IF( ABS(SCRI).LE.TOL) THEN
+             KR1(KV0)=2
+          ENDIF
+        ENDIF
+        CALL OTTVAD(SS1,VV1,XVAL,NDEF,VV2,XC,
+     &     TOL,QV1,QV2,QV3,KV0,KR1,MCN,IERUT)
+        IF(IERUT.NE.0) RETURN
+*
+        WO0 = 0.
+        DO J=1,NDEF
+          WO0 = WO0 +  QV1(KV0,J)*SS2(J)
+        ENDDO
+        PWX(KV0) = WO0 
+        IF (PWX(KV0).LT.-TOL) GO TO 100
+        IF(ABS(PWX(KV0)).LE.TOL) THEN
+           IF(KV0.EQ.3.AND.SS2(1).LE.0.) GO TO 100
+           IF(KV0.EQ.6.AND.SS2(2).LE.0.) GO TO 100
+           IF(KV0.EQ.9.AND.SS2(3).LE.0.) GO TO 100
+           IF(KV0.EQ.2.AND.SS2(1).GE.0.) GO TO 100
+           IF(KV0.EQ.5.AND.SS2(2).GE.0.) GO TO 100
+           IF(KV0.EQ.8.AND.SS2(3).GE.0.) GO TO 100
+         ENDIF
+        IF(KV0.EQ.1.OR.KV0.EQ.4.OR.KV0.EQ.7) THEN
+          RTRAC=XVAL(3)
+          KV0C = KR4(KV0)
+          XLAM1  = VV1(2*(KV0C-1)+1)
+          XLAMAX = VV1(2*(KV0C-1)+2)
+          IF(ABS(XLAM1-XLAMAX)*RTRAC.LE.TOL) THEN
+            MCO = MCO + 1
+            KR2(MCO) = KV0
+            KR3(KV0) = 1
+          ENDIF
+        ELSE
+          IF(KR1(KV0).NE.2) THEN
+            IF((KV0.EQ.2.OR.KV0.EQ.3).AND.KR3(1).EQ.1) GO TO 10 
+            IF((KV0.EQ.5.OR.KV0.EQ.6).AND.KR3(4).EQ.1) GO TO 10
+            IF((KV0.EQ.8.OR.KV0.EQ.9).AND.KR3(7).EQ.1) GO TO 10
+            MCO = MCO + 1
+            KR2(MCO) = KV0
+            KR3(KV0) = 1
+10        CONTINUE
+          ENDIF
+        ENDIF
+100   CONTINUE
+*
+      DO I=1,3
+        I3=3*I
+        IF(KR3(I3)+KR3(I3-1)+KR3(I3-2).GT.1) THEN
+          IERUT=2
+          GO TO 99
+        ENDIF
+      ENDDO
+      RETURN
+ 99   CONTINUE
+      IERUT = 1
+      RETURN
+      END
+
+ 

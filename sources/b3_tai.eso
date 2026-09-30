@@ -1,0 +1,121 @@
+C B3_TAI    SOURCE    PV090527  23/01/27    21:15:08     11574          
+      subroutine b3_tai(xmat,nmat,ifou,mfr1,nmat1,
+     # t33,n33,err1,xe3d,NBNMAX3D,NBNB3D,idimb3d,Mjacob,Mnoeuds)
+
+c     chargement des tailles de l element en cours pour la procedure 
+c     de Hillerborgh, en fonction de la formulation
+
+c     declarations externes
+      real*8 ray
+      integer nmat,ifou,mfr1,nmat1,err1
+      real*8 xmat(nmat)
+      real*8 n33(3,3)
+      real*8 t33(3,3)
+      integer NBNMAX3D,NBNB3D,idimb3d
+      real*8 xe3d(3,NBNMAX3D)
+      logical Mjacob,Mnoeuds
+c      print*,'ds b3_tai:'
+c      print*,'nmat,ifou,mfr1,nmat1'
+c      print*, nmat,ifou,mfr1,nmat1    
+c     nombre de parametres obligatoires endommagement:nmat1
+
+
+c     initiation variable logique methode de calcul de li
+c     a reinitialiser ds nfin3d,majw3d,endo3d egalement
+      if (Mjacob) then
+c      methode des fonctions de forme
+       print*,'Cette methode n est plus utilisee pour estimer'
+       print*,'la taille des elements lineaires'
+       ierr1=1
+       return       
+C        if ((mfr1.eq.1).or.(mfr1.eq.33)) then 
+C c      elements massifs(1) ou poreux(33)     
+C         if (ifou.eq.2) then
+C c       formulation tridimensionelle
+C             t33(1,1)=xmat(nmat1+1)
+C             t33(2,2)=xmat(nmat1+2)
+C             t33(3,3)=xmat(nmat1+3)
+C             t33(1,2)=xmat(nmat1+4)
+C             t33(1,3)=xmat(nmat1+5)
+C             t33(2,3)=xmat(nmat1+6)
+C             t33(2,1)=t33(1,2)
+C             t33(3,1)=t33(1,3)
+C             t33(3,2)=t33(2,3)
+C             n33(1,1)=xmat(nmat1+7)
+C             n33(2,2)=xmat(nmat1+8)
+C             n33(3,3)=xmat(nmat1+9)
+C             n33(1,2)=xmat(nmat1+10)
+C             n33(1,3)=xmat(nmat1+11)
+C             n33(2,3)=xmat(nmat1+12)
+C             n33(2,1)=n33(1,2)
+C             n33(3,1)=n33(1,3)
+C             n33(3,2)=n33(2,3)
+C         end if
+C         if ((ifou.eq.0).or.(ifou.eq.-1)) then
+C c        mode axisymetrique(0) ou deformation plane(-1)
+C c        chargement des matrices des tailles de EF
+C          t33(1,1)=xmat(nmat1+1)
+C          t33(2,2)=xmat(nmat1+2)
+C          if(ifou.eq.0) then
+C c        axisymetrie        
+C          t33(3,3)=xmat(nmat1+8)
+C c         print*,t33(3,3)
+C          else
+C c        deformations planes on recupere l epaisseur vraie 
+C          t33(3,3)=xmat(nmat1+8)
+C          end if
+C             t33(1,2)=xmat(nmat1+4)
+C             t33(1,3)=0.d0
+C             t33(2,3)=0.d0
+C             t33(2,1)=t33(1,2)
+C             t33(3,1)=t33(1,3)
+C             t33(3,2)=t33(2,3)
+C             n33(1,1)=xmat(nmat1+5)
+C             n33(2,2)=xmat(nmat1+6)
+C             n33(3,3)=1.d0
+C             n33(1,2)=xmat(nmat1+7)
+C             n33(1,3)=0.d0
+C             n33(2,3)=0.d0
+C             n33(2,1)=n33(1,2)
+C             n33(3,1)=n33(1,3)
+C             n33(3,2)=n33(2,3)
+C          end if
+C        else
+C          print*,'b3_tai, non implante pour cette formulation'
+C          err1=1
+C          return
+C        end if
+C c      variable logique localisation 
+C c      la transformation de Hillerborgh n est activee que si t33 non nul 
+C c      c a d fourni en prametres materiaux
+C        if ((t33(1,1).eq.0.).and.Mjacob) then
+C          print*, 'Traitement Hillerborgh necessite les tailles'
+C          print*, 'Dans b3_tai'
+C          err1=1
+C          return
+C        end if
+      else
+c       on utilisera la methode des noeuds ou la non locale on met a un
+c       les matrices pour la methode des jacobiennes
+        do i=1,3
+             do j=1,3
+                 if(i.eq.j) then
+                     t33(i,j)=1.d0
+                     n33(i,j)=1.d0
+                 else
+                     t33(i,j)=0.d0
+                     n33(i,j)=0.d0
+                 end if
+             end do
+        end do
+c        print*,'dans b3_tai la methode des neouds n est pas appelee' 
+c        call afic33(t33)
+c        read*
+c        ierr=1        
+      end if
+
+      return
+      end
+******************************************************************************************
+
+ 

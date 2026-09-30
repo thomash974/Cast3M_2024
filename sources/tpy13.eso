@@ -1,0 +1,313 @@
+C TPY13     SOURCE    OF166741  23/12/04    21:15:16     11800          
+
+C=======================================================================
+C=                            T P Y 1 3                                =
+C=                            ---------                                =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=   Acquisition des caracteristiques d'integration aux noeuds, aux    =
+C=   points d'integration (Gauss) ou au centre de gravite pour         =
+C=   l'element thermique support PY13.                                 =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   ISUPTH  (E)   Indique le support d'integration demande            =
+C=   IPINTE  (S)   Pointeur sur le segment MINTE associe (ACTIF en S)  =
+C=======================================================================
+
+      SUBROUTINE TPY13 (ISUPTH,IPINTE)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC SMINTE
+
+      PARAMETER ( UN=1.D0, XZER=0.D0, DEUX=2.D0, TROIS=3.D0 )
+      PARAMETER ( QUATRE=4.D0 )
+      PARAMETER ( UNDEMI=0.5D0, UNQUA=0.25D0 )
+      PARAMETER ( UN239=2.D0/39.D0 )
+      PARAMETER ( A1=0.788073483D0 )
+      PARAMETER ( B6=0.499369002D0 )
+      PARAMETER ( B =0.848418011D0 )
+      PARAMETER ( C8=0.478508449D0 )
+      PARAMETER ( C =0.652816472D0 )
+      PARAMETER ( D12=0.032303742D0 )
+      PARAMETER ( D =1.106412889D0 )
+
+      NBNO = 13
+      IF      (ISUPTH.EQ.1) THEN
+        NBPGAU = 13
+      ELSE IF (ISUPTH.EQ.2) THEN
+        NBPGAU = 27
+      ELSE IF (ISUPTH.EQ.3) THEN
+        NBPGAU = 1
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+      SEGINI,MINTE
+
+C COORDONNEES ET POIDS DES 13 NOEUDS
+      IF (ISUPTH.EQ.1) THEN
+        QSIGAU( 1) =  UN
+        QSIGAU( 2) =  UNDEMI
+        QSIGAU( 3) =  XZER
+        QSIGAU( 4) = -UNDEMI
+        QSIGAU( 5) = -UN
+        QSIGAU( 6) = -UNDEMI
+        QSIGAU( 7) =  XZER
+        QSIGAU( 8) =  UNDEMI
+        QSIGAU( 9) =  UNDEMI
+        QSIGAU(10) =  XZER
+        QSIGAU(11) = -UNDEMI
+        QSIGAU(12) =  XZER
+        QSIGAU(13) =  XZER
+
+        ETAGAU( 1) =  XZER
+        ETAGAU( 2) =  UNDEMI
+        ETAGAU( 3) =  UN
+        ETAGAU( 4) =  UNDEMI
+        ETAGAU( 5) =  XZER
+        ETAGAU( 6) = -UNDEMI
+        ETAGAU( 7) = -UN
+        ETAGAU( 8) = -UNDEMI
+        ETAGAU( 9) =  XZER
+        ETAGAU(10) =  UNDEMI
+        ETAGAU(11) =  XZER
+        ETAGAU(12) = -UNDEMI
+        ETAGAU(13) =  XZER
+
+        DZEGAU( 1) = XZER
+        DZEGAU( 2) = XZER
+        DZEGAU( 3) = XZER
+        DZEGAU( 4) = XZER
+        DZEGAU( 5) = XZER
+        DZEGAU( 6) = XZER
+        DZEGAU( 7) = XZER
+        DZEGAU( 8) = XZER
+        DZEGAU( 9) = UNDEMI
+        DZEGAU(10) = UNDEMI
+        DZEGAU(11) = UNDEMI
+        DZEGAU(12) = UNDEMI
+        DZEGAU(13) = UN
+
+        DO I = 1, 13
+          POIGAU(I) = UN239
+        ENDDO
+
+C COORDONNEES ET POIDS DES 27 POINTS DE GAUSS
+C- Formules pour augmenter la precision des constantes B,C,D,A1,B6,C8,D12 ?
+C- Coordonnees DZETA des POINTS 6 et 7 a verifier ?
+C- Verifier les poids de Gauss : dependance en DZETA ?
+      ELSE IF (ISUPTH.EQ.2) THEN
+
+        DZEGAU(1) = UNDEMI
+        DZEGAU(2) = UNDEMI
+        DZEGAU(3) = UNDEMI
+        DZEGAU(4) = UNDEMI
+        DZEGAU(5) = UNDEMI
+        DZEGAU(6) = UNDEMI*(UN-B)
+        DZEGAU(7) = UNDEMI*(UN+B)
+        DO I = 8, 11
+          DZEGAU(I   ) = UNDEMI*(UN-C)
+          DZEGAU(I+4 ) = UNDEMI*(UN+C)
+          DZEGAU(I+8 ) = UNDEMI*(UN-D)
+          DZEGAU(I+12) = UNDEMI
+          DZEGAU(I+16) = UNDEMI*(UN+D)
+        ENDDO
+
+        QSIGAU(1 ) =  XZER
+        QSIGAU(2 ) =  UNDEMI*B*(UN-DZEGAU(2))
+        QSIGAU(3 ) = -UNDEMI*B*(UN-DZEGAU(3))
+        QSIGAU(4 ) = -UNDEMI*B*(UN-DZEGAU(4))
+        QSIGAU(5 ) =  UNDEMI*B*(UN-DZEGAU(5))
+        QSIGAU(6 ) =  XZER
+        QSIGAU(7 ) =  XZER
+        QSIGAU(8 ) =  C*(UN-DZEGAU(8))
+        QSIGAU(9 ) =  XZER
+        QSIGAU(10) = -C*(UN-DZEGAU(10))
+        QSIGAU(11) =  XZER
+        QSIGAU(12) =  C*(UN-DZEGAU(12))
+        QSIGAU(13) =  XZER
+        QSIGAU(14) = -C*(UN-DZEGAU(14))
+        QSIGAU(15) =  XZER
+        QSIGAU(16) =  UNDEMI*D*(UN-DZEGAU(16))
+        QSIGAU(17) = -UNDEMI*D*(UN-DZEGAU(17))
+        QSIGAU(18) = -UNDEMI*D*(UN-DZEGAU(18))
+        QSIGAU(19) =  UNDEMI*D*(UN-DZEGAU(19))
+        QSIGAU(20) =  D*(UN-DZEGAU(20))
+        QSIGAU(21) =  XZER
+        QSIGAU(22) = -D*(UN-DZEGAU(22))
+        QSIGAU(23) =  XZER
+        QSIGAU(24) =  UNDEMI*D*(UN-DZEGAU(24))
+        QSIGAU(25) = -UNDEMI*D*(UN-DZEGAU(25))
+        QSIGAU(26) = -UNDEMI*D*(UN-DZEGAU(26))
+        QSIGAU(27) =  UNDEMI*D*(UN-DZEGAU(27))
+
+        ETAGAU(1 ) =  XZER
+        ETAGAU(2 ) =  QSIGAU(2)
+        ETAGAU(3 ) = -QSIGAU(3)
+        ETAGAU(4 ) =  QSIGAU(4)
+        ETAGAU(5 ) = -QSIGAU(5)
+        ETAGAU(6 ) =  XZER
+        ETAGAU(7 ) =  XZER
+        ETAGAU(8 ) =  XZER
+        ETAGAU(9 ) =  C*(UN-DZEGAU(9))
+        ETAGAU(10) =  XZER
+        ETAGAU(11) = -C*(UN-DZEGAU(11))
+        ETAGAU(12) =  XZER
+        ETAGAU(13) =  C*(UN-DZEGAU(13))
+        ETAGAU(14) =  XZER
+        ETAGAU(15) = -C*(UN-DZEGAU(15))
+        ETAGAU(16) =  QSIGAU(16)
+        ETAGAU(17) = -QSIGAU(17)
+        ETAGAU(18) =  QSIGAU(18)
+        ETAGAU(19) = -QSIGAU(19)
+        ETAGAU(20) =  XZER
+        ETAGAU(21) =  D*(UN-DZEGAU(21))
+        ETAGAU(22) =  XZER
+        ETAGAU(23) = -D*(UN-DZEGAU(23))
+        ETAGAU(24) =  QSIGAU(24)
+        ETAGAU(25) = -QSIGAU(25)
+        ETAGAU(26) =  QSIGAU(26)
+        ETAGAU(27) = -QSIGAU(27)
+
+        r_z = UN - DZEGAU(1)
+        POIGAU(1) = A1 * UNQUA * r_z * r_z
+        DO I = 2, 7
+          r_z = UN - DZEGAU(I)
+          POIGAU(I) = B6 * UNQUA * r_z * r_z
+        ENDDO
+        DO I = 8, 15
+          r_z = UN - DZEGAU(I)
+          POIGAU(I) = C8 * UNQUA * r_z * r_z
+        ENDDO
+        DO I = 16, 27
+          r_z = UN - DZEGAU(I)
+          POIGAU(I) = D12 * UNQUA * r_z * r_z
+       ENDDO
+
+C COORDONNEES ET POIDS DU CENTRE DE GRAVITE
+      ELSE IF (ISUPTH.EQ.3) THEN
+        QSIGAU(1) = O0
+        ETAGAU(1) = O0
+        DZEGAU(1) = UNQUA
+        POIGAU(1) = DEUX/TROIS
+
+      ENDIF
+
+C FONCTIONS DE FORME ET LEURS DERIVEES
+      DO I = 1, NBPGAU
+        DZEM  = UN-DZEGAU(I)
+
+        IF (ABS(DZEM).LT.1.D-6) THEN
+C- Initialisations a 0 faites par SEGINI
+c          DO IB = 1, 13
+c            DO IA = 1, 4
+c              SHPTOT(IA,IB,I)= XZER
+c            ENDDO
+c          ENDDO
+          SHPTOT(1,13,I) = UN
+          SHPTOT(2,1 ,I) = -UNDEMI
+          SHPTOT(2,5 ,I) =  UNDEMI
+          SHPTOT(2,9 ,I) =  DEUX
+          SHPTOT(2,11,I) = -DEUX
+          SHPTOT(3,3 ,I) = -UNDEMI
+          SHPTOT(3,7 ,I) =  UNDEMI
+          SHPTOT(3,10,I) =  DEUX
+          SHPTOT(3,12,I) = -DEUX
+          DO IB = 1, 7, 2
+            SHPTOT(4,IB,I) = UNQUA
+          ENDDO
+c          DO IB = 2, 8, 2
+c            SHPTOT(4,IB,I) = XZER
+c          ENDDO
+          DO IB = 9, 12
+            SHPTOT(4,IB,I) = -UN
+          ENDDO
+          SHPTOT(4,13,I) = TROIS
+
+        ELSE
+          DZEM2 = DEUX*DZEM
+          PAUX  = +QSIGAU(I)+ETAGAU(I)+DZEGAU(I)-UN
+          PAUX1 = -QSIGAU(I)+ETAGAU(I)+DZEGAU(I)-UN
+          PAUX2 = -QSIGAU(I)-ETAGAU(I)+DZEGAU(I)-UN
+          PAUX3 = +QSIGAU(I)-ETAGAU(I)+DZEGAU(I)-UN
+          QAUX  =  QSIGAU(I)-UNDEMI
+          QAUX1 =  ETAGAU(I)-UNDEMI
+          QAUX2 = -QSIGAU(I)-UNDEMI
+          QAUX3 = -ETAGAU(I)-UNDEMI
+
+          SHPTOT(1,1 ,I) = PAUX1*PAUX2*QAUX /DZEM2
+          SHPTOT(1,2 ,I) = -PAUX1*PAUX2*PAUX3/DZEM2
+          SHPTOT(1,3 ,I) = PAUX2*PAUX3*QAUX1/DZEM2
+          SHPTOT(1,4 ,I) = -PAUX2*PAUX3*PAUX /DZEM2
+          SHPTOT(1,5 ,I) = PAUX3*PAUX *QAUX2/DZEM2
+          SHPTOT(1,6 ,I) = -PAUX3*PAUX *PAUX1/DZEM2
+          SHPTOT(1,7 ,I) = PAUX *PAUX1*QAUX3/DZEM2
+          SHPTOT(1,8 ,I) = -PAUX *PAUX1*PAUX2/DZEM2
+          SHPTOT(1,9 ,I) = DZEGAU(I)*PAUX1*PAUX2/DZEM
+          SHPTOT(1,10,I) = DZEGAU(I)*PAUX2*PAUX3/DZEM
+          SHPTOT(1,11,I) = DZEGAU(I)*PAUX3*PAUX /DZEM
+          SHPTOT(1,12,I) = DZEGAU(I)*PAUX *PAUX1/DZEM
+          SHPTOT(1,13,I) = DEUX*DZEGAU(I)*(DZEGAU(I)-UNDEMI)
+
+          SHPTOT(2,1 ,I) = (PAUX1*PAUX2-(PAUX1+PAUX2)*QAUX)/DZEM2
+          SHPTOT(2,2 ,I) = (PAUX2*PAUX3+PAUX1*PAUX3-PAUX1*PAUX2)/DZEM2
+          SHPTOT(2,3 ,I) = (PAUX2-PAUX3)*QAUX1/DZEM2
+          SHPTOT(2,4 ,I) = (PAUX3*PAUX-PAUX2*PAUX-PAUX2*PAUX3)/DZEM2
+          SHPTOT(2,5 ,I) = ((PAUX+PAUX3)*QAUX2-PAUX3*PAUX)/DZEM2
+          SHPTOT(2,6 ,I) = (PAUX3*PAUX-PAUX*PAUX1-PAUX3*PAUX1)/DZEM2
+          SHPTOT(2,7 ,I) = (PAUX1-PAUX)*QAUX3/DZEM2
+          SHPTOT(2,8 ,I) = (PAUX*PAUX2+PAUX*PAUX1-PAUX1*PAUX2)/DZEM2
+          SHPTOT(2,9 ,I) = (-PAUX2-PAUX1)*DZEGAU(I)/DZEM
+          SHPTOT(2,10,I) = (PAUX2-PAUX3)*DZEGAU(I)/DZEM
+          SHPTOT(2,11,I) = (PAUX+PAUX3)*DZEGAU(I)/DZEM
+          SHPTOT(2,12,I) = (PAUX1-PAUX)*DZEGAU(I)/DZEM
+          SHPTOT(2,13,I) = XZER
+
+          SHPTOT(3,1 ,I) = (PAUX2-PAUX1)*QAUX/DZEM2
+          SHPTOT(3,2 ,I) = (PAUX1*PAUX3+PAUX1*PAUX2-PAUX2*PAUX3)/DZEM2
+          SHPTOT(3,3 ,I) = (PAUX2*PAUX3-(PAUX2+PAUX3)*QAUX1)/DZEM2
+          SHPTOT(3,4 ,I) = (PAUX3*PAUX+PAUX2*PAUX-PAUX2*PAUX3)/DZEM2
+          SHPTOT(3,5 ,I) = (PAUX3-PAUX)*QAUX2/DZEM2
+          SHPTOT(3,6 ,I) = (PAUX*PAUX1-PAUX3*PAUX1-PAUX3*PAUX)/DZEM2
+          SHPTOT(3,7 ,I) = ((PAUX1+PAUX)*QAUX3-PAUX*PAUX1)/DZEM2
+          SHPTOT(3,8 ,I) = (PAUX*PAUX1-PAUX1*PAUX2-PAUX*PAUX2)/DZEM2
+          SHPTOT(3,9 ,I) = (PAUX2-PAUX1)*DZEGAU(I)/DZEM
+          SHPTOT(3,10,I) = (-PAUX3-PAUX2)*DZEGAU(I)/DZEM
+          SHPTOT(3,11,I) = (PAUX3-PAUX)*DZEGAU(I)/DZEM
+          SHPTOT(3,12,I) = (PAUX+PAUX1)*DZEGAU(I)/DZEM
+          SHPTOT(3,13,I) = XZER
+
+          SHPTOT(4,1 ,I) = (PAUX1+PAUX2+PAUX1*PAUX2/DZEM)*QAUX/DZEM2
+          SHPTOT(4,2 ,I) = -UN*(PAUX2*PAUX3+PAUX1*PAUX3+PAUX1*PAUX2+
+     &                      PAUX1*PAUX2*PAUX3/DZEM)/DZEM2
+          SHPTOT(4,3 ,I) = (PAUX2+PAUX3+PAUX2*PAUX3/DZEM)*QAUX1/DZEM2
+          SHPTOT(4,4 ,I) = -UN*(PAUX3*PAUX +PAUX2*PAUX+PAUX2*PAUX3+
+     &                     PAUX2*PAUX3*PAUX/DZEM)/DZEM2
+          SHPTOT(4,5 ,I) = (PAUX+PAUX3+PAUX*PAUX3/DZEM)*QAUX2/DZEM2
+          SHPTOT(4,6 ,I) = -UN*(PAUX*PAUX1+PAUX3*PAUX1+PAUX3*PAUX+
+     &                     PAUX3*PAUX*PAUX1/DZEM)/DZEM2
+          SHPTOT(4,7 ,I) = (PAUX1+PAUX+PAUX*PAUX1/DZEM)*QAUX3/DZEM2
+          SHPTOT(4,8 ,I) = -UN*(PAUX1*PAUX2+PAUX*PAUX2+PAUX*PAUX1+
+     &                     PAUX*PAUX1*PAUX2/DZEM)/DZEM2
+          SHPTOT(4,9 ,I) = PAUX1*PAUX2/DZEM/DZEM
+     &                     + (PAUX2+PAUX1)*DZEGAU(I)/DZEM
+          SHPTOT(4,10,I) = PAUX2*PAUX3/DZEM/DZEM
+     &                     + (PAUX3+PAUX2)*DZEGAU(I)/DZEM
+          SHPTOT(4,11,I) = PAUX3*PAUX /DZEM/DZEM
+     &                     + (PAUX +PAUX3)*DZEGAU(I)/DZEM
+          SHPTOT(4,12,I) = PAUX *PAUX1/DZEM/DZEM
+     &                     + (PAUX +PAUX1)*DZEGAU(I)/DZEM
+          SHPTOT(4,13,I) = QUATRE*DZEGAU(I)-UN
+        ENDIF
+      ENDDO
+
+      IPINTE = MINTE
+
+c      RETURN
+      END
+
+ 

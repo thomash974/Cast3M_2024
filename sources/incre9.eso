@@ -1,0 +1,100 @@
+C INCRE9    SOURCE    PASCAL    19/02/20    21:15:24     10116          
+       SUBROUTINE INCRE9(SIG,VAR,ZMAT,NSTRS,EPSVPT,VARPT)
+C--------------------------------------------------------------------C
+C
+C          Sous-programme d'integration de la loi de CHABOCHE        C
+C
+C--------------------------------------------------------------------C
+C
+C  ENTREES :
+C    - SIG   : contraintes en debute de pas
+C    - VAR   : variables internes en debut de pas
+C    - ZMAT  : carateristiques materielles
+C    - NSTRS : dimension du tableau SIG
+C
+C  SORTIES :
+C    - EPSVPT : increment de deformation viscoplastique
+C    - VARPT  : increment de variables internes
+C
+C--------------------------------------------------------------------C
+C
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+C
+       DIMENSION SIG(*),VAR(*),EPSVPT(*),VARPT(*)
+       DIMENSION XX(6),ZMAT(100)
+C
+       PARAMETER (AMAX = 1.0D20 , AMIN = 1.D-10)
+C
+       DETIER = 2.0D0/3.0D0
+C-------------------------------------------------------------------|
+C*******  EVALUATION OF J2(SIGMA - X)                               |
+C-------------------------------------------------------------------I
+       TRACE =(SIG(1)+SIG(2)+SIG(3))/3.0D0
+       DO 70 I=1,NSTRS
+         A = 0.0D0
+         IF (I.LE.3) A=1.0D0
+         XX(I) = SIG(I) - A*TRACE - DETIER*ZMAT(8)*ZMAT(9)*VAR(I)
+  70   CONTINUE
+C
+       AJ2 = PROCON(XX,XX,NSTRS)
+       AJ2 = SQRT(1.5D0*AJ2)
+C       write(6,*) 'SIG(i)=',(SIG(i),i=1,NSTRS)
+C       write(6,*) 'AJ2=',AJ2
+C       write(6,*) 'VAR(i)=',(VAR(i),i=1,NSTRS)
+C--------------------------------------------------------------------|
+C*******  CALCUL OF SIGV/K                                           |
+C -------------------------------------------------------------------I
+       RR = ZMAT(10)*ZMAT(11)*VAR(NSTRS+2)
+       SK = (AJ2 - RR - ZMAT(5)) / ZMAT(6)
+C       write(6,*) 'RR, SK=',RR,SK
+C--------------------------------------------------------------------|
+C*******  CALCULATION OF EFFECTIVE INELASTIC STRAIN INCREMENT (P)    |
+C -------------------------------------------------------------------I
+       IF (SK.GT.0.0D0) THEN
+         PPT= XPUISS(SK,ZMAT(7),AMAX)
+       ELSE
+         PPT= 0.0D0
+       ENDIF
+       VARPT(NSTRS+1) = PPT
+C       write(6,*) 'PPT=',PPT
+C---------------------------------------------------------------------|
+C*******  CALCULATION OF INELASTIC STRAIN INCREMENTS  (EPSVPT)        |
+C---------------------------------------------------------------------I
+       DO 71 I=1,NSTRS
+         IF (PPT.EQ.0.D0) THEN
+            EPSVPT(I) = 0.0D0
+         ELSE
+            XX(I)     = 1.5D0*XX(I)/AJ2
+            EPSVPT(I) = XX(I)*PPT
+         ENDIF
+ 71    CONTINUE
+C       write(6,*) 'EPSVPT(i)=',(EPSVPT(i),i=1,NSTRS)
+C----------------------------------------------------------------|
+C*******  CALCULATION OF ALPHPT                                  |
+C----------------------------------------------------------------I
+       DO 72 I=1,NSTRS
+         IF (PPT.EQ.0.0) THEN
+            VARPT(I)=0.D0
+         ELSE
+            VARPT(I)=EPSVPT(I)-ZMAT(9)*VAR(I)*PPT
+         ENDIF
+ 72    CONTINUE
+C       write(6,*) '  ALPH(i)=',(  VAR(i),i=1,NSTRS)
+C       write(6,*) 'ALPHPT(i)=',(VARPT(i),i=1,NSTRS)
+C----------------------------------------------------------------|
+C*******  CALCULATION OF QQPT                                    |
+C----------------------------------------------------------------I
+       IV = NSTRS+2
+       IF (PPT.EQ.0.0) THEN
+         VARPT(IV)=0.D0
+       ELSE
+         XQQ = 1.D0 - ZMAT(10)*VAR(IV)
+         VARPT(IV) = XQQ*PPT
+       ENDIF
+C       write(6,*) 'QQPT=',VARPT(IV)
+C
+       RETURN
+       END
+
+ 

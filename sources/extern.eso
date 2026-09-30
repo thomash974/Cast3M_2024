@@ -1,0 +1,332 @@
+C EXTERN    SOURCE    PV090527  24/02/26    21:15:02     11850          
+C  interface vers un programme exterieur
+
+      subroutine extern
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREDLE
+-INC SMTABLE
+-INC SMLREEL
+-INC SMLENTI
+
+      external long
+      segment sbuff
+        character*(lbuf) buff
+      endsegment
+      logical bid
+      character*(LOCHAI) lacomm,motbuf
+      character*(8)      icha
+
+      bid = .true.
+      i_z = 0
+      r_z = 0.D0
+
+      ith=0
+      ith=oothrd
+
+      call lircha(lacomm,1,iretou)
+      if (ierr.ne.0) return
+      l=long(lacomm)
+c#dbg      write(ioimp,*) 'La commande "'//lacomm(1:l)//'"'
+
+      call lance (lacomm(1:l)//char(0),ith)
+
+*  ecriture des donnees
+      lbuf=1000
+      segini sbuff
+
+      lpos=0
+* Boucle sur les donnees eventuelles de la commande :
+ 100  CONTINUE
+        icha='        '
+        call quetyp(icha,0,iretou)
+        if (ierr.ne.0) return
+        if (iretou.eq.0) goto 200
+c#dbg        write(ioimp,*) 'objet lu de type :',icha
+        if (icha.eq.'TABLE   ') then
+          call lirobj(icha,mtable,1,iretou)
+          if (ierr.ne.0) return
+          segact mtable
+          DO 120 ipot = 1, mlotab
+            do 130 ipou = 1, mlotab
+              if (mtabti(ipou).ne.'ENTIER  ') goto 130
+              if (mtabii(ipou).ne.ipot) goto 130
+              goto 140
+ 130        continue
+            goto 120
+ 140        continue
+            icha=mtabtv(ipou)
+            if (icha.eq.'ENTIER  ') then
+              ient=mtabiv(ipou)
+              l_z=lpos+11
+              if (l_z.gt.lbuf) then
+                lbuf=lbuf+l_z
+                segadj sbuff
+              endif
+              write(buff(lpos+1:l_z),fmt=501) ient
+              lpos=l_z
+            elseif (icha.eq.'FLOTTANT') then
+              xv=rmtabv(ipou)
+              l_z=lpos+22
+              if (l_z.gt.lbuf) then
+                lbuf=lbuf+l_z
+                segadj sbuff
+              endif
+              write(buff(lpos+1:l_z),fmt=502) xv
+              lpos=l_z
+            elseif (icha.eq.'LISTENTI') then
+              mlenti=mtabiv(ipou)
+              segact mlenti
+              llect=lect(/1)
+              l_z = lpos+11*llect
+              if (l_z.gt.lbuf) then
+                lbuf=lbuf+l_z
+                segadj sbuff
+              endif
+              write(buff(lpos+1:l_z),fmt=503) (lect(jg),jg=1,llect)
+              segdes mlenti
+              lpos=l_z
+            elseif (icha.eq.'LISTREEL') then
+              mlreel=mtabiv(ipou)
+              segact mlreel
+              lprog=prog(/1)
+              l_z = lpos+22*lprog
+              if (l_z.gt.lbuf) then
+                lbuf=lbuf+l_z
+                segadj sbuff
+              endif
+              write(buff(lpos+1:l_z),fmt=504) (prog(jg),jg=1,lprog)
+              segdes mlreel
+              lpos = l_z
+            elseif (icha.eq.'MOT     ') then
+              motbuf = ' '
+              call acctab(mtable,'ENTIER  ',ipot,r_z,'    ',bid,0,
+     &                           'MOT     ',i_z ,r_z,motbuf,bid,i_z)
+              if (ierr.ne.0) return
+              segact mtable
+              lcom=long(motbuf)
+              if (motbuf(1:lcom).eq.'RC') then
+                motbuf(1:1)=char(10)
+                lcom=1
+              endif
+              l_z = lpos+lcom+1
+              if (l_z.gt.lbuf) then
+                lbuf=lbuf+l_z
+                segadj sbuff
+              endif
+              buff(lpos+1:l_z)=motbuf(1:lcom)//' '
+              lpos = l_z
+            endif
+ 120      CONTINUE
+          segdes mtable
+        elseif (icha.eq.'ENTIER  ') then
+          call lirent(ient,1,iretou)
+          if (ierr.ne.0) return
+          l_z=lpos+11
+          if (l_z.gt.lbuf) then
+            lbuf=lbuf+l_z
+            segadj sbuff
+          endif
+          write(buff(lpos+1:l_z),fmt=501) ient
+          lpos=l_z
+        elseif (icha.eq.'FLOTTANT') then
+          call lirree(xv,1,iretou)
+          if (ierr.ne.0) return
+          l_z=lpos+22
+          if (l_z.gt.lbuf) then
+            lbuf=lbuf+l_z
+            segadj sbuff
+          endif
+          write(buff(lpos+1:l_z),fmt=502) xv
+          lpos=l_z
+          goto 100
+        elseif (icha.eq.'LISTENTI') then
+          call lirobj(icha,mlenti,1,iretou)
+          if (ierr.ne.0) return
+          segact mlenti
+          llect=lect(/1)
+          l_z = lpos+11*llect
+          if (l_z.gt.lbuf) then
+            lbuf=lbuf+l_z
+            segadj sbuff
+          endif
+          write(buff(lpos+1:l_z),fmt=503) (lect(jg),jg=1,llect)
+          segdes mlenti
+          lpos=l_z
+        elseif (icha.eq.'LISTREEL') then
+          call lirobj(icha,mlreel,1,iretou)
+          if (ierr.ne.0) return
+          segact mlreel
+          lprog=prog(/1)
+          l_z = lpos+22*lprog
+          if (l_z.gt.lbuf) then
+            lbuf=lbuf+l_z
+            segadj sbuff
+          endif
+          write(buff(lpos+1:l_z),fmt=504) (prog(jg),jg=1,lprog)
+          segdes mlreel
+          lpos = l_z
+        elseif (icha.eq.'MOT     ') then
+          motbuf = ' '
+          call lircha(motbuf,1,iretou)
+          if (ierr.ne.0) return
+          lcom=long(motbuf)
+          if (motbuf(1:lcom).eq.'RC') then
+            motbuf(1:1)=char(10)
+            lcom=1
+          endif
+          l_z = lpos+lcom+1
+          if (l_z.gt.lbuf) then
+            lbuf=lbuf+l_z
+            segadj sbuff
+          endif
+          buff(lpos+1:l_z)=motbuf(1:lcom)//' '
+          lpos = l_z
+        else
+          write(ioimp,*) 'Objet '//icha//' non traite a ce jour'
+        endif
+      GOTO 100
+ 200  continue
+      if (lpos+1.gt.lbuf) then
+        lbuf=lbuf+LOCHAI
+        segadj sbuff
+      endif
+      lpos=lpos+1
+      buff(lpos:lpos)=char(10)
+%IF WIN32,WIN64
+      call ecrdon(buff,lpos,ith)
+%ELSE
+      if (lpos .gt. 1) call ecrdon(buff,lpos,ith)
+%ENDIF
+c#dbg      write(ioimp,*) '=>'//buff(1:lpos)//'<=',lpos
+      segsup sbuff
+
+C Les formats d'ecriture des donnees (ajout systematique d'un espace)
+ 501  FORMAT(i10,1x)
+ 502  FORMAT(e21.15,1x)
+C!! 502  FORMAT(d21.15,1x)
+ 503  FORMAT(2000000000(i10,1x))
+ 504  FORMAT(2000000000(e21.15,1x))
+C!! 504  FORMAT(2000000000(d21.15,1x))
+
+*  creation du resultat
+      m=100
+      segini mtable
+      mlotab=0
+      call inired(sredle)
+      separa=.false.
+ 10   CONTINUE
+*  boucle jusqu'a un rc
+**      iend=text(/1)
+        iend=LOCHAI
+        call lires(text(1:LOCHAI),iend,istat,ith)
+        if (iend.le.0) goto 50
+*  virer les retours chariots
+        do i = 1, iend
+          if (text(i:i).eq.char(10)) text(i:i)=' '
+          if (text(i:i).eq.char(13)) text(i:i)=' '
+        enddo
+        text(iend+1:LOCHAI)=' '
+        lgval = LONG(text)
+c#dbg      write(ioimp,*) '==>'//text(1:lgval)//'<==',lgval,iend
+        if (lgval.eq.0) goto 10
+
+        idval = 1
+ 20     CONTINUE
+          ifval = lgval
+*  Recherche espace (' ') comme separateur
+          ind = INDEX(text(idval:ifval),' ')
+          IF (ind.NE.0) ifval = idval + ind - 2
+*  Cas particulier ou 2 espaces se suivent
+          IF (ind.EQ.1) GOTO 21
+
+          icour  = ifval
+          ifinan = ifval+1
+          nran   = idval-1
+          call redlec(sredle)
+          if (ierr.ne.0) goto 999
+          if (ire.eq.0) goto 21
+          ipot=mlotab+1
+          if (ipot.gt.mtabti(/2)) then
+            m=mtabti(/2)+256
+            segadj mtable
+          endif
+          ncas=ncar
+          motbuf(1:ncas)=mot(1:ncas)
+c#dbg      write(ioimp,*) '==>'//motbuf(1:ncas)//'<==',ire,ncas
+          ncas=ifval-idval+1
+          motbuf(1:ncas)=text(idval:ifval)
+c#dbg      write(ioimp,*) '==>'//motbuf(1:ncas)//'<==',ire,ncas
+          if (ire.eq.1) then
+*            call ecctab(mtable,'ENTIER  ',ipot,r_z,' ',bid,i_z,
+*     >                         'ENTIER  ',nfix,r_z,' ',bid,i_z)
+            mlotab=ipot
+            mtabti(mlotab)='ENTIER'
+            mtabii(mlotab)=mlotab
+            mtabtv(mlotab)='ENTIER'
+            mtabiv(mlotab)=nfix
+          elseif (ire.eq.2) then
+*            call ecctab(mtable,'ENTIER  ',ipot,r_z ,' ',bid,i_z,
+*     >                         'FLOTTANT',i_z ,flot,' ',bid,i_z)
+            mlotab=ipot
+            mtabti(mlotab)='ENTIER'
+            mtabii(mlotab)=mlotab
+            mtabtv(mlotab)='FLOTTANT'
+            rmtabv(mlotab)=flot
+          elseif (ire.eq.3 .or. ire.eq.4) then
+            call ecctab(mtable,
+     >                    'ENTIER  ',ipot,r_z,' '           ,bid,i_z,
+     >                    'MOT     ',i_z ,r_z,motbuf(1:ncas),bid,i_z)
+            segact mtable*mod
+          elseif (ire.eq.5) then
+            bid=bool
+            call ecctab(mtable,'ENTIER  ',ipot,r_z,' ',bid,i_z,
+     >                         'LOGIQUE ',i_z ,r_z,' ',bid,i_z)
+            segact mtable*mod
+          elseif (ire.eq.6) then
+            call ecctab(mtable,
+     >                    'ENTIER  ',ipot,r_z,' '           ,bid,i_z,
+     >                    'MOT     ',i_z ,r_z,motbuf(1:ncas),bid,i_z)
+            segact mtable*mod
+          else
+          endif
+          if (ierr.ne.0) goto 999
+* Il faut sauter le separateur
+ 21       CONTINUE
+          idval = ifval + 2
+* Fin de la chaine text atteinte ?
+          IF (idval.GT.lgval) GOTO 10
+        GOTO 20
+      GOTO 10
+
+ 50   CONTINUE
+* En fin de traitement de la commande et de la recuperation de tous 
+* les resultats,on doit avoir istat = 0 !
+      if (istat.ne.0) then
+        interr(1)=istat
+        l=long(lacomm)
+        if (l.gt.128) then
+          moterr=lacomm(1:125)//'...'
+        else
+          moterr=lacomm(1:l)
+        end if
+        call erreur(873)
+        goto 999
+      end if
+
+* Ecriture de la table resultat
+      call ecrobj('TABLE   ',mtable)
+
+ 999  continue
+      segdes,mtable
+      segsup,sredle
+
+c      return
+      end
+
+ 
+ 

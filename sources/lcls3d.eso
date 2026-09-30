@@ -1,0 +1,378 @@
+C LCLS3D    SOURCE    FD218221  24/02/07    21:15:17     11834          
+       subroutine lcls3d(IETAP,NGF,ERR1,AA,XX,A2,BB,AAI,BBI,AAP,IPZERO,
+     # NBRINC,NINC,NDIMG,NDIMA,LOG_FLU,PLAST,ITER,DETH,DEPH,DEPST3,
+     # JEA,JSE,AK,BK,AM,EE0,EK0,DEPSE1,DEPSM1,DEPSK1,FRAC,DEPST1,
+     # NTMAX,FT,NBRACT,LNUMCRT,ACTIFT,PLASTT,DPFTDS,DGFTDS,REST,
+     # PFT_GRAD_PFT,PFT_GRAD_GFT,DEPSC1,NCMAX,NBRACC,FC,LNUMCRC,
+     # ACTIFC,PLASTC,DPFCDS,DGFCDS,RESC,PFC_GRAD_PFC,PFC_GRAD_GFC,
+     # DEPSL1,NLMAX,FL,NBRACL,LNUMCRL,ACTIFL,PLASTL,DPFLDS,DGFLDS,
+     # RESL,PFL_GRAD_PFL,PFL_GRAD_GFL,Gch,bg,dbgVg,dbgVd,dbwPw,
+     # reduc_resg,JSP,Je1epg,Mbg,NDIMPL,RgR,Jsgep,
+     # PFG_GRAD_PFG,PRECISION3D,AFFICHE,CONV_FORCEE)
+
+     
+     
+c     calcul des deformation elastiques (A.Sellier 2021/02/26)
+c     modif AS 2022/02/10
+c     adaptation variables generalisees 30/03/2022
+
+c     calcul des variables internes locales dans  inclusions et matrice
+c     construction de la matrice de localisation integrant le fluage
+c     resolution dans la base principale de l increment
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     --- variables externes -------------------------------------------
+
+
+c     nbre maxi d inclusions      
+      integer NBRINC,NINC,NDIMG,NDIMA,NTMAX,NCMAX,NLMAX
+c     nbre de type de criteres de plasticite
+      integer NBTYPL      
+      logical AFFICHE
+      integer IETAP,ngf,err1
+      real*8 AA(NGF,NGF+1),BB(NGF),XX(NGF),A2(NGF*NGF)
+      real*8 AAI(NGF,NGF+1),BBI(NGF)
+      integer ipzero(ngf)
+
+c     dimension de l espace de minimisation des residus plastiques
+      integer NDIMPL
+c     matrice d bgpg / d ea ds l espace de minimisation
+      real*8 Jsgep(NDIMG,NDIMPL)
+c     Vecteur R.grad(R) dans l espace de minimisation
+      real*8 RgR(NDIMPL)
+c     Module de Biot des gels Mbg(numero phase , debut ou fin de pas)
+      real*8 Mbg(0:NBRINC,0:1)  
+      
+c     preparation de la matrice inv(A).Jea
+      real*8 AAP(NDIMG,NDIMPL)
+c     matrice jsp=dseff g/d eps p (base ecoulement plastique)
+      real*8 jsp(NDIMG,NDIMPL)
+      
+      real*8 FRAC(0:NBRINC)
+c     coeff de biot des gels
+      real*8 bg(0:NBRINC,0:1)      
+c     fluage
+      real*8 ak(NDIMG),bk(NDIMG),am(NDIMG)
+      real*8 ek0(NDIMG),ee0(NDIMG)   
+      logical LOG_FLU,PLAST
+      integer ITER
+c     thermo hydro chimie      
+      real*8 DETH(0:NBRINC),DEPH(0:NBRINC)    
+c     indicateur de diffusion produits chimiques dans fissure
+      real*8 GCH(0:NBRINC)
+c     increment de deformation homogeneisee
+      real*8 DEPST3(3) 
+c     calcul visco elastique forcee
+      logical CONV_FORCEE   
+c     donnes poro-mechaniques (eau, gel, dechrage)      
+      real*8 dbwPw(0:NBRINC),dbgVg(0:NBRINC),dbgVd(0:NBRINC)
+
+      
+c     derivee du critere par rapport à la contrainte
+      real*8 DPFTDS(NTMAX,NDIMG),DPFCDS(NCMAX,NDIMG)  
+c     derivee du critere par rapport à la contrainte
+      real*8 DGFTDS(NTMAX,NDIMG),DGFCDS(NCMAX,NDIMG)      
+c     activite des criteres      
+      logical ACTIFT(NTMAX),ACTIFC(NCMAX)
+c     table du critere de rankine et dp  
+      real*8 FT(NTMAX),FC(NCMAX)
+c     numeror critre retenu pour les tensions refermeture      
+      integer LNUMCRT(NTMAX),LNUMCRC(NCMAX)
+c     gradient pondéré des fonctions seuil et pseudo potentiels pour les critères de  Traction diffuse
+      real*8 PFT_GRAD_PFT(NDIMPL),PFT_GRAD_GFT(NDIMPL) 
+c     gradient pondéré des fonctions seuil et pseudo potentiels pour les critères de Cisaillement diffus
+      real*8 PFC_GRAD_PFC(NDIMPL),PFC_GRAD_GFC(NDIMPL) 
+c     gradiant pondéré des fonctions pour les criteres de traction localisee aubords extérieurs des phases
+      real*8 PFL_GRAD_PFL(NDIMPL),PFL_GRAD_GFL(NDIMPL)
+c     par de fgradf due a la pression de gel pour les criteres de decollement
+      real*8 PFG_GRAD_PFG(NDIMPL)
+c     coeff de relaxation du residu
+      real*8 reduc_resg 
+c     jacobienne Je1epg dans la base des ecoulements plastiques
+      real*8 Je1epg(NDIMG,NDIMPL)      
+      
+      
+c     variables dans espace des variables generalise
+C     EPS(1-3)=INCLUSION
+C     EPS(4-6)=INTERFACE RADIALE
+C     EPS(7-9)=INTERFACE ORTHORADIALE
+C     EPS(10-12)=INFINI MATRICE    
+    
+   
+c     Res vecteur des residus des criteres
+      real*8 Rest,resc,resl
+      
+c     vecteur deformations solutions       
+      real*8 DEPSE1(NDIMG),DEPSM1(NDIMG),DEPSK1(NDIMG)
+c     vecteur solution def anelastiques      
+      real*8 DEPST1(NDIMG),DEPSC1(NDIMG)
+c     precision 
+      real*8 PRECISION3D
+c     jacobienne depse/depsimp si un seul type dinclusion
+      real*8 JEA(NDIMG,NDIMA)
+c     jacobienne d sigma / d epse      
+      real*8 JSE(NDIMG,NDIMG)
+c     indicateur de plasticite elementaire      
+      logical PLASTT,PLASTC,PLASTL 
+c     nombre de criteres actif, numero d ordre du dernier traitement 
+      integer NBRACT
+c     nombre de criteres actif cisaillement, numero d ordre du dernier traitement 
+      integer NBRACC
+c     nombre de citeres localises actifs
+      integer NBRACL
+c     criteres de fissures localisees
+      real*8 FL(NLMAX),DEPSL1(NDIMG)
+      integer LNUMCRL(NLMAX)
+      logical ACTIFL(NLMAX)
+      real*8 DPFLDS(NLMAX,NDIMG),DGFLDS(NLMAX,NDIMG)
+
+      
+c     tableau de classement des criteres 
+      integer NORDRE(NDIMG)      
+    
+c   -- variables locales -----------------------------------------------
+      real*8 detc0,detc1,determinant
+      integer i,j,NUMA,iordre,idir
+      logical affiche_local
+      integer NDIM_SOLVE   
+          
+c     -- intialisations ------------------------------------------------
+
+      ERR1=0      
+      affiche_local=affiche
+c      affiche_local=.true.
+      if(affiche_local) then
+        print*,'On arrive dans lcls3d'
+      end if    
+
+c     -- localisation de la deformation imposee ------------------------  
+    
+      if((IETAP.eq.0).and.(.not.LOG_FLU)) then
+
+c     ----------TIR ELASTIQUE (IETAP=0) --------------------------------
+      
+c        tir elastique calcul direct des depse sans fluage
+         if(affiche_local) then
+             write(*,'(/,A50,1X,A6,I2)') 
+     #       'Calcul direct des DEPSE dans lcls3d', 
+     #       'IETAP=',ietap
+         end if
+c        prise en compte des conditions imposees sur epse generalise et MK
+         call elin3d(NBRINC,NDIMG,DETH(1),DEPH(1),DETH(0),DEPH(0),
+     #   DEPST3,dbwpw,dbgVg,JEA,DEPSE1,affiche_local,err1)
+         do i=1,NDIMG
+c           vecteur des inconnues en fluage si une seule inclusion
+            DEPSM1(i)=0.d0
+c           vecteur des inconnues en fluage si une seule inclusion
+            DEPSK1(i)=0.d0                   
+c           vecteur des inconnues plastique traction si une seule inclusion           
+            DEPST1(i)=0.d0    
+c           vecteur des inconnues plastique compression si une seule inclusion           
+            DEPSC1(i)=0.d0
+c           vecteur des inconnues plastique localisee si une seule inclusion           
+            DEPSL1(i)=0.d0             
+         end do
+c        pas d ecoulement des gels car les fissures n ont pas evoluees        
+         dbgVd(0)=0.d0
+         dbgVd(1)=0.d0
+       
+      else if ((IETAP.eq.0).and.LOG_FLU) then
+
+c     ----------TIR VISCO-ELASTIQUE (IETAP=0) --------------------------
+            
+         if(affiche_local) then
+             write(*,'(/,A50,1X,A6,I2)') 
+     #       'Calcul visco-elastique des DEPSE dans lcls3d', 
+     #       'IETAP=',ietap
+         end if      
+c        construction du systeme lineaire NDIMG*NDIMG pour tir visco elastique
+         call a1ti3d(NBRINC,NDIMG,AK,BK,AM,JEA,NGF,AA,ERR1,
+     #    AFFICHE_local)
+c        construction du second membre
+         call bbti3d(NBRINC,NDIMG,ak,bk,am,DETH(1),DEPH(1),DETH(0),
+     #   DEPH(0),ek0,ee0,DEPST3,dbwPw,dbgVg,JEA,ngf,BB,ERR1,
+     #   affiche_local)     
+c        resolution du systeme lineaire             
+         call gaus3d(NDIMG,aa,xx,bb,ngf,err1,ipzero)
+         if(err1.eq.1) then
+             NDIM_SOLVE=NDIMG
+             goto 20 
+         end if 
+c        recuperation des increments elastiques et fluage
+         do i=1,NDIMG
+            DEPSE1(i)=xx(i)
+c           vecteur des inconnues en fluage si une seule inclusion
+            DEPSM1(i)=am(i)*(ee0(i)+depse1(i)/2.d0)
+c           vecteur des inconnues en fluage si une seule inclusion
+            DEPSK1(i)=ak(i)*(ee0(i)+depse1(i))-bk(i)*ek0(i)                    
+c           vecteur des inconnues plastique traction si une seule inclusion           
+            DEPST1(i)=0.d0    
+c           vecteur des inconnues plastique compression si une seule inclusion           
+            DEPSC1(i)=0.d0
+c           vecteur des inconnues plastique localisee si une seule inclusion           
+            DEPSL1(i)=0.d0            
+         end do
+c        pas d ecoulement  des gels car les fissures n ont pas evoluees     
+         dbgVd(0)=0.d0
+         dbgVd(1)=0.d0       
+      else 
+      
+c     -------------- ELASTO VISCO PLASTICITE (IETAP=4) ----------------- 
+
+         if(affiche_local) then
+             write(*,'(A50,1X,A6,I2)') 
+     #       'Calcul de l ecoulement plastique dans lcls3d', 
+     #       'IETAP=',ietap
+         end if
+C        construction du systeme lineaire pour maintenir les criteres
+c        actifs a zero lors du tir visco plastique
+         
+c        dimension du sous systeme a resoudre         
+         NDIM_SOLVE=NDIMG
+            
+c        matrice de couplage  AA=1-Je1ee dans le cas avec ecoulement visco
+c        elasto plastique en base generalisee des ecoulements plastiques       
+         call a1re3d(NBRINC,NDIMG,NDIMA,NGF,AA,AK,BK,AM,JEA,
+     #   AFFICHE_local,ERR1)
+
+c        inversion de la matrice de couplage AAI*AA=I -> AAI=1/(1-Je1ee)    
+         call minv3d(NGF,AA,AAI,BBI,XX,IPZERO,NDIM_SOLVE,
+     #   ERR1,AFFICHE_local)
+
+c        jacobienne de e1 par rapport à ep Je1ep ep en base  d ecoulement (3*12=32)
+         call jepg3d(NBRINC,NINC,NDIMG,NDIMA,NDIMPL,FRAC,GCH,Mbg,bg,
+     #   JEA,Je1epg,AFFICHE,ERR1)
+
+c        jacobienne des pressions de gel par rapport aux deformatins plastique
+         call jbgp3d(NBRINC,NINC,NDIMG,NDIMPL,FRAC,GCH,Mbg,bg,
+     #   Jsgep,AFFICHE,ERR1)
+
+c        --- calcul des ecoulement plastiques par methode du gradient -- 
+
+         call denc3d(ngf,NDIMG,NDIMA,NTMAX,NCMAX,NLMAX,
+     #   nbract,ft,lnumcrt,dpftds,dgftds,REST,PFT_GRAD_PFT,PFT_GRAD_GFT,
+     #   nbracc,fc,lnumcrc,dpfcds,dgfcds,RESC,PFC_GRAD_PFC,PFC_GRAD_GFC,
+     #   nbracl,fl,lnumcrl,dpflds,dgflds,RESL,PFL_GRAD_PFL,PFL_GRAD_GFL,
+     #   jse,jea,aai,aap,jsp,Je1epg,DEPST1,DEPSL1,DEPSC1,reduc_resg,
+     #   NDIMPL,RgR,ninc,NBRINC,Jsgep,ACTIFT,ACTIFC,ACTIFL,PFG_GRAD_PFG,
+     #   precision3d,err1,affiche)
+
+            
+c        --- actualisation du second membre  ---------------------------
+     
+         call bbre3d(NBRINC,NDIMG,NDIMA,ngf,BB,bg,DEPST1,
+     #   DEPSC1,DEPSL1,JEA,frac,Gch,affiche_local)    
+
+c         --- resolution des deformations elastiques -------------------
+
+         do i=1,NDIMG
+            xx(i)=0.d0
+            do j=1,NDIMG
+                xx(i)=xx(i)+aai(i,j)*bb(j)
+            end do
+         end do
+                     
+         if(err1.eq.1) then             
+             goto 20
+         else
+         
+c           --recuperation des increments elastiques et visco elastiques
+
+            do i=1,NDIMG
+c               elastique
+                DEPSE1(i)=xx(i)
+c               Maxwell
+                DEPSM1(i)=am(i)*(depse1(i)/2.d0)
+c               Kelvin
+                DEPSK1(i)=ak(i)*(depse1(i))                                
+            end do
+            
+c           ---- modification des volumes de decharge du gel -----------        
+
+            call dbgv3d(NBRINC,NINC,NDIMG,GCH,FRAC,dbgVd,bg,
+     #      DEPST1,DEPSL1,ERR1,AFFICHE)
+     
+         end if                
+        
+      end if
+      
+      
+c     **** affichage fin de lcls3d *********************************       
+      if (affiche_local) then
+            do i=1,NDIMG
+                if(DEPST1(i).lt.0.) then
+                   write(*,'(1X,A39,I2,1X,A9,I2,A2,E10.3)') 
+     #             'Dans lcls3d, on referme la fissure ',i,
+     #             ' et epst(',i,')=',depst1(i)
+c                  read*
+                end if
+            end do
+      end if
+      
+c     **** traitement de l erreur enventuelle **************************       
+      
+20    if(err1.eq.1) then
+            write(*,'(A36,/,3(A7,I2,1X,A6,I2,1X,A3,E10.3,/))')
+     #     'Erreur Gauss3d dans lcls3d avec:',
+     #     'NBRACT',NBRACT,'NUMCR',LNUMCRT(1),'FT',FT(LNUMCRT(1)),
+     #     'NBRACC',NBRACC,'NUMCR',LNUMCRC(1),'FC',FC(LNUMCRC(1)),
+     #     'NBRACL',NBRACL,'NUMCR',LNUMCRL(1),'FL',FL(LNUMCRL(1))
+            write(*,'(3(A10))') 'Numero','direction','FT'
+            do i=1,NTMAX
+                write(*,'(2(I10),E10.3,L2)') i ,LNUMCRT(i),
+     #          FT(LNUMCRT(i)),ACTIFT(LNUMCRT(i))
+            end do
+            write(*,'(3(A10))') 'Numero','direction','FC'  
+            do i=1,NCMAX
+                write(*,'(2(I10),E10.3,L2)') i ,LNUMCRC(i),
+     #          FC(LNUMCRC(i)),ACTIFC(LNUMCRC(i))
+            end do 
+            write(*,'(3(A10))') 'Numero','direction','FL'
+            do i=1,NLMAX
+                write(*,'(2(I10),E10.3,L2)') i ,LNUMCRL(i),
+     #          FL(LNUMCRL(i)),ACTIFL(LNUMCRL(i))
+            end do        
+            write(*,'(3(A10))') 'AK','BK','AM'
+            do i=1,NDIMG
+                write(*,'(3E10.3)') AK(i),BK(i),AM(i)
+            end do
+            print*, 'Matrice de couplage'
+            write(*,'(A3)',advance='no') 'AA'
+            do i=1,NDIM_SOLVE
+                write(*,'(9X,I2)',advance='no') i
+            end do
+            write(*,'(A11)') 'BB'
+            do i=1,NDIM_SOLVE
+                write(*,'(1X,I2)',advance='no') i
+                do j=1,NDIM_SOLVE
+                    write (*,'(1X,E10.3)',advance='no') AA(i,j)
+                end do
+                write(*,'(1X,A1,1X,E10.3)') '=',BB(i)
+            end do                  
+            return
+      else 
+c       print*,'Dans lcls3d'
+c       do i=1,nt
+c           write(*,10) i,xx(i)
+c       end do
+c       read*
+        continue
+      end if 
+      
+c     *** detection des inconsistances plastiques **********************
+c      test determinant du systeme
+c      call detq3d(aa,a2,ngf,nt,determinant,ifault)
+c      print*,'Dans lcls3d Determinant du systeme', determinant
+c      read*    
+
+      return
+      end 
+      
+c***********************************************************************
+
+      
+      
+ 
+ 

@@ -1,0 +1,49 @@
+C FRENET    SOURCE    CB215821  23/11/02    21:15:04     11779          
+
+      SUBROUTINE FRENET
+C ====================================================================
+C Opérateur FRENET : calcul du repère de Frenet d'une ligne
+C
+C Utilisation : voir notice de l'opérateur FRENET
+C ====================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+C
+C     Declarations
+C     ************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+       integer obligatoire, a_eu_lieu, activation, repere
+       integer arc
+
+C
+C     Lecture d'un 'MAILLAGE'
+C     ***********************
+
+C     Lecture du maillage
+      obligatoire = 1
+      call lirobj('MAILLAGE', arc, obligatoire, a_eu_lieu)
+      call actobj('MAILLAGE', arc, obligatoire)
+      if(ierr.ne.0) return
+
+C
+C     Appel a frene0 pour faire le travail
+C     ************************************
+
+      call frene0(arc, repere)
+      if(ierr.ne.0) return
+
+C
+C     Ecriture du chpo
+C     ****************
+      activation = 1
+      call actobj('CHPOINT', repere, activation)
+      call ecrobj('CHPOINT', repere)
+
+      END
+ 

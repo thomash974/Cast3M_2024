@@ -1,0 +1,113 @@
+C ELIN3D    SOURCE    PV090527  23/01/27    21:15:29     11574          
+      subroutine elin3d(NBRINC,NDIMG,dethi,dephi,dethm,dephm,deh,
+     # dbwpw,dbgVg,JEA,DEPSE1,affiche,err1)
+      
+c     tir d epse dans le cas d un seul type d inclusion sans le fluage
+
+c     organisation de la Jacobienne
+c     ligne : [eie1, eie2, eie3, ere1, ere2, ere3, eoe1, eoe2, eoe3, eme1, eme2, eme3]
+c                 1     2     3     4     5     6     7     8     9     10    11    12 = NDIMG
+c   colonne : [eia1, eia2, eia3, era1, era2, era3, eoa1, eoa2, eoa3, e00a1, e00a2, e00a3, eca1, eca2, eca3, eh1, eh2, eh3, bwiPwi, bgiVgi, bgiVdi, bwmPwm, bgmVgm, bgmVdm]
+c                 1     2     3     4     5     6     7     8     9     10    11    12    13     14   15     16   17   18      19      20      21      22      23       24  
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      logical affiche
+      integer NDIMG,err1
+      real*8 dethi,dephi,dethm,dephm
+      real*8 deh(3)
+      real*8 dbwpw(0:NBRINC),dbgVg(0:NBRINC)
+c     jacobienne depse/depsimp si un seul type dinclusion
+      real*8 JEA(NDIMG,NDIMG+12),DEPSE1(NDIMG)
+      
+      if(NDIMG.ne.12) then
+        print*,'Pb de dimension dans jelc3d'
+        err1=1
+        return
+      end if
+      
+      if (affiche) then
+        print*,'Chargement ds elin3d'
+        print*,'dethi',dethi
+        print*,'dephi',dephi
+        print*,'dethm',dethm
+        print*,'dethm',dethm
+        print*,'deh',deh
+        print*,'dbwpw',dbwpw
+        print*,'dbgVg',dbgVg
+      end if
+      
+      t1 = dethi + dephi
+      t2 = dethm + dephm
+      t3 = t1 * (JEA(3,1) + JEA(3,2) + JEA(3,3)) + t2 * (JEA(3,13) + JEA
+     #(3,14) + JEA(3,15)) + JEA(3,16) * deh(1) + JEA(3,17) * deh(2) + JE
+     #A(3,18) * deh(3) + JEA(3,19) * dbwPw(1) + JEA(3,20) * dbgVg(1) + J
+     #EA(3,22) * dbwPw(0) + JEA(3,23) * dbgVg(0)
+      t4 = t1 * (JEA(4,1) + JEA(4,2) + JEA(4,3)) + t2 * (JEA(4,13) + JEA
+     #(4,14) + JEA(4,15)) + JEA(4,16) * deh(1) + JEA(4,17) * deh(2) + JE
+     #A(4,18) * deh(3) + JEA(4,19) * dbwPw(1) + JEA(4,20) * dbgVg(1) + J
+     #EA(4,22) * dbwPw(0) + JEA(4,23) * dbgVg(0)
+      t5 = t1 * (JEA(5,1) + JEA(5,2) + JEA(5,3)) + t2 * (JEA(5,13) + JEA
+     #(5,14) + JEA(5,15)) + JEA(5,16) * deh(1) + JEA(5,17) * deh(2) + JE
+     #A(5,18) * deh(3) + JEA(5,19) * dbwPw(1) + JEA(5,20) * dbgVg(1) + J
+     #EA(5,22) * dbwPw(0) + JEA(5,23) * dbgVg(0)
+      t6 = t1 * (JEA(6,1) + JEA(6,2) + JEA(6,3)) + t2 * (JEA(6,13) + JEA
+     #(6,14) + JEA(6,15)) + JEA(6,16) * deh(1) + JEA(6,17) * deh(2) + JE
+     #A(6,18) * deh(3) + JEA(6,19) * dbwPw(1) + JEA(6,20) * dbgVg(1) + J
+     #EA(6,22) * dbwPw(0) + JEA(6,23) * dbgVg(0)
+      t7 = t1 * (JEA(7,1) + JEA(7,2) + JEA(7,3)) + t2 * (JEA(7,13) + JEA
+     #(7,14) + JEA(7,15)) + JEA(7,16) * deh(1) + JEA(7,17) * deh(2) + JE
+     #A(7,18) * deh(3) + JEA(7,19) * dbwPw(1) + JEA(7,20) * dbgVg(1) + J
+     #EA(7,22) * dbwPw(0) + JEA(7,23) * dbgVg(0)
+      t8 = t1 * (JEA(8,1) + JEA(8,2) + JEA(8,3)) + t2 * (JEA(8,13) + JEA
+     #(8,14) + JEA(8,15)) + JEA(8,16) * deh(1) + JEA(8,17) * deh(2) + JE
+     #A(8,18) * deh(3) + JEA(8,19) * dbwPw(1) + JEA(8,20) * dbgVg(1) + J
+     #EA(8,22) * dbwPw(0) + JEA(8,23) * dbgVg(0)
+      t9 = t1 * (JEA(9,1) + JEA(9,2) + JEA(9,3)) + t2 * (JEA(9,13) + JEA
+     #(9,14) + JEA(9,15)) + JEA(9,16) * deh(1) + JEA(9,17) * deh(2) + JE
+     #A(9,18) * deh(3) + JEA(9,19) * dbwPw(1) + JEA(9,20) * dbgVg(1) + J
+     #EA(9,22) * dbwPw(0) + JEA(9,23) * dbgVg(0)
+      t10 = t1 * (JEA(10,1) + JEA(10,2) + JEA(10,3)) + t2 * (JEA(10,13) 
+     #+ JEA(10,14) + JEA(10,15)) + JEA(10,16) * deh(1) + JEA(10,17) * de
+     #h(2) + JEA(10,18) * deh(3) + JEA(10,19) * dbwPw(1) + JEA(10,20) * 
+     #dbgVg(1) + JEA(10,22) * dbwPw(0) + JEA(10,23) * dbgVg(0)
+      t11 = t1 * (JEA(11,1) + JEA(11,2) + JEA(11,3)) + t2 * (JEA(11,13) 
+     #+ JEA(11,14) + JEA(11,15)) + JEA(11,16) * deh(1) + JEA(11,17) * de
+     #h(2) + JEA(11,18) * deh(3) + JEA(11,19) * dbwPw(1) + JEA(11,20) * 
+     #dbgVg(1) + JEA(11,22) * dbwPw(0) + JEA(11,23) * dbgVg(0)
+      t12 = t1 * (JEA(12,1) + JEA(12,2) + JEA(12,3)) + t2 * (JEA(12,13) 
+     #+ JEA(12,14) + JEA(12,15)) + JEA(12,16) * deh(1) + JEA(12,17) * de
+     #h(2) + JEA(12,18) * deh(3) + JEA(12,19) * dbwPw(1) + JEA(12,20) * 
+     #dbgVg(1) + JEA(12,22) * dbwPw(0) + JEA(12,23) * dbgVg(0)
+      DEPSE1(1) = t1 * (JEA(1,1) + JEA(1,2) + JEA(1,3)) + t2 * (JEA(1,13
+     #) + JEA(1,14) + JEA(1,15)) + JEA(1,16) * deh(1) + JEA(1,17) * deh(
+     #2) + JEA(1,18) * deh(3) + JEA(1,19) * dbwPw(1) + JEA(1,20) * dbgVg
+     #(1) + JEA(1,22) * dbwPw(0) + JEA(1,23) * dbgVg(0)
+      DEPSE1(2) = t1 * (JEA(2,1) + JEA(2,2) + JEA(2,3)) + t2 * (JEA(2,13
+     #) + JEA(2,14) + JEA(2,15)) + JEA(2,16) * deh(1) + JEA(2,17) * deh(
+     #2) + JEA(2,18) * deh(3) + JEA(2,19) * dbwPw(1) + JEA(2,20) * dbgVg
+     #(1) + JEA(2,22) * dbwPw(0) + JEA(2,23) * dbgVg(0)
+      DEPSE1(3) = t3
+      DEPSE1(4) = t4
+      DEPSE1(5) = t5
+      DEPSE1(6) = t6
+      DEPSE1(7) = t7
+      DEPSE1(8) = t8
+      DEPSE1(9) = t9
+      DEPSE1(10) = t10
+      DEPSE1(11) = t11
+      DEPSE1(12) = t12
+
+
+      
+      if(affiche) then
+         print*,'dans elin3d'
+         do i=1,NDIMG
+            print*,'DEPSE1(',i,')=',DEPSE1(i)
+         end do
+      end if
+      
+      return    
+      end
+
+ 

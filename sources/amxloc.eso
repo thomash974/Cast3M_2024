@@ -1,0 +1,18 @@
+C AMXLOC    SOURCE    PV090527  23/01/27    21:15:06     11574          
+      subroutine amxloc(f,nl,nmax)     
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+          dimension f(nl)
+c         
+          fmax=f(1)
+          nmax=1
+      do i=2,nl
+          if(f(i).GT.fmax) then
+            fmax=f(i)       
+        nmax=i
+      endif     
+          enddo
+      return
+      end
+      
+ 

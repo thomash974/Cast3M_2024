@@ -1,0 +1,23 @@
+C CHRE3     SOURCE    PV090527  23/01/27    21:15:13     11574          
+c***************************************************************************
+c     changement de repère d'une matrice 3*3
+c     M = P'AP  où P'=transposée(P)
+c     M, P, A sont des matrices 3*3
+      subroutine chre3(M,A,P)
+      real*8 M(3,3),A(3,3),P(3,3)
+      real*8 TP(3,3),R(3,3)
+      integer i,j
+
+c     on calcule la transposée de P => TP
+      do i=1,3
+        do j=1,3
+          TP(i,j)=P(j,i)
+          M(i,j)=0.D0
+        enddo
+      enddo                                          
+      call mtmt3d(A,P,3,3,3,R)
+      call mtmt3d(TP,R,3,3,3,M)
+      return
+      end
+      
+ 

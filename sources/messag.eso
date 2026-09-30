@@ -1,0 +1,36 @@
+C MESSAG    SOURCE    PV        20/03/06    21:15:04     10546          
+      SUBROUTINE MESSAG
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+
+      CHARACTER*(LOCHAI) MESS
+      CHARACTER*(6)      fm
+      EXTERNAL           long
+
+      MESS =' '
+      ilong=1
+      call chain1(mess)
+      ilong=long(mess)
+      if(ierr.ne.0) return
+
+      if(ilong.ne.0) then
+        fm='(a'
+        if (ilong.le.9) then
+          write(fm(3:3),fmt='(i1)') ilong
+          fm(4:4)=')'
+        elseif (ilong.le.99) then 
+          write(fm(3:4),fmt='(i2)') ilong
+          fm(5:5)=')'
+        elseif (ilong.le.999) then
+          write(fm(3:5),fmt='(i3)') ilong
+          fm(6:6)=')'
+        endif
+        write(ioimp,fmt=fm) mess(1:ilong)
+
+      else
+        write(ioimp,fmt='(1X)')
+      endif
+
+      end

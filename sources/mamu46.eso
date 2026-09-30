@@ -1,0 +1,106 @@
+C MAMU46    SOURCE    PV        20/02/22    21:15:17     10531          
+      subroutine mamu46(long,val11,lpl1,val1,lpl,pt)
+      implicit real*8 (a-h,o-z)
+      real*8 val11(*),val1(*)
+      real*8 pt(36)
+           id12=lpl1
+           id13=lpl1+ lpl1+1
+           id14=lpl1+ lpl1+1+ lpl1+2
+           id15=lpl1+ lpl1+1+ lpl1+2+ lpl1+3
+           id16=lpl1+ lpl1+1+ lpl1+2+ lpl1+3 +lpl1+4
+           id2=lpl
+           id3=lpl+ lpl+1
+           id4=lpl+ lpl+1 +lpl+2
+           pt1=pt(1)
+           pt2=pt(2)
+           pt3=pt(3)
+           pt4=pt(4)
+           pt5=pt(5)
+           pt6=pt(6)
+           pt7=pt(7)
+           pt8=pt(8)
+           pt9=pt(9)
+           pt10=pt(10)
+           pt11=pt(11)
+           pt12=pt(12)
+           pt13=pt(13)
+           pt14=pt(14)
+           pt15=pt(15)
+           pt16=pt(16)
+           pt17=pt(17)
+           pt18=pt(18)
+           pt19=pt(19)
+           pt20=pt(20)
+           pt21=pt(21)
+           pt22=pt(22)
+           pt23=pt(23)
+           pt24=pt(24)
+           do 110 i=1,long
+              xval1=val1(i)
+              xval2=val1(i+id2)
+              xval3=val1(i+id3)
+              xval4=val1(i+id4)
+              xval11=val11(i)
+              xval12=val11(i+id12)
+              xval13=val11(i+id13)
+              xval14=val11(i+id14)
+              xval15=val11(i+id15)
+              xval16=val11(i+id16)
+              pt1=pt1+xval1*xval11
+              pt2=pt2+xval1*xval12
+              pt3=pt3+xval1*xval13
+              pt4=pt4+xval1*xval14
+              pt5=pt5+xval1*xval15
+              pt6=pt6+xval1*xval16
+              pt7=pt7+xval2*xval11
+              pt8=pt8+xval2*xval12
+              pt9=pt9+xval2*xval13
+              pt10=pt10+xval2*xval14
+              pt11=pt11+xval2*xval15
+              pt12=pt12+xval2*xval16
+              pt13=pt13+xval3*xval11
+              pt14=pt14+xval3*xval12
+              pt15=pt15+xval3*xval13
+              pt16=pt16+xval3*xval14
+              pt17=pt17+xval3*xval15
+              pt18=pt18+xval3*xval16
+              pt19=pt19+xval4*xval11
+              pt20=pt20+xval4*xval12
+              pt21=pt21+xval4*xval13
+              pt22=pt22+xval4*xval14
+              pt23=pt23+xval4*xval15
+              pt24=pt24+xval4*xval16
+ 110       continue
+           pt(1)=pt1
+           pt(2)=pt2
+           pt(3)=pt3
+           pt(4)=pt4
+           pt(5)=pt5
+           pt(6)=pt6
+           pt(7)=pt7
+           pt(8)=pt8
+           pt(9)=pt9
+           pt(10)=pt10
+           pt(11)=pt11
+           pt(12)=pt12
+           pt(13)=pt13
+           pt(14)=pt14
+           pt(15)=pt15
+           pt(16)=pt16
+           pt(17)=pt17
+           pt(18)=pt18
+           pt(19)=pt19
+           pt(20)=pt20
+           pt(21)=pt21
+           pt(22)=pt22
+           pt(23)=pt23
+           pt(24)=pt24
+
+           end
+
+ 
+ 
+ 
+ 
+ 
+ 

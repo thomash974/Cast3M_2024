@@ -1,0 +1,75 @@
+C DECOUP    SOURCE    PASCAL    22/11/09    21:15:01     11496          
+C  CALCUL AUTOMATIQUE DES DECOUPAGES
+C
+      SUBROUTINE DECOUP(INBR,DEN1,DEN2,APROG,NBELEM,DENI,DECA,DLONG)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      LOGICAL LPROG
+-INC CCREEL
+**    DEN1=SIGN(MAX(XPETIT,ABS(DEN1)),DEN1)
+**    DEN2=SIGN(MAX(XPETIT,ABS(DEN2)),DEN2)
+      DEN1=MAX(XPETIT,ABS(DEN1))
+      DEN2=MAX(XPETIT,ABS(DEN2))
+C     write(6,*) 'INBR,DEN1,DEN2=',INBR,DEN1,DEN2
+      IF ((INBR.EQ.0).AND.(ABS(DEN1*DEN2).LT.XPETIT)) THEN
+         CALL ERREUR(809)
+         RETURN
+      ENDIF
+      IF (INBR.GT.0) THEN
+         APROG =1.D0
+         NBELEM=INBR
+         DEN1  =1.D0/INBR
+         DENI  =DLONG/INBR
+         DECA  =0.D0
+      ELSE
+         IF (SIGN(1.D0,DEN1)*SIGN(1.D0,DEN2).LE.0.D0) THEN
+            CALL ERREUR(809)
+            RETURN
+         ENDIF
+*
+         XAUX=abs(((DEN1-DEN2)**2)/2)
+         IF (DEN2.LT.DEN1) THEN
+            APROG=1.D0+XAUX-SQRT(XAUX*(2+XAUX))
+         ELSE
+            APROG=1.D0+XAUX+SQRT(XAUX*(2+XAUX))
+         ENDIF
+         IF (ABS(APROG).LT.XPETIT) THEN
+           CALL ERREUR(809)
+           RETURN
+         ENDIF
+         LPROG=((ABS(APROG-1))   .GT.  1.D-5)
+C     write(6,*) 'XAUX,APROG =',XAUX,APROG
+         IF (INBR.LT.0) THEN
+            NBELEM=-INBR
+         ELSE
+            IF (LPROG) THEN
+*sg 2019/07 eviter les pbs si DEN2/DEN1 est trop grand
+*sg      XNBELE=(LOG(DEN2/DEN1)/LOG(APROG))
+               XNBELE=(LOG(ABS(DEN2))-LOG(ABS(DEN1)))/(LOG(APROG))
+            ELSE
+               XNBELE=min(1.D0/DEN1,dble(igrand))
+               XNBELE=max(xnbele,-2.d0**31)
+            ENDIF
+            if(.not.(xnbele.ge.xpetit)) xnbele=xpetit
+            NBELEM=INT(XNBELE)
+            NBELEM=MAX(1,NBELEM)
+            IF (XNBELE/NBELEM.GT.(NBELEM+1)/XNBELE) NBELEM=NBELEM+1
+         ENDIF
+         IF (LPROG) THEN
+            DEN1=(1.D0-APROG)/((1.D0-APROG**NBELEM)*APROG)
+         ELSE
+            DEN1=1.D0/REAL(NBELEM)
+         ENDIF
+         DENI=DEN1*DLONG
+         DECA=(DEN2-DEN1)*DLONG
+      ENDIF
+*      write(6,*) ' decoup nbelem deni deca',nbelem,deni,deca
+*      if (deni.LE.xzprec) write(6,*) ' deni < xzprec' 
+      if (nbelem.GT.igranD) nbelem=1
+      RETURN
+      END
+ 
+ 
+ 
+ 

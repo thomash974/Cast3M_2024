@@ -1,0 +1,734 @@
+C LEXTPN    SOURCE    OF166741  23/11/14    21:15:03     11784          
+
+*----------------------------------------------------------------------*
+      SUBROUTINE LEXTPN (iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+      PARAMETER (LOCHAJ = 10 * LOCHAI)
+      PARAMETER (NBLIB  = 3)
+
+*  dirloi repertoire de la loi externe
+      SEGMENT SDIEXT
+        CHARACTER*(LOCHAI) dirloi(nbdir)
+      ENDSEGMENT
+
+*  ficloi fichier (bibliotheque) de la loi externe
+*  idrloi entier correspondant a dirloi de SDIEXT
+      SEGMENT SLOEXT
+        CHARACTER*(LOCHAI) ficloi(nbloi)
+        INTEGER            idrloi(nbloi)
+      ENDSEGMENT
+
+*DEV*  nomloi nom de la loi externe dans la bibliotheque
+*DEV*  idfloi entier correspondant a ficloi de SLOEXT
+*DEV*  iptloi pointeur fonction de la loi externe
+*DEV      SEGMENT SFCEXT
+*DEV        CHARACTER*(LOCHAI) nomloi(nbfct)
+*DEV        INTEGER            idfloi(nbfct)
+*DEV        INTEGER            iptloi(nbfct)
+*DEV      ENDSEGMENT
+
+      EXTERNAL long
+
+      CHARACTER*(*) repl,ficl,noml
+
+      CHARACTER*(LOCHAJ) cvarenv,rep,entr
+      CHARACTER*(LOCHAI) dirb,ficb,nomb
+      CHARACTER*(1)      sepa1(NBLIB)
+      CHARACTER*(2)      sepa2(NBLIB)
+      CHARACTER*(6)      sextl(NBLIB)
+
+      EQUIVALENCE(cvarenv,ivarenv)
+      EQUIVALENCE(entr   ,ientr  )
+
+      LOGICAL logdbg
+
+      SAVE SDIEXT, NDIEXT, SLOEXT, NLOEXT
+*DEV      SAVE SFCEXT, NFCEXT
+      SAVE sepa1, sepa2, sextl, iextl, nextl
+      SAVE logdbg
+
+* Option cachee de debogage :
+      cvarenv = 'CASTEM_MFRONT_DEBUG'//CHAR(0)
+      l = LOCHAJ
+      CALL OOOZEN(ivarenv,l)
+      logdbg = l.GE.1
+      if (logdbg) write(ioimp,*) 'Mode debogage actif'
+
+      iret = 0
+* 0 - Initialisation des segments sdiext, sloext, sfcexT
+      ndiext = 0
+      nbdir = 256
+      SEGINI,sdiext
+
+      nloext = 0
+      nbloi = 256
+      SEGINI,sloext
+
+*DEV      nfcext = 0
+*DEV      nbfct = 256
+*DEV      SEGINI,sfcext
+
+* 1 - Definition pour chaque OS (LINUX, WIN, MAC) :
+*         - du separateur de recherche
+*         - du(des) separateur(s) de repertoire
+*         - de l'extension de la bibliotheque
+      sextl(1) = '.so   '
+      sepa1(1) = ':'
+      sepa2(1) = '//'
+      sextl(2) = '.dll  '
+      sepa1(2) = ';'
+      sepa2(2) = '\/'
+      sextl(3) = '.dylib'
+      sepa1(3) = ':'
+      sepa2(3) = '//'
+%IF WIN32,WIN64
+      iextl = 2
+%ELSE
+      iextl = 1
+* Cas particulier du MACOS
+      cvarenv = 'CASTEM_PLATEFORME'//CHAR(0)
+      l = LOCHAI
+      CALL OOOZEN(ivarenv,l)
+      IF (l.GE.1) THEN
+        IF (cvarenv(1:l).EQ.'MAC') iextl = 3
+      END IF
+%ENDIF
+      nextl = LONG(sextl(iextl))
+      if (logdbg) then
+        if (iextl.eq.1) write(ioimp,*) 'OS = LINUX (default)'
+        if (iextl.eq.2) write(ioimp,*) 'OS = WIN32/WIN64'
+        if (iextl.eq.3) write(ioimp,*) 'OS = MACOS64'
+      end if
+
+* 2 - Recherche des repertoires a scruter
+      rep   = '.'//sepa1(iextl)(1:1)//'.'//sepa2(iextl)(1:1)//'src'
+      lgrep = LONG(rep)
+      cvarenv = 'CASTEM_MFRONT_PATH'//CHAR(0)
+      l = LOCHAJ
+      CALL OOOZEN(ivarenv,l)
+      IF (l.GE.1) THEN
+        if (lgrep+1+l.gt.LOCHAJ) then
+          moterr = '(Warning 0) CASTEM_MFRONT_PATH too long'
+          call erreur(-385)
+          moterr = '=> Variable not used'
+          call erreur(-385)
+          iret = iret + 1
+        else
+      if (logdbg) write(ioimp,*) 'rep =>CASTEM_MFRONT_PATH<='
+          lgrep = lgrep + 1
+          rep(lgrep:lgrep) = sepa1(iextl)(1:1)
+          rep(lgrep+1:lgrep+l) = cvarenv(1:l)
+          GOTO 2
+        end if
+      END IF
+      cvarenv = 'LD_LIBRARY_PATH'//CHAR(0)
+      if (iextl.eq.3) cvarenv = 'DYLD_LIBRARY_PATH'//CHAR(0)
+      l = LOCHAJ
+      CALL OOOZEN(ivarenv,l)
+      IF (l.GE.1) THEN
+        if (lgrep+1+l.gt.LOCHAJ) then
+          moterr = '(Warning 0) (DY)LD_LIBRARY_PATH too long'
+          call erreur(-385)
+          moterr = '=> Variable not used'
+          call erreur(-385)
+          iret = iret + 1
+        else
+      if (logdbg) write(ioimp,*) 'rep =>(DY)LD_LIBRARY_PATH<='
+          lgrep = lgrep + 1
+          rep(lgrep:lgrep) = sepa1(iextl)(1:1)
+          rep(lgrep+1:lgrep+l) = cvarenv(1:l)
+          GOTO 2
+        end if
+      END IF
+      if (logdbg) write(ioimp,*) 'rep =>default<='
+ 2    CONTINUE
+      lgrep = LONG(rep)
+      if (logdbg) write(ioimp,*) 'rep "',rep(1:lgrep),'"',lgrep
+
+      idrep  = 1
+* 3 - Boucle sur les repertoires indiques
+ 30   CONTINUE
+
+* 3.1 - Analyse du nom du repertoire
+        ifrep = lgrep
+*  Recherche debut fin du repertoire
+        ind = INDEX(rep(idrep:ifrep),sepa1(iextl)(1:1))
+        IF (ind.NE.0) ifrep = idrep + ind - 2
+*  Cas particulier ou 2 separateurs se suivent
+        IF (ind.EQ.1) GOTO 31
+        lgd = LONG(rep(idrep:ifrep))
+*  Cas particulier ou il n'y a que des espaces entre 2 separateurs
+        IF (lgd.EQ.0) GOTO 31
+        if (lgd.gt.LOCHAI) then
+          moterr = '(Warning 1) External laws: '//
+     &             'Directory name too long'
+          call erreur(-385)
+          l = 60
+          moterr = ' "'//rep(idrep:idrep+l)//'[...]'//
+     &             rep(ifrep-l:ifrep)//'"'
+          call erreur(-385)
+          moterr = '=> Directory not used'
+          call erreur(-385)
+          iret = iret + 1
+          goto 31
+        end if
+        dirb = ' '
+        dirb = rep(idrep:ifrep)
+*  Cas particulier du melange de "separateurs de repertoire" (sepa2)
+        DO i = 1, lgd
+          IF (dirb(i:i).EQ.sepa2(iextl)(2:2)) THEN
+            dirb(i:i) = sepa2(iextl)(1:1)
+          END IF
+        END DO
+*  On ajoute le separateur en fin de repertoire s'il manque
+        IF (dirb(lgd:lgd).NE.sepa2(iextl)(1:1)) THEN
+          if (lgd.eq.LOCHAI) then
+            moterr = '(Warning 1) External laws: '//
+     &               'Directory name too long'
+            call erreur(-385)
+            l = 60
+            moterr = ' "'//dirb(1:1+l)//'[...]'//
+     &               dirb(lgd-l-1:lgd)//sepa2(iextl)(1:1)//'"'
+            call erreur(-385)
+            moterr = '=> Directory not used'
+            call erreur(-385)
+            iret = iret + 1
+            goto 31
+          end if
+          lgd = lgd + 1
+          dirb(lgd:lgd) = sepa2(iextl)(1:1)
+        END IF
+
+        CALL LEXTDN(dirb,ios)
+        IF (ios.GT.0) THEN
+      if (logdbg) then
+          moterr = '(Warning 2) External laws: '//
+     &             'Directory already read'
+          call erreur(-385)
+          if (lgd.gt.125) then
+            l = 60
+            moterr = ' "'//dirb(1:1+l)//'[...]'//dirb(lgd-l:lgd)//'"'
+          else
+            moterr = ' "'//dirb(1:lgd)//'"'
+          end if
+          call erreur(-385)
+      end if
+          GOTO 31
+        END IF
+
+* 3.2 - Ouverture du repertoire "complet"
+        ios = 0
+        CALL fopendir(dirb(1:lgd)//CHAR(0),ios,iajout)
+        IF (ios.NE.0) THEN
+      if (logdbg) then
+          moterr = '(Warning 3) External laws: '//
+     &             'Directory cannot be opened'
+          call erreur(-385)
+          if (lgd.gt.125) then
+            l = 60
+            moterr = ' "'//dirb(1:1+l)//'[...]'//dirb(lgd-l:lgd)//'"'
+          else
+            moterr = ' "'//dirb(1:lgd)//'"'
+          end if
+          call erreur(-385)
+          moterr = '=> Directory not used'
+          call erreur(-385)
+      end if
+          iret = iret + 1
+          GOTO 31
+        END IF
+
+* On ajoute le repertoire a la liste :
+        ndiext = ndiext + 1
+        IF (ndiext.GT.nbdir) THEN
+          nbdir = nbdir + 256
+          SEGADJ,sdiext
+        END IF
+        sdiext.dirloi(ndiext) = ' '
+        sdiext.dirloi(ndiext)(1:lgd) = dirb(1:lgd)
+      if (logdbg) then
+        write(ioimp,*) 'Ajout du repertoire',ndiext
+        write(ioimp,*) ' "'//dirb(1:lgd)//'"'
+      end if
+
+* 3.3 - Boucle sur le contenu du repertoire
+        nlopre = nloext
+ 310    CONTINUE
+          entr = CHAR(0)
+          CALL freaddir(ientr)
+          IF (ICHAR(entr(1:1)).EQ.0) GOTO 320
+* 3.3.1 - Analyse du fichier trouve : extension attendue... 
+          lgf = LONG(entr) - 1
+          if (lgf.LE.0) goto 310
+          IF (lgf.LT.nextl) GOTO 310
+%IF WIN32,WIN64
+          CALL CHCASS(entr(lgf-nextl+1:lgf),0,ficb(1:nextl))
+%ELSE
+          ficb(1:nextl) = entr(lgf-nextl+1:lgf)
+%ENDIF
+          IF (ficb(1:nextl).NE.sextl(iextl)(1:nextl)) GOTO 310
+          if (lgf.gt.LOCHAI) then
+            moterr = '(Warning 4) External laws: '//
+     &               'Library name too long'
+            call erreur(-385)
+            if (lgf.gt.125) then
+              l = 60
+              moterr = ' "'//entr(1:1+l)//'[...]'//entr(lgf-l:lgf)//'"'
+            else
+              moterr = ' "'//entr(1:lgf)//'"'
+            end if
+            call erreur(-385)
+            moterr = '=> Library not used'
+            call erreur(-385)
+            iret = iret + 1
+            goto 310
+          end if
+          lgf = lgf - nextl
+          ficb = ' '
+          ficb(1:lgf) = entr(1:lgf)
+          CALL LEXTFN(ficb,ios)
+          IF (ios.GT.0) then
+      if (logdbg) then
+            moterr = '(Warning 5) External laws: '//
+     &               'Library already found'
+            call erreur(-385)
+            if (lgf.gt.120) then
+              l = 58
+              moterr = ' "'//ficb(1:1+l)//'[...]'//ficb(lgf-l:lgf)//
+     &                 sextl(iextl)(1:nextl)//'"'
+            else
+              moterr = ' "'//ficb(1:lgf)//sextl(iextl)(1:nextl)//'"'
+            end if
+            call erreur(-385)
+            moterr = 'in the following directory'
+            call erreur(-385)
+            if (lgd.gt.125) then
+              l = 60
+              moterr = ' "'//dirb(1:1+l)//'[...]'//dirb(lgd-l:lgd)//'"'
+            else
+              moterr = ' "'//dirb(1:lgd)//'"'
+            end if
+            call erreur(-385)
+            moterr = 'already found in the previous directory'
+            call erreur(-385)
+            i_z = sloext.idrloi(ios)
+            l_z = LONG(sdiext.dirloi(i_z))
+            if (l_z.gt.125) then
+              l = 60
+              moterr = ' "'//sdiext.dirloi(i_z)(1:1+l)//'[...]'//
+     &                 sdiext.dirloi(i_z)(l_z-l:l_z)//'"'
+            else
+              moterr = ' "'//sdiext.dirloi(i_z)(1:l_z)//'"'
+            end if
+            call erreur(-385)
+            moterr = '=> Library not added'
+            call erreur(-385)
+      end if
+            goto 310
+          END IF
+
+          nloext = nloext + 1
+          IF (nloext.GT.nbloi) THEN
+            nbloi = nbloi + 256
+            SEGADJ,sloext
+          END IF
+          sloext.ficloi(nloext) = ' '
+          sloext.ficloi(nloext)(1:lgf) = ficb(1:lgf)
+          sloext.idrloi(nloext) = ndiext
+      if (logdbg) then
+        write(ioimp,*) 'Ajout bibliotheque',nloext
+        CALL LEXTPR(nloext)
+      end if
+
+*DEV* 3.3.3 - Analyse de la bibliotheque :
+*DEV* 3.3.3.1 - Ouverture de la bibliotheque
+*DEV          CALL DLOPEN(dirb(1:lgd)//ficb(1:lgf)//sextl(iextl)(1:nextl)//CHAR(0),...)
+*DEV          IF (...) THEN
+*DEV            nloext = nloext - 1
+*DEV            GOTO 3120
+*DEV          END IF
+*DEV* 3.3.3.2 - Boucle sur le contenu de la bibiotheque
+*DEV 3110     CONTINUE
+*DEV*     on recupere le i-eme fonction dans la bibliotheque
+*DEV            nomb = ' '
+*DEV            lgn = LOCHAI
+*DEV            CALL LEXTNN(nomb,ios)
+*DEV            IF (ios.GT.0) then
+*DEV              moterr = nomb
+*DEV              CALL ERREUR(-302)
+*DEV              nloext = nloext - 1
+*DEV              goto 3110
+*DEV            END IF
+*DEV            nfcext = nfcext + 1
+*DEV            IF (nfcext.GT.nbfct) THEN
+*DEV              nbfct = nbfct + 256
+*DEV              SEGADJ,sfcext
+*DEV            END IF
+*DEV            sfcext.nomloi(nfcext) = ' '
+*DEV            sfcext.nomloi(nfcext)(1:lgn) = nomb(1:lgn)
+*DEV            sfcext.idfloi(nfcext) = nloext
+*DEV            sfcext.iptloi(nfcext) = 0
+*DEV          GOTO 3110
+*DEV* 3.3.3.3 - Fermeture de la bibiotheque
+*DEV 3120     CONTINUE
+*DEV* LA FERMETURE
+
+        GOTO 310
+* 3.3 - Fin de la boucle sur le contenu du repertoire
+
+ 320    CONTINUE 
+        CALL fclosedir
+* Si pas de bibliotheque dans le repertoire, on le retire :
+        IF (nloext .LE. nlopre) then
+          ndiext = ndiext - 1
+      if (logdbg) then
+          moterr = '(Warning 6) External laws: '//
+     &             'No new librairies found in the directory'
+          call erreur(-385)
+          if (lgd.gt.125) then
+            l = 60
+            moterr = ' "'//dirb(1:1+l)//'[...]'//dirb(lgd-l:lgd)//'"'
+          else
+            moterr = ' "'//dirb(1:lgd)//'"'
+          end if
+          call erreur(-385)
+          moterr = '=> Directory not used'
+          call erreur(-385)
+      end if
+        END IF
+
+* Il faut sauter le separateur
+ 31     CONTINUE
+        idrep = ifrep + 2
+* Fin de la chaine rep atteinte ?
+        IF (idrep.GE.lgrep) GOTO 4
+      GOTO 30
+* 3 - Fin de la boucle sur les repertoires
+
+* 4 - Fin du traitement initial des repertoires de bibliotheques de loi
+ 4    CONTINUE
+      if ( (ndiext.eq.0 .and. nloext.ne.0) .or.
+     &     (ndiext.ne.0 .and. nloext.eq.0) ) then
+        moterr = '(Fatal Error) External laws: '// 
+     &           'ndiext & nloext not consistent'
+        call erreur(-385)
+        call erreur(5)
+      end if
+      nbdir = ndiext
+      SEGADJ,sdiext
+      SEGACT,sdiext*NOMOD
+      nbloi = nloext
+      SEGADJ,sloext
+      SEGACT,sloext*NOMOD
+*DEV      nbfct = nfcext
+*DEV      SEGADJ,sfcext
+*DEV      SEGACT,sfcext*NOMOD
+*DEV      CALL SAVSEG(sdiext)
+*DEV      CALL SAVSEG(sloext)
+*DEV      CALL SAVSEG(sdiext)
+
+      if (logdbg) CALL LEXTPR(0)
+
+      RETURN
+
+*----------------------------------------------------------------------*
+*  conversion repertoire numero :
+      ENTRY LEXTDN(repl,iret)
+
+      iret = 0
+      lgd = LONG(repl)
+      if (logdbg) write(ioimp,*) 'LEXTDN ='//repl(1:lgd)//'=',lgd
+      if (lgd.LE.0 .OR. lgd.GT.LOCHAI) RETURN
+**      SEGACT,sdiext*NOMOD
+      DO i = 1, ndiext
+        l_z = LONG(sdiext.dirloi(i))
+        IF (l_z .EQ. lgd) THEN
+          IF (sdiext.dirloi(i)(1:lgd).EQ.repl(1:lgd)) THEN
+            iret = i
+      if (logdbg) write(ioimp,*) 'LEXTDN = repl trouve en',iret
+            RETURN
+          END IF
+        END IF
+      END DO
+      if (logdbg) write(ioimp,*) 'LEXTDN = repl non trouve',iret
+      RETURN
+
+*----------------------------------------------------------------------*
+*  conversion fichier numero :
+      ENTRY LEXTFN(ficl,iret)
+
+      iret = 0
+      lgf = LONG(ficl)
+      if (logdbg) write(ioimp,*) 'LEXTFN ='//ficl(1:lgf)//'=',lgf
+      if (lgf.LE.0 .OR. lgf.GT.LOCHAI) RETURN
+**      SEGACT,sloext*NOMOD
+      DO i = 1, nloext
+        l_z = LONG(sloext.ficloi(i))
+        IF (l_z.EQ.lgf) THEN
+          IF (sloext.ficloi(i)(1:lgf).EQ.ficl(1:lgf)) THEN
+            iret = i
+      if (logdbg) write(ioimp,*) 'LEXTFN = ficl trouve en',iret
+            RETURN
+          END IF
+        END IF
+      END DO
+      if (logdbg) write(ioimp,*) 'LEXTFN = ficl non trouve',iret
+      RETURN
+
+*----------------------------------------------------------------------*
+*  conversion nom numero
+      ENTRY LEXTNN(noml,iret)
+
+      iret = 0
+      lgn = LONG(noml)
+      if (lgn.LE.0) RETURN
+*dbg      write(ioimp,*) 'LEXTNN ='//noml(1:lgn)//'='
+*DEV***      SEGACT,sfcext*NOMOD
+*DEV*      DO i = 1, nfcext
+*DEV*        l_z = LONG(sfcext.nomloi(i))
+*DEV*        IF (l_z.EQ.lgn) THEN
+*DEV*          IF (sfcext.nomloi(i)(1:lgn).EQ.noml(1:lgn)) THEN
+*DEV*            iret = i
+*DEV*            RETURN
+*DEV*          END IF
+*DEV*        END IF
+*DEV*      END DO
+      RETURN
+
+*----------------------------------------------------------------------*
+* Recherche de la bibliotheque et ouverture de la loi demandee
+      ENTRY LEXTOP(ficl,noml,npar,iloi,iptr)
+
+      iloi = 0
+      iptr = -3
+
+*  Recherche "fichier" dans une chaine "(chemin_repertoire/)fichier(.ext)" :
+      lgf = LONG(ficl)
+      if      (lgf.LE.0) then
+        moterr = 'LEXTOP(0.1) - Null size String !'
+        call erreur(-385)
+        call erreur(21)
+        return
+      else if (lgf.gt.LOCHAI) then
+        moterr = 'LEXTOP(0.2) - String too long - Very strange !'
+        call erreur(-385)
+        call erreur(5)
+        return
+      end if
+* Recherche d'une extension si elle est fournie
+      DO i = 1, NBLIB
+        j = LONG(sextl(i))
+        IF (lgf.GT.j) THEN
+%IF WIN32,WIN64
+          CALL CHCASS(ficl(lgf-j+1:lgf),0,ficb(1:j))
+%ELSE
+          ficb(1:j) = ficl(lgf-j+1:lgf)
+%ENDIF
+          IF (ficb(1:j).EQ.sextl(i)(1:j)) THEN
+            lgf = lgf - j
+            GOTO 10
+          END IF
+        END IF
+      END DO
+ 10   CONTINUE
+      ficb = ' '
+      ficb(1:lgf) = ficl(1:lgf)
+* Recherche d'un chemin (en tete) si donne
+      ind = 0
+      DO i = 1, NBLIB
+        j = INDEX(ficb(1:lgf),sepa2(i)(1:1),.TRUE.)
+        ind = MAX(ind,j)
+        j = INDEX(ficb(1:lgf),sepa2(i)(2:2),.TRUE.)
+        ind = MAX(ind,j)
+      END DO
+* Nom de la bibliotheque trouve
+      ficb = ' '
+      ficb = ficl(ind+1:lgf)
+      lgf  = LONG(ficb)
+      if (lgf.LE.0) then
+        moterr = 'LEXTOP(1.2) - Null size String !'
+        call erreur(-385)
+        call erreur(21)
+        return
+      end if
+      ideb = 1
+      ifin = lgf
+      CALL LEXTFN(ficb(ideb:ifin),ios)
+      IF (ios.LE.0) THEN
+%IF WIN32,WIN64
+        CALL CHCASS(ficb(1:3),0,dirb(1:3))
+%ELSE
+        dirb(1:3) = ficb(1:3)
+%ENDIF
+        IF (dirb(1:3).EQ.'lib') THEN
+          ideb = 1+3
+          CALL LEXTFN(ficb(ideb:ifin),ios)
+        ELSE
+          if (lgf+3.gt.LOCHAI) then
+            moterr = 'External law (6): Library name too long'
+            call erreur(-385)
+            if (lgf.gt.122) then
+              l = 58
+              moterr = ' "lib'//ficb(1:1+l)//'[...]'//
+     &                 ficb(lgf-l:lgf)//'"'
+            else
+              moterr = ' "lib'//ficb(1:lgf)//'"'
+            end if
+            call erreur(-385)
+            call erreur(21)
+            return
+          end if
+          CALL LEXTFN('lib'//ficb(ideb:ifin),ios)
+        END IF
+      END IF
+      IF (ios.LE.0) THEN
+        moterr = 'External law: Library "(lib)'//ficb(ideb:ifin)//
+     &           '" not found!'
+        call erreur(-385)
+        call erreur(21)
+        RETURN
+      ENDIF
+* Librairie trouvee
+      ficl = sloext.ficloi(ios)(1:lgf)
+      iloi = ios
+      if (logdbg) call lextpr(ios)
+
+      lgn  = LONG(noml)
+      if      (lgn.LE.0) then
+        moterr = 'LEXTOP(3.1) - Null size String !'
+        call erreur(-385)
+        call erreur(5)
+        return
+      else if (lgn.gt.LOCHAI) then
+        moterr = 'LEXTOP(3.2) - String too long - Very strange !'
+        call erreur(-385)
+        call erreur(5)
+        return
+      end if
+
+**      SEGACT,sloext*NOMOD
+      idi  = sloext.idrloi(ios)
+      lgd  = LONG(sdiext.dirloi(idi))
+      lgf  = LONG(sloext.ficloi(ios))
+      lge  = lgd + lgf + nextl
+      entr = ' '
+      entr(1:lgd)         = sdiext.dirloi(idi)(1:lgd)
+      entr(lgd+1:lgd+lgf) = sloext.ficloi(ios)(1:lgf)
+      entr(lgd+lgf+1:lge) = sextl(iextl)(1:nextl)
+      ip     = npar
+      lmeptr = 0
+      CALL PTRLOI(entr(1:lge)//CHAR(0),lge, noml(1:lgn)//CHAR(0),lgn,
+     &            ip, lmeptr)
+      IF (lmeptr.LE.0) THEN
+        MOTERR = ' '
+        i_z = MIN(32,lgn)
+        MOTERR(1 :i_z) = noml(1:i_z)
+        i_z = MIN(32,lgf)
+        MOTERR(32+1:32+i_z) = entr(lgd+1:lgd+i_z)
+        i_z = MIN(64,lgd)
+        MOTERR(64+1:64+i_z) = entr(1:i_z)
+        CALL ERREUR(1113)
+      END IF
+      iptr = lmeptr
+
+      RETURN
+
+*----------------------------------------------------------------------*
+*  Affichage d'une ou de toutes les lois trouvees :
+      ENTRY LEXTPR(iret)
+
+* iret = 0 : affichage d'un recapitulatif complet
+* iret > 0 : affichage de la bibliotheque de numero iret
+      IF (ndiext.LE.0) RETURN
+      IF (nloext.LE.0) RETURN
+      IF (iret.LT.0 .OR. iret.GT.nloext) RETURN
+
+* Travail sur les formats d'affichage
+      entr ='(A,I ) (A,I ,A) (A,I ) (A,I ,A)'
+**           1   56 8   1  1 1   22 2   2  3
+**                      2  5 7   12 4   8  1
+      id = INT(LOG10(REAL(ndiext))) + 1
+      if (id.lt.1 .or. id.gt.6) then
+        moterr = '(Error) Too many directories'
+        call erreur(-385)
+        call erreur(5)
+        return
+      end if
+      il = INT(LOG10(REAL(nloext))) + 1
+      if (il.lt.1 .or. il.gt.6) then
+        moterr = '(Error) Too many libairies'
+        call erreur(-385)
+        call erreur(5)
+        return
+      end if
+      write(entr( 5: 5),FMT='(I1)') id
+      write(entr(12:12),FMT='(I1)') id
+      write(entr(21:21),FMT='(I1)') il
+      write(entr(28:28),FMT='(I1)') il
+
+* Bornes de la boucle d'affichage des bibliotheques
+      IF (iret.EQ.0) THEN
+        ideb = 1
+        ifin = nloext
+      ELSE
+        ideb = iret
+        ifin = iret
+      END IF
+
+* Affichage de l'entete selon la demande :
+      IF (iret.EQ.0) THEN
+        write(ioimp,*)
+        write(ioimp,*) 'External Laws Summary:'
+        write(ioimp,*) '----------------------'
+      if (logdbg) then
+        write(ioimp,fmt=entr(1:6))
+     &              ' Number of directories found: ',ndiext
+        write(ioimp,*) '----------------------'
+        DO i = 1, ndiext
+          dirb = sdiext.dirloi(i)
+          lgd  = LONG(dirb)
+          write(ioimp,fmt=entr(8:15))
+     &                ' Dir.#',i,' "'//dirb(1:lgd)//'"'
+        END DO
+        write(ioimp,*) '----------------------'
+      end if
+        write(ioimp,fmt=entr(17:22))
+     &              ' Number of libraries ('//sextl(iextl)(1:nextl)//
+     &              ') found: ',nloext
+        write(ioimp,*) '----------------------'
+      ELSE
+      END IF
+
+      if (logdbg) then
+      DO i = ideb,ifin
+        idi = sloext.idrloi(i)
+        lgd = LONG(sdiext.dirloi(idi))
+        lgf = LONG(sloext.ficloi(i))
+
+        write(ioimp,FMT=entr(17:22)) ' External Law Library #',i
+        write(ioimp,*) ' - Name "'//sloext.ficloi(i)(1:lgf)//'"'
+        write(ioimp,*) ' - Dir. "'//sdiext.dirloi(idi)(1:lgd)//'"'
+      END DO
+      end if
+
+      IF (iret.EQ.0) THEN
+        write(ioimp,*)
+        write(ioimp,*) '***********************************************'
+     &               //'************************'
+        write(ioimp,*)
+      ELSE
+      END IF
+      write(ioimp,*)
+
+      RETURN
+
+*----------------------------------------------------------------------*
+      END
+
+ 

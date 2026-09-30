@@ -1,0 +1,157 @@
+C DRPR3D    SOURCE    PV090527  23/01/27    21:15:27     11574          
+      subroutine  DrPr3D(young,hpla,delta,beta,rc,epicc,epleq,rmin,
+     #sig13,bwpw,bgpg,bsps,tauc,nc,np,na,ig,fa,dpfa_ds,dgfa_ds,dpfa_dp,
+     #dpfa_dr,dra_dl,fg,i,precision2,rt_dp,drpr,bw,pw,kwrc,
+     #epeqpc,rt_app)
+     
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)  
+
+c     variables externes
+      real*8 young,epicc,epleq,rc,rmin,hpla,delta,beta,kwrc
+      real*8 sig13(3),bwpw,bgpg,bsps,precision2
+      real*8 sigs,tauc,rt_dp
+      integer nc,np,na,ig(nc),i
+      real*8 fa(nc),dpfa_ds(nc,6),dgfa_ds(nc,6),dpfa_dp(nc,np)
+      real*8 dpfa_dr(nc),dra_dl(nc),fg(nc),bw,pw,epeqpc,rt_app
+
+c     variables locales      
+      real*8 coeff,rceff,dr_dp,eppc1,rseuil,epseuil,taulim
+      real*8 x3(3),indict3(3),sigs_3,delta1,beta1,taue2,rpiceff
+      real*8 sigd6(6)
+      real*8 Fp,depleq_dl,fglim,x2,fg1,dfc_dpg,seq
+      integer j,ia
+      logical drpr  
+      
+c          le critere est évalué avec des contraintes limitées soit
+c          par rt_dp soit pas rt_app
+           sig_max=min(rt_dp,rt_app)      
+      
+c          rapport entre la resistance à la compression et au cisaillement
+           coeff=(1.d0/dsqrt(3.d0)-delta/3.d0)
+c          prise en compte de l ecrouissage en cisaillement pre pic
+           call ecrp3d(rceff,dr_dp,rc,young,epicc,epleq,eppc1,
+     #     rseuil,epseuil,rmin,hpla,beta,epeqpc,rpiceff)     
+c          passage en contrainte de cisaillement 
+c           print*,'ds drpr3d rceff',rceff,'dr/dp',dr_dp          
+           taulim=max(rceff*coeff,rc*coeff*precision2)
+c          calcul des contraintes equivalentes totales
+           sigs=0.d0         
+           do j=1,3
+c            contrainte normale matrice a comparer a la traction matrice
+c            en enlevant la containte capilliare ce qui revient a 
+c            rajouter delta1*bw*pw a la resistance au cisaillement
+c            ce qui en gendre dpfa_dpw=-(-delta1*bw)
+             seq=sig13(j)-bgpg-bsps-bwpw
+             if(seq.gt.sig_max) then
+                 x3(j)=sig_max
+c                derive de la contrainte apparente / a la vraie  
+                 indict3(j)=1.d0                  
+             else
+                 x3(j)=seq
+c                derive de la contrainte apparente / a la vraie  
+                 indict3(j)=1.d0                 
+             end if
+c            trace de sigma apparente             
+             sigs=sigs+x3(j)            
+           end do
+c          partie spherique vraie : -p           
+           sigs_3=sigs/3.d0            
+c          coeff de Drucker Prager pour le critere           
+           delta1=delta
+c          coeff de Drucker Prager pour la dilatance           
+           beta1=beta
+c          calcul du deviateur           
+           taue2=0.d0
+           do j=1,6
+             if (j.le.3) then
+                sigd6(j)=x3(j)-sigs_3
+                taue2=taue2+sigd6(j)**2                
+             else
+                sigd6(j)=0.d0
+             end if
+           end do
+           taue=sqrt(taue2/2.d0) 
+c          fonction seuil pour drucker prager 
+c          limitation de la contrainte spherique en cas de traction
+c          if (sigs_3.lt.taulim/delta1) then         
+           fg1=(taue+delta1*sigs_3)-taulim
+           fg(i)=fg1           
+c          taux de cisaillement
+           tauc=max((taue+delta1*sigs_3)/(rpiceff*coeff),0.d0)          
+c           print*,'ds drpr3d tauc:',tauc           
+c          pseudo potentiel plastique
+           Fp=(taue+beta1*sigs_3)
+c          initialisation d epl eq / d lambda           
+           depleq_dl=0.d0           
+c          test franchissement du critere 
+c          stockage de la valeur limite du critere
+           fglim=(taulim*precision2) 
+c          on active le critere que si les rgi sont deja satisfaites
+c          et si la dilatance induit bien une dissipation           
+           if((fg1.gt.fglim).and.(Fp.gt.fglim)) then
+c              indicateur de franchissement du critere 
+               drpr=.true.                          
+c              print*,'rceff dans crir3d',rceff
+c              print*,'(taue+delta*sigs_3)-taulim>0'
+c              print*,fg(i),taue,delta,sigs_3,taulim
+c              read*
+c              critere  de cisaillement actif
+c              increment du nbre de critere actifs            
+               na=na+1
+               ia=na                 
+c              tableau de correspondance i global <- i actif              
+               ig(ia)=i
+c              stockage dans la table des criteres actifs              
+               fa(ia)=fg1
+c              derive de fg et direction de l ecoulement
+               x2=0.5d0/taue
+c              calcul des derivees dans les 6 directions              
+               do k=1,6                
+c               termes de la diagonale                   
+                if (k.le.3) then 
+                   x0=x2*sigd6(k)
+c                  definition des derivees du potentiel / sigma 
+                   dpfa_ds(ia,k)=(x0+delta1/3.d0)*indict3(k)
+c                  definition des derives du pseudo potentiel
+c                  reste non associee meme si perte de l effet du confinement
+c                  sur le critere
+c                   dgfa_ds(ia,k)=(x0+beta1/3.d0)*indict3(k) 
+                   dgfa_ds(ia,k)=(x0+beta1/3.d0)                   
+                else 
+c                  potentiel
+                   x0=x2*sigd6(k)
+                   dpfa_ds(ia,k)=x0
+c                  direction d ecoulement             
+c                  calcul de la direction de l ecoulement 
+c                  gama (et pas epsilon !)                     
+                   dgfa_ds(ia,k)=2.d0*x0                  
+                end if
+                if (k.le.3) then
+                    depleq_dl=depleq_dl+x3(k)*dgfa_ds(ia,k)
+                end if
+               end do
+c              derivee de la fonction / pressions 
+               do k=1,np              
+                 dpfa_dp(ia,k)=0.d0
+               end do
+c              prise en compte de l effet benefique de la tension capillaire
+               dpfa_dp(ia,1)=kwrc*bw               
+c              normalisation du tau d evolution de la def plastique equivalente
+               depleq_dl=depleq_dl/Rceff
+c              derivee de la fonction / resistance
+               dpfa_dr(ia)=-1.d0              
+c              derive de la resistance par rapport au multiplicateur plastique
+c              on multiplie par coeff car critere en cisaillement
+               dra_dl(ia)=dr_dp*depleq_dl*coeff
+              end if
+              
+c             print*,'a la fin de DRPR3D'
+c             print*,young,hpla,delta,beta,rc,epicc,epleq,rmin,
+c     #       sig13,bwpw,bgpg,bsps,tauc,nc,np,na,ig(1),fg(1),i  
+c             read*               
+              return
+              end
+              
+              
+ 

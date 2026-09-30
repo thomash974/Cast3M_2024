@@ -1,0 +1,156 @@
+C DEVPR2    SOURCE    BP208322  20/09/18    21:15:41     10718          
+
+c       SUBROUTINE DEVPR2(XPHILB,FTOTB,FTOTBA,KTOTXB,KTOTVB,KTOTXBA,
+c      &     KTOTVBA,IBASB,INMSB,IPLSB,IORSB,NSB,NPLSB,NA2,IDIMB,NPLB,NA1)
+      SUBROUTINE DEVPR2(XPHILB,FTOTB,FTOTBA,KTOTXB,KTOTVB,KTOTXA,
+     &     KTOTVA,IBASB,INMSB,IPLSB,IORSB,NSB,NPLSB,NA2,IDIMB,NPLB,NA1)
+     
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateurs DYNE/DYNC                                           *
+*     ________________________________________________               *
+*                                                                    *
+*     Projection des forces base r{elle sur base A.                  *
+*                                                                    *
+*     Param}tres:                                                    *
+*                                                                    *
+* e   XPHILB  Tableau des vecteurs propres aux points de liaisons.   *
+*             XPHILB(iBase,jptB,i,idim)                              *
+* e   FTOTB   Tableau des forces sur base B.                         *
+*  s  FTOTBA  Tableau des forces base B projet{es sur base A.        *
+*             F_i = \phi_i(x_{jptB},id)^T * F(x_{jptB},id)
+*                 = projection sur le mode i de la force de liaison IP
+*                   au point jptB (IPLB) selon la direction id
+* e   KTOTB   Tableau des raideurs tangentes sur base B              *
+*  s  KTOTBA  Tableau des raiduers tangentes base B projetees sur    *
+*             base A.
+* e   IBASB   Indique dans quelle sous base appartient le point de   *
+*             liaison.                                               *
+* e   INMSB   Nombre de modes par sous base.                         *
+* e   IORSB   Donne l'indice du premier mode de la sous base dans    *
+*             l'ensemble des modes.                                  *
+* e   NSB     Nombre total de sous base.                             *
+* e   NPLSB   Nombre total de points intervenant dans les liaisons   *
+*             d'une sous base.                                       *
+* e   NPLB    Nombre total de points intervenant dans les liaisons.  *
+* e   IDIMB   Nombre de ddl retenus.                                 *
+* e   NA1     Nombre total d'inconnues en base A.                    *
+*                                                                    *
+*                                                                    *
+*--------------------------------------------------------------------*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      INTEGER IBASB(*),INMSB(*),IPLSB(*),IORSB(*)
+      REAL*8  XPHILB(NSB,NPLSB,NA2,*),FTOTB(NPLB,*),FTOTBA(*)
+      REAL*8  KTOTXB(NPLB,IDIMB,IDIMB),KTOTVB(NPLB,IDIMB,IDIMB) 
+c       REAL*8  KTOTXBA(NA1,NA1), KTOTVBA(NA1,NA1) 
+      REAL*8  KTOTXA(NA1,NA1), KTOTVA(NA1,NA1) 
+c       REAL*8  KTOTXBA0(NA1,NA1), KTOTVBA0(NA1,NA1) 
+c       REAL*8  KTEMPX(NA1,IDIMB), KTEMPV(NA1,IDIMB)      
+c       REAL*8  MPAS(IDIMB,NA1), MPAST(NA1,IDIMB)
+
+*----------------------------------------------------------------------*
+*     Initialisation a 0
+       DO IN = 1,NA1
+         FTOTBA(IN) = 0.D0
+       ENDDO
+c c        prevoir if (janalytic) then
+c        DO IM = 1,NA1 
+c        DO IN = 1,NA1
+c            KTOTXBA(IN,IM) = 0. 
+c            KTOTVBA(IN,IM) = 0.
+c        ENDDO
+c        ENDDO
+c c        prevoir endif
+
+*----------------------------------------------------------------------*
+*      Boucle sur les points des liaisons base B : l=1..
+       DO IP = 1,NPLB
+       
+         ISB  = IBASB(IP)
+         IPLB = IPLSB(IP)
+         NA3  = INMSB(ISB)
+         INA2 = IORSB(ISB) - 1 
+
+*        Boucle sur les modes : i=1..  (IN = i de la sous base, IN2 = i global)       
+         DO IN = 1,NA3
+            XRET = 0.D0
+*           Boucle sur les directions : k=1..3  
+            DO ID = 1,IDIMB
+               XRET = XRET + XPHILB(ISB,IPLB,IN,ID) * FTOTB(IP,ID)
+            ENDDO            
+            IN2 = INA2 + IN
+*           Cumul des forces projetees : 
+*           F_i = \sum_l (\sum_k  (\Phi_i(x_l)*e_k) * F_lk)
+            FTOTBA(IN2) = FTOTBA(IN2) + XRET
+         ENDDO
+         
+*        Projection des matrices tangentes
+c *        (pour l'instant le cas avec plusieurs bases n'est pas prevu)
+c          IF (INA2.NE.0) THEN 
+c *          Si une unique base, NA3 = NA1 et INA2 = 0
+c            WRITE(*,*) 'Oh, no. INA2 = ', INA2
+c            CALL ERREUR(491)
+c            CALL ERREUR(5)
+c            STOP
+c          ENDIF         
+c *        Projection des matrices tangentes
+c *          Matrice de passage (def. modale) et sa transposee
+c            DO JJ = 1,IDIMB 
+c            DO II = 1,NA1
+c                MPAST(II,JJ) = XPHILB(ISB,IPLB,II,JJ)
+c                MPAS(JJ,II) = MPAST(II,JJ)
+c            ENDDO 
+c            ENDDO    
+c *          KTOTX    
+c            CALL PRMATNC(NA1,IDIMB,IDIMB,MPAST,KTOTXB,KTEMPX)
+c            CALL PRMATNC(NA1,IDIMB,NA1,KTEMPX,MPAS,KTOTXBA0)    
+c *          KTOTV      
+c            CALL PRMATNC(NA1,IDIMB,IDIMB,MPAST,KTOTVB,KTEMPV)
+c            CALL PRMATNC(NA1,IDIMB,NA1,KTEMPV,MPAS,KTOTVBA0)    
+c            DO J = 1,NA1 
+c            DO I = 1,NA1
+c                KTOTXBA(I,J) = KTOTXBA(I,J) + KTOTXBA0(I,J) 
+c                KTOTVBA(I,J) = KTOTVBA(I,J) + KTOTVBA0(I,J) 
+c            ENDDO
+c            ENDDO
+
+cbp : ci-dessus me semble faux... --> on reecrit
+
+*        Projection des matrices tangentes calculees analytiquement
+c        prevoir if (janalytic) then
+*        Boucle 1 sur les modes : i=1..  (IN = i de la sous base, IN2 = i global)       
+         DO IN = 1,NA3
+         IN2 = INA2 + IN
+*        Boucle 2 sur les modes : j=1..       
+         DO JN = 1,NA3
+         JN2 = INA2 + JN
+            XRET = 0.D0
+            VRET = 0.D0
+*           Boucle 1 sur les directions : k=1..3  
+            DO ID = 1,IDIMB
+*           Boucle 2 sur les directions : k'=1..3
+            DO JD = 1,IDIMB
+               XRET = XRET + ( XPHILB(ISB,IPLB,IN,ID) * KTOTXB(IP,ID,JD) 
+     &                       * XPHILB(ISB,IPLB,JN,JD) )
+               VRET = VRET + ( XPHILB(ISB,IPLB,IN,ID) * KTOTVB(IP,ID,JD) 
+     &                       * XPHILB(ISB,IPLB,JN,JD) )
+            ENDDO            
+            ENDDO            
+*           Cumul des raideurs projetees : 
+*           K_ij = \sum_l \sum_k \sum_k'  (\Phi_i(x_l)*e_k) * K_lkk' * (\Phi_j(x_l)*e_k')
+c             KTOTXBA(IN2,JN2) = KTOTXBA(IN2,JN2) + XRET         
+c             KTOTVBA(IN2,JN2) = KTOTVBA(IN2,JN2) + VRET         
+            KTOTXA(IN2,JN2) = KTOTXA(IN2,JN2) + XRET         
+            KTOTVA(IN2,JN2) = KTOTVA(IN2,JN2) + VRET         
+         ENDDO            
+         ENDDO    
+c        prevoir endif
+         
+         
+       ENDDO
+       
+       END
+
+ 
+ 

@@ -1,0 +1,118 @@
+C WFIS3D    SOURCE    PV090527  23/01/27    21:16:09     11574          
+      subroutine wfis3d(depspt3,long3,vdepspt33t,wplt06,wplt6,
+     # vwpl33,vwpl33t,wpl3,wpltx06,wpltx6,vwplx33,vwplx33t,wplx3)
+
+c     calcul des ouvertures de fissures      
+c     Sellier 26/04/2021
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      
+      real*8 depspt3(3),long3(3),vdepspt33t(3,3),wplt06(6),wplt6(6)
+      real*8 vwpl33(3,3),vwpl33t(3,3),wpl3(3),wpltx06(6),wpltx6(6)
+      real*8 vwplx33(3,3),vwplx33t(3,3),wplx3(3)
+      
+      real*8 dwp6(6),dw6(6)
+      integer i
+      real*8 wplt33(3,3)
+      real*8 wplt61(6),wpltx061(6),wpltx61(6)
+      real*8 wpltx33(3,3)
+      
+c     increment des ouvertures
+c      print*,'Dans wfis3d,depspt3,long3'
+      do i=1,3
+        dwp6(i)=depspt3(i)*long3(i)
+c        print*,depspt3(i),long3(i)
+      end do
+      do i=4,6
+         dwp6(i)=0.d0
+      end do
+c     passage des increments en base fixe 
+      call chrep6(dwp6,vdepspt33t,.false.,dw6)
+c     actualisation de l ouverture actuelle (stockage en gamma)
+      do i=1,6
+         wplt6(i)=wplt06(i)+dw6(i)
+      end do
+c     direction principale des ouvertures actuelles
+c     passage en epsilon pour diagonalise
+c     passage 33      
+      call x6x33(wplt6,wplt33)      
+c     diagonalisation   
+c      print*,'dans wfis3d, wplt33'
+c      call afic33(wplt33)  
+      call b3_v33(wplt33,wpl3,vwpl33)  
+c     construction matrice de passage inverse         
+      call traps1(vwpl33t,vwpl33,3)  
+c     on s assure que les valeurs propres sont positives
+      do i=1,3
+        wpl3(i)=max(wpl3(i),0.d0)
+        wplt61(i)=wpl3(i)
+      end do
+      do i=4,6
+        wplt61(i)=0.d0
+      end do
+c     on repasse en matrice de def avec des eps      
+      call chrep6(wplt61,vwpl33t,.false.,wplt6)      
+c      print*,' apres actualisation 1 dans majw3d'      
+c      do i=1,3
+c         print*,'ds majw3d wpl3(',i,')=',wpl3(i)
+c      end do
+
+c     ***** ouvertures maximales ***************************************
+
+c     passage des ouvertures maximale dans la base principale  actuelle 
+      call chrep6(wpltx06,vwpl33,.false.,wpltx061)
+c     comparaison des valeurs normales maxi
+      do i=1,3
+        wpltx61(i)=max(wpltx061(i),wpl3(i))        
+      end do
+c     completion      
+      do i=4,6
+        wpltx61(i)=wpltx061(i)
+      end do
+c     retour en base fixe des ouvertures maximales
+      call chrep6(wpltx61,vwpl33t,.false.,wpltx6)
+c     on a les nouveaux gama      
+c      print*,' apres actualisation 2 dans majw3d'      
+c      do i=1,3
+c         print*,'ds majw3d wpl3(',i,')=',wpl3(i)
+c      end do
+c     diagonalisation des ouvertures maxi pour la base d endommagement
+c     passage 33 pour diagonalisation (apres passage en epsilon)
+c     passage en epsilon pour diagonaliser
+c      do i=1,6
+c          print*,'maj wpltx6(',i,')=',wpltx6(i)
+c      end do          
+c     on diagonalise les epsilon      
+      call x6x33(wpltx6,wpltx33)      
+c     diagonalisation   
+c      print*,' apres actualisation 3 dans majw3d'      
+c      do i=1,3
+c         print*,'ds majw3d wpl3(',i,')=',wpl3(i)
+c      end do
+      call b3_v33(wpltx33,wplx3,vwplx33)
+      do i=1,3
+         wplx3(i)=max(wplx3(i),0.d0)
+      end do
+c      print*,' apres actualisation 4 dans majw3d'      
+c      do i=1,3
+c         print*,'ds majw3d wpl3(',i,')=',wpl3(i)
+c      end do
+c     construction matrice de passage inverse 
+      call traps1(vwplx33t,vwplx33,3)
+      
+c      print*,' apres actualisation  dans majw3d w' 
+c      call afic33( vwpl33)
+c      call afic33( wplt33)
+c      print*,' apres actualisation  dans majw3d wmax'       
+c      call afic33( vwplx33t) 
+c      call afic33( wpltx33)
+      
+c      do i=1,3
+c         print*,'ds majw3d wpl3(',i,')=',wpl3(i)
+c         print*,'ds majw3d wplx3(',i,')=',wplx3(i)
+c      end do
+      return
+      end
+      
+ 

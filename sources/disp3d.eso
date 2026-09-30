@@ -1,0 +1,161 @@
+C DISP3D    SOURCE    PV090527  23/02/07    11:58:35     11592          
+      subroutine disp3d(s,xg,yg,zg,tri,npos)
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+c      include './decl_disc_spher.h' 
+-INC HDECSPH
+
+
+      integer i,j,k,n
+c calcule les surfaces et les orientations des cdg de triangles qui discrétisent une surface
+c en repère sphérique pour 1/2 de sphere
+      
+
+      
+c    orientation des points
+      do i=1,npos+1
+        thet1(i)=(i-1)*ang1/npos       
+        gam1(i)=-pi/2+(i-1)*ang1/npos 
+      end do
+      
+c coordonnées des points
+      do i=1,npos+1
+        do j=1,npos+1
+           x(i,j)=sin(thet1(j))*cos(gam1(i))     
+           y(i,j)=sin(thet1(j))*sin(gam1(i))
+           z(i,j)=cos(thet1(j)) 
+           
+c           open(unit=1,file="ptsphere.res")
+c           if(i.eq.1) then
+c           write(unit=1,fmt='(11g13.5)')
+c           end if
+c           write(unit=1,fmt='(11g13.5)') x(i,j),y(i,j),z(i,j)
+c          splot "ptsphere.res" u 1:2:3 with pm3d at s
+c          splot "ptsphere.res" u 1:2:3 with lines
+        end do
+      end do
+
+c numérotation des triangles
+c n,k : triangles
+c l : sommet
+c m : coordonnée
+      do n=1,npos
+        do k=1,2*npos-2
+c               print*,mod(k,2),k
+            if(k.eq.1) then
+c sommet 1 
+              tri(n,k,1,1)=x(1,1)
+              tri(n,k,1,2)=y(1,1)
+              tri(n,k,1,3)=z(1,1)
+c sommet 2              
+               tri(n,k,2,1)=x(n+1,2)
+               tri(n,k,2,2)=y(n+1,2)
+               tri(n,k,2,3)=z(n+1,2)             
+c sommet 3               
+               tri(n,k,3,1)=x(n,2)
+               tri(n,k,3,2)=y(n,2)
+               tri(n,k,3,3)=z(n,2) 
+               
+            else if (k.eq.2*npos-2) then 
+c sommet 1 
+              tri(n,k,1,1)=x(n+1,npos)
+              tri(n,k,1,2)=y(n+1,npos)
+              tri(n,k,1,3)=z(n+1,npos)
+c sommet 2              
+               tri(n,k,2,1)=x(n,npos)
+               tri(n,k,2,2)=y(n,npos)
+               tri(n,k,2,3)=z(n,npos)             
+c sommet 3               
+               tri(n,k,3,1)=x(npos+1,npos+1)
+               tri(n,k,3,2)=y(npos+1,npos+1)
+               tri(n,k,3,3)=z(npos+1,npos+1)               
+               
+               
+            else if( mod(k,2).eq.0) then 
+c            =0 si pair, 1 si impair   
+c sommet 1             
+              tri(n,k,1,1)=x(n+1,k/2+1)
+              tri(n,k,1,2)=y(n+1,k/2+1)
+              tri(n,k,1,3)=z(n+1,k/2+1)
+c sommet 2              
+               tri(n,k,2,1)=x(n,k/2+1)
+               tri(n,k,2,2)=y(n,k/2+1)
+               tri(n,k,2,3)=z(n,k/2+1)         
+c sommet 3              
+               tri(n,k,3,1)=x(n+1,k/2+2)
+               tri(n,k,3,2)=y(n+1,k/2+2)
+               tri(n,k,3,3)=z(n+1,k/2+2)
+
+            else if( mod(k,2).eq.1) then 
+c            =0 si pair, 1 si impair 
+c sommet 1             
+              tri(n,k,1,1)=x(n,(k-1)/2+1)
+              tri(n,k,1,2)=y(n,(k-1)/2+1)
+              tri(n,k,1,3)=z(n,(k-1)/2+1)
+c sommet 2              
+               tri(n,k,2,1)=x(n+1,(k+1)/2+1)
+               tri(n,k,2,2)=y(n+1,(k+1)/2+1)
+               tri(n,k,2,3)=z(n+1,(k+1)/2+1)         
+c sommet 3              
+               tri(n,k,3,1)=x(n,(k+1)/2+1)
+               tri(n,k,3,2)=y(n,(k+1)/2+1)
+               tri(n,k,3,3)=z(n,(k+1)/2+1)
+            end if
+      end do
+         end do
+
+c calcul des positions des cdg
+
+      do n=1,npos
+        do k=1,2*npos-2    
+         xg(n,k)=(tri(n,k,1,1)+tri(n,k,2,1)+tri(n,k,3,1))/3.d0
+         yg(n,k)=(tri(n,k,1,2)+tri(n,k,2,2)+tri(n,k,3,2))/3.d0
+         zg(n,k)=(tri(n,k,1,3)+tri(n,k,2,3)+tri(n,k,3,3))/3.d0
+         
+c normalisation des vecteurs         
+         xg(n,k)=xg(n,k)/sqrt(xg(n,k)**2+yg(n,k)**2+zg(n,k)**2)
+         yg(n,k)=yg(n,k)/sqrt(xg(n,k)**2+yg(n,k)**2+zg(n,k)**2)
+         zg(n,k)=zg(n,k)/sqrt(xg(n,k)**2+yg(n,k)**2+zg(n,k)**2)
+         
+c           open(unit=2,file="cdgtri.res")
+c           write(unit=2,fmt='(11g13.5)') xg(n,k),yg(n,k),zg(n,k)
+c           splot "cdgtri.res"
+c           splot "cdgtri.res","ptsphere.res" lc "blue" w pm3d at s
+      end do
+        end do         
+
+
+c calcul des surfaces
+      do n=1,npos
+        do k=1,2*npos-2    
+      s(n,k) = sqrt((tri(n, k, 2, 2) * tri(n, k, 1, 1) - tri(n, k, 1,1)* 
+     #tri(n, k, 3, 2) - tri(n, k, 1, 2) * tri(n, k, 2, 1) + tri(n, k, 2,
+     # 1) * tri(n, k, 3, 2) + tri(n, k, 1, 2) * tri(n, k, 3, 1) - tri(n,
+     # k, 3, 1) * tri(n, k, 2, 2)) ** 2 + (tri(n, k, 1, 2) * tri(n, k, 2
+     #, 3) - tri(n, k, 1, 2) * tri(n, k, 3, 3) - tri(n, k, 1, 3) * tri(n
+     #, k, 2, 2) + tri(n, k, 2, 2) * tri(n, k, 3, 3) + tri(n, k, 1, 3) *
+     # tri(n, k, 3, 2) - tri(n, k, 3, 2) * tri(n, k, 2, 3)) ** 2 + (-tri
+     #(n, k, 1, 1) * tri(n, k, 2, 3) + tri(n, k, 1, 1) * tri(n, k, 3, 3)
+     # + tri(n, k, 1, 3) * tri(n, k, 2, 1) - tri(n, k, 2, 1) * tri(n, k,
+     # 3, 3) - tri(n, k, 1, 3) * tri(n, k, 3, 1) + tri(n, k, 3, 1) * tri
+     #(n, k, 2, 3)) ** 2) / 0.2D1
+      end do
+        end do
+        
+
+c    somme des surfaces
+      sum1=sum(s)
+c normalisation des surfaces pour que la somme fasse 2 ang1
+      do n=1,npos
+        do k=1,2*npos-2
+        s(n,k)=s(n,k)/sum1*2*ang1  
+      end do
+        end do
+
+ 
+      return
+
+      end
+ 
+ 

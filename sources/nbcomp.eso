@@ -1,0 +1,114 @@
+C NBCOMP    SOURCE    CB215821  23/12/07    21:15:05     11805          
+      SUBROUTINE NBCOMP(IPOI1,CTYP,NBCO)
+
+C-----------------------------------------------------------------------
+C     Cette SUBROUTINE donne le nombre de composante d'un objet
+C       CHPOINT si CTYP='CHPOINT '
+C       MCHAML  si CTYP='MCHAML  '
+C
+C     Travaille a SEGMENTS ouverts !
+C-----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC SMCHAML
+-INC SMLMOTS
+-INC SMCHPOI
+-INC PPARAM
+
+      CHARACTER*(*)    CTYP
+      PARAMETER       (NCOPRE=100,IDEC=50,IMUL=2)
+C                      NCOPRE : Nombre de composantes preconditionnees (Pour éviter SEGINI)
+C                      IDEC   : Partie arithmetique de l'augmentation du SEGADJ
+C                      IMUL   : Partie geometrique  de l'augmentation du SEGADJ
+      CHARACTER*(LOCOMP) CLIST(NCOPRE),MOTn
+
+      MLMOTS = 0
+      NBCO   = 0
+      IF    (CTYP .EQ. 'CHPOINT')THEN
+        MCHPOI=IPOI1
+        NSOUPO=IPCHP(/1)
+        DO I=1,NSOUPO
+          MSOUPO=IPCHP(I)
+          DO 40 K=1,MSOUPO.NOCOMP(/2)
+            MOTn=MSOUPO.NOCOMP(K)
+            IF(MLMOTS .EQ. 0)THEN
+              DO J=1,NBCO
+                IF (CLIST(J).EQ.MOTn) GOTO 40
+              ENDDO
+            ELSE
+              DO J=1,NBCO
+                IF (MLMOTS.MOTS(J).EQ.MOTn) GOTO 40
+              ENDDO
+            ENDIF
+            NBCO = NBCO + 1
+
+            IF (NBCO .GT. NCOPRE)THEN
+              IF(MLMOTS .EQ. 0)THEN
+                JGN=LOCOMP
+                JGM=NBCO*IMUL + IDEC
+                SEGINI,MLMOTS
+                DO ii=1,NCOPRE
+                  MLMOTS.MOTS(ii)=CLIST(ii)
+                ENDDO
+
+              ELSEIF(NBCO .GT. JGM)THEN
+                JGM=NBCO*IMUL + IDEC
+                SEGADJ,MLMOTS
+              ENDIF
+              MLMOTS.MOTS(NBCO)=MOTn
+
+            ELSE
+              CLIST(NBCO)=MOTn
+            ENDIF
+ 40       CONTINUE
+        ENDDO
+
+      ELSEIF(CTYP .EQ. 'MCHAML')THEN
+        MCHELM=IPOI1
+        N1    =MCHELM.ICHAML(/1)
+        DO IN1=1,N1
+          MCHAML=MCHELM.ICHAML(IN1)
+          N2    =MCHAML.NOMCHE(/2)
+          DO 60 IN2=1,N2
+            MOTn=MCHAML.NOMCHE(IN2)
+            IF(MLMOTS .EQ. 0)THEN
+              DO J=1,NBCO
+                IF (CLIST(J).EQ.MOTn) GOTO 60
+              ENDDO
+            ELSE
+              DO J=1,NBCO
+                IF (MLMOTS.MOTS(J).EQ.MOTn) GOTO 60
+              ENDDO
+            ENDIF
+            NBCO = NBCO + 1
+
+            IF (NBCO .GT. NCOPRE)THEN
+              IF(MLMOTS .EQ. 0)THEN
+                JGN=LOCOMP
+                JGM=NBCO*IMUL + IDEC
+                SEGINI,MLMOTS
+                DO ii=1,NCOPRE
+                  MLMOTS.MOTS(ii)=CLIST(ii)
+                ENDDO
+
+              ELSEIF(NBCO .GT. JGM)THEN
+                JGM=NBCO*IMUL + IDEC
+                SEGADJ,MLMOTS
+              ENDIF
+              MLMOTS.MOTS(NBCO)=MOTn
+
+            ELSE
+              CLIST(NBCO)=MOTn
+            ENDIF
+ 60       CONTINUE
+        ENDDO
+
+      ELSE
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+
+      END
+ 

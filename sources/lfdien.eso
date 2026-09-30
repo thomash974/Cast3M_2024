@@ -1,0 +1,86 @@
+C LFDIEN    SOURCE    PV        21/07/07    21:15:01     11062          
+      SUBROUTINE LFDIEN(NBAND,SEGTAB,iretou,IFORM)
+
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCFXDR
+
+      SEGMENT SEGTAB
+        CHARACTER*(LCHAWR) ITAB(NM)
+      ENDSEGMENT
+
+C     CFORMAT : Format pour lire en 'FORMAT' dans le fichier
+      CHARACTER*12 CFORMAT
+
+      LCHAWR=SEGTAB.ITAB(/1)
+      NM    =SEGTAB.ITAB(/2)
+      
+      IF (NM.EQ.0)RETURN
+
+C     Calcul du format des chaines
+      CFORMAT='('
+      IF(IONIVE .LT. 23)THEN
+        CFORMAT='(16(1X,A4))'
+        JCH=11
+
+      ELSE
+        ICH=2
+        IF    (NM.GT.0  .AND. NM.LE.9  )THEN
+          JCH=ICH
+          WRITE(CFORMAT(ICH:JCH) ,FMT='(I1)') NM
+        ELSEIF(NM.GT.9  .AND. NM.LE.99 )THEN
+          ICH=2
+          JCH=ICH+1
+          WRITE(CFORMAT(ICH:JCH) ,FMT='(I2)') NM
+        ELSEIF(NM.GT.99 .AND. NM.LE.999)THEN
+          ICH=3
+          JCH=ICH+2
+          WRITE(CFORMAT(ICH:JCH) ,FMT='(I3)') NM
+        ELSE
+          PRINT*,'ECDIEN.ESO-Valeur de NM:',NM
+          CALL ERREUR(5)
+        ENDIF
+        ICH=ICH+1
+        CFORMAT(ICH:ICH+4)='(1X,A'
+        
+        ICH=ICH+5
+        IF    (LCHAWR.GT.0  .AND. LCHAWR.LE.9  )THEN
+          JCH=ICH
+          WRITE(CFORMAT(ICH:JCH) ,FMT='(I1)') LCHAWR
+
+        ELSEIF(LCHAWR.GT.9  .AND. LCHAWR.LE.99 )THEN
+          JCH=ICH+1
+          WRITE(CFORMAT(ICH:JCH) ,FMT='(I2)') LCHAWR
+          CFORMAT(ICH+2:ICH+2)=')'
+
+        ELSEIF(LCHAWR.GT.99 .AND. LCHAWR.LE.999)THEN
+          JCH=ICH+2
+          WRITE(CFORMAT(ICH:JCH),FMT='(I3)') LCHAWR
+          CFORMAT(ICH+3:ICH+3)=')'
+
+        ELSE
+          PRINT*,'ECDIEN.ESO-Valeur de LCHAWR:',LCHAWR
+          CALL ERREUR(5)
+        ENDIF
+        
+        ICH=JCH+1
+        JCH=ICH+1
+        CFORMAT(ICH:JCH)='))'
+      ENDIF
+      iretou=0
+      IF (IFORM.EQ.1)read(NBAND,FMT=CFORMAT,err=1000)(ITAB(I),I=1,NM)
+      IF (IFORM.EQ.0)read(NBAND,err=1000)            (ITAB(I),I=1,NM)
+      if (iform.eq.2)then 
+       ios=IXDRSTRING(ixdrr,itab(1)(1:LCHAWR*NM))
+       iretou=ios
+      endif
+
+      RETURN
+ 1000 continue
+      iretou=1
+      return
+      END
+ 
+ 

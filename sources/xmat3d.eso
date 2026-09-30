@@ -1,0 +1,43 @@
+C XMAT3D    SOURCE    FD218221  24/02/07    21:15:31     11834          
+       subroutine xmat3d(x,xmat,nmat,vnmat,nstype,nbelas,ntype,inum)
+
+c      recuperation d un parametre materiau classé par categorie
+c      cf idvisc.eso pour ajouter ou retrancher des variables
+c           ntype=0 elasticite du modele support (1-nbelas)
+c           ntype=1 parametres communs
+c           ntype=2 Maxwell consolidant
+c           ntype=3 Maxwell fluide transitoire
+c           ntype=4 Kelvin
+c           ntype=5 Traction localisee
+c           ntype=6 Drucker Prager
+c           ntype=7 Cam Clay
+c           ntype=8 Rag
+c           ntype=9 Rsi
+      
+c      declarations externes
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+
+       integer nmat,nstype,ntype,inum,nbelas
+       integer vnmat(nstype)
+       real*8 x,xmat(nmat)
+       integer i
+
+       imat=0
+       if (ntype.ge.2) then
+            imat=nbelas
+c           parametres des sous modeles 
+            do i=1,ntype-1
+                imat=imat+vnmat(i)
+            end do
+       else if (ntype.eq.1) then
+c           parametres commune
+            imat=nbelas
+       else if (ntype.eq.0) then
+c           parametres elastiques de base
+            imat=0
+       end if
+       imat=imat+inum
+       x=xmat(imat)
+       return
+       end 

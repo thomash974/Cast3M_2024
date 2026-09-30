@@ -1,0 +1,38 @@
+C TVAR3D    SOURCE    FD218221  24/02/07    21:15:29     11834          
+       subroutine tvar3d(V3,V33,nprec,var,nvari,vnvari,nstype,
+     # ndtens,styp,snumt)
+
+c      recuperation d une vari tensoreille et de son pointeur pour mc3d
+c      styp est la sous categorie de variable
+c      snumt est le numero du tenseur dans cette categorie
+c      nprec est le numero de la variable juste avant le tenseur
+
+c      declarations externes
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+
+       real*8 V3(3),V33(3,3)
+       integer nprec,nvari,nstype,ndtens
+       real*8 var(nvari)
+       integer vnvari(nstype,2)
+       integer styp,snumt
+
+       integer ityp,i,j
+
+       nprec=0
+       if(styp.gt.1) then
+            do ityp=1,styp-1
+                nprec=nprec+vnvari(ityp,1)+vnvari(ityp,2)*ndtens
+            end do
+       end if
+c      position debut du tenseur-1 
+       nprec=nprec+vnvari(styp,1)+(snumt-1)*ndtens
+       do i=1,3
+           V3(i)=var(nprec+i)
+           do j=1,3
+                V33(j,i)=var(nprec+3+(i-1)*3+j)
+           end do
+       end do
+
+       return
+       end  

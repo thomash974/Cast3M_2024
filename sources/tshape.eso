@@ -1,0 +1,180 @@
+C TSHAPE    SOURCE    OF166741  23/12/05    21:15:08     11801          
+
+C=======================================================================
+C=                            T S H A P E                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=  Calcul des fonctions de forme et de leurs derivees soit aux noeuds =
+C=  soit aux points de Gauss d'un element fini MASSIF a integration    =
+C=  numerique (branchement vers les sous-programmes adequats).         =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   NEF     (E)  Numero de l'ELEMENT FINI dans NOMTP (cf. CCHAMP)     =
+C=   POINTS  (E)  Chaine de caracteres indiquant si l'on souhaite les  =
+C=                valeurs aux noeuds (='NOEUD'), aux points de Gauss   =
+C=                (='GAUSS') ou au centre de gravite (='GRAVITE') de   =
+C=                l'element fini considere                             =
+C=   IPINTE  (S)  Pointeur sur le segment MINTE (ACTIF en S)           =
+C=                                                                     =
+C=  Remarque : Il s'agit des derivees par rapport aux coordonnees de   =
+C=  ---------- l'element de reference (Eta,Qsi,Dzeta).                 =
+C=======================================================================
+      SUBROUTINE TSHAPE (NEF,POINTS,IPINTE)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+c-INC PPARAM
+c-INC CCOPTIO
+
+-INC SMINTE
+
+      PARAMETER (NELSTH = 20, NTINTE = 3, NEFMAX = 33)
+      PARAMETER (NINTEG = NELSTH * NTINTE)
+
+C  Nom des EF :     SEG2  RAC2  COQ2  BARRe T1D2  TUY2  SEG3  RAC3 
+C  (voir NOMTP)     T1D3  TUY3  TRI3  LIA3  COQ3  TRI6  LIA6  QUA4
+C                   LIA4  QUA8  LIA8  CUB8  CU20  PRI6  PR15  TET4
+C                   TE10  PYR5  PY13  COQ4  COQ8  COQ6  POI1  POI1
+C                   JOI1  
+
+C  Liste des Elements Finis (NEF) traites ici (voir NUMGEO)
+      INTEGER LISNEF(NEFMAX)
+      SAVE LISNEF
+      DATA LISNEF /    2,   12,   44,   46,  191,  269,    3,   13,
+     &               192,  270,    4,   18,   27,    6,   20,    8,
+     &                19,   10,   21,   14,   15,   16,   17,   23,
+     &                24,   25,   26,   49,   41,   56,    1,   45,
+     &               265 /
+
+C   Element Support THermique associe a chaque Element Fini
+      INTEGER LELSTH(NEFMAX)
+      SAVE LELSTH
+      DATA LELSTH /    1,    1,    1,    1,    1,    1,    2,    2,
+     &                 2,    2,    3,    3,    3,    4,    4,    5,
+     &                 5,    6,    6,    7,    8,    9,   10,   11,
+     &                12,   13,   14,   15,   16,   17,   18,   18,
+     &                19 /
+
+C  Tableau des pointeurs MINTE pour chaque ELement Support THermique 
+C  et chaque Support (<0 si non defini, 0 si non utile et >0 sinon)
+      INTEGER IPINTH(NELSTH,NTINTE)
+      SAVE IPINTH
+      DATA IPINTH / NINTEG * -3 /
+
+      CHARACTER*(*) POINTS
+
+C 1 - Les valeurs ne peuvent etre donnees qu'aux noeuds, aux points 
+C === d'integration (Gauss) ou au centre de gravite.
+      ITINTE = 0
+      IF      ( POINTS(1:5).EQ.'NOEUD'   ) THEN
+        ITINTE = 1
+      ELSE IF ( POINTS(1:5).EQ.'GAUSS'   ) THEN
+        ITINTE = 2
+      ELSE IF ( POINTS(1:7).EQ.'GRAVITE' ) THEN
+        ITINTE = 3
+      ELSE
+        CALL ERREUR(19)
+        RETURN
+      ENDIF
+c      if (itinte .gt. ntinte) then
+c        write(ioimp,*) 'TSHAPE : redimensionner NTINTE'
+c        call erreur(5)
+c        return
+c      endif
+
+C 2 - Determination de l'element support thermique pour l'ELEMENT FINI
+C ===
+      IELSTH = 0
+      CALL PLACE2(LISNEF,NEFMAX,ielsth,NEF)
+      IF (ielsth.EQ.0) THEN
+        CALL ERREUR(19)
+        RETURN
+      ENDIF
+      IELSTH = LELSTH(ielsth)
+c      if (ielsth.gt. nelsth) then
+c        write(ioimp,*) 'TSHAPE : redimensionner NELSTH'
+c        call erreur(5)
+c      endif
+
+C 3 - Recuperation/Construction du segment SMINTE demande
+C ===
+C- Si pointeur deja construit, on le recupere, on l'active et retour.
+      IPINTE = IPINTH(IELSTH,ITINTE)
+      IF (IPINTE.GE.0) THEN
+        IF (IPINTE.NE.0) THEN
+          MINTE = IPINTE
+          SEGACT,MINTE*NOMOD
+        ENDIF
+        RETURN
+      ENDIF
+
+C- Sinon il faut l'evaluer via le sousprogramme associe a l'element.
+      IPINTE = -3
+      IF      ( IELSTH .EQ. 1 ) THEN
+        CALL TSEG2F(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 2) THEN
+        CALL TSEG3(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 3) THEN
+        CALL TTRI3F(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 4) THEN
+        CALL TTRI6(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 5) THEN
+        CALL TQUA4(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 6) THEN
+        CALL TQUA8(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 7) THEN
+        CALL TCUB8(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 8) THEN
+        CALL TCU20(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 9) THEN
+        CALL TPRI6(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 10) THEN
+        CALL TPR15(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 11) THEN
+        CALL TTET4F(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 12) THEN
+        CALL TTE10(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 13) THEN
+        CALL TPYR5(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 14) THEN
+        CALL TPY13(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 15) THEN
+        CALL TCOQ4(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 16) THEN
+        CALL TCOQ8(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 17) THEN
+        CALL TCOQ6(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 18) THEN
+        CALL TPOI1(ITINTE,IPINTE)
+      ELSE IF ( IELSTH .EQ. 19) THEN
+        IPINTE = 0
+      ELSE
+C- ERREUR : Element fini non implemente
+        write(ioimp,*) 'TSHAPE(1) : Element fini non implemente'
+        call erreur(5)
+        return
+      ENDIF
+
+C- ERREUR lors de l'appel au sous-programme T_ef_
+      IF (IPINTE.LT.0) THEN
+        write(ioimp,*) 'TSHAPE(2) : Erreur lors appel a T_ef_'
+        call erreur(5)
+        return
+      ENDIF
+
+      IPINTH(IELSTH,ITINTE) = IPINTE
+      IF (IPINTE.GT.0) THEN
+        CALL SAVSEG(IPINTE)
+        MINTE = IPINTE
+        SEGACT,MINTE*NOMOD
+      ENDIF
+
+c      RETURN
+      END
+
+ 
+ 

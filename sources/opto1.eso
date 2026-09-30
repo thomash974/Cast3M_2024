@@ -1,0 +1,552 @@
+C OPTO1     SOURCE    PV        22/07/28    21:15:05     11419          
+      SUBROUTINE OPTO1(ITOPO,IELEM,IPVIRT,ICMETR,
+     $     ITOPA,ICMETA)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : OPTO1
+C DESCRIPTION : Une implémentation de l'amélioration d'une topologie
+C               autour d'un élément. On reprend OPTITOPO pour le corps
+C     du programme. On reprend l'extraction et la topologie inverse de
+C     EXTO. Le point crucial sera d'implémenter la modification de la
+C     topologie : enlever les anciens éléments et mettre les nouveaux.
+C     
+C
+C     Ici, on fait quelques tests, on passe les entrées en numérotation
+C     locale basée sur celle de ITOPO, on crée également un MCOORD local
+C     avant de passer à OPTO2. En effet, OPTO2 sera suceptible de créer
+C     des noeuds
+C      
+C     En sortie, on repasse en numérotation globale, on inclue les
+C     éventuels nouveaux noeuds créés dans OPTO2 dans le MCOORD global.
+C
+C     La programmation est inspirée de demete.eso et reprise de
+C     exto1.eso 
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : OPTO2 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       : PROPTO
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 06/10/2017, version initiale
+C HISTORIQUE : v1, 06/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMELEME      
+* Numerotation globale
+      POINTEUR ITOPO.MELEME,IELEM.MELEME
+      POINTEUR ITOPA.MELEME
+** Numerotation locale
+      POINTEUR JTOPO.MELEME
+      POINTEUR JELEM.MELEME
+-INC SMCHPOI
+      POINTEUR ICMETR.MCHPOI
+      POINTEUR ICMETA.MCHPOI
+-INC SMCOORD
+* Numerotation globale
+      POINTEUR ICOORD.MCOORD
+** Numerotation locale
+      POINTEUR JCOORD.MCOORD
+-INC TMATOP1
+*-INC STOPINV
+*-INC STRAVJ
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+-INC TMTRAV      
+      SEGMENT MISDEF
+      INTEGER ISDEF(NNIN,NNNOE)
+      ENDSEGMENT
+-INC SMLMOTS
+      POINTEUR JNMETR.MLMOTS
+*      
+* Passage de numerotation globale -> locale
+*   et locale -> globale    
+      SEGMENT ICPR(XCOOR(/1)/(IDIM+1))
+      SEGMENT IDCP(NPTINI)
+*     integer oooval
+      logical lnul
+      CHARACTER*24 FORMA
+      CHARACTER*4 MOT
+      INTEGER IMPR,IRET
+* Noms de composantes pour la métrique
+      
+*     
+* Executable statements
+*
+      impr=0
+      IF (IMPR.GE.5) WRITE(IOIMP,*) 'Entrée dans opto1.eso'
+      IDIMP=IDIM+1
+      ICOORD=MCOORD
+      SEGACT MCOORD
+*      write(ioimp,*) 'opto1 debut : nbpts, xcoor=',nbpts,xcoor(/1)/(idim
+*     $     +1)
+      IBPTS=NBPTS
+*     On se simplifie la vie en ne considérant que des maillages simples
+*      call ecmai1(itopo,0)
+      SEGACT ITOPO
+      NBSOUS=ITOPO.LISOUS(/1)
+      NBNN=ITOPO.NUM(/1)
+      IF (NBSOUS.NE.0.OR.NBNN.NE.IDIMP) THEN
+         WRITE(IOIMP,*)
+     $        'Topologie : pas un maillage de simplex volumiques'
+         GOTO 9999
+      ENDIF
+      SEGACT IELEM
+      NBSOUS=IELEM.LISOUS(/1)
+      NBELEM=IELEM.NUM(/2)
+*      IF (NBSOUS.NE.0.OR.NBELEM.NE.1) THEN
+      IF (NBSOUS.NE.0) THEN
+*         WRITE(IOIMP,*) 'Deuxieme maillage : pas un element unique'
+         WRITE(IOIMP,*) 'Deuxieme maillage : pas un maillage simple'
+         GOTO 9999
+      ENDIF
+* Correspondances de numérotation
+      SEGINI ICPR
+      IK=0
+      DO 23 IEL=1,ITOPO.NUM(/2)
+         DO 230 INO=1,ITOPO.NUM(/1)
+            IP=ITOPO.NUM(INO,IEL)
+            IF (ICPR(IP).EQ.0) THEN
+               IK=IK+1
+               ICPR(IP)=IK
+            ENDIF
+ 230     CONTINUE
+ 23   CONTINUE
+      NBLINI=ITOPO.NUM(/2)
+      NPTINI=IK
+      SEGINI IDCP
+      NPTBAS=XCOOR(/1)/IDIMP
+      DO 500 I=1,NPTBAS
+         if (icpr(i).ne.0) IDCP(ICPR(I))=I
+ 500  CONTINUE
+      if (IMPR.GE.6) then 
+         write(ioimp,*) 'Nb noeud globaux,locaux=',NPTBAS,IK
+*         write(ioimp,*) 'ICPR'
+*         write(ioimp,187) (ICPR(I),I=1,ICPR(/1))
+         write(ioimp,*) 'IDCP'
+         write(ioimp,187) (IDCP(I),I=1,IDCP(/1))
+      endif
+      IF (IMPR.GE.3) THEN
+         write(ioimp,*) 'opto1.eso : topologie en coord globales : '
+         call ecmai1(itopo,0)
+         segact itopo*mod
+      ENDIF
+*
+      IF (IDIM.EQ.2) THEN
+         NELMOY=15
+         NPOMOY=10
+      ELSEIF (IDIM.EQ.3) THEN
+         NELMOY=40
+         NPOMOY=20
+      ELSE
+         write(ioimp,*) 'idim=',idim
+         goto 9999
+      ENDIF
+
+      SEGINI TRAVJ
+      NVINI=NBLINI
+      NVCOU=NBLINI
+      NVMAX=NBLINI+MAX(NELMOY,NBLINI)
+      NPINI=NPTINI
+      NPCOU=NPTINI
+      NPMAX=NPTINI
+*ijob      IF (IJOB.NE.0) NPMAX=NPMAX+MAX(NPOMOY,NPTINI)
+      IF (IAJNO.NE.0) NPMAX=NPMAX+MAX(NPOMOY,NPTINI)
+*      
+* Melemes en coordonnées locales
+*     Topologie
+      NBELEM=travj.NVMAX
+      NBNN=IDIMP
+      NBSOUS=0
+      NBREF=0
+      SEGINI,JTOPO
+      JTOPO.ITYPEL=ITOPO.ITYPEL
+      TRAVJ.TOPO=JTOPO
+      DO 33 IEL=1,travj.nvcou
+         DO 330 INO=1,IDIMP
+            IP=ITOPO.NUM(INO,IEL)
+            JP=ICPR(IP)
+            IF (JP.NE.0) THEN
+               JTOPO.NUM(INO,IEL)=JP
+            ELSE
+               WRITE(IOIMP,*) 'Erreur de programmation'
+               GOTO 9999
+            ENDIF
+ 330     CONTINUE
+ 33   CONTINUE
+* Eventuellement, IELEM=ITOP donc à désactiver ici      
+      SEGDES IELEM
+      SEGDES ITOPO
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*) 'opto1.eso : topologie en coord locales : '
+         call ecmai1(jtopo,0)
+         segact jtopo*mod
+      ENDIF
+      
+*     Noeud virtuel en coordonnées locales
+      IF (IPVIRT.NE.0) THEN
+         JPVIRT=ICPR(IPVIRT)
+*! Ceci peut se produire quand on veut conserver le bord total
+*! On ne l'interdit plus          
+*!         IF (JPVIRT.EQ.0) THEN
+*!            write(ioimp,*)
+*!     $           'Noeud virtuel non inclus dans la topologie ?'
+*!            goto 9999
+*!         ENDIF
+      ELSE
+         JPVIRT=0
+      ENDIF
+      TRAVJ.PVIRT=JPVIRT
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*) 'opto1.eso : noeud virtuel en coord locales : '
+     $        ,JPVIRT
+      ENDIF         
+*     Element autour duquel on extrait
+*         write(ioimp,*) 'opto1.eso : element en coord globales : '
+*         call ecmai1(ielem,0)
+*         segact ielem*mod
+      SEGINI,JELEM=IELEM
+      DO 43 IEL=1,JELEM.NUM(/2)
+         DO 430 INO=1,JELEM.NUM(/1)
+            IP=JELEM.NUM(INO,IEL)
+            JP=ICPR(IP)
+*     Il faudra gérer le cas où certains noeuds de JELEM sont nuls. Voir
+*     dans EXTO3.
+*            IF (JP.NE.0) THEN
+               JELEM.NUM(INO,IEL)=JP
+*            ELSE
+             IF (JP.EQ.0) THEN 
+                WRITE(IOIMP,*)
+     $               'Element fourni non inclus dans la topologie'
+*     Pour avoir un comportement identique à la version Gibiane de
+*     EXTOPLOC, on annule l'élément. La gestion des éléments nuls est
+*     faite dans exto3.eso
+                DO INOO=1,JELEM.NUM(/1)
+                   JELEM.NUM(INOO,IEL)=0
+                ENDDO
+                GOTO 43
+             ENDIF
+*               GOTO 9999
+*            ENDIF
+ 430     CONTINUE
+ 43   CONTINUE
+      IF (IMPR.GE.6) THEN
+         write(ioimp,*) 'opto1.eso : element en coord locales : '
+         call ecmai1(jelem,0)
+         segact jelem*mod
+      ENDIF
+* debug      
+      impr=0
+* Passage des coordonnées en locale
+*      NBPTS=NPTINI
+      NBPTS=travj.NPMAX
+      SEGINI,JCOORD
+      TRAVJ.COORD=JCOORD
+      DO 53 IPL=1,travj.npcou
+         IREFL=IDIMP*(IPL-1)
+         IP=IDCP(IPL)
+         IREF=IDIMP*(IP-1)
+         DO 530 IC=1,IDIMP
+            JCOORD.XCOOR(IREFL+IC)=XCOOR(IREF+IC)
+ 530     CONTINUE
+ 53   CONTINUE
+* Passage de la métrique en local
+*
+      IF (ICMETR.NE.0) THEN
+*     Définition des noms de composantes
+         JGN=4
+         JGM=0
+         IF (IMET.EQ.3) JGM=1
+* On a enlevé le cas orthotrope         
+*         IF (IMET.EQ.4) JGM=IDIM
+         IF (IMET.EQ.4) JGM=IDIM*(IDIM+1)/2
+         SEGINI JNMETR
+         DO I=1,JGM
+            JNMETR.MOTS(I)='G    '
+         ENDDO
+* On a enlevé le cas orthotrope         
+*         IF (IMET.EQ.4) THEN
+*            DO I=1,IDIM
+*               WRITE(JNMETR.MOTS(I)(2:2),FMT='(I1)') I
+*            ENDDO
+*         ELSEIF (IMET.EQ.5) THEN            
+         IF (IMET.EQ.4) THEN
+            idx=0
+            DO I=1,IDIM
+               DO J=1,I
+                  idx=idx+1
+                  WRITE(JNMETR.MOTS(idx)(2:2),FMT='(I1)') I
+                  WRITE(JNMETR.MOTS(idx)(3:3),FMT='(I1)') J
+               ENDDO
+            ENDDO
+         ENDIF
+*dbg         WRITE (IOIMP,2019) (JNMETR.MOTS(I),I=1,JNMETR.MOTS(/2))
+*dbg 2019    FORMAT (20(2X,A4) )
+         NNIN=JNMETR.MOTS(/2)
+         NNNOE=travj.NPCOU
+         if (iveri.ge.1) SEGINI MISDEF
+         NNNOE=travj.NPMAX
+         SEGINI JCMETR
+         MCHPOI=ICMETR
+         SEGACT MCHPOI
+         NSOUPO=IPCHP(/1)
+         DO ISOUPO=1,NSOUPO
+            MSOUPO=IPCHP(ISOUPO)
+            SEGACT MSOUPO
+            NC=NOCOMP(/2)
+            MELEME=IGEOC
+            MPOVAL=IPOVAL
+            SEGACT MELEME
+            SEGACT MPOVAL
+            N=VPOCHA(/1)
+            DO IC=1,NC
+               ININ=0
+               DO JNIN=1,NNIN
+                  IF (NOCOMP(IC).EQ.JNMETR.MOTS(JNIN)) THEN
+                     ININ=JNIN
+                     GOTO 11
+                  ENDIF
+               ENDDO
+ 11            CONTINUE
+               IF (ININ.NE.0) THEN
+                  DO I=1,N
+                     INNOE=ICPR(NUM(1,I))
+                     IF (INNOE.NE.0) THEN
+                        if (iveri.ge.1) ISDEF(ININ,INNOE)=1
+                        JCMETR.XIN(ININ,INNOE)=VPOCHA(I,IC)
+                     ENDIF
+                  ENDDO
+               ENDIF
+            ENDDO
+            SEGDES MPOVAL
+            SEGDES MELEME
+            SEGDES MSOUPO
+         ENDDO
+         SEGDES MCHPOI
+         if (iveri.ge.1) then
+*     Vérification que la métrique a été définie sur tous les noeuds et
+*     toutes les composantes
+            DO J=1,ISDEF(/2)
+               IF (J.NE.JPVIRT) THEN
+                  DO I=1,ISDEF(/1)
+                     IF (ISDEF(I,J).NE.1) THEN
+                        MOT=JNMETR.MOTS(I)
+                        INOD=IDCP(J)
+                        write(ioimp,*)
+     $                       'Metrique non definie pour la composante '
+     $                       ,MOT,' au noeud ',INOD
+                        GOTO 9999
+                     ENDIF
+                  ENDDO
+               ENDIF
+            ENDDO
+            SEGSUP MISDEF
+         endif
+*dbg         write(ioimp,*) 'Inimetr ok'
+      ELSE
+         JNMETR=0
+         JCMETR=0
+      ENDIF
+      TRAVJ.NMETR=JNMETR
+      TRAVJ.CMETR=JCMETR
+*tst      WRITE(IOIMP,185) 'SEGMENT JCOORD ',JCOORD
+*tst         WRITE(FORMA,FMT='("(1(",I1,"(1PG12.5,2X)))")') IDIMP
+*tst         write(ioimp,*) 'forma=',forma
+*tst         write(ioimp,*) 'XCOOR'
+*tst         write(ioimp,forma)  (jcoord.xcoor(I),I=1,jcoord.xcoor(/1))
+      
+* La numérotation globale devient la locale dans ce bloc  !!!
+      MCOORD=JCOORD
+* Tous les arguments sont potentiellement des entrées-sorties    
+*     in EXTO2 SEGINI JTOPA
+*      write(ioimp,*) ' opto1  : avant opto2 =',OOOVAL(2,1)
+      CALL OPTO2(TRAVJ,JELEM)
+*      write(ioimp,*) ' opto1  : apres opto2 =',OOOVAL(2,1)
+* Point de branchement si erreur pendant le bloc en numérotation locale
+ 555  CONTINUE
+*     On rétablit la numérotation globale originelle et on rajoute les
+*     noeuds nouvellement créés
+*     ! Attention, il faut aussi rétablir le NBPTS suite aux changements
+*     !  de Pierre dans SMCOORD
+      NBPTS=IBPTS
+      MCOORD=ICOORD
+*     On part en erreur après le rétablissement du MCOORD global
+      IF (IERR.NE.0) RETURN
+*     NPTFIN=JCOORD.XCOOR(/1)/IDIMP
+      NPTFIN=travj.npcou
+      if (jchang.eq.0) then
+         ITOPA=ITOPO
+         ICMETA=ICMETR
+         IF (NPTINI.NE.NPTFIN) THEN
+            write(ioimp,*) nptfin-nptini,' nouveaux noeuds crees'
+            write(ioimp,*) 'pas normal car topologie inchangee'
+         ENDIF
+      else
+         IF (NPTINI.NE.NPTFIN) THEN
+            SEGACT MCOORD*MOD
+            if (impr.ge.4)
+     $           write(ioimp,*) nptfin-nptini,' nouveaux noeuds crees'
+            NBPTA=NPTBAS
+            NBPTS=NBPTA+NPTFIN-NPTINI
+            SEGADJ MCOORD
+            nnonul=0
+            DO 5000 I=NPTINI+1,NPTFIN
+               lnul=.true.
+               DO 5010 J=1,IDIMP
+                  XCOOR(NBPTA*IDIMP+J)=JCOORD.XCOOR((I-1)*IDIMP+J)
+                  lnul=lnul.and.(XCOOR(NBPTA*IDIMP+J).EQ.0.D0)
+ 5010          CONTINUE
+               NBPTA=NBPTA+1
+               if (lnul) nnonul=nnonul+1
+ 5000       CONTINUE
+            if (iveri.ge.1.and.nnonul.ne.0) then
+               write(ioimp,*) '!!! ',nnonul
+     $              ,' nouveaux noeuds nuls crees'
+*            goto 9999
+            endif
+            IF (JCMETR.NE.0) THEN
+*     La nouvelle métrique
+               NNIN=JCMETR.XIN(/1)
+               NNNOE=TRAVJ.NPCOU
+*dbg               npmax=jcmetr.xin(/2)
+*dbg               write(ioimp,*) 'nnin,nnnoe,npmax=',nnin,nnnoe,npmax
+*               
+               NSOUPO=1
+               NAT=1
+               SEGINI,MCHPOI
+               IFOPOI=IFOUR
+               JATTRI(1)=0
+               MTYPOI='        '
+               MOCHDE='            CHPOINT CREE PAR OPTO  '
+               NC=NNIN
+               SEGINI,MSOUPO
+               IPCHP(1)=MSOUPO
+               DO ININ=1,NNIN
+                  NOCOMP(ININ)=JNMETR.MOTS(ININ)
+               ENDDO
+               NBSOUS=0
+               NBREF=0
+               NBNN=1
+               NBELEM=NNNOE
+               N=NBELEM
+               SEGINI,MPOVAL
+               SEGINI,MELEME
+               ITYPEL=1
+               DO INNOE=1,NNNOE
+                  IF (INNOE.LE.NPTINI) THEN
+                     NUM(1,INNOE)=IDCP(INNOE)
+                  ELSE
+                     NUM(1,INNOE)=INNOE-NPTINI+NPTBAS
+                  ENDIF
+                  DO ININ=1,NNIN
+                     VPOCHA(INNOE,ININ)=JCMETR.XIN(ININ,INNOE)
+                  ENDDO
+               ENDDO
+               IGEOC=MELEME
+               IPOVAL=MPOVAL
+               SEGDES,MPOVAL
+               SEGDES,MSOUPO
+               SEGDES,MELEME
+               ICMETA=MCHPOI
+               SEGDES,MCHPOI
+            ELSE
+               ICMETA=0
+            ENDIF
+         ELSE
+            ICMETA=ICMETR
+         ENDIF
+*     On ne serait pas obligé de faire ceci mais alors, il faut faire
+*     attention au cas où JTOPA=JTOPO
+*     SEGINI,ITOPA=JTOPA
+*      write(ioimp,*) 'opto1.eso : on a genere la topologie : '
+*      call ecmai1(jtopo,0)
+*      segact jtopo*mod
+*     En place
+         JTOPO=TRAVJ.TOPO
+         ITOPA =JTOPO
+* Pour éviter une suprression dans topsup      
+         travj.topo=0
+         if (nvcou.ne.nvmax) then
+            nbnn=idimp
+            nbelem=nvcou
+            nbsous=0
+            nbref=0
+            segadj,itopa
+         endif         
+*      write(ioimp,*) 'itopa'
+*      call ecmail(itopa,0)
+*      segact itopa*mod
+* On ajuste le nombre d'éléments
+         DO 63 IEL=1,ITOPA.NUM(/2)
+            DO 630 INO=1,ITOPA.NUM(/1)
+               IPL=ITOPA.NUM(INO,IEL)
+               IF (IPL.LE.NPTINI) THEN
+                  IP=IDCP(IPL)
+               ELSE
+                  IP=IPL-NPTINI+NPTBAS
+               ENDIF
+               ITOPA.NUM(INO,IEL)=IP
+ 630        CONTINUE
+ 63      CONTINUE
+         IF (IMPR.GE.3) THEN
+            write(ioimp,*) 'opto1.eso : topologie amelioree totale : '
+            call ecmai1(itopa,0)
+            segact itopa*mod
+         ENDIF
+      ENDIF
+*      write(ioimp,*) 'opto1 fin : nbpts, xcoor=',nbpts,xcoor(/1)/(idim
+*     $     +1)
+      SEGDES MCOORD
+*     write(ioimp,*) ' opto1  : avant segsup=',OOOVAL(2,1)
+      if (icmeta.ne.0) SEGDES ICMETA
+      SEGDES ITOPA
+      SEGSUP JELEM
+      SEGSUP IDCP
+      SEGSUP ICPR
+      CALL TOPSUP(TRAVJ)
+*      write(ioimp,*) ' opto1  : apres segsup=',OOOVAL(2,1)
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 184  FORMAT (2X,'noeud ip=',i4,' relie aux elements')
+ 185  FORMAT (/2X,10(A16,'=',I8,2X)/)
+ 186  FORMAT (2X,10(A6,'=',I6,2X))
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT (5X,10(1X,1PG12.5))
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='OPTO1   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine OPTO1
+*
+      END
+
+ 
+ 
+ 

@@ -1,0 +1,90 @@
+C INDIC     SOURCE    CB215821  23/01/25    21:15:24     11573          
+      SUBROUTINE INDIC
+C=======================================================================
+C     OPERATEUR INDIQUANT LA QUALITE D'UN MAILLAGE
+C          PHILIPPE BEAUMIER  90
+C     LECTURE DES MOTS CLES DE LA PROCEDURE ET APPEL A INDCR
+C
+C
+C     SYNTAXE
+C     -------
+C
+C     CHL = INDI GEOM1 NOMI ... ;
+C
+C        GEOM1 = OBJET DE TYPE GEOMETRIE
+C        NOMI  = MOTS CLES
+C        CHL   = OBJET DE TYPE CHAMALEM (NOUVEAU CHAMALEM, OF COURSE|)
+C
+C=======================================================================
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+-INC SMCOORD
+-INC PPARAM
+-INC CCOPTIO
+      
+      PARAMETER (NCLE=3)      
+      CHARACTER*4 MOCLE(NCLE)
+      CHARACTER*(LOCOMP) MOLUS(NCLE)
+      CHARACTER*8 CHAR
+      CHARACTER*4 MOTOPO(1)
+C
+      DATA MOCLE/'PLAN','ASPE','SKEW'/
+      DATA MOTOPO/'TOPO'/
+      ICHA=0
+C
+C Lecture du mot-cle particulier TOPO     
+C      
+      CALL LIRMOT(MOTOPO,1,itopo,0)
+      if (ierr.ne.0) return
+C
+C     LECTURE DU MAILLAGE (OBJET DE TYPE MAILLAGE)
+C
+      IMAIL=0
+      IER1=0
+      CALL LIROBJ('MAILLAGE',IMAIL,1,IER1)
+      IF(IERR .NE. 0)RETURN
+      CALL ACTOBJ('MAILLAGE',IMAIL,1)
+      IF(IERR .NE. 0)RETURN
+      if (itopo.eq.1) then
+         CALL INDI2(IMAIL)
+         RETURN
+      else
+         
+C     
+C     LECTURE DES MOTS CLES
+C
+         NLUS=0
+         DO I=1,NCLE
+            CALL QUETYP(CHAR,0,IRETOU)
+            IF (CHAR.EQ.'        ') GOTO 1
+            CALL LIRMOT(MOCLE,NCLE,ICLE,1)
+            MOLUS(I)=MOCLE(ICLE)
+            NLUS=NLUS+1
+         ENDDO
+C
+ 1       CONTINUE
+C     SI AUCUN MOT CLEF LU
+         IF (NLUS.EQ.0) THEN
+            CALL ERREUR(498)
+            RETURN
+         ENDIF
+C     REALISATION DE LA TACHE
+         SEGACT,MCOORD
+         CALL INDCR(MOLUS,NLUS,IMAIL,ICHA)
+         SEGDES,MCOORD
+         
+         CALL ACTOBJ('MCHAML',ICHA,1)
+         CALL ECROBJ('MCHAML',ICHA)
+      endif
+C
+666   RETURN
+      END
+ 
+ 
+ 
+ 
+ 
+ 
+ 

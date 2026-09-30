@@ -1,0 +1,85 @@
+C D2VINT    SOURCE    BP208322  22/09/20    21:15:02     11462          
+C DEVINT    SOURCE    PLAF      90/05/03    21:11:36
+
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE : algorithme de Fu - de Vogelaere               *
+*     ________________________________________________               *
+*                                                                    *
+*     Interpolation d'un liste REEL.                                 *
+*     Remplissage du segment de travail KTRAV.                       *
+*                                                                    *
+*     Param}tres:                                                    *
+*                                                                    *
+* e   ICHATE  pointeur sur un LISTREEL, abscisse                     *
+* e   ICHAFO  pointeur sur un LISTREEL, ordonnee                     *
+* e   KTNUM   segment contenant les param}tres numeriques            *
+* s   KTRAV   segment de travail                                     *
+* e   ICHAR   numero du chargement                                   *
+*                                                                    *
+*     Auteur, date de creation:                                      *
+*     Lionel VIVAN, le 17 avril 1990                                 *
+*                                                                    *
+*     Parallélisation : BP, 2022-09-19                               *
+*                                                                    *
+*--------------------------------------------------------------------*
+
+      SUBROUTINE D2VINT(ICHATE,ICHAFO,KTNUM,KTRAV,ICHAR)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLREEL
+
+      SEGMENT,MTNUM
+         REAL*8 XDT(NPC1),XTEMPS(NPC1)
+      ENDSEGMENT
+      SEGMENT,MTRAV
+         REAL*8 FTCHG(NCHAR,NPC1)
+         REAL*8 XFORCA(NPREF,NCHAR)
+      ENDSEGMENT
+      
+*--------------------------------------------------------------------*
+*     lecture arguments d'entree/sortie
+*--------------------------------------------------------------------*
+
+*     discretisation temporelle de DYNE
+      MTNUM = KTNUM
+      NPC1   = XDT(/1)
+      PASTEM = XDT(1)
+
+*     objets du chargement fourni
+      MLREE1 = ICHATE
+      SEGACT MLREE1
+      NF = MLREE1.PROG(/1)
+      MLREE2 = ICHAFO
+      SEGACT MLREE2
+
+cbp,2022      SEGINI MTRAV
+      MTRAV = KTRAV
+*
+*--------------------------------------------------------------------*
+*     interpolation du chargement
+*--------------------------------------------------------------------*
+*
+      N1 = 1
+      N2 = 2
+
+      DO 10 IT = 1,NPC1
+         TEMP = XTEMPS(IT)
+         CALL INTLIN(TEMP,ICHATE,ICHAFO,NF,N1,N2, FTEM,IRET)
+         IF (IRET.EQ.0) THEN
+*           temps en dehors de la liste
+            CALL ERREUR(208)
+            RETURN
+         ENDIF
+         FTCHG(ICHAR,IT) = FTEM
+ 10   CONTINUE
+
+      SEGDES,MLREE1,MLREE2
+
+      END
+
+
+ 

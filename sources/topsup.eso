@@ -1,0 +1,99 @@
+C TOPSUP    SOURCE    GOUNAND   21/04/06    21:15:32     10940          
+      SUBROUTINE TOPSUP(TRAVJ)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPSUP
+C DESCRIPTION : Suppression d'un segment TRAVJ et de ses éventuels
+C      sous-objets.
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 18/10/2017, version initiale
+C HISTORIQUE : v1, 18/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+      POINTEUR JCOORD.MCOORD
+-INC SMLENTI
+      POINTEUR JNBL.MLENTI
+      POINTEUR JNNO.MLENTI
+-INC SMELEME
+      POINTEUR JTOPO.MELEME
+-INC TMATOP2
+-INC TMATOP1
+*-INC STOPINV
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+*-INC STRAVJ
+-INC SMLMOTS
+      POINTEUR JNMETR.MLMOTS
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans topsup.eso'
+*
+      JCOORD=TRAVJ.COORD
+      if (jcoord.ne.0) segsup jcoord
+      JNMETR=TRAVJ.NMETR
+      if (jnmetr.ne.0) segsup jnmetr
+      JCMETR=TRAVJ.CMETR
+      if (jcmetr.ne.0) segsup jcmetr
+      JTOPO=TRAVJ.TOPO
+      if (jtopo.ne.0) segsup jtopo
+*     
+      TOPINV=TRAVJ.TOPI
+      if (topinv.ne.0) segsup topinv
+*     
+      jnbl=travj.nbl
+      if (jnbl.ne.0) segsup jnbl
+*      
+      jnno=travj.nno
+      if (jnno.ne.0) segsup jnno
+*
+      segsup travj
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 286  FORMAT ('Segment TRAV=',I8,' nbel max ajusté de ',I6,' à ',I6,
+     $     ' (nbel. courant=',I6,')') 
+* 187  FORMAT (5X,10I8)
+* 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+* 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+*     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPSUP  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TOPSUP
+*
+      END
+
+ 

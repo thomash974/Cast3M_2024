@@ -1,0 +1,49 @@
+C LNUD3D    SOURCE    PV090527  23/01/27    21:15:48     11574          
+      subroutine LNUD3D(long,xe3d,NBNMAX3D,NBNB3D,dir3)
+
+c     calcul taille de l element a partir des coordonnees des noeuds
+c     tables de dimension fixe pour resolution des sytemes lineaires 
+c     Sellier 26/04/2021
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+c     declaration 
+      real*8 dir3(3),long    
+      integer i,j
+      real*8 dmin,dmax,dim1
+      integer NBNMAX3D,NBNB3D
+      real*8 xe3d(3,NBNMAX3D)
+
+         dmin=0.d0
+         dmax=0.d0
+         do i=1,nbnb3d
+          if (i.eq.1) then
+c           initialisation dmin dmax sur 1er neoud          
+            dim1=0.d0
+            do j=1,3
+                dim1=dim1+xe3d(j,i)*dir3(j)
+            end do
+            dmin=dim1
+            dmax=dim1
+          else
+            dim1=0.d0
+            do j=1,3
+                dim1=dim1+xe3d(j,i)*dir3(j)
+            end do
+            if (dim1.lt.dmin) then
+               dmin=dim1
+            else if (dim1.gt.dmax) then
+               dmax=dim1 
+            end if
+          end if    
+         end do          
+         long=dmax-dmin
+         if(long.eq.0.) then
+             print*,'dir3',dir3,'long',long
+             err1=1
+             return
+         end if
+        return
+        end
+        
+ 

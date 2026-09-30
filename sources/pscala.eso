@@ -1,0 +1,135 @@
+C PSCALA    SOURCE    BP208322  20/02/24    21:15:06     10530          
+C=======================================================================
+C
+C   CALCULE LE PRODUIT SCALAIRE DE 2 : - VECTEURS
+C                                      - CHPOINTS
+C                                      - CHAMELEMS
+C                                      - TABLES DE SOUS-TYPE VECTEUR
+C
+C=======================================================================
+
+      SUBROUTINE PSCALA
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMTABLE
+      CHARACTER*8 CAUX1,CAUX2
+      
+c     Lecture d'1 point ?
+      CALL LIROBJ('POINT ',IP1,0,IRETOU)
+      IF(IRETOU.EQ.0) GO TO 10
+C
+C=======================================================================
+C     CAS DE 2 POINTS           
+C=======================================================================
+C
+      CALL LIROBJ('POINT ',IP2,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      SEGACT MCOORD
+      IREF1=(IDIM+1)*(IP1-1)
+      IREF2=(IDIM+1)*(IP2-1)
+      SCAL=0.D0
+      DO 1 I=1,IDIM
+      SCAL=SCAL+XCOOR(IREF1+I)*XCOOR(IREF2+I)
+   1  CONTINUE
+      CALL ECRREE(SCAL)
+      RETURN
+C
+C=======================================================================
+C     CAS DE 2 CHPOINTS
+C=======================================================================
+C
+  10  CONTINUE
+      CALL LIROBJ('CHPOINT ',MCHPO1,0,IRETOU)
+      IF(IRETOU.EQ.0) GOTO 20
+      CALL LIROBJ('CHPOINT ',MCHPO2,1,IRETOU)
+      CALL LIROBJ('LISTMOTS',MLMOTX,1,IRETOU)
+      CALL LIROBJ('LISTMOTS',MLMOTY,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      CALL PROSCA(MCHPO1,MCHPO2,MLMOTX,MLMOTY,IRET)
+      CALL ACTOBJ('CHPOINT ',IRET,1)
+      CALL ECROBJ('CHPOINT ',IRET)
+      RETURN
+
+C=======================================================================
+C     CAS DE 2 CHAMELEMS
+C=======================================================================
+C
+  20  CONTINUE
+      CALL LIROBJ('MCHAML  ',IPCHE1,0,IRETOU)
+      IF(IRETOU.EQ.0) GOTO 30
+      CALL LIROBJ('MCHAML  ',IPCHE2,1,IRETOU)
+      CALL LIROBJ('LISTMOTS',MLMOTX,1,IRETOU)
+      CALL LIROBJ('LISTMOTS',MLMOTY,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      CALL SCACHA(IPCHE1,IPCHE2,MLMOTX,MLMOTY,IRET)
+      CALL ACTOBJ('MCHAML  ',IRET,1)
+      CALL ECROBJ('MCHAML  ',IRET)
+      RETURN
+
+C=======================================================================
+C     CAS DE 2 TABLES 'VECTEURS'
+C=======================================================================
+c BP,TODO : cas a documenter ou table vecteur a remplacer par listreel 
+C
+ 30   CONTINUE
+      CALL LIRTAB('VECTEUR',MTAB1,0,IRETOU)
+      IF(IRETOU.EQ.0) GO TO 99
+      CALL LIRTAB('VECTEUR',MTAB2,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+*  ON FAIT LE PRODUIT SCALAIRE DE TOUS LES REELS ISOINDICES
+      SEGACT MTAB1,MTAB2
+      SCAL=0.D0
+      DO 100 I=1,MTAB1.MLOTAB
+       CAUX1=MTAB1.MTABTV(I)
+       IAUX1=MTAB1.MTABIV(I)
+       XAUX1=MTAB1.RMTABV(I)
+       CAUX2=MTAB1.MTABTI(I)
+       IAUX2=MTAB1.MTABII(I)
+       XAUX2=MTAB1.RMTABI(I)
+       IF (CAUX1.EQ.'FLOTTANT') THEN
+        VAL1=XAUX1
+       ELSEIF (CAUX1.EQ.'ENTIER  ') THEN
+        VAL1=IAUX1
+       ELSE
+        GOTO 100
+       ENDIF
+       DO 110 J=1,MTAB2.MLOTAB
+        IF (MTAB2.MTABTI(J).NE.CAUX2) GOTO 110
+        IF (CAUX2.EQ.'FLOTTANT') THEN
+          IF (MTAB2.RMTABI(J).NE.XAUX2) GOTO 110
+        ELSE
+          IF (MTAB2.MTABII(J).NE.IAUX2) GOTO 110
+        ENDIF
+        IF (MTAB2.MTABTV(J).EQ.'FLOTTANT') THEN
+         VAL2=MTAB2.RMTABV(J)
+        ELSEIF (MTAB2.MTABTV(J).EQ.'ENTIER  ') THEN
+         VAL2=MTAB2.MTABIV(J)
+        ELSE
+         GOTO 100
+        ENDIF
+        SCAL=SCAL+VAL1*VAL2
+ 110   CONTINUE
+ 100  CONTINUE
+      CALL ECRREE(SCAL)
+      SEGDES MTAB1,MTAB2
+      RETURN
+
+C=======================================================================
+C    PAS D OPERANDE CORRECTE TROUVE
+C=======================================================================
+C
+ 99   CALL QUETYP(MOTERR(1:8),0,IRETOU)
+      IF(IRETOU.NE.0) THEN
+         CALL ERREUR (39)
+      ELSE
+         CALL ERREUR(533)
+      ENDIF
+      
+      END
+
+ 
+ 

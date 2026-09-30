@@ -1,0 +1,86 @@
+C WATR3D    SOURCE    FD218221  24/02/07    21:15:30     11834          
+c********************************************************************** 
+      subroutine watr3d(mfr,biotw,poro,vw,xnsat,mw,pw,bw,srw,teta,
+     # tetar,dtetak,pw0,Mwat,dphiw,bw0,bw1)
+      
+c     calcul de la pression hydrique en saturé et non saturé      
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables externes      
+      integer mfr
+      real*8 biotw,poro,vw,xnsat,mw,pw,bw,srw,teta,xnsat1,pw0,Mwat,dphiw
+      
+c     variables locales      
+      real*8 vvw,mw1
+        
+c     **** pression capillaire si non sature actif *********************
+      
+      if(mfr.ne.33) then
+c        formulation non poreuse : on ne traite que les depression hydriques 
+         vvw=poro
+         if(poro.ne.0.) then
+              srw=(vw/vvw)
+         else
+              srw=1.d0
+         end if
+         bw=srw*biotw
+         bw1=bw
+         if(vw.lt.vvw) then
+            if(srw.gt.0.0d0) then     
+                srw=min(srw,1.d0)
+            else
+                srw=0.01d0
+            end if
+c           van genuchten
+            if(mw.ne.0.) then 
+              mw1=mw
+              xnsat1=xnsat*exp(-(teta-tetar)/(dtetak))                
+              pw=-xnsat1*(srw**(-1.d0/mw1)-1.d0)**(1.d0-mw1)
+              Mwat=xnsat1
+              if(xnsat1.ne.0.) then
+                 dphiw=(pw-pw0)/xnsat1
+              else
+                 dphiw=0.d0
+              end if
+            else
+                print*,'MVGN ne devrait pas etre nul pour bwpw'
+                print*,'mise a zero de la pression capillaire dans bwpw'
+                read*
+                pw=0.d0
+                Mwat=0.d0
+                dphiw=0.d0
+                bw=0.d0
+                bw1=bw
+            end if
+         else
+            pw=0.d0
+            bw=biotw
+            bw1=bw
+            srw=1.d0
+            Mwat=0.d0
+c           (milieu / squelette drainé ?)            
+            dphiw=0.d0
+         end if
+      else
+c        en poreux la pression d eau n est pas geree dans le modele local
+c        il serait possible de gerer le complement au calcul poro meca 
+c        si necessaire (supplement de pression/ resolution poro elastique)
+         srw=1.0
+         pw=0.d0
+         bw=biotw
+         bw1=bw
+         Mwat=0.d0
+         dphiw=0.d0
+         print*,'ERREUR dans watr3d.eso srw=',srw,' imprevu pour '
+         print*,'formulation poreuse'
+c        cela influe sur la vitesse de fluage...         
+      end if
+c     print*,'watr3d :bw',bw,'pw',pw,Mwat,dphiw
+      return
+      end
+c**********************************************************************       
+      
+ 
+ 

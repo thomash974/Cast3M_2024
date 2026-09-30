@@ -1,0 +1,37 @@
+C LIRREE    SOURCE    CB215821  19/08/20    21:19:24     10287          
+      SUBROUTINE LIRREE(XVAL , ICODE , IRETOU )
+      IMPLICIT INTEGER(I-N)
+-INC CCNOYAU
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCASSIS
+      REAL*8 XVAL
+      CHARACTER*(8) IFL
+      
+      ith=0
+      if (nbesc.ne.0) ith=oothrd
+      
+      lotesc=.false.
+      if (ith.ne.0) lotesc=.true.
+      IFL ='FLOTTANT'
+      ICOD=ICODE
+      
+      CALL LIRABJ(IFL,IRAT,ICOD,IRETOU)
+      IF(IERR  .NE.0) RETURN
+      IF(IRETOU.EQ.0) RETURN
+      
+      IF(IFL.EQ.'FLOTTANT'.AND. (.not. lotesc)) THEN
+         if(nbesc.ne.0) segact ipiloc
+         XVAL=XIFLOT(IRAT)
+         if(nbesc.ne.0) SEGDES,IPILOC
+      ELSEIF(IFL.EQ.'FLOTTANT'.AND. lotesc) THEN
+         mescla=imescl(ith)
+         XVAL=ESOPRE(IRAT)
+      ELSEIF(IFL.EQ.'ENTIER  ') THEN
+         XVAL=IRAT
+      ENDIF
+      
+      END
+
+ 

@@ -1,0 +1,299 @@
+C EXPCHE    SOURCE    CB215821  20/11/04    21:17:02     10766          
+      SUBROUTINE EXPCHE(IPCHEL,IMM,IAB,IAV,IPLIS,VALREF,VALRE2,IPMAIL)
+*
+*   EXTRAIRE LE OU LES POINTS SUPPORTS DU MAXI OU DU MINI DES VALEURS DE
+*   COMPOSANTES D'UN CHAMP/ELEMENT
+*
+************************************************************************
+*   ENTREES :
+*
+*     IPCHEL = POINTEUR SUR UN MCHAML
+*     IMM    = 1  MAXI , 2 MINI , 3 A 8  AUTRES
+*     IAB    = 0 VALEURS ALGEBRIQUES  ,1 VALEURS ABSOLUES
+*     IAV    = 1 LES NOMS DE LA LISEMOTS SONT CONSIDERES ,2 ILS SONT EXC
+*     IPLIS  = POINTEUR SUR UN LISTMOTS
+*     VALREF = VALEUR DE REFERENCE
+*     VALRE2 = IDEM POUR OPTION COMPRIS
+*
+*    SORTIES :
+*
+*    IPMAIL  = POINTEUR  SUR OBJET MAILLAGE CONTENANT LE OU LES POINTS
+*              SUPPORTS DU MAXI OU DU MINI
+*
+*  P DOWLATYARI OCT 91
+************************************************************************
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCHAML
+-INC SMELEME
+-INC SMCOORD
+-INC SMLMOTS
+-INC SMINTE
+*
+      SEGMENT QUELCO
+        INTEGER ICO(NCOMX,NSOUS)
+      ENDSEGMENT
+*
+      SEGMENT XE(3,NBNN1)
+
+*     MACRO ESOPE des options possibles
+      MACRO, (MAXI,MINI,SUPE,EGSU,EGAL,EGIN,INFE,DIFF,COMP)
+
+      CHARACTER*(LOCOMP) MOCOMP
+*
+*     INITIALISATIONS
+*
+      QUELCO=0
+      XE    =0
+      IPMAIL=0
+      
+      IF(IAB.EQ.0)THEN
+        IF    (IMM.EQ.MAXI)THEN
+          VALRE1=-XGRAND
+        ELSEIF(IMM.EQ.MINI)THEN
+          VALRE1= XGRAND
+        ELSE
+          VALRE1=VALREF
+        ENDIF
+
+      ELSE
+        IF    (IMM.EQ.MAXI)THEN
+          VALRE1=0.D0
+        ELSEIF(IMM.EQ.MINI)THEN
+          VALRE1= XGRAND
+        ELSE
+          VALRE1=VALREF
+        ENDIF
+      ENDIF
+
+      IF(IPLIS.NE.0)THEN
+         MLMOTS=IPLIS
+         NC    =MLMOTS.MOTS(/2)
+      ENDIF
+
+C     RECUPERE LE CHAMELEM
+      MCHELM=IPCHEL
+      NSOUS =IMACHE(/1)
+
+      IF(IPLIS.NE.0) THEN
+*       RECHERCHE LE NOMBRE MAXIMALE DE COMPOSANTES POUR LE SEGMENT QUELCO
+        NCOMX = 0
+        DO 10 ISOUS=1,NSOUS
+          MCHAML=ICHAML(ISOUS)
+          NCOMX =MAX(NCOMX,NOMCHE(/2))
+  10    CONTINUE
+        SEGINI,QUELCO
+      ENDIF
+
+*     BOUCLE SUR LES SOUS-ZONES POUR DETERMINER QUELLES COMPOSANTES SERONT TRAITEES
+      NCOTOT=0
+      IMINTE=0
+      NBELEM=0
+      DO 500 ISOUS=1,NSOUS
+        MCHAML=ICHAML(ISOUS)
+        NCOMP =NOMCHE(/2)
+
+        IF(IPLIS.NE.0)THEN
+          NCO=0
+          DO 20 ICOMP=1,NCOMP
+            MOCOMP=NOMCHE(ICOMP)
+            CALL PLACE(MOTS,NC,IX,MOCOMP)
+            IF(IAV.EQ.1)THEN
+              IF(IX.NE.0)THEN
+                QUELCO.ICO(ICOMP,ISOUS)=1
+                NCO=NCO+1
+              ELSE
+                QUELCO.ICO(ICOMP,ISOUS)=0
+              ENDIF
+
+            ELSE
+              IF(IX.EQ.0)THEN
+                QUELCO.ICO(ICOMP,ISOUS)=1
+                NCO=NCO+1
+              ELSE
+                QUELCO.ICO(ICOMP,ISOUS)=0
+              ENDIF
+            ENDIF
+ 20       CONTINUE
+          NCOTOT=NCOTOT+NCO
+        ELSE
+          NCO=NCOMP
+        ENDIF
+        
+        IF(NCO .GT. 0)THEN
+          MINTE =INFCHE(ISOUS,4)
+          IPT1  =IMACHE(ISOUS)
+          NBEL1 =IPT1.NUM(/2)
+          IF (MINTE .NE. 0)THEN
+            IMINTE=1
+            NBPGAU=MINTE.POIGAU(/1)
+          ELSE
+            NBPGAU=IPT1.NUM(/1)
+          ENDIF
+          NBELEM=NBELEM + (NBEL1 * NBPGAU)
+        ENDIF
+*
+        IF(IMM.EQ.MAXI .OR. IMM.EQ.MINI) THEN
+C         Determine le MAXI ou le MINI parmi les composantes demandees
+          DO 100 ICOMP=1,NCOMP
+            IF(IPLIS.NE.0) THEN
+               IF(QUELCO.ICO(ICOMP,ISOUS) .EQ. 0)GOTO 100
+            ENDIF
+            MELVAL=IELVAL(ICOMP)
+            NEL   =VELCHE(/2)
+            NBPTEL=VELCHE(/1)
+            DO 110 IB=1,NEL
+              DO 120 IGAU=1,NBPTEL
+                XX=VELCHE(IGAU,IB)
+                IF(IAB.EQ.1) XX = ABS(XX)
+                IF(IMM.EQ.MAXI)THEN
+                  VALRE1=MAX(XX,VALRE1)
+                ELSE
+                  VALRE1=MIN(XX,VALRE1)
+                ENDIF
+ 120          CONTINUE
+ 110        CONTINUE
+ 100      CONTINUE
+        ENDIF
+ 500  CONTINUE
+
+C     ERREUR si aucune composante a traiter ? ==> MAILLAGE VIDE + SOUCIS ?
+      IF(IPLIS.NE.0)THEN
+        IF(NCOTOT .EQ. 0)THEN
+          NBNN  =1
+          NBELEM=0
+          NBSOUS=0
+          NBREF =0
+          SEGINI,MELEME
+          IPMAIL=MELEME
+          MELEME.ITYPEL=1
+
+C         Emission d'un soucis 280 : "Composante inexistante"
+          CALL soucis(280)
+          RETURN
+        ENDIF
+      ENDIF
+*
+*   CREATION DE L'OBJET MAILLAGE CONTENANT LES POINTS SUPPORTS
+*
+      NBNN=1
+      IF(IMINTE .NE. 0)THEN
+*       Il va falloir creer au plus NBELEM points
+        SEGACT,MCOORD*MOD
+        NBPT1 = NBPTS
+        NBPTS = NBPTS + NBELEM
+        SEGADJ,MCOORD
+      ENDIF
+
+      NBMAX =NBELEM
+
+      NBSOUS=0
+      NBREF =0
+      SEGINI,MELEME
+      IPMAIL=MELEME
+      ITYPEL=1
+      NBELEM=0
+*
+*    DEUXIEME BOUCLE SUR LES SOUS-ZONES POUR TROUVER LES POINTS SUPPORTS
+*
+      DO 600 ISOUS=1,NSOUS
+*
+        MCHAML=ICHAML(ISOUS)
+        NCOMP =NOMCHE(/2)
+        MINTE =INFCHE(ISOUS,4)
+        IPT1  =IMACHE(ISOUS)
+        NBNN1 =IPT1.NUM(/1)
+        NBEL1 =IPT1.NUM(/2)
+        IF(MINTE.NE.0)THEN
+          NBPGAU=MINTE.POIGAU(/1)
+          IF (XE .EQ. 0)THEN
+            SEGINI,XE
+          ELSEIF(NBNN1 .GT.XE(/2) )THEN
+            SEGADJ,XE
+          ENDIF
+        ELSE
+          NBPGAU=NBNN1
+        ENDIF
+
+        DO 300 ICOMP=1,NCOMP
+          IF(IPLIS.NE.0) THEN
+             IF(QUELCO.ICO(ICOMP,ISOUS) .EQ. 0)GOTO 300
+          ENDIF
+          MELVAL=IELVAL(ICOMP)
+          NBPTEL=VELCHE(/1)
+          NEL   =VELCHE(/2)
+          DO 400 IB=1,NBEL1
+            DO 410 IGAU=1,NBPGAU
+              XX=VELCHE(MIN(IGAU,NBPTEL),MIN(IB,NEL))
+              IF(IAB.EQ.1)XX=ABS(XX)
+
+*             Enumeration des differentes options
+              XPREC=ABS(VALRE1)*XZPREC
+              XDIFF=XX-VALRE1
+
+              CASE, IMM
+              WHEN, MAXI,MINI,EGAL
+                IF(ABS(XDIFF).GT.XPREC ) GOTO 410
+              WHEN,SUPE
+                IF(XDIFF.LE.XPREC) GOTO 410
+              WHEN,EGSU          
+                IF(XDIFF.LT.-XPREC) GOTO 410
+              WHEN,EGIN          
+                IF(XDIFF.GT.XPREC) GOTO 410
+              WHEN,INFE          
+                IF(XDIFF.GE.-XPREC) GOTO 410
+              WHEN,DIFF
+                IF(ABS(XDIFF).LE.XPREC ) GOTO 410
+              WHEN,COMP
+                XDIFF2=VALRE2-XX
+                IF((XDIFF.GE.-XPREC).AND.(XDIFF2.LE.XPREC))GOTO 410
+              ENDCASE
+
+              NBELEM=NBELEM+1
+              IF(MINTE.EQ.0)THEN
+                IPTS1=IPT1.NUM(IGAU,IB)
+
+              ELSE
+                 CALL DOXE(XCOOR,IDIM,NBNN1,IPT1.NUM,IB,XE(1,1))
+                 XC=0.D0
+                 YC=0.D0
+                 ZC=0.D0
+                 DO 405 IE=1,NBNN1
+                   XC=XC+SHPTOT(1,IE,IGAU)*XE(1,IE)
+                   YC=YC+SHPTOT(1,IE,IGAU)*XE(2,IE)
+                   ZC=ZC+SHPTOT(1,IE,IGAU)*XE(3,IE)
+ 405             CONTINUE
+                 NBPT1=NBPT1+1
+                 XCOOR((NBPT1-1)*(IDIM+1)+1)=XC
+                 XCOOR((NBPT1-1)*(IDIM+1)+2)=YC
+                 IF(IDIM.EQ.3)
+     1           XCOOR((NBPT1-1)*(IDIM+1)+3)=ZC
+                 IPTS1=NBPT1
+              ENDIF
+              NUM(1,NBELEM)=IPTS1
+
+ 410        CONTINUE
+ 400      CONTINUE
+ 300    CONTINUE
+ 600  CONTINUE
+
+      IF(NBELEM .LT. NBMAX)SEGADJ,MELEME
+
+      IF(IMINTE .NE. 0)THEN
+*       Ajustement du MCOORD
+        IF(NBPT1 .LT. NBPTS)THEN
+          NBPTS = NBPT1
+          SEGADJ,MCOORD
+        ENDIF
+        SEGDES,MCOORD
+      ENDIF
+
+      IF(IPLIS.NE.0)SEGSUP,QUELCO
+      IF(XE   .NE.0)SEGSUP,XE
+      END
+ 
+ 

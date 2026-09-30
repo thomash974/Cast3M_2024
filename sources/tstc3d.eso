@@ -1,0 +1,40 @@
+C TSTC3D    SOURCE    FD218221  24/02/07    21:15:29     11834          
+      subroutine TSTC3D(poro0,EPLCCV,deplcc3,precision3d,
+     #log_reduc,reduc)
+  
+c     test refermetures excessives de la porosite lors de l'ecoulement 
+c     et calcul du coeff  de reduction de retour radial pour camclay
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      real*8 poro0,EPLCCV,deplcc3(3),precision3d,reduc
+      logical log_reduc
+      
+      real*8 dporo,poro1
+
+c       test consolidation maxi non dépassée
+        dporo=deplcc3(1)+deplcc3(2)+deplcc3(3)
+        poro1=poro0+EPLCCV+dporo
+c        print*,'ds tstc3d',poro0,poro1,EPLCCV,dporo
+c        read*
+        if(poro1.lt.(poro0*precision3d)) then
+c           on arrive a la limite de la consolidation possible  
+c           on reduit le retour pour ne pas avoir de poro nulle
+            if(abs(dporo).gt.(precision3d*poro0)) then
+               reduc=-(poro0+EPLCCV)/dporo
+            else
+               reduc=-(poro0+EPLCCV)/(precision3d*poro0)
+            end if
+            log_reduc=.true.
+            print*,'Testcc3d reduction  increment plastique CC',reduc
+c            print*,poro0,EPLCCV,deplcc3,precision3d,
+c     #      log_reduc,reduc
+c            read*
+        else
+            reduc=1.d0        
+        end if
+        return
+        end
+ 
+ 

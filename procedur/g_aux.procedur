@@ -1,0 +1,822 @@
+$$$$ G_AUX
+* G_AUX     PROCEDUR  JB251061  22/08/09    21:15:01     11426          
+* =============================================================================
+*             PROCEDURE DE CONSTRUCTION DES CHAMPS AUXILIAIRES 
+*             POUR CALCULER LES FIC VIA LA PROCEDURE G_THETA
+*             ------------------------------------------------
+*
+* DESCRIPTION : CALCULE LES CHAMPS AUXILIAIRES NECESSAIRES A G_THETA POUR
+*               DETERMINER LES FACTEURS D'INTENSITE DES CONTRAINTES VIA
+*               L'OPTION 'DECOUPLAGE';
+* =============================================================================
+DEBP G_AUX SUPTAB*'TABLE' OBJUTI*'TABLE' BOOL*'TABLE';
+
+NMESS = OBJUTI.'NMESS';
+MESS 'Calcul des champs auxiliaires...'/NMESS;
+
+* I - PRELIMINAIRES
+* -----------------
+
+* TABLES QUI CONTIENDRONT LES CHAMPS AUXILIAIRES
+CH_AUX = TABL;
+
+* OBJETS UTILES
+GDIME = OBJUTI.'DIMENSION';
+ZER1 = MANU 'CHML' MOD_MEC_R 'SCAL' 0. 'TYPE' 'SCALAIRE' 'STRESSES';
+DIR1 = OBJUTI.'DIRECTION1';
+SI (EXIS OBJUTI 'DIRECTION2');
+    DIR2 = OBJUTI.'DIRECTION2';
+FINSI;
+SI (EXIS OBJUTI 'DIRECTION3');
+    DIR3 = OBJUTI.'DIRECTION3';
+FINSI;
+SI (BOOL.'XFEM' ET (EGA GDIME 3));
+    V1 V2 V3 = OBJUTI.'V1' OBJUTI.'V2' OBJUTI.'V3';
+FINSI;
+SI (EGA METH_AUX 'MECA');
+    RIGTOT = OBJUTI.'RIGTOT';
+FINSI;
+MAT_INST = OBJUTI.'MAT_INST';
+MODSUP = OBJUTI.'MODSUP';
+MODINF = OBJUTI.'MODINF';
+ELTETA = OBJUTI.'ELTETA';
+MAILLAGE = OBJUTI.'MAILLAGE';
+M_FRONT = OBJUTI.'FRONT';
+* AJOUT BP BT POUR LE CONTACT FROTTANT
+SI BOOL.'FROT';
+    OBJCON = OBJUTI.'OBJCON';
+    MAILCON = OBJUTI.'MAILCON';
+FINSI;
+* LISTMOT SCAL :
+MTS1 = MOTS 'SCAL';
+* LISTMOTS POUR LE DEPLACEMENT ET POUR LA FORCE :
+* ON EXTRAIT LES GDIME PREMIERS MOTS CAR ON NE VEUT PAS DES ROTATIONS
+* DANS LE CAS DES COQUES
+MOD_MEC_R = OBJUTI.'MOD_MEC_R';
+MOD_MEC = OBJUTI.'MOD_MEC';
+MUI = EXTR (EXTR MOD_MEC_R 'DEPL') (LECT 1 PAS 1 GDIME);
+MFI = EXTR (EXTR MOD_MEC_R 'FORC') (LECT 1 PAS 1 GDIME);
+MU1 = EXTR MUI 1 ; MU2 = EXTR MUI 2 ; 
+MF1 = EXTR MFI 1 ; MF2 = EXTR MFI 2;
+SI (EGA GDIME 3);
+    MF3 = EXTR MFI 3;
+FINSI;
+* FRONT DE FISSURE
+PM = SUPTAB.'FRONT_FISSURE';
+SI ((EGA GDIME 3) ET (NON BOOL.'DANS'));
+    SI (NON BOOL.'COQ');
+        PM = POIN PM 'INIT';
+    FINSI;
+FINSI;
+* CHAMPS NULS
+DEP000 = CHAN 'CHPO' MOD_MEC_R (ZERO MOD_MEC_R 'DEPLACEM');
+FOR000 = CHAN 'CHPO' MOD_MEC_R (ZERO MOD_MEC_R 'FORCES  ');
+
+* ON COMMENCE A REMPLIR LA TABLE CH_AUX
+REPE IMOD GDIME;
+    CH_AUX.&IMOD = TABL;
+    CH_AUX.&IMOD.'MOTMIX' = EXTR 'III' 1 &IMOD;
+    CH_AUX.&IMOD.'MOTMIA' = CHAI (CH_AUX.&IMOD.'MOTMIX')*3;
+FIN IMOD;
+
+* COEFFICIENTS MATERIAUX
+CHAM1 = (EXCO 'YOUN' MAT_INST) ET (EXCO 'NU  ' MAT_INST);
+SI (NON BOOL.'DANS');
+*    CAS D UN MONO-MATERIAU
+*    on construit les champ auxilaires d'une solution d'un materiau
+*    homogene => on prend les valeurs de E et nu en pointe de fissure
+    CHPO1 = CHAN 'CHPO' MOD_MEC_R CHAM1;
+    SI BOOL.'XFEM';
+        CHPO1 = INT_COMP ELTETA CHPO1 (MANU 'POI1' PM);
+    FINSI;
+    SI (EGA (TYPE PM) 'MAILLAGE');
+        VYO_1 = (MAXI (RESU (EXCO CHPO1 'YOUN'))) / (NBNO PM);
+        VNU_1 = (MAXI (RESU (EXCO CHPO1 'NU  '))) / (NBNO PM);
+    SINON;
+        VYO_1 = EXTR CHPO1 'YOUN' PM;
+        VNU_1 = EXTR CHPO1 'NU  ' PM;
+    FINSI;
+*    Constante de Kolosov
+    SI (EGA GMODE 'PLANCONT');
+        KAP_1 = (3. - VNU_1) / (1. + VNU_1);
+    SINON;
+        KAP_1 = (3. - (4. * VNU_1));
+    FINSI;
+*    Module de cisaillement
+    MU_1 = VYO_1 / (2.*(1. + VNU_1));
+*    Constante C_MATE (= 1 / E^etoile)
+    SI (EGA GMODE 'PLANCONT');
+        C_MATE = 1. / VYO_1;
+    SINON;
+        C_MATE = (1. - (VNU_1*VNU_1)) / VYO_1;
+    FINSI;
+SINON;
+*    CAS D UN BI-MATERIAU
+    CHPO1 = CHAN 'CHPO' MODSUP (REDU CHAM1 MODSUP);
+    VYO_1 = EXTR CHPO1 'YOUN' PM;
+    VNU_1 = EXTR CHPO1 'NU  ' PM;
+    CHPO1 = CHAN 'CHPO' MODINF (REDU CHAM1 MODINF);
+    VYO_2 = EXTR CHPO1 'YOUN' PM;
+    VNU_2 = EXTR CHPO1 'NU  ' PM;
+    SI BOOL.'MESS';
+        MESS ' MAT_INST  MAT2';
+        MESS  VYO_1 VYO_2;
+        MESS  VNU_1 VNU_2;
+    FINSI;
+*    Constante de Kolosov
+    SI (EGA GMODE 'PLANCONT');
+        KAP_1 = (3. - VNU_1) / (1. + VNU_1);
+        KAP_2 = (3. - VNU_2) / (1. + VNU_2);
+    SINON;
+        KAP_1 = (3. - (4. * VNU_1));
+        KAP_2 = (3. - (4. * VNU_2));
+    FINSI;
+*    Module de cisaillement
+    MU_1 = VYO_1 / (2.*(1. + VNU_1));
+    MU_2 = VYO_2 / (2.*(1. + VNU_2));
+*    Constante bi-metallique EPS1
+    VA1 = (KAP_1/MU_1) + (1./MU_2);
+    VA2 = (KAP_2/MU_2) + (1./MU_1);
+    EPS1 = (1./(2.*PI)) * (LOG (VA1/VA2));
+*    Constante C_MATE (= 1 / E^etoile)
+    COSH1 = PI * EPS1;
+    COSH1 = ((EXP COSH1) + (EXP (COSH1*(-1.)))) / 2.;
+    VA1 = (MU_1 + (KAP_1*MU_2)) * (MU_2 + (KAP_2*MU_1));
+    VA2 = MU_1 * MU_2 * ((MU_1*(1. + KAP_2)) + (MU_2*(1. + KAP_1)));
+    C_MATE = (COSH1*COSH1*VA1) / (4.*VA2);
+    MESS  'EPS1=' EPS1 '  C_MATE=' C_MATE;
+FINSI;
+OBJUTI.'MU_1' = MU_1;
+OBJUTI.'C_MATE' = C_MATE;
+
+* METHODE DE CALCUL DES CHAMPS AUXILIAIRES :
+* G-ANALYTIQUE = ON UTILISE L EXPRESSION ANALYTIQUE DE GRAD(U) ET SIGMA
+* U-ANALYTIQUE = ON UTILISE L EXPRESSION ANALYTIQUE DE U ET ON CALCULE
+*                SIGMA, FINT=BSIGMA, GRAD(U) ...
+* MECANIQUE = ON APPLIQUE UNE PRESSION/UN CISAILLEMENT SUR LES FACES DE LA FISSURE
+*             ET ON RESOUT LE PROBLEME ASSOCIE
+METH_AUX = MOT SUPTAB.'METH_AUX';
+SI (EGA METH_AUX 'MECA');
+    MESS_METH = CHAI 'Methode : mecanique';
+FINSI;
+SI (EGA METH_AUX 'UANA');
+    MESS_METH = CHAI 'Methode : U-analytique';
+FINSI;
+SI (EGA METH_AUX 'GANA');
+    MESS_METH = CHAI 'Methode : G-analytique';
+FINSI;
+MESS MESS_METH/NMESS;
+
+
+* II - METHODE MECANIQUE
+* ----------------------
+
+SI (EGA METH_AUX 'MECA');
+
+* II.1 - CONDITIONS AUX LIMITES
+* *****************************
+
+    SI (NON BOOL.'COQ');
+        CL1 = BLOQ 'DEPL' M_FRONT;
+    SINON;
+        CL1 = (BLOQ 'DEPL' M_FRONT) ET (BLOQ 'ROTA' M_FRONT);
+    FINSI;
+
+
+* II.2 - CHARGEMENT
+* *****************
+
+* LEVRES DE FISSURE
+    LSUP = SUPTAB.'LEVRE_SUPERIEURE';
+    LINF = SUPTAB.'LEVRE_INFERIEURE';
+* CALCUL DU CHARGEMENT EN MODE I
+    FI = PRES 'MASS' MOD_MEC 1. (LSUP ET LINF);
+* CALCUL DE LA NORMALE AUX LEVRES (DE LINF VERS LSUP)
+    NFIS = RESU (REDU FI LSUP);
+    NVAL = EXTR NFIS 'VALE' MFI;
+    P0 = M_FRONT POIN 1;
+    NP = P0 MOIN P0;
+    CHPO1 = MANU 'CHPO' NP MUI NVAL;
+    DEPL NP 'PLUS' CHPO1;
+* CALCUL DU CHARGEMENT EN MODE II
+    LVS = TABL;
+    LVS.(1) LVS.(2) = (ORIE LSUP NP) (ORIE LINF NP);
+    TFII = TABL;
+    MOD_TH = MODE MAILLAGE 'THERMIQUE';
+    REPE ILEVR 2;
+        LEVR = LVS.&ILEVR;
+        LEVRLIN = CHAN 'LINEAIRE' LEVR;
+        PSI0 PHI0 = PSIP MAILLAGE LEVRLIN 'DEUX' M_FRONT;
+        GPSI0 = CHAN 'NOEUD' MOD_TH (GRAD (NOMC 'T' PSI0) MOD_TH);
+        GPSI0 = NOMC (EXTR GPSI0 'COMP') MFI GPSI0;
+        FII = PROI LEVR GPSI0;
+        PSCA1 = PSCA FI FII MFI MFI;
+        FII = FII - (PSCA1 * FI);
+        NFII = (PSCA FII FII MFI MFI)**0.5;
+        TFII.&ILEVR = FII / NFII;
+    FIN ILEVR;
+    FII = TFII.(1) - TFII.(2);
+* CALCUL DU CHARGEMENT EN MODE III
+    FIII = PVEC (TFII.(1) + TFII.(2)) FI MFI MFI MFI;
+* ON ENLEVE DE LSUP ET LINF LA PARTIE QUI EST DANS ELTETA
+    LSUP = LSUP DIFF (LSUP ELEM 'APPUYE' ELTETA);
+    LINF = LINF DIFF (LINF ELEM 'APPUYE' ELTETA);
+* ON APPLIQUE LA PRESSION SUR LES LEVRES REDUITES
+    FI = PRES 'MASS' MOD_MEC 1. (LSUP ET LINF);
+* ON DONNE LA BONNE AMPLITUDE A FII ET FIII EN UTILISANT CELLE DE FI QUI EST
+* BIEN CALCULEE (JUSQU'ICI FII ET FIII SONT DE NORME UNITE) ET ON REDUIT
+    NFI = (PSCA FI FI MFI MFI)**0.5;
+    FII = NFI * (REDU FII (LSUP ET LINF));
+    FIII = NFI * (REDU FIII (LSUP ET LINF));
+    T_PREI = TABL;
+    T_PREI.(1) T_PREI.(2) T_PREI.(3) = FI FII FIII;
+    
+    
+* II.3 - CALCUL DU DEPLACEMENT ET DES CONTRAINTES
+* ***********************************************
+    
+    REPE IMOD GDIME;
+        TAB1 = CH_AUX.&IMOD;
+        TAB1.'A_PREI' = T_PREI.&IMOD;
+        TAB1.'A_DEPI' = RESO (RIGTOT ET CL1) TAB1.'A_PREI';
+        TAB1.'A_SIGF' = SIGM 'LINE' MAT_INST MOD_MEC_R TAB1.'A_DEPI';
+        TAB1.'A_DEPGR' = GRAD MOD_MEC_R MAT_INST TAB1.'A_DEPI';
+    FIN IMOD;
+    
+FINSI;
+
+
+* III - METHODES ANALYTIQUES
+* --------------------------
+
+* III.1 PREPARATION DU PASSAGE LOCAL -> GLOBAL
+* ********************************************
+
+SI BOOL.'XFEM';
+* CAS XFEM
+    PSI0 PHI0 = SUPTAB.'PSI' SUPTAB.'PHI';
+SINON;
+* CAS ELEMENTS STANDARDS
+    SI (EGA METH_AUX 'UANA');
+* METHODE U-ANALYTIQUE (FORCEMENT EN 2D POUR L'INSTANT)
+* INCLINAISON DE LA FISSURE PAR RAPPORT A L'AXE GLOBAL
+        XG0 YG0 = COOR PM;
+        SEG1 = ORDO (SUPTAB.'LEVRE_SUPERIEURE' ELEM 'APPU' 'LARG' PM);
+        PINIFIN = (POIN SEG1 'INIT') ET (POIN SEG1 'FINA');
+        P_SUP = POIN (DIFF PINIFIN ((VIDE 'MAILLAGE') ET PM)) 1;
+        SEG1 = ORDO (SUPTAB.'LEVRE_INFERIEURE' ELEM 'APPU' 'LARG' PM);
+        PINIFIN = (POIN SEG1 'INIT') ET (POIN SEG1 'FINA');
+        P_INF = POIN (DIFF PINIFIN ((VIDE 'MAILLAGE') ET PM)) 1;
+        XP1 YP1 = COOR P_SUP;
+        XP2 YP2 = COOR P_INF;
+        ALPHA1 = ATG (YG0 - ((YP1 + YP2)/2.)) (XG0 - ((XP1 + XP2)/2.));
+* COORDONNEES DANS LE REPERE GLOBAL ET LOCAL
+        XG1 YG1 = COOR ELTETA;
+        XL1 = ((XG1 - XG0)*(COS ALPHA1)) + ((YG1 - YG0)*(SIN ALPHA1));
+        YL1 = ((YG1 - YG0)*(COS ALPHA1)) - ((XG1 - XG0)*(SIN ALPHA1));
+        SI ((MESU ('DROI' 1 P_SUP P_INF)) < 1.E-10);
+            L1 = SUPTAB.'LEVRE_SUPERIEURE' ELEM 'APPU' ELTETA;
+            C1 = MANU 'CHPO' L1 1 'SCAL' 1.E-10;
+            L2 = SUPTAB.'LEVRE_INFERIEURE' ELEM 'APPU' ELTETA;
+            C2 = MANU 'CHPO' L2 1 'SCAL' -1.E-10;
+            YL1 = YL1 + C1 + C2;
+        FINSI;
+* COORDONNEES CYLINDRIQUES RAY1 TETA1 (1.E-30 POUR EVITER ERREUR ATG 0 0)
+        TETA1 = ATG YL1 (XL1 + 1.E-30);
+        RAY1 = (((XL1*XL1) + (YL1*YL1))**0.5) + 1.E-10;
+        M1 = ELTETA ELEM 'APPU' 'LARG' P_SUP;
+        M2 = ELTETA ELEM 'APPU' 'LARG' P_INF;
+        VA1 = XTY (MANU 'CHPO' M1 1 'SCAL' 1.)
+                    (REDU YL1 M1) MTS1 MTS1;
+        VA2 = XTY (MANU 'CHPO' M2 1 'SCAL' 1.)
+                    (REDU YL1 M2) MTS1 MTS1;
+* ON INVERSE AFIN D'AVOIR YL1 > 0 POUR MODSUP ET < 0 POUR MODINF
+        SI ((VA1 < 0.) ET (VA2 > 0.));
+            PPPP = P_SUP ;  P_SUP = P_INF ;   P_INF = PPPP;
+            MMDD = MODSUP ; MODSUP = MODINF ; MODINF = MMDD;
+        FINSI;
+        SI ((EGA XP1 XP2 1.E-10) ET (EGA YP1 YP2 1.E-10));
+            TETA_S = REDU TETA1 SUPTAB.'LEVRE_SUPERIEURE';
+            TETA_F = REDU TETA1 SUPTAB.'LEVRE_INFERIEURE';
+            TETA1 = TETA1 - TETA_S - TETA_F;
+* ON SE DEBROUILLE POUR AVOIR EXACTEMENT +/-180 SUR LEVRE SUP/INF
+            SI ((VA1 > 0.) ET (VA2 < 0.));
+                TETA1 = TETA1 + ((TETA_S*0.) + 180.) + ((TETA_F*0.) - 180.);
+            SINON;
+                TETA1 = TETA1 + ((TETA_F*0.) + 180.) + ((TETA_S*0.) - 180.);
+            FINSI;
+        FINSI;
+* VALEUR EN RADIAN
+        TETA1RAD = TETA1*PI/180.;
+        SI BOOL.'DANS';
+            M1 = EXTR MODSUP 'MAIL';
+            M2 = EXTR MODINF 'MAIL';
+            L1 = (CONT M1) ELEM 'APPU' (CONT M2);
+            M1 = M1 ELEM 'APPU' 'STRI' ELTETA;
+            M2 = M2 ELEM 'APPU' 'STRI' ELTETA;
+            PM1 = (CHAN M1 'POI1') DIFF (CHAN L1 'POI1');
+            PM2 = (CHAN M2 'POI1') DIFF (CHAN L1 'POI1');
+        FINSI;
+        SI BOOL.'TRAC';
+            TRAC RAY1 ELTETA 'TITR' 'RAY1';
+            TRAC TETA1 ELTETA 'TITR' 'TETA1' (PROG -180. PAS 20. 180.);
+        FINSI;
+    SINON;
+* METHODE G-ANALYTIQUE
+        LSUP = SUPTAB.'LEVRE_SUPERIEURE';
+* ON EST OBLIGE DE PASSER PAR DES ELEMENTS LINEAIRES A CAUSE DE PSIP
+        SI (EGA GDIME 2);
+            M_FRONT = M_FRONT POIN 1;
+        FINSI;
+        LEVRLIN = CHAN 'LINEAIRE' LSUP;
+        PSI0 PHI0 = PSIP MAILLAGE LEVRLIN 'DEUX' M_FRONT;
+    FINSI;
+FINSI;
+SI (BOOL.'XFEM' OU (EGA METH_AUX 'GANA'));
+* CAS XFEM OU STD EN METHODE G-ANALYTIQUE
+* ON RECUPERE LES LEVEL SET
+* LV7 = (PSI PHI 0)^T
+    PSI1 = REDU PSI0 ELTETA;
+    PHI1 = REDU PHI0 ELTETA;
+    LV0 = MANU 'CHPO' ELTETA MUI (PROG GDIME * 0.) 'NATURE' 'DIFFUS';
+    LV7 = LV0 + (NOMC MU1 PSI1) + (NOMC MU2 PHI1);
+* ET ON CALCULE LES GRADIENTS DANS LE REPERE GLOBAL
+* GLV7 = (PSI,X PSI,Y PSI,Z)
+*        (PHI,X PHI,Y PHI,Z)
+*        (0     0     0    )
+    GLV7 = CHAN (GRAD LV7 MOD_MEC_R) 'TYPE' 'SCALAIRE';
+    MGUI = EXTR MOD_MEC_R 'GRAD';
+    GPSI1 = EXCO (EXTR MGUI (LECT 1 PAS 1 NPAS (GDIME - 1))) GLV7 MUI;
+    GPHI1 = EXCO (EXTR MGUI (LECT 4 PAS 1 NPAS (GDIME - 1))) GLV7 MUI;
+    SI (EGA GDIME 2);
+* CAS 2D
+* ON S'ASSURE QUE LE REPERE EST DIRECT VIA SIGN1
+        GPSI1PO = CHAN 'CHPO' MOD_MEC_R GPSI1 'MOYE';
+        GPHI1PO = CHAN 'CHPO' MOD_MEC_R GPHI1 'MOYE';
+        ZVPSI1 = PVEC GPSI1PO MUI MUI;
+        PSCA1 = PSCA ZVPSI1 GPHI1PO MUI MUI;
+        SIGN1 = SIGN (MAXI (RESU PSCA1));
+        PHI1 = SIGN1 * PHI1;
+        GPHI1 = SIGN1 * GPHI1;
+        LV7 = LV0 + (NOMC MU1 PSI1) + (NOMC MU2 PHI1);
+        GLV7 = CHAN (GRAD LV7 MOD_MEC_R) 'TYPE' 'SCALAIRE';
+* ANGLE ALPHA1 DE PASSAGE LOCAL -> GLOBAL
+        NGPSI1 = (PSCA GPSI1 GPSI1 MUI MUI)**0.5;
+        NGPHI1 = (PSCA GPHI1 GPHI1 MUI MUI)**0.5;
+        GPHI1VZ = -1.*(PVEC GPHI1 MUI MUI);
+        PPMOY = 0.5 * ((GPSI1 / NGPSI1) + (GPHI1VZ / NGPHI1));
+        COS1A = EXCO PPMOY MU1 'SCAL';
+        SIN1A = EXCO PPMOY MU2 'SCAL';
+        ROT0 = ZERO MOD_MEC_R 'GRADIENT';
+        ROT0 = CHAN 'TYPE' ROT0 'SCALAIRE';
+        ROT1 = (NOMC (EXTR MGUI 1) COS1A) - (NOMC (EXTR MGUI 2) SIN1A) +
+                (NOMC (EXTR MGUI 4) SIN1A) + (NOMC (EXTR MGUI 5) COS1A);
+        ROT1 = ROT1 + (MANU 'CHML' MOD_MEC_R (EXTR MGUI 9) 1. 'STRESSES');
+        ROT1 = ROT0 + ROT1;
+        ALPHA1 = (MASQ SIN1A 'EGSUPE' 0.) * (ACOS COS1A);
+        COSA2 = COS1A ** 2;
+        SINA2 = SIN1A ** 2;
+        SINCOSA = SIN1A * COS1A;
+    SINON;
+* CAS 3D
+* CREATION DE LA MATRICE DE ROTATION
+        TAW1 = PVEC GPSI1 GPHI1 MUI MUI MUI;
+        THETA = PVEC GPHI1 TAW1 MUI MUI MUI;
+        THETA =  CHAN 'CHPO' MOD_MEC_R THETA 'MOYE';
+        NTHETA = (PSCA THETA THETA MUI MUI)**0.5;
+        MTHETA = MASQ NTHETA 'SUPERIEUR' 1.E-2;
+        BTHETA = BORN NTHETA 'SCAL' 'MINIMUM' 1.E-2;
+        THETA = CHAN (THETA / BTHETA * MTHETA) 'ATTRIBUT' 'NATURE' 'DIFFUS';
+        GPHI1 = CHAN 'CHPO' MOD_MEC_R GPHI1 'MOYE';
+        NGPHI1 = (PSCA GPHI1 GPHI1 MUI MUI)**0.5;
+        GPHI1 = CHAN (GPHI1 / NGPHI1) 'ATTRIBUT' 'NATURE' 'DIFFUS';
+        TAW1 = CHAN 'CHPO' MOD_MEC_R TAW1 'MOYE';
+        NTAW1 = (PSCA TAW1 TAW1 MUI MUI)**0.5;
+        MTAW1 = MASQ NTAW1 'SUPERIEUR' 1.E-2;
+        BTAW1 = BORN NTAW1 'SCAL' 'MINIMUM' 1.E-2;
+        TAW1 = CHAN (TAW1 / BTAW1 * MTAW1) 'ATTRIBUT' 'NATURE' 'DIFFUS';
+        ROT1 = (EXCO THETA MUI (EXTR MGUI (LECT 1 4 7)))
+                ET (EXCO GPHI1 MUI (EXTR MGUI (LECT 2 5 8)))
+                ET (EXCO TAW1 MUI (EXTR MGUI (LECT 3 6 9)));
+        ROT1 = EXCO ROT1 MGUI;
+        ROT1 = CHAN 'CHAM' ROT1 MOD_MEC_R 'STRESSES' 'SCALAIRE';
+    FINSI;
+* REPERE LOCAL DE LA FISSURE
+    XL1 = (NOMC PSI1 'SCAL') CHAN 'CHAM' MOD_MEC_R 'STRESSES';
+    YL1 = (NOMC PHI1 'SCAL') CHAN 'CHAM' MOD_MEC_R 'STRESSES';
+* Coordonnees cylindriques RAY1 TETA1
+    TETA1 = CHAN (ATG YL1 (XL1 + 1.D-30)) 'TYPE' 'SCALAIRE';
+    RAY1 = ((XL1**2) + (YL1**2))**0.5;
+    RAY1 = CHAN RAY1 'TYPE' 'SCALAIRE';
+    
+    
+* debut du cas contact frottant BOOL.'FROT' (btrolle 19/02/2013)
+* ajout des solutions analytiques du saut sur les levres de la fissure
+* projection de psi1 sur la fissure et calcul de psi,x
+    SI (NON BOOL.'DANS');
+        SI BOOL.'FROT';
+* PSI en CHAML aux PG sur la fissure utilise pour calcul du gradient
+* on selectionne la partie de psi2 non nulle (= dans le champ theta)
+            SI (EGA GDIME 2);
+* contour du domaine theta
+                CON1  = CONT ELTETA;
+* maillage support pour l'integration
+                MAI1 = INCL MAICON CON1 'STRI';
+* OBJCON2 = MODE mai1 'MECANIQUE' 'ZCO2';
+                OBJCON2 = REDU  OBJCON mai1;
+            SINON;
+* maillage support pour l'integration
+                MAI1 = INCL (EXTR OBJCON 'MAIL') ELTETA 'VOLU' 'STRI';
+* OBJCON2 = 'MODELISER' mai1 'MECANIQUE' 'ZCO3';
+                OBJCON2 = REDU  OBJCON mai1;
+            FINSI;
+* ON GARDE OBJCON2 POUR PLUS TARD
+            OBJUTI.'OBJCON2' = OBJCON2;
+            PSI1E = CHAN 'CHAM' PSI1 MOD_MEC_R 'NOEUDS';
+            PSI2 = PROI OBJCON2 PSI1E 'STRESSES';
+* PSI en CHPOINT sur la fissure utilise pour calcul du repere local
+            PSI3 = PROI MAICON PSI1E;
+            TESPSI = PSI2 'MASQUE' 'INFERIEUR'(-1E-15);
+            PSI2B = TESPSI * (-1.*PSI2) ('MOTS' 'PSI') ('MOTS' 'PSI') ('MOTS' 'PSI');
+* terme sqrt(r/2pI) et sa derivee,r
+            RM05B = ((PSI2B/(2.*PI)) **0.5);
+            RM05BR = 0.5*((2.*PI*PSI2B)**-0.5);
+* Change le nom pour pouvoir calculer grad avec ZCO
+            LV72 = (PSI3 NOMC 'AX')
+                    ET (MANU 'CHPO' ('EXTRAIRE' OBJCON2 'MAIL')
+                        1 'AY  ' 0. 'NATURE' 'DIFFUS')
+                    ET (MANU  'CHPO' ('EXTRAIRE' OBJCON2 'MAIL')
+                        1 'AZ  ' 0. 'NATURE' 'DIFFUS');
+            GLV72 = 'CHANGER' (GRAD LV72 OBJCON2) 'TYPE' 'SCALAIRE';
+            MAXJ = MOTS 'AX,X' 'AX,Y' 'AX,Z';
+            MAXJ = EXTR MAXJ (LECT 1 PAS 1 GDIME);
+            GPSI2 = EXCO MAXJ GLV72 MUI;
+            SI (GDIME 'EGA' 2);
+* Angle ALPHA1 de passage local -> global
+                NGPSI2 = (PSCA GPSI2 GPSI2 MUI MUI)**0.5;
+                COS1AB = EXCO (GPSI2 / NGPSI2) 'UX' 'SCAL';
+                SIN1AB = EXCO (GPSI2 / NGPSI2) 'UY' 'SCAL';
+                ROT2 = (NOMC 'AX,X' COS1AB) - (NOMC 'AX,Y' SIN1AB) + 
+                        (NOMC 'AY,X' SIN1AB) + (NOMC 'AY,Y' COS1AB);
+                ROT20 = MANU 'CHML' OBJCON2 'AX,Z' 0. 'AY,Z' 0. 'AZ,X' 0. 
+                            'AZ,Y' 0. 'AZ,Z' 1. 'STRESSES';
+                ROT2 = ROT20 + ROT2;
+            SINON;
+* CHAM DES NORMALES
+                V22 = VSUR OBJCON2 'NORM';
+                MVI = EXTR V22 'COMP';
+                V22 = NOMC MVI MUI V22;
+* CHAM PREMIERE TANGENTE = GRAD DE PSI
+* MAIS ON ORTHONORMALISE LE REPERE
+                PSCA1 = PSCA V22 GPSI2 MUI MUI;
+                V12 = GPSI2 - (PSCA1 * V22);
+                NV12 = (PSCA V12 V12 MUI MUI)**0.5;
+                V12 = V12 / NV12;
+* CHAM DE LA DERNIERE TANGENTE PRODUIT VECT DES 2 AUTRES
+                V32 = PVEC V12 V22 MUI MUI MUI;
+                MAIX = MOTS 'AX,X' 'AY,X' 'AZ,X';
+                MAIY = MOTS 'AX,Y' 'AY,Y' 'AZ,Y';
+                MAIZ = MOTS 'AX,Z' 'AY,Z' 'AZ,Z';
+                ROT2 = (NOMC MUI MAIX V12) ET (NOMC MUI MAIY V22) ET 
+                        (NOMC MUI MAIZ V32);
+            FINSI;
+
+* r,x (r = -PSI sur la fissure)
+            DRDX2 = (EXCO GLV72 'AX,X' 'SCAL');
+            DRDY2 = (EXCO GLV72 'AX,Y' 'SCAL');
+            SI (EGA GDIME 3);
+                DRDZ2 = (EXCO GLV72 'AX,Z' 'SCAL');
+            FINSI;
+        FINSI;
+    FINSI;
+* fin du cas contact frottant BOOL.'FROT' (btrolle 19/02/2013)
+FINSI;
+SI (NEG (TYPE TETA1) 'MOT');
+* COS ET SIN UTILES
+    COS1T  = COS TETA1;
+    COS05T = COS (0.5*TETA1);
+    COS15T = COS (1.5*TETA1);
+    SIN1T  = SIN TETA1;
+    SIN05T = SIN (0.5*TETA1);
+    SIN15T = SIN (1.5*TETA1);
+FINSI;
+
+
+* III.2 - METHODE U-ANALYTIQUE
+* ----------------------------
+
+SI (EGA METH_AUX 'UANA');
+    
+    ULOC = TABL;
+    SI (NON BOOL.'DANS');
+* CAS D UN MONO-MATERIAU
+* CHAMP AUX. MODE 1
+        UX_1 = ((RAY1/(2.*PI))**0.5) / (2.*MU_1) * COS05T * (KAP_1 - COS1T);
+        UY_1 = ((RAY1/(2.*PI))**0.5) / (2.*MU_1) * SIN05T * (KAP_1 - COS1T);
+        ULOC.(1) = (CHAN 'COMP' MU1 UX_1 'NATU' 'DIFFUS') ET
+                    (CHAN 'COMP' MU2 UY_1 'NATU' 'DIFFUS');
+* CHAMP AUX. MODE 2
+        UX_1 = ((RAY1/(2.*PI))**0.5) / (2.*MU_1) * SIN05T * (2. + KAP_1 + COS1T);
+        UY_1 = ((RAY1/(2.*PI))**0.5) / (2.*MU_1) * COS05T * (2. - KAP_1 - COS1T);
+        ULOC.(2) = (CHAN 'COMP' MU1 UX_1 'NATU' 'DIFFUS') ET
+                    (CHAN 'COMP' MU2 UY_1 'NATU' 'DIFFUS');
+    SINON;
+* CAS D UN BI-MATERIAU
+        EPSLGR = EPS1 * (LOG RAY1);
+        VA1 = COS (EPSLGR*180./PI);
+        VA2 = SIN (EPSLGR*180./PI);
+        BTA1   = ((0.5*VA1) + (EPS1*VA2)) / (0.25 + (EPS1*EPS1));
+        BTAPM1 = ((0.5*VA2) - (EPS1*VA1)) / (0.25 + (EPS1*EPS1));
+        DTA_1 = EXP (0. - ((PI - TETA1RAD)*EPS1));
+        DTA_2 = EXP ((PI + TETA1RAD)*EPS1);
+        GAM_1 = (KAP_1*DTA_1) - (DTA_1**(-1.));
+        GAM_2 = (KAP_2*DTA_2) - (DTA_2**(-1.));
+        GAMPM_1 = (KAP_1*DTA_1) + (DTA_1**(-1.));
+        GAMPM_2 = (KAP_2*DTA_2) + (DTA_2**(-1.));
+        COS05T = COS (TETA1/2.) ;  SIN05T = SIN (TETA1/2.);
+        D_1 = (BTA1*GAM_1*COS05T) + (BTAPM1*GAMPM_1*SIN05T);
+        D_2 = (BTA1*GAM_2*COS05T) + (BTAPM1*GAMPM_2*SIN05T);
+        DPM_1 = (BTAPM1*GAM_1*COS05T) - (BTA1*GAMPM_1*SIN05T);
+        DPM_2 = (BTAPM1*GAM_2*COS05T) - (BTA1*GAMPM_2*SIN05T);
+        GTAR1 = EPSLGR + (0.5*TETA1RAD);
+        CVA_1 = (SIN TETA1) * (SIN (GTAR1*180./PI));
+        CVA_2 = (SIN TETA1) * (COS (GTAR1*180./PI));
+* CHAMP AUX. MODE 1
+        UX_1 = ((RAY1/(2.*PI))**0.5)/(4.*MU_1)*(D_1 + (2.*DTA_1*CVA_1));
+        UX_2 = ((RAY1/(2.*PI))**0.5)/(4.*MU_2)*(D_2 + (2.*DTA_2*CVA_1));
+        UXMOY = (CHAN 'ATTRIBUT' UX_1 'NATURE' 'DIFFUS') ET
+                    (CHAN 'ATTRIBUT' UX_2 'NATURE' 'DIFFUS');
+        UY_1 = 0-(((RAY1/(2.*PI))**0.5)/(4.*MU_1)*(DPM_1 + (2.*DTA_1*CVA_2)));
+        UY_2 = 0-(((RAY1/(2.*PI))**0.5)/(4.*MU_2)*(DPM_2 + (2.*DTA_2*CVA_2)));
+        UYMOY = (CHAN 'ATTRIBUT' UY_1 'NATURE' 'DIFFUS') ET
+                    (CHAN 'ATTRIBUT' UY_2 'NATURE' 'DIFFUS');
+        ULOC.(1) = (NOMC MU1 UXMOY) + (NOMC MU2 UYMOY);
+* CHAMP AUX. MODE 2
+        UX_1 = 0-(((RAY1/(2.*PI))**0.5)/(4.*MU_1)*(DPM_1 - (2.*DTA_1*CVA_2)));
+        UX_2 = 0-(((RAY1/(2.*PI))**0.5)/(4.*MU_2)*(DPM_2 - (2.*DTA_2*CVA_2)));
+        UXMOY = (CHAN 'ATTRIBUT' UX_1 'NATURE' 'DIFFUS') ET
+                    (CHAN 'ATTRIBUT' UX_2 'NATURE' 'DIFFUS');
+        UY_1 = 0-(((RAY1/(2.*PI))**0.5)/(4.*MU_1)*(D_1 - (2.*DTA_1*CVA_1)));
+        UY_2 = 0-(((RAY1/(2.*PI))**0.5)/(4.*MU_2)*(D_2 - (2.*DTA_2*CVA_1)));
+        UYMOY = (CHAN 'ATTRIBUT' UY_1 'NATURE' 'DIFFUS') ET
+                    (CHAN 'ATTRIBUT' UY_2 'NATURE' 'DIFFUS');
+        ULOC.(2) = (NOMC MU1 UXMOY) + (NOMC MU2 UYMOY);
+    FINSI;
+    REPE IMOD GDIME;
+* RETOUR DU REPERE LOCAL VERS LE GLOBAL
+        UL1 = EXCO MU1 ULOC.&IMOD;
+        UL2 = EXCO MU2 ULOC.&IMOD;
+        UG1 = (UL1*(COS ALPHA1)) - (UL2*(SIN ALPHA1));
+        UG2 = (UL1*(SIN ALPHA1)) + (UL2*(COS ALPHA1));
+* CHAMPS AUXILIAIRES
+        TAB1 = CH_AUX.&IMOD;
+        TAB1.'A_DEPI' = (NOMC MU1 UG1) + (NOMC MU2 UG2);
+        TAB1.'A_SIGF' = SIGM 'LINE' MAT_INST MOD_MEC_R TAB1.'A_DEPI';
+        TAB1.'A_PREI' = BSIG TAB1.'A_SIGF' MOD_MEC_R;
+        TAB1.'A_DEPGR' = GRAD MOD_MEC_R MAT_INST TAB1.'A_DEPI';
+    FIN IMOD;
+    
+FINSI;
+
+
+* III.3 - METHODE G-ANALYTIQUE
+* ****************************
+
+SI (EGA METH_AUX 'GANA');
+
+* ON COMMENCE PAR CREER UN CHAMP DE TYPE GRADIENT NUL QUE L'ON TRANSFORME EN
+* CHAMP DE TYPE SCALAIRE POUR POUVOIR FAIRE LES OPERATIONS ALGEBRIQUES AVEC LES
+* CHAMPS DE TYPE SCALAIRE DEFINIS PLUS HAUT A PARTIR DE TETA1
+    GRU0 = ZERO MOD_MEC_R 'GRADIENT';
+    GRU0 = CHAN 'TYPE' GRU0 'SCALAIRE';
+
+* PREMIERE ETAPE : ECRITURE DES CHAMPS
+* ------------------------------------
+
+* PREFACTEURS
+    PREF1 = (1/(2*PI*RAY1))**0.5;
+* TABLES (ELLES CONTIENDRONT LES CHAMPS POUR LES 2/3 MODES)
+    GRULOC = TABL;
+    SIGLOC = TABL;
+    
+* REMARQUE : DANS CE QUI SUIT ON EXPRIME LES COMPOSANTES DU GRADIENT DU CHAMP
+*            DE DEPLACEMENT DANS LA BASE MIXTE ENTRE LA BASE CARTESIENNE LOCALE
+*            ET LA BASE CYLINDRIQUE LOCALE. 
+*            U1T N'EST DONC PAS U1,T MAIS BIEN (U1,T)/R.
+
+* REMARQUE : LE TENSEUR DES CONTRAINTES EST BIEN SUR SYMETRIQUE MAIS ON LE
+*            TRAITE QUAND MEME COMME S'IL NE L'ETAIT PAS POUR POUVOIR EFFECTUER
+*            LA ROTATION DE LA MEME MANIERE QUE POUR LE GRADIENT DU DEPLACEMENT
+    
+* MODE I :
+* ********
+* GRADIENT DU DEPLACEMENT DANS LA BASE LOCALE
+    U1R = NOMC (EXTR MGUI 1) (((KAP_1 - 0.5)*COS05T) - (0.5*COS15T));
+    U1T = NOMC (EXTR MGUI 2) (((0.5 - KAP_1)*SIN05T) + (1.5*SIN15T));
+    U2R = NOMC (EXTR MGUI 4) (((KAP_1 + 0.5)*SIN05T) - (0.5*SIN15T));
+    U2T = NOMC (EXTR MGUI 5) (((KAP_1 + 0.5)*COS05T) - (1.5*COS15T));
+    MSCAL = MOTS (DIME MGUI)*'SCAL';
+    GRU1 = GRU0 + U1R + U1T + U2R + U2T;
+    GRULOC.(1) = (PREF1 / (4.*MU_1)) * GRU1 MSCAL MGUI MGUI;
+* CONTRAINTES DANS LA BASE LOCALE
+    SIG11 = NOMC (EXTR MGUI 1) COS05T*(1. - (SIN05T*SIN15T));
+    SIG12 = NOMC (EXTR MGUI 2) COS05T*SIN05T*COS15T;
+    SIG21 = NOMC (EXTR MGUI 4) SIG12;
+    SIG22 = NOMC (EXTR MGUI 5) COS05T*(1. + (SIN05T*SIN15T));
+    SIG33 = VNU_1*((NOMC (EXTR MGUI 9) SIG11) + (NOMC (EXTR MGUI 9) SIG22));
+    SIG1 = GRU0 + SIG11 + SIG12 + SIG21 + SIG22 + SIG33;
+    SIGLOC.(1) = PREF1 * SIG1 MSCAL MGUI MGUI;
+    
+* MODE II :
+* *********
+* GRADIENT DU DEPLACEMENT DANS LA BASE LOCALE
+    U1R = NOMC (EXTR MGUI 1) (((KAP_1 + 1.5)*SIN05T) + (0.5*SIN15T));
+    U1T = NOMC (EXTR MGUI 2) (((KAP_1 + 1.5)*COS05T) + (1.5*COS15T));
+    U2R = NOMC (EXTR MGUI 4) (((1.5 - KAP_1)*COS05T) - (0.5*COS15T));
+    U2T = NOMC (EXTR MGUI 5) (((KAP_1 - 1.5)*SIN05T) + (1.5*SIN15T));
+    GRU1 = GRU0 + U1R + U1T + U2R + U2T;
+    GRULOC.(2) = (PREF1 / (4.*MU_1)) * GRU1 MSCAL MGUI MGUI;
+* CONTRAINTES DANS LA BASE LOCALE
+    SIG11 = NOMC (EXTR MGUI 1) (0 - (SIN05T*(2. + (COS05T*COS15T))));
+    SIG12 = NOMC (EXTR MGUI 2) COS05T*(1. - (SIN05T*SIN15T));
+    SIG21 = NOMC (EXTR MGUI 4) SIG12;
+    SIG22 = NOMC (EXTR MGUI 5) SIN05T*COS05T*COS15T;
+    SIG33 = VNU_1*((NOMC (EXTR MGUI 9) SIG11) + (NOMC (EXTR MGUI 9) SIG22));
+    SIG1 = GRU0 + SIG11 + SIG12 + SIG21 + SIG22 + SIG33;
+    SIGLOC.(2) = PREF1 * SIG1 MSCAL MGUI MGUI;
+
+* MODE III :
+* **********
+* GRADIENT DU DEPLACEMENT DANS LA BASE LOCALE
+    U3R = NOMC (EXTR MGUI 7) SIN05T;
+    U3T = NOMC (EXTR MGUI 8) COS05T;
+    GRU1 = GRU0 + U3R + U3T;
+    GRULOC.(3) = (PREF1 / MU_1) * GRU1 MSCAL MGUI MGUI;
+* CONTRAINTES DANS LA BASE LOCALE
+    SIG13 = NOMC (EXTR MGUI 3) (0. - SIN05T);
+    SIG31 = NOMC (EXTR MGUI 7) SIG13;
+    SIG23 = NOMC (EXTR MGUI 6) COS05T;
+    SIG32 = NOMC (EXTR MGUI 8) SIG23;
+    SIG1 = GRU0 + SIG13 + SIG31 + SIG23 + SIG32;
+    SIGLOC.(3) = PREF1 * SIG1 MSCAL MGUI MGUI;
+                         
+
+* DEUXIEME ETAPE : PASSAGE DANS LA BASE GLOBALES
+* ----------------------------------------------
+
+* MATRICE DE PASSAGE DE LA BASE CYLINDRIQUE A LA BASE CART. GLOBALE
+* (SA TRANSPOSEE EN FAIT)
+* PCG = (R,X  R*T,X  0)
+*       (R,Y  R*T,Y  0)
+*       (R,Z  R*T,Z  0)
+* AVEC :
+* R,I = COST * PSI,I + SINT * PHI,I
+* R*T,I = COST * PHI,I - SINT * PSI,I
+    PCG = GRU0;
+    REPE I 3;
+        MGU1I = EXTR MGUI &I;
+        MGU2I = EXTR MGUI (&I + 3);
+        PSIJ = EXCO MGU1I GLV7 'SCAL';
+        PHIJ = EXCO MGU2I GLV7 'SCAL';
+        MGUI1 = EXTR MGU1I (LECT 1 4 3 2);
+        MGUI2 = EXTR MGU2I (LECT 1 4 3 2);
+        PCG = PCG + (NOMC MGUI1 ((COS1T * PSIJ) + (SIN1T * PHIJ)));
+        PCG = PCG + (NOMC MGUI2 ((COS1T * PHIJ) - (SIN1T * PSIJ)));
+    FIN I;
+* MATRICE DE PASSAGE DE LA BASE CART. LOCALE A LA BASE CART. GLOBALE
+* (SA TRANSPOSEE EN FAIT)
+* C'EST ROT1 CALCULE PLUS HAUT
+    
+* BOUCLE SUR LES MODES
+    MSIG = EXTR MOD_MEC_R 'CONT';
+    REPE IMOD GDIME;
+        GRU1 = GRULOC.&IMOD;
+        SIG1 = SIGLOC.&IMOD;
+        GRUAUX = GRU0;
+        SIGAUX = GRU0;
+* BOUCLES SUR LES INDICES (DOUBLE PRODUIT MATRICIEL)
+        REPE I 3;
+        REPE J 3;
+        MUIJ = EXTR MGUI ((3*(&I - 1)) + &J);
+        MSIJ = CHAI 'SM' (EXTR MUIJ (LECT 2 4));
+        REPE K 3;
+        MUIK = EXTR MGUI ((3*(&I - 1)) + &K);
+        ROTIK = EXCO MUIK ROT1 'SCAL';
+        REPE L 3;
+            MUJL = EXTR MGUI ((3*(&J - 1)) + &L);
+            PCGJL = EXCO MUJL PCG 'SCAL';
+            ROTJL = EXCO MUJL ROT1 'SCAL';
+* POUR LE GRADIENT DU DEPLACEMENT : LE CHANGEMENT DE BASE EST MIXTE
+            MUKL = EXTR MGUI ((3*(&K - 1)) + &L);
+            GRUKL = EXCO MUKL GRU1 'SCAL';
+            GRUAUX = GRUAUX + (NOMC MUIJ (ROTIK * PCGJL * GRUKL));
+* POUR LE TENSEUR DES CONTRAINTES : LE CHANGEMENT DE BASE EST NORMAL
+            SIGKL = EXCO MUKL SIG1 'SCAL';
+            SIGAUX = SIGAUX + (NOMC MSIJ (ROTIK * ROTJL * SIGKL));
+        FIN L;
+        FIN K;
+        FIN J;
+        FIN I;
+* IL FAUT REPASSER LE CHAMP DE CONTRAINTE EN TYPE 'CONTRAINTES' ET NE GARDER
+* QUE LES COMPOSANTES PERTINENTES
+        SIGAUX = CHAN 'TYPE' (EXCO MSIG SIGAUX) 'CONTRAINTES';
+* IL FAUT REPASSER LE GRADIENT DU DEPLACEMENT EN TYPE 'GRADIENT'
+        GRUAUX = CHAN 'TYPE' GRUAUX 'GRADIENT';
+        
+* STOCKAGE
+        TAB1 = CH_AUX.&IMOD;
+        TAB1.'A_PREI' = FOR000;
+        TAB1.'A_DEPI' = DEP000;
+        TAB1.'A_SIGF' = SIGAUX;
+        TAB1.'A_DEPGR' = GRUAUX;
+    FIN IMOD;
+    
+*******************************************************************************
+* SAUT DE DEPLACEMENT DANS LE CAS DU FROTTEMENT ENTRE LES LEVRES
+
+    SI BOOL.'FROT';
+    
+        GRW0 = ZERO OBJCON2 'GRADIENT';
+        GRW0 = CHAN 'TYPE' GRW0 'SCALAIRE';
+        GRW0 = MANU 'CHML' OBJCON2 'AX,X' 0. 'AX,Y' 0. 'AX,Z' 0.
+                'AY,X' 0. 'AY,Y' 0. 'AY,Z' 0. 'AZ,X' 0. 'AZ,Y' 0. 'AZ,Z' 0.
+                'TYPE' 'SCALAIRE' 'STRESSES';
+*       LIST GRW0 ;FIN;
+        GRWLOC = TABL;
+    
+* MODE I :
+* ********
+* GRADIENT DU SAUT DE DEPLACEMENT DANS LA BASE LOCALE (MIS A 0 EN MODE I
+* CAR NE DOIT PAS INTERVENIR)
+        GRWLOC.(1) = GRW0;
+        
+* MODE II :
+* *********
+* GRADIENT DU SAUT DE DEPLACEMENT DANS LA BASE LOCALE
+        W1R = (8.*C_MATE * RM05BR) / 2.;
+        W1R = NOMC W1R 'SCAL';
+        W1X = W1R*DRDX2;
+        W1Y = W1R*DRDY2;
+        GRWLOC.(2) = GRW0 + (NOMC 'AX,X' W1X) + (NOMC 'AX,Y' W1Y);
+        SI (EGA GDIME 3);
+            W1Z = W1R*DRDZ2;
+            GRWLOC.(2) = GRWLOC.(2) + (NOMC 'AX,Z' W1Z);
+        FINSI;
+
+* MODE III :
+* **********
+* GRADIENT DU SAUT DE DEPLACEMENT DANS LA BASE LOCALE
+        GRWLOC.(3) = GRW0;
+        SI (EGA GDIME 3);
+            W3R =  (8*C_MATE * RM05BR/(1. - VNU_1)) / 2.;
+            W3R = NOMC W3R 'SCAL';
+            W3X = W3R*DRDX2;
+            W3Y = W3R*DRDY2;
+            W3Z = W3R*DRDZ2;
+            GRWLOC.(3) = GRWLOC.(3) + (NOMC 'AZ,X' W3X) + (NOMC 'AZ,Y' W3Y) +
+                            (NOMC 'AZ,Z' W3Z);
+        FINSI;
+        
+* MATRICE DE PASSAGE DE LA BASE CART. LOCALE A LA BASE CART. GLOBALE
+* (SA TRANSPOSEE EN FAIT)
+* C'EST ROT2 CALCULE PLUS HAUT
+
+* BOUCLE SUR LES MODES
+        REPE IMOD GDIME;
+            GRW1 = GRWLOC.&IMOD;
+            GRWAUX = GRW0;
+* BOUCLES SUR LES INDICES (DOUBLE PRODUIT MATRICIEL)
+            REPE I 3;
+            REPE J 3;
+                MAIJ = CHAI 'A' (EXTR 'XYZ' &I &I) ',' (EXTR 'XYZ' &J &J);
+                MI = EXTR 'XYZ' &I &I;
+                MJ = EXTR 'XYZ' &J &J;
+                MAIK = MOTS (CHAI 'A' MI ',X') (CHAI 'A' MI ',Y')
+                            (CHAI 'A' MI ',Z');
+                MAKJ = MOTS (CHAI 'AX,' MJ) (CHAI 'AY,' MJ) (CHAI 'AZ,' MJ);
+                GRWAUX = GRWAUX + (NOMC MAIJ (PSCA ROT2 GRW1 MAIK MAKJ));
+            FIN J;
+            FIN I;
+            GRWAUX = CHAN 'TYPE' GRWAUX 'GRADIENT';
+            CH_AUX.&IMOD.'B_DEPGR' = GRWAUX;
+        FIN IMOD;
+    FINSI;
+    
+FINSI;
+
+MESS 'Calcul des champs termine'/NMESS;
+
+REPE IMOD 0;
+*   MSUP = MAILLAGE ELEM 'BLEU';
+*   TRAC 'CACH' (VECT (REDU T_PREI.&IMOD MSUP) 'FORC') MSUP;
+    UAUX = CH_AUX.&IMOD.'A_DEPI';
+    DEF1 = DEFO MAILLAGE UAUX;
+    TRAC 'CACH' DEF1;
+FIN IMOD;
+
+FINP CH_AUX;
+$$$$
+ 
+ 
+ 
+ 

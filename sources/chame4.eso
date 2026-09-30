@@ -1,0 +1,217 @@
+C CHAME4    SOURCE    MB234859  21/11/09    21:15:07     11183          
+      SUBROUTINE CHAME4(IPCHAM,IPMINT,MELEME,MELVA3)
+*____________________________________________________________________*
+*                                                                    *
+*     Transformation d'un MCHAML en T TINF TSUP en un MCHAML         *
+*     uniquement en T mais dont la répartition est parabolique dans  *
+*     l'épaisseur . Ce sous-programme n'est utilisé que pour les     *
+*     éléments coques avec intégration dans l'épaisseur              *
+*                                                                    *
+*     Entr{es:                                                       *
+*     ________                                                       *
+*                                                                    *
+*     IPCHAM       Pointeur sur le MCHAML                            *
+*                                                                    *
+*     Sorties:                                                       *
+*     ________                                                       *
+*                                                                    *
+*     IPCHAM       Pointeur sur le MCHAML r{sultat                   *
+*                                                                    *
+*____________________________________________________________________*
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+*
+-INC SMCHAML
+-INC SMELEME
+-INC SMINTE
+*
+      CHARACTER*(LOCOMP)  NOMC
+      CHARACTER*16 TYPC
+*
+*----- mise en ordre des composantes : TINF et TSUP en dernier -----
+*
+*      write(6,*) '2 ipcham,ipmint,meleme',ipcham,ipmint,meleme
+      MCHAML = IPCHAM
+CC    segact mchaml*mod
+      NCOMP = NOMCHE(/2)
+      ITINF=0
+      ITSUP=0
+      IT=0
+      DO 10 I1=1,NCOMP
+        IF(NOMCHE(I1).EQ.'TINF ') ITINF = I1
+        IF(NOMCHE(I1).EQ.'TSUP ') ITSUP = I1
+        IF(NOMCHE(I1).EQ.'T    ') IT = I1
+  10  CONTINUE
+      IF(ITINF*ITSUP*IT.EQ.0) THEN
+        moterr(1:8)='CHAME4-2'
+        CALL ERREUR(359)
+        RETURN
+      ENDIF
+CC    NLIMIT = NCOMP - 2
+C
+C------------------ On s'occupe de la composante TINF --------------
+C
+CC    IF(ITINF.LE.NLIMIT) THEN
+CC        IF(NOMCHE(NLIMIT + 1).NE.'TSUP    ') THEN
+CC           INTER = IELVAL(ITINF)
+CC           NOMC  = NOMCHE(ITINF)
+CC           TYPC  = TYPCHE(ITINF)
+CC           IELVAL(ITINF) = IELVAL(NLIMIT + 1)
+CC           NOMCHE(ITINF) = NOMCHE(NLIMIT + 1)
+CC           TYPCHE(ITINF) = TYPCHE(NLIMIT + 1)
+CC           ITINF = NLIMIT + 1
+CC           IELVAL(ITINF) = INTER
+CC           NOMCHE(ITINF) = NOMC
+CC           TYPCHE(ITINF) = TYPC
+CC        ELSEIF (NOMCHE(NLIMIT + 2).NE.'TSUP    ') THEN
+CC           INTER = IELVAL(ITINF)
+CC           NOMC  = NOMCHE(ITINF)
+CC           TYPC  = TYPCHE(ITINF)
+CC           IELVAL(ITINF) = IELVAL(NLIMIT + 2)
+CC           NOMCHE(ITINF) = NOMCHE(NLIMIT + 2)
+CC           TYPCHE(ITINF) = TYPCHE(NLIMIT + 2)
+CC           ITINF = NLIMIT + 2
+CC           IELVAL(ITINF) = INTER
+CC           NOMCHE(ITINF) = NOMC
+CC           TYPCHE(ITINF) = TYPC
+CC        ENDIF
+CC    ENDIF
+C
+C------------------ On s'occupe de la composante TSUP --------------
+C
+CC    IF(ITSUP.LE.NLIMIT) THEN
+CC        IF(NOMCHE(NLIMIT + 1).NE.'TINF    ') THEN
+CC           INTER = IELVAL(ITSUP)
+CC           NOMC  = NOMCHE(ITSUP)
+CC           TYPC  = TYPCHE(ITSUP)
+CC           IELVAL(ITSUP) = IELVAL(NLIMIT + 1)
+CC           NOMCHE(ITSUP) = NOMCHE(NLIMIT + 1)
+CC           TYPCHE(ITSUP) = TYPCHE(NLIMIT + 1)
+CC           ITSUP = NLIMIT + 1
+CC           IELVAL(ITSUP) = INTER
+CC           NOMCHE(ITSUP) = NOMC
+CC           TYPCHE(ITSUP) = TYPC
+CC        ELSEIF (NOMCHE(NLIMIT + 2).NE.'TSUP    ') THEN
+CC           INTER = IELVAL(ITSUP)
+CC           NOMC  = NOMCHE(ITSUP)
+CC           TYPC  = TYPCHE(ITSUP)
+CC           IELVAL(ITSUP) = IELVAL(NLIMIT + 2)
+CC           NOMCHE(ITSUP) = NOMCHE(NLIMIT + 2)
+CC           TYPCHE(ITSUP) = TYPCHE(NLIMIT + 2)
+CC           ITSUP = NLIMIT + 2
+CC           IELVAL(ITSUP) = INTER
+CC           NOMCHE(ITSUP) = NOMC
+CC           TYPCHE(ITSUP) = TYPC
+CC        ENDIF
+CC    ENDIF
+CC    DO 11 I1=1,NCOMP
+CC       IF(NOMCHE(I1).EQ.'TINF    ') ITINF = I1
+CC       IF(NOMCHE(I1).EQ.'TSUP    ') ITSUP = I1
+CC       IF(NOMCHE(I1).EQ.'T       ') IT = I1
+CC11  CONTINUE
+CC    IF( ITINF+ITSUP.NE.NCOMP*2-1) then
+CC      moterr(1:8)='CHAME4-1'
+CC      call erreur (349)
+CC      return
+CC    endif
+C
+CC    SEGACT MELEME
+      NBELEM = NUM(/2)
+CC    SEGDES MELEME
+      MINTE = IPMINT
+CC    SEGACT MINTE                     <- Actif en (E/S)
+      NBGAUS = POIGAU(/1)
+CC    N1EL = NBELEM
+CC    N1PTEL = NBGAUS
+CC    N2EL = 0
+CC    N2PTEL = 0
+CC    SEGINI MELVA3
+C
+C-------------- Calcul de T a partir de T TINF et TSUP -------------
+C
+C      write(6,*) ' it , itinf, itsup',it , itinf, itsup
+      MELVAL = IELVAL(IT)
+      MELVA1 = IELVAL(ITINF)
+      MELVA2 = IELVAL(ITSUP)
+C      write(6,*) '1 melval,melva1,melva2',melval,melva1,melva2
+CC    SEGACT MELVAL
+CC    SEGACT MELVA1
+CC    SEGACT MELVA2
+      NPT = VELCHE(/1)
+      NEL = VELCHE(/2)
+      N1PT = MELVA1.VELCHE(/1)
+      N1EL = MELVA1.VELCHE(/2)
+      N2PT = MELVA2.VELCHE(/1)
+      N2EL = MELVA2.VELCHE(/2)
+C      write(6,*) 'NPT ',NPT
+C      write(6,*) 'N1PT ',N1PT
+C      write(6,*) 'N2PT ',N2PT
+C      write(6,*) 'NEL ',NEL
+C      write(6,*) 'N1EL ',N1EL
+C      write(6,*) 'N2EL ',N2EL
+*
+*------------------------ boucle sur les elements -----------------
+*-------------------- boucle sur les points de gauss --------------
+*
+      DO 20 I2=1,NBELEM
+C        write(6,*) ' '
+C        write(6,*) '------------------------------'
+C        write(6,*) 'Element numero :',I2
+        DO 30 I3=1,NBGAUS
+C           write(6,*) 'Point numero :',I3
+           IF(NPT.EQ.1.AND.NEL.EQ.1) THEN
+              T = VELCHE(1,1)
+           ELSEIF(NPT.EQ.1) THEN
+              T = VELCHE(1,I2)
+           ELSE
+              T = VELCHE(I3,I2)
+           ENDIF
+           IF(N1PT.EQ.1.AND.N1EL.EQ.1) THEN
+              TINF = MELVA1.VELCHE(1,1)
+           ELSEIF(N1PT.EQ.1) THEN
+              TINF = MELVA1.VELCHE(1,I2)
+           ELSE
+              TINF = MELVA1.VELCHE(I3,I2)
+           ENDIF
+           IF(N2PT.EQ.1.AND.N2EL.EQ.1) THEN
+              TSUP = MELVA2.VELCHE(1,1)
+           ELSEIF(N2PT.EQ.1) THEN
+              TSUP = MELVA2.VELCHE(1,I2)
+           ELSE
+              TSUP = MELVA2.VELCHE(I3,I2)
+           ENDIF
+           ZZ = DZEGAU(I3)
+C           write(6,*) 'ZZ ',ZZ
+C           write(6,*) 'T : ',T
+C           write(6,*) 'TINF : ',TINF
+C           write(6,*) 'TSUP : ',TSUP
+           TT = (0.5D0 * (TINF + TSUP - (2.D0 * T)) * (ZZ*ZZ))
+     1          + (0.5D0*(TSUP - TINF) * ZZ) + T
+C           write(6,*) 'Temperature calculee : ',TT
+           MELVA3.VELCHE(I3,I2) = TT
+  30    CONTINUE
+  20  CONTINUE
+
+C
+C--------- desactivation et suppression des segments ---------------
+C
+CC    N2 = NLIMIT
+CC      SEGADJ MCHAML
+CC      write(6,*) ' melval,melva1,melva2',melval,melva1,melva2
+CC      SEGSUP MELVAL
+CC    IELVAL(IT) = MELVA3
+CC      SEGSUP MELVA1,MELVA2
+CC    SEGDES MINTE                     <- Actif en (E/S)
+CC    SEGDES MELVA3
+      RETURN
+      END
+
+
+ 
+ 
+ 

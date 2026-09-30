@@ -1,0 +1,625 @@
+C FLUO3D    SOURCE    FD218221  24/02/07    21:15:12     11834          
+       SUBROUTINE FLUO3D(XMAT,NMAT,SIG0,SIGF,DEPST,NSTRS,VAR0,VARF,
+     # NVARI,TETA1,TETA2,DT,KERRE,MFR,IFOURB,ISTEP,EPST0,
+     # EPSTF,TREFB,NBVIA3d,INLVIA3d,NBNMAX3D,NBNB3D,IDIMB3D,XE3D)
+
+c     A Sellier Nov 2023
+
+C     MFR           =  NUMERO DE LA FORMULATION DE L'ELEMENT FINI
+C                   = 1       MASSIF
+C                   = 33      POREUX
+C     IFOU    INDICE DU TYPE DE PROBLEME                                     
+C            -1  DEFORMATIONS PLANES                                       
+C             0  AXISYMETRIQUE                                                                                     
+C             2  TRIDIMENSIONNEL 
+
+C     ISTEP=0 : CALCUL LOCAL
+C     ISTEP=1 : PREPARATION DU 1ER PASSGE NON LOCAL
+C     ISTEP=2 : DERNIER PASSAGE NON LOCAL EFFECTUE
+C     ISTEP=3 : PASSAGE NON LOCAL INTERMEDIAIRE EN NON LOCAL ITERATIF
+
+C     TABLES DE DIMENSION FIXE POUR RESOLUTION DES SYTEMES LINEAIRES 
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+
+C******** DECLARATION DES VARIABLES EXTERNES *************************** 
+      INTEGER NMAT,NVAR0,NVAR1,NVAR2,NVAR3,NVARI,NBVIA,ISTEP
+      INTEGER NSTRS,KERRE,MFR,IFOURB
+      REAL*8 XMAT(NMAT),SIG0(NSTRS),SIGF(NSTRS),DEPST(NSTRS)
+      REAL*8 EPST0(NSTRS),EPSTF(NSTRS)
+      REAL*8 VAR0(NVARI),VARF(NVARI)
+      REAL*8 DT,TETA1,TETA2,TREFB  
+C     LIGNE A INCLURE DANS LES MODELES UTILISANT LES NOEUDS     
+      INTEGER NBNMAX3D,NBNB3D,IDIMB3D
+      REAL*8  XE3D(3,NBNMAX3D)
+C     VARIABLE LOGIQUE POUR MATRICE INIT ISOTROPE
+      LOGICAL ISO,ORTHO
+      PARAMETER(ISO=.false.,ORTHO=.true.)      
+
+c********DECLARATION DES VARIABLES LOCALES *****************************
+
+c     nombre de parametre elastiques obligatoire en debut de xmat
+      integer NBELAS3D
+c     nombre de sous type de modele et de variable par tenseur (cf idvar4)
+      integer NSTYPE,NDTENS
+      parameter (NSTYPE=4,NDTENS=12)
+c     nombre de parametres scalaires par sous type de modele
+      integer VNMAT(NSTYPE) 
+c     nombre de vari scalaires par sous type de modele
+      integer VNVARI(NSTYPE,2)
+
+c     declarations locales
+c     indicateur 1er pas
+      logical PPAS
+c     teneur en eau3d
+      real*8 vw0,vwf
+c     module 1er passage
+      real*8 E,nu,E1,nu12,k0,mu0,k1,mu1
+c     numero vari
+      integer ivar,numx,numk,numm,nx
+c     matrices de Hoocke base d orthotropie
+      real*8 raideuro66(6,6),souplesseo66(6,6),Po33(3,3),TPo33(3,3)
+c     matrices de Hoocke base fixe
+      real*8 raideurf66(6,6),souplessef66(6,6),Pf33(3,3),TPf33(3,3)
+c     matrices de Hoockebase quelconque     
+      real*8 raideurb66(6,6),souplesseb66(6,6),Pb33(3,3),TPb33(3,3)      
+c     contraintes initiales dans la matrice
+      real*8 sigm03(3),vsigm033(3,3),Tvsigm033(3,3)
+      real*8 dsigm06(6),dsigm16(6)
+c     invariant contraintes initiales
+      real*8 sigm0d3(3),devis0,tracs0
+c     contraintes effectives
+      real*8 sigeff6(6)
+c     influence de la temperature 
+      real*8 dtherm,kthermv,kthermp
+c     increment total de deformation mecanique
+      real*8 epst06(6),epstf6(6),deps6(6)
+c     influence de l eau capillaire et nano
+      real*8 keau,knanov,kmecap
+c     coeff de fluage de Maxwell
+      real*8 kflum
+c     consolidation et temps de maxwell
+      real*8 taumc3(3),taum,CC3(3)
+c     increment deformation totale
+      real*8 deps33(3,3),deps3(3),Vdeps33(3,3),TVdeps33(3,3)
+c     tenseur d orientations
+      real*8 O333(3,3,3),DX3(3),VDX33(3,3)
+c     increment de deformations elastiques et de contraintes
+      real*8 depse3(3),dsig3(3)
+c     contraintes
+      real*8 sigm06(6),sigmf6(6)
+c     increments de deformations anelastiques
+      real*8 depsx3(NSTYPE,3)
+c     coeff de fluage
+      real*8 cflux3(NSTYPE,3)
+c     def elastiques
+      real*8 epse3(3),Vepse33(3,3),TVepse33(3,3)
+
+      
+C************* PARAMETRES POUR LES RENFORTS ****************************
+C-INC HNBRREN
+C     ADAPTE POUR FLUOR3D
+      PARAMETER(NB_RENF=0)
+      PARAMETER(NB_PARA_PAR_RENF=0)
+      PARAMETER(NB_PARA_RENF=0)
+      PARAMETER(NB_VARI_PAR_RENF=0)
+      PARAMETER(NB_VARI_RENF=0)
+c     declaration des renforts du fluendo3d si on veut les utiliser
+C-INC HDECREN
+C***********************************************************************
+
+
+C************** DECLARATIONS POUR LES FIBRES ROMAIN ********************
+c      declaration des fibres de romain gontero si on veut les utiliser
+C-INC HDECFIB
+C***********************************************************************
+
+
+C************** PARAMETRES POUR HELMHOLTZ ******************************
+c     lignes a inclure dans les modeles utilisant helmholtz
+c     recuperation des dimensions des tableaux pour helmholtz
+-INC HNBRHEL
+c     declaration des tableaux pour helmholtz
+-INC HDECHEL
+C c     recuperation des variables d helmholtz
+C -INC HMATHEL
+C c     attention il faut NVAR3 debut de la zone de Helmholtz dans les vari
+C       NVAR3=NVARI-(NB_VARI_RENF+NB_VARI_HELM)
+C       DO NL=1,NB_HELM
+C c       lecture des variable internes et rangements dans helm0(nl,ii)
+C c       et helm1(nl,ii) avec ii=1,nb_vari_par_helm
+C -INC HLVIHEL
+C       END DO
+C***********************************************************************
+
+
+c******recuperation des parametres pour les fibres si modele de fibre*** 
+C-INC HMATFIB
+c***********************************************************************
+
+
+c*************** recuperation des parametres pour les renforts *********
+c-INC HMATREN
+c***********************************************************************
+
+
+c*************** NOMBRE DE PARAMETRES PAR SOUS TYPE ********************
+
+c     a actualiser en fonction du contenu de idvisc
+c     numero du sous type de modele  1   2   3   4   5   6  7  
+c     type de sous modele :          ELA,MAX,FLU,KEL,TRA,DP,CC 
+                         data VNMAT /8  ,6  ,4  ,2  /
+c                         ,5  ,6 ,3 /
+
+c************** NOMBRE DE VARI ET TYPE DE VARI PAR SOUS TYPE ***********
+
+c     nombre de variables scalaire par sous type
+c     numero du sous type de modele  1   2   3   4   5   6  7  
+c     type de sous modele :          ELA,MAX,FLU,KEL,TRA,DP,CC 
+      data (VNVARI(I,1),I=1,NSTYPE) /9  ,0  ,2  ,0 /
+c      ,3  ,2 ,3 /,
+c     nombre de variables tensorielles par sous type
+c     numero du sous type de modele  1   2   3   4   5   6  7  
+c     type de sous modele :          ELA,MAX,FLU,KEL,TRA,DP,CC 
+     #     (VNVARI(I,2),I=1,NSTYPE) /1  ,1  ,1  ,1 /
+c     ,1  ,1 ,1 /
+
+c      print*,'debut de FLUOR3D'
+c      verification des varf
+C      do i=1,nvari
+c         print*,'var0',10,'=',var0(10)
+C      end do
+c      read*
+
+
+c******* INITIALISATIONS ***********************************************
+
+c     indicateur d erreur     
+      KERRE=0 
+c     dimension de la zone des parametres elastiques dans xmat
+      if(mfr.eq.1)then
+c         milieu elastique
+          if(iso) then
+            print*,'Verifier ces valeurs dans fluor3d'
+            NBELAS3D=4
+c           YOUN NU RHO ALP
+            NBFAC3D=3
+c           VISQ TREF TALP            
+            kerre=1
+            return
+          else if (ortho) then
+            NBELAS3D=15
+c           E1 E2 E3 nu12 n23 nu 13 G12 G23 G13 V1X V1Y V1Z V2X V2Y V2Z            
+            NBFAC3D=6
+c           RHO ALP1 ALP2 ALP3 TREF TALP          
+          else
+            print*,'Erreur formulation 0 dans fluor3d.eso'
+            kerre=1
+            return
+          end if
+      else if (mfr.eq.33) then
+c         milieu poro elastique
+          print*,'Erreur formulation 1 dans fluor3d.eso'
+          kerre=1
+          return
+      else
+c       cas imprevu
+        print*,'Erreur formulation 2 dans fluor3d.eso'
+        kerre=1
+        return
+      end if
+
+c     copie des var0 sur les varf avec dilution des vari scalaires
+      call init3d(xmat,nmat,vnmat,nstype,nbelas3d,var0,varf,
+     # nvari,vnvari,ndtens,KERRE)
+c      print*, 'varf apres init'
+c      print*,'varf',10,'=',varf(10)
+         
+c     initialisation de l indicateur de premier passage dans le modele
+      if (var0(1).ne.1.) then
+         ppas=.true.
+      else
+         ppas=.false.
+      end if 
+c     traitements particuliers lors du premier passage
+      if(ppas) then
+c         controle des dimensions des listes de parametres 
+          ntest=nbelas3d
+          do i=1,NSTYPE
+            ntest=ntest+VNMAT(i)
+          end do
+c         on a supprimer les parametres de Helmholtz pour ne pas avoir
+c         de pb de lecture des donnees          
+          ntest=ntest+0*NB_PARA_HELM+NB_PARA_RENF+NBFAC3D
+          if(ntest.ne.nmat) then
+             print*,'ERREUR nmat dans FLUOR3D.ESO'
+             print*,'nmat',nmat
+             print*,'ntest',ntest
+             KERRE=1
+             do i=1,nmat
+                 print*,'xmat(',i,')=',xmat(i)
+             end do
+             return
+          end if
+c         controle des dimensions des listes de variables internes
+          ntest=0
+          do i=1,NSTYPE
+            ntest=ntest+VNvari(i,1)+VNvari(i,2)*ndtens
+          end do
+          ntest=ntest+NB_VARI_HELM+NB_VARI_PAR_RENF
+          if(ntest.ne.nvari) then
+             print*,'ERREUR nvari dans FLUOR3D.ESO'
+             print*,'nvari',nvari
+             print*,'ntest',ntest
+             do i=1,nvari
+                print*,'var0(',i,')=',var0(i)
+             end do          
+             KERRE=1
+             return
+          end if
+          if(iso) then
+c           initialisation des module dans les vari pour le suivi d hydratation
+            call xmat3d(E,xmat,nmat,vnmat,nstype,nbelas3d,0,1)
+            call xmat3d(nu,xmat,nmat,vnmat,nstype,nbelas3d,0,2)
+            k1=E/(3.d0*(1.d0-2.d0*nu))
+            mu1=E/(2.d0*(1.d0+nu))
+c           print*,E,nu,k1,mu1
+            call xvar3d(k0,numk,var0,nvari,vnvari,nstype,ndtens,1,7)
+            call xvar3d(mu0,numm,var0,nvari,vnvari,nstype,ndtens,1,8)
+            var0(numk)=k1
+            var0(numm)=mu1
+          else if (ortho) then
+c           initialisation des module dans les vari pour le suivi d hydratation
+            call xmat3d(E1,xmat,nmat,vnmat,nstype,nbelas3d,0,1)
+            call xmat3d(nu12,xmat,nmat,vnmat,nstype,nbelas3d,0,4)
+            k1=E1/(3.d0*(1.d0-2.d0*nu12))
+            mu1=E1/(2.d0*(1.d0+nu12))
+c           print*,E,nu,k1,mu1
+            call xvar3d(k0,numk,var0,nvari,vnvari,nstype,ndtens,1,7)
+            call xvar3d(mu0,numm,var0,nvari,vnvari,nstype,ndtens,1,8)
+            var0(numk)=k1
+            var0(numm)=mu1
+          else
+            print*,'Erreur formulation 3 dans fluor3d.eso'
+            kerre=1
+            return
+          end if
+      end if
+      
+c******* MATRICE DE RIGIDITE EN BASE D ORTHTROPIE et FIXE **************
+
+c     matrice de Hoocke en base fixe
+      if(iso)then
+c        matrices de raideur et de souplesse en base fixe cas isotrope
+         call hook3d(iso,xmat,nmat,nbelas3d,KERRE,
+     #   raideurf66,souplessef66)
+      else if(ortho) then
+c       matrice en base d orthotropie
+        call rior3d(xmat,nmat,nbelas,ierr1,
+     #  raideuro66,souplesseo66,Po33,TPo33)
+c       matrice de rigidite en base fixe
+        do i=1,3
+            do j=1,3
+                if(i.eq.j) then
+                    Pf33(i,j)=1.d0
+                else
+                    Pf33(i,j)=0.d0
+                end if
+            end do
+        end do
+        call traps1(TPf33,Pf33,3)
+        call chre66(raideuro66,raideurf66,Po33,TPo33,Pf33,TPf33)
+        call chre66(souplesseo66,souplessef66,Po33,TPo33,Pf33,TPf33)
+      else
+         print*,'Erreur 4 fluor3d formulation imprevue'
+      end if
+      
+C******* TENEUR EN EAU ************************************************* 
+
+      if(mfr.ne.33) then
+c       actualisation de la teneur en eau debut de pas pour le fluage
+c       et la capillarite
+        call xvar3d(vw0,numx,var0,nvari,vnvari,nstype,ndtens,1,2)
+        call xmat3d(vwf,xmat,nmat,vnmat,nstype,nbelas3d,1,3)
+        if (ppas) then
+c           on initialise la teneur en eau pour le 1er pas
+            var0(numx)=vwf
+            vw0=vwf
+        end if
+      else
+        call xvar3d(vw0,numx,var0,nvari,vnvari,nstype,ndtens,1,2)
+        print*,'ERREUR2 Implementation poreux / calcul vw ds FLUOR3D'
+        print*,'Actualiser la vari numro:', numx,' avec vwf'
+        KERRE=1
+        return
+      end if
+c     stockage pour le prochain pas
+      varf(numx)=vwf
+
+c******* CONTRAINTES INITIALES *****************************************
+
+c     contraintes principales en fonction des deformations elastiques
+c     calcul en base fixe
+      call sigp3d(nstype,var0,nvari,vnvari,ndtens,iso,raideurf66,
+     # sigm03,vsigm033)
+c     matrice de passage inverse     
+      call traps1(Tvsigm033,vsigm033,3)
+
+c      print*,'FLUOR3D sigm03 av relaxation',sigm03
+c      print*,'FLUOR3D vsigm033'
+c      call afic33(vsigm033)
+
+c     relaxation de la nouvelle contrainte principale en cas 
+c     d augmentation des modules et actualisation des def visco elastiques
+      if(iso) then 
+         call hydr3d(xmat,nmat,vnmat,nstype,nbelas3d,var0,varf,
+     #   nvari,vnvari,ndtens,iso,sigm03,souplessef66)
+      else if (ortho) then
+c        matrice de souplesse en base principale des contraintes
+         call chre66(souplesseo66,souplessef66,Po33,TPo33,
+     #   vsigm033,Tvsigm033)      
+         call hydr3d(xmat,nmat,vnmat,nstype,nbelas3d,var0,varf,
+     #   nvari,vnvari,ndtens,iso,sigm03,souplessef66)     
+      else
+         print*,'Erreur 5 fluor3d formulation imprevue'
+      end if
+
+c      print*,'FLUOR3D sigm03 apres relaxation chimique',sigm03
+
+c     ** 1-1 actualisation des parametres de fluage ********************
+
+c     prise en compte de la temperature
+      call ther3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas3d,teta1,teta2,TREFB,dtherm,kthermv,kthermp)
+
+c     prise en compte de l eau capillaire
+      call eau3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas3d,teta1,teta2,TREFB,mfr,keau)
+
+c     prise en compte de la surpression dans la nanoporosité
+      call nano3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas3d,teta1,teta2,TREFB,ppas,dt,kthermv,knanov)
+
+c     Amplification non lineaire du fluage entre Rc/3 et Rc
+      call kmkf3d(xmat,nmat,vnmat,nstype,nbelas3d,sigm03,kmecap)
+
+c     ** 1-2 relaxation visco elastique a deformation constante ********
+
+c     deformations elastiques initiales principales
+      call tvar3d(epse3,Vepse33,nE,varf,nvari,vnvari,nstype,ndtens,1,1)
+      call traps1(TVepse33,Vepse33,3)
+      
+c     coeff de fluage dans les directions elastiques principales initiales      
+      call cofl3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas3d,Vepse33,dt,kthermv,kthermp,kmecap,keau,
+     # knanov,cflux3)
+C       print*,'FLUOR3D avant rela coeff de fluage '
+C       do ityp=1,4
+C         do j=1,3
+C             print*,ityp,j,cflux3(ityp,j)
+C         end do
+C       end do
+
+c     raideur en base principale des deformations elastiques
+      call chre66(raideuro66,raideurb66,Po33,TPo33,Vepse33,TVepse33)
+c     relaxation visco elastique
+c      print*, 'varf avant relaxation'
+      call rela3d(xmat,nmat,vnmat,nstype,nbelas3d,var0,varf,nvari,
+     # vnvari,ndtens,KERRE,iso,cflux3,raideurb66,sigm03,vsigm033)
+
+c     expression de sigm0 en base fixe
+      call orie3d(vsigm033,O333)
+      do i=1,6
+        sigm06(i)=0.d0
+      end do
+c      print*,'aff0 ds FLUOR3D',sigm06,sigm03,O333
+      call incv3d(sigm06,sigm03,O333)
+c      print*,'FLUOR3D sigm03 ap relaxation des contraintes init',sigm03
+c      read*
+c      print*, 'varf apres reeevaluation contrainte 1'
+c      print*,'varf',10,'=',varf(10)
+
+
+c******* INCREMENT TOTAL DE DEFORMATION MECANIQUE **********************
+
+c     chargement increment de deformation imposee et deformation finale
+c     remarque 4-5-6 sont des gama jusqu ici, ensuite des epsilons
+      if(nstrs.lt.6) then
+         do i=1,nstrs
+             deps6(i)=DEPST(i)
+             epstf6(i)=epstf(i)
+             epst06(i)=epst0(i)             
+         end do
+         do i=nstrs+1,6
+             deps6(i)=0.d0
+             epstf6(i)=0.d0
+             epst06(i)=0.d0
+         end do
+      else
+         do i=1,6
+             deps6(i)=DEPST(i)
+             epstf6(i)=epstf(i)
+             epst06(i)=epst0(i)
+         end do      
+      end if
+c     passage gama en epsilon
+      do i=4,6
+         deps6(i)=0.5d0*deps6(i)
+         epstf6(i)=0.5d0*epstf6(i)
+         epst06(i)=0.5d0*epst06(i)         
+      end do
+
+c******* TIR VISCO ELASTIQUE *******************************************
+
+c     diagonalisation du tenseur des increments de deformation
+      call x6x33(deps6,deps33)
+c     valeurs principales des increments
+      call b3_v33(deps33,deps3,Vdeps33)
+c     matrice de passage inverse      
+      call traps1(TVdeps33,Vdeps33,3)
+c     tenseurs d orientations des increments
+      call orie3d(Vdeps33,O333)
+c      print*,'aff1 cm3d',deps33,deps3,Vdeps33
+
+c     coeff visco elastique dans la base principele de l increment
+      call cofl3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas3d,Vdeps33,dt,kthermv,kthermp,kmecap,keau,
+     # knanov,cflux3)
+C       print*,'aff2 cm3d'
+C       do ityp=1,4
+C         do j=1,3
+C             print*,ityp,j,cflux3(ityp,j)
+C         end do
+C       end do
+C       read*
+
+c     resolution visco elastique en base principales
+      do i=1,3
+c        deformation elastique (ityp=1)
+         depsx3(1,i)=deps3(i)/(1.d0+cflux3(1,i))
+c        deformations visqueuses (itype=2,3,4)
+         do ityp=2,4
+            depsx3(ityp,i)=depsx3(1,i)*cflux3(ityp,i)
+         end do
+c        deformations plastiques (itype=5,..,nstype)
+         do ityp=5,nstype
+            depsx3(ityp,i)=0.d0
+         end do
+      end do
+c     mise a jour des increments de deformation visco elastiques
+      do ityp=1,4
+        do i=1,3
+            dx3(i)=depsx3(ityp,i)
+        end do
+c        print*,'info envoyee a majt3d',ityp,1
+c        print*,'valeurs',DX3
+c        print*,'orientatio',O333
+        call majt3d(DX3,O333,varf,nvari,vnvari,nstype,
+     #  ndtens,ityp,1)
+      end do
+c      print*, 'varf apres increment visco elastique'
+c      print*,'varf',10,'=',varf(10)
+c     increments de contraintes
+      if(iso) then
+        do i=1,3
+            dsig3(i)=0.d0
+            do j=1,3
+                dsig3(i)=dsig3(i)+raideur66f(i,j)*depsx3(1,j)
+            end do
+        end do
+c       nouvelle valeur des contraintes
+        do i=1,6
+            sigmf6(i)=sigm06(i)
+        end do
+        call incv3d(sigmf6,dsig3,O333)          
+      else 
+c        print*,'base des increments deps'
+c        call afic33(Vdeps33)      
+c       passage matrice de raideur base principale de l increment
+        call chre66(raideuro66,raideurb66,Po33,TPo33,Vdeps33,TVdeps33)
+c       calcul des 6 increments de contraintes en fonction des 3 depse
+C         print*,'raideuro'
+C         call afic66(raideuro66)
+C         print*,'raideurb'
+C         call afic66(raideurb66)        
+C         print*,'depse'
+C         do i=1,3
+C             print*,'depse(',i,')=',depsx3(1,i)
+C         end do
+        do i=1,6
+            dsigm16(i)=0.d0
+            do j=1,3
+                dsigm16(i)=dsigm16(i)+raideurb66(i,j)*depsx3(1,j)
+            end do
+        end do 
+c       retour de  l increment de contrainte en base fixe
+        call chrep6(dsigm16,TVdeps33,.false.,dsigm06)
+        do i=1,6
+            sigmf6(i)=sigm06(i)+dsigm06(i)
+c            print*,'fluo3d sigmf(',i,')=',sigmf6(i)
+        end do   
+c        read*        
+      end if
+
+
+c     print*,'aff3 FLUOR3D apres tir visco elastique sigmf6',sigmf6
+c     print*, 'varf apres increment contrainte visco elastique'
+c     print*,'varf',10,'=',varf(10)
+
+c******* EVALUATION DES CRITERES ***************************************
+
+c     chargement des tenseurs de plasticité pour les ecrouissages
+c      do ityp=5,nstype
+c        call tvar3d(dx3,vdx33,nx,var0,nvari,vnvari,nstype,ndtens,ityp,1)        
+c      end do
+
+c     *** re-mise a zero de tous les increments de deformation *********
+      do ityp=1,nstype
+        do i=1,3
+            depsx3(ityp,i)=0.d0
+        end do
+      end do
+
+c     *** evaluation et tri des criteres actifs ************************
+      na=0
+
+c     *** gestion de l ecoulement plastique ****************************
+      if(na.ne.0) then
+c       *** ecoulement plastique ***************************************
+        print*,'Ecoulement plastique'
+
+c       *** mise a jour des deformations *******************************
+        do ityp=1,nstype
+            do i=1,3
+                dx3(j)=depsx3(ityp,i)
+            end do
+            call majt3d(dx3,O333,varf,nvari,vnvari,nstype,
+     #      ndtens,ityp,1)
+        end do
+      end if
+c     print*,'varf apres plasticite'
+c     print*,'varf',10,'=',varf(10)
+
+c****** FIN DE L ECOULEMENT PLASTIQUE **********************************
+
+c****** TRANSFERT DES CONTRAINTES VERS LES POINTS DE GAUSS *************
+      do i=1,nstrs
+             sigf(i)=sigmf6(i)
+c             print*,'sigf(',i,')=',sigf(i)
+      end do 
+c      read*
+   
+     
+c     indicateur de fin de 1er pas 
+      if(ppas.and.((istep.eq.2).or.(istep.eq.0))) then     
+             varf(1)=1.d0
+      else
+             if(ppas) then
+                 varf(1)=0.d0
+             else
+                 varf(1)=var0(1)
+             end if
+      end if
+
+c***********************************************************************
+c     VARIABLES INTERNES A ACTUALISER POUR LES FORMULATIONS DE HELMHOLTZ
+C***********************************************************************
+c     sauvegarde des vari de helmholtz HELM1(NL,ii=1..NBR_VARI_HELM) 
+C       do NL=1,NB_HELM
+C -INC HEVIHEL   
+C       end do
+c      print*,'fin de FLUOR3D'
+c      verification des varf
+C       do i=1,nvari
+c         print*,'varf',10,'=',varf(10)
+C       end do
+c       read*
+        
+      return
+      end
+c     fin         
+c*********************************************************************** 
+
+
+
+ 

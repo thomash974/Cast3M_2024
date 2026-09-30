@@ -1,0 +1,162 @@
+C OTTVAI    SOURCE    FD218221  21/06/10    21:15:52     11030          
+      SUBROUTINE OTTVAI(VAR1,XVAL,VAR2,RCZ,KV0,IERUT)
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION VAR1(*),XVAL(*),VAR2(*)
+*
+        IERUT=0
+        RCZ=0.
+        GO TO  (1,2,3,4,5,6,7,8,9,10),KV0
+*
+ 1      CONTINUE
+          RTRAC = XVAL(3)
+          GFTR = XVAL(4)
+          WO1= VAR1(2)
+                  FIL = VAR2(13)
+                  IF(FIL.EQ.0.D0) THEN
+                    WO0 = 0.D0
+                  ELSE  
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+          ENDIF           
+          WO2 = RTRAC - WO0 * WO1
+          RCZ = - WO2
+          GO TO 20
+*
+ 2      CONTINUE
+          RTRAC  = XVAL(3)
+          GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO3  = VAR1(1)
+          WO1 = VAR1(2)
+          IF(WO1.GT.0.) THEN
+                        FIL  = VAR2(13)
+                        WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                    WO4 = RTRAC - WO0 * WO1
+            WO4=  MAX(WO4,0.D0)
+            IF(WO4.GT.0.) THEN
+              WO2 = WO4*(BETA - WO3/WO1)/(1.-BETA)
+              RCZ = WO2
+            ELSE
+              RCZ = (BETA - WO3/WO1) * RTRAC
+            ENDIF
+          ELSE
+            RCZ = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 3      CONTINUE
+
+          RTRAC  = XVAL(3)
+          WO3  = VAR1(1)
+          WO1 = VAR1(2)
+          IF(WO1.GT.0.) THEN
+              RCZ = (WO3/WO1 - 1.D0) * RTRAC
+          ELSE
+            RCZ = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 4      CONTINUE
+          RTRAC = XVAL(3)
+          GFTR  = XVAL(4)
+          WO1= VAR1(4)
+                  FIL = VAR2(14)
+                  IF(FIL.EQ.0.D0) THEN
+                    WO0 = 0.D0
+                  ELSE  
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+          ENDIF 
+          WO2 = RTRAC - WO0 * WO1
+          RCZ = - WO2
+          GO TO 20
+*
+ 5      CONTINUE
+          RTRAC  = XVAL(3)
+          GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO3  = VAR1(3)
+          WO1 = VAR1(4)
+          IF(WO1.GT.0.) THEN
+                        FIL  = VAR2(14)
+                        WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                    WO4 = RTRAC - WO0 * WO1
+            WO4=  MAX(WO4,0.D0)
+            IF(WO4.GT.0.) THEN
+              WO2 = WO4*(BETA - WO3/WO1)/(1.-BETA)
+              RCZ = WO2
+            ELSE
+              RCZ = (BETA - WO3/WO1) * RTRAC
+            ENDIF
+          ELSE
+            RCZ = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 6      CONTINUE
+          RTRAC  = XVAL(3)
+          WO3  = VAR1(3)
+          WO1 = VAR1(4)
+          IF(WO1.GT.0.) THEN
+              RCZ = (WO3/WO1 - 1.D0) * RTRAC
+          ELSE
+            RCZ = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 7      CONTINUE
+          RTRAC = XVAL(3)
+          GFTR  = XVAL(4)
+          WO1= VAR1(6)
+                  FIL = VAR2(15)
+                  IF(FIL.EQ.0.D0) THEN
+                    WO0 = 0.D0
+                  ELSE  
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+          ENDIF
+          WO2 = RTRAC - WO0 * WO1
+          RCZ = - WO2
+          GO TO 20
+*
+ 8      CONTINUE
+          RTRAC  = XVAL(3)
+          GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO3  = VAR1(5)
+          WO1 = VAR1(6)
+          IF(WO1.GT.0.) THEN
+                        FIL  = VAR2(15)
+                        WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                    WO4 = RTRAC - WO0 * WO1
+            WO4=  MAX(WO4,0.D0)
+            IF(WO4.GT.0.) THEN
+              WO2 = WO4*(BETA - WO3/WO1)/(1.-BETA)
+              RCZ = WO2
+            ELSE
+              RCZ = (BETA - WO3/WO1) * RTRAC
+            ENDIF
+          ELSE
+            RCZ = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 9      CONTINUE
+          RTRAC  = XVAL(3)
+          WO3  = VAR1(5)
+          WO1 = VAR1(6)
+          IF(WO1.GT.0.) THEN
+              RCZ = (WO3/WO1 - 1) * RTRAC
+          ELSE
+            RCZ = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 10     CONTINUE
+          RTRAC = XVAL(3)
+          WO2 = RTRAC
+          RCZ = - WO2
+20    CONTINUE
+      RETURN
+      END
+
+ 

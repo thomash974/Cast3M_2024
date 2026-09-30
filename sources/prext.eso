@@ -1,0 +1,24 @@
+C PREXT     SOURCE    BP208322  20/09/18    21:17:08     10718          
+        
+        SUBROUTINE PREXT(NT,V1,V2,MAT)
+        
+c-----------------------------------------------------------------------        
+c       Calcul du produit externe de 2 vecteurs de taille NT.
+c       Le resultat est la matrice MAT(I,J) = V1(1)*V2(J)
+c-----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+        INTEGER NT,I,J
+        REAL*8 V1(NT),V2(NT),MAT(NT,NT)
+*
+c         DO I=1,NT
+        DO J=1,NT
+        DO I=1,NT
+            MAT(I,J) = V1(I)*V2(J)
+        ENDDO          
+        ENDDO        
+        END
+ 
+ 

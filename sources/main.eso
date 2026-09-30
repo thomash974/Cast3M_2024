@@ -1,0 +1,45 @@
+C MAIN      SOURCE    PV        22/04/14    21:15:03     11342          
+CCC
+C     PROGRAMME GIBI   MAIN     INITIALISATIONS VARIEES
+C
+      PROGRAM CAST3M
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC CCREDLE
+-INC CCASSIS
+
+      CHARACTER*1 AREA
+      INTEGER     ICODE
+
+      if (ioimp.le.0) then
+        write(6,*) 'Erreur d''installation: Block Data non charge'
+        stop 12
+      endif
+
+C  Prologue: controle et verification avant execution
+C  l'epilogue est appelle dans fin, avant le stop
+      CALL PROLOG
+
+C  Initialisations variees deplacees dans debut
+      CALL DEBUT
+
+
+C  FIN DES INITIALISATIONS
+      CALL PILOT
+
+      CALL FIN
+      STOP
+      END
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,46 @@
+C TPOI1     SOURCE    OF166741  23/12/04    21:15:13     11800          
+
+C=======================================================================
+C=                            T P O I 1                                =
+C=                            ---------                                =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=   Acquisition des caracteristiques d'integration aux noeuds, aux    =
+C=   points d'integration (Gauss) ou au centre de gravite pour         =
+C=   l'element POI1 (CONVECTION en 1D)                                 =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   ISUPTH  (E)   Indique le support d'integration demande            =
+C=   IPINTE  (S)   Pointeur sur le segment MINTE associe (ACTIF en S)  =
+C=======================================================================
+
+      SUBROUTINE TPOI1 (ISUPTH,IPINTE)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC SMINTE
+
+      PARAMETER (XZero = 0.D0, XUn = 1.D0)
+
+      NBNO   = 1
+      NBPGAU = 1
+      SEGINI,MINTE
+
+c      QSIGAU(1) = XZero
+c      ETAGAU(1) = XZero
+c      DZEGAU(1) = XZero
+
+      POIGAU(1) = XUn
+
+      SHPTOT(1,1,1) = XUn
+c      SHPTOT(2,1,1) = XZero
+
+      IPINTE = MINTE
+
+C      RETURN
+      END
+
+ 

@@ -1,0 +1,17 @@
+C YLDDJ2    SOURCE    PV        22/04/22    21:15:14     11344          
+
+CCC
+C **********************************************************************
+CCC
+      SUBROUTINE YIELDDJ2 (SIG,NDIMS,VAR,NDIMV,VALOR)
+      IMPLICIT INTEGER(I-N)
+      integer ndims,ndimv
+      real*8  sig(ndims),var(ndimv),valor,siginv(3)
+      call InvariantesIJJ(sig,ndims,siginv)
+      call yieldvm (siginv,var(1),valor)
+      return
+      end
+
+
+
+ 

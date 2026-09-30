@@ -1,0 +1,104 @@
+C INTLRE    SOURCE    PASCAL    21/07/15    21:15:05     11076          
+      SUBROUTINE INTLRE(IPROG1,IPROG2)
+C----------------------------------------------------------------------C
+C    INTERSECTION DEUX LISTREEL
+C
+C    SYNTAXE : voir notice
+C
+C    ENTREES :
+C      - IPROG1 : LISTREEL 1
+C      - IPROG2 : LISTREEL 2
+
+C    SORTIE : le resultat est renvoye dans la pile.
+C
+C----------------------------------------------------------------------C
+
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL 
+-INC SMLREEL
+
+      SEGMENT ILU1(LL1)
+
+C Activation de l'objet :
+      MLREE1 = IPROG1
+      MLREE2 = IPROG2
+      CALL ACTOBJ('LISTREEL',MLREE1,1)
+      CALL ACTOBJ('LISTREEL',MLREE2,1)
+
+C---- CAS LISTREEL VIDE EN ARGUMENT ----C
+
+      JG1 = MLREE1.PROG(/1)
+      IF (JG1.EQ.0) THEN
+        CALL ECROBJ('LISTREEL',MLREE1)
+        RETURN
+      ENDIF
+
+      JG2 = MLREE2.PROG(/1)
+      IF (JG2.EQ.0) THEN
+        CALL ECROBJ('LISTREEL',MLREE2)
+        RETURN
+      ENDIF
+
+C---- CAS GENERAL ----C
+
+C     On met la liste la + longue en 2e
+      IF (JG1.GT.JG2) THEN
+        JG  = JG2
+        JG2 = JG1
+        JG1 = JG
+        MLREEL = MLREE2
+        MLREE2 = MLREE1
+        MLREE1 = MLREEL
+      ENDIF
+
+C     Initialisation du segment resultat 
+      JG = MIN(JG1,JG2)
+      SEGINI, MLREEL
+
+C     Inidicateur elts 2e liste lus
+      LL1 = JG2
+      SEGINI, ILU1
+
+      JG = 0
+      DO 100 I1=1,JG1
+        INUL1 = 0 
+        XVAL1 = MLREE1.PROG(I1)
+        IF (ABS(XVAL1).LT.XPETIT) INUL1 = 1
+        DO 110 J2=1,JG2
+          IF (ILU1(J2).EQ.1) GOTO 110
+          INUL2 = 0
+          XVAL2 = MLREE2.PROG(J2)
+          IF (ABS(XVAL2).LT.XPETIT) INUL2 = 1
+          IF (INUL1.EQ.INUL2) THEN
+            IF (INUL1.EQ.1) THEN
+              JG = JG + 1
+              MLREEL.PROG(JG) = 0.D0
+              ILU1(J2) = 1
+              GOTO 100
+            ELSE
+              IF (A_EGALE_B(XVAL1,XVAL2)) THEN
+                JG = JG + 1
+                MLREEL.PROG(JG) = XVAL1
+                ILU1(J2) = 1
+                GOTO 100
+              ENDIF
+            ENDIF
+          ENDIF
+ 110    CONTINUE
+ 100  CONTINUE
+      SEGADJ,MLREEL
+
+C Ecriture resultat dans la pile :
+      CALL ECROBJ('LISTREEL',MLREEL)
+
+      RETURN
+      END
+
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,151 @@
+C COTRA1    SOURCE    CB215821  22/03/07    21:15:02     11307          
+
+      SUBROUTINE COTRA1 (ITRAC,YUNG,LTRAC,TRAC,NTRAC,KERRE)
+
+C=======================================================================
+C=   Remplissage de la courbe Contrainte-Deformation plastique utile   =
+C=   pour le calcul de la matrice tangente a partir de la courbe de    =
+C=   traction Contrainte-Deformation (totale)                          =
+C=                                                                     =
+C= Entrees :                                                           =
+C= ---------                                                           =
+C=   ITRAC    Pointeur sur un objet EVOLUTION de la courbe de traction =
+C=            Segment desactive en E/S                                 =
+C=    YUNG    Module de YOUNG (pente initiale de la courbe)            =
+C=    LTRAC   Nombre maximal de valeurs de la courbe Sigma-Def.Plas    =
+C=            Dimension du vecteur TRAC lors de sa declaration FORTRAN =
+C= Sorties :                                                           =
+C= ---------                                                           =
+C=    TRAC(*) Points de la courbe Contrainte-Deformation plastique     =
+C=            TRAC(1,3,5,7,...) Contraintes                            =
+C=            TRAC(2,4,6,8,...) Deformations plastiques                =
+C=    NTRAC   Nombre de valeurs de la courbe TRAC (Sigma-Def.Plas)     =
+C=    KERRE   Indicateur de SUCCES (= 0) et d'ERREUR sinon             =
+C=                                                                     =
+C=  Les valeurs de KERRE de l'ERREUR associee sont :      ERREUR(   )  =
+C=    Contrainte ultime nulle                               270        =
+C=    Trop de points sur la courbe de traction              271        =
+C=    Pas assez de points sur la courbe de traction         272        =
+C=    Pente en un point superieure au module de Young       273        =
+C=    Module de Young du materiau nul                       325        =
+C=    Pente a l'origine non egale au module de Young        330        =
+C=    Courbe de traction vide                               354        =
+C=======================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC SMEVOLL
+-INC SMLREEL
+-INC CCREEL
+-INC PPARAM
+-INC CCOPTIO
+
+      PARAMETER(XPREC=1.D-3,XZER=0.D0,UN=1.D0)
+      DIMENSION TRAC(*)
+
+      KERRE=0
+C  Quelques verifications d'usage :
+C===================================
+C= Module de Young nul ?
+      IF (YUNG.LE.XZER) THEN
+        KERRE=325
+        RETURN
+      ENDIF
+C= Pointeur sur la courbe de traction errone ?
+      IF (ITRAC.LE.0) THEN
+        KERRE=354
+        RETURN
+      ENDIF
+C= On recupere l'objet EVOLUTION
+      MEVOLL=ITRAC
+      SEGACT,MEVOLL
+      KEVOLL=IEVOLL(1)
+C*//  SEGDES,MEVOLL
+C
+      SEGACT,KEVOLL
+      MLREEL=IPROGX
+      MLREE1=IPROGY
+C*//  SEGDES,KEVOLL
+C
+      SEGACT,MLREEL,MLREE1
+      NBPOIX=PROG(/1)
+C
+C  TROP DE POINTS SUR LA COURBE DE TRACTION OU PAS ASSEZ
+C
+      IF (NBPOIX.LT.3) THEN
+        KERRE=272
+        GOTO 777
+      ENDIF
+      NTRAC=2*NBPOIX
+      IF (NTRAC.GT.LTRAC) THEN
+        KERRE=271
+        GOTO 777
+      ENDIF
+C
+C  VERIF LIMITE ELASTIQUE NON NULLLE
+C
+      PSIG =MLREE1.PROG(1)
+      IF(PSIG.LT.0.D0) THEN
+        REAERR(1)=PSIG
+        CALL ERREUR(1091)
+        KERRE=30
+        RETURN
+      ENDIF
+      PEPS=PROG(1)
+      IF(ABS(PEPS).GT.XZPREC) THEN
+        REAERR(1)=PEPS
+        CALL ERREUR(1099)
+        KERRE=35
+        RETURN
+      ENDIF
+C
+C
+C  VERIF DE LA PENTE
+C
+      DO 100 I=2,NBPOIX
+        I1=I-1
+        DEPS=PROG(I)-PROG(I1)
+        IF(DEPS.LE.0.D0) THEN
+          CALL ERREUR(1101)
+          KERRE=33
+          RETURN
+        ENDIF
+        PENTE=(MLREE1.PROG(I)-MLREE1.PROG(I1))/DEPS
+        IF(ABS(PENTE-YUNG).LT.(1.D-3*YUNG)) THEN
+          CALL ERREUR(1102)
+          KERRE=33
+          RETURN
+        ENDIF
+ 100  CONTINUE
+
+C Remplissage de la courbe de traction Contrainte-Deformation plastique
+C
+      NCOURB = 2
+      TRAC(1)= MLREE1.PROG(1)
+      TRAC(2)= 0.D0
+      DO 200 I=2,NBPOIX
+        PEPS = PROG(I)
+        PSIG = MLREE1.PROG(I)
+        NCOURB = NCOURB+2
+        TRAC(NCOURB-1) = PSIG
+        TRAC(NCOURB) = PEPS
+  200 CONTINUE
+C
+C       ON REMPLIT JUSQUE AU BOUT
+C
+      IF (NCOURB.LT.LTRAC) THEN
+        NCOURB=NCOURB+2
+        DEPS = TRAC(NCOURB  )-TRAC(NCOURB-2)
+        DSIG = TRAC(NCOURB-1)-TRAC(NCOURB-3)
+        DO 250 I=NCOURB,LTRAC,2
+          TRAC(I  ) = TRAC(I-2) + DEPS
+          TRAC(I-1) = TRAC(I-3) + DSIG
+ 250    CONTINUE
+      ENDIF
+
+ 777  CONTINUE
+
+      RETURN
+      END
+ 

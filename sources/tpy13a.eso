@@ -1,0 +1,14 @@
+C TPY13A    SOURCE    OF166741  23/12/04    21:15:15     11800          
+C
+C ===>  SOUS-PROGRAMME  TPY13A  PLUS UTILISE    <===
+C ===>  SUBROUTINE              NO LONGER USED  <===
+C
+      SUBROUTINE TPY13A
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      RETURN
+      END
+
+ 

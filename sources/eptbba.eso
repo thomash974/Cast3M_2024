@@ -1,0 +1,139 @@
+C EPTBBA    SOURCE    SP204843  23/11/30    21:15:09     11798          
+      SUBROUTINE EPTBBA(MELE,IPCHA1,IPMINT,IPMAIL,IPCHA2)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+-INC SMCHAML
+-INC SMINTE
+
+      PARAMETER (NIC=6)
+
+      LOGICAL        QUAD
+      CHARACTER*2    MOEP1
+      DIMENSION      ICQUAD(NIC)
+
+C-----------------------------------------------------------------------
+C---- Elements incompressibles (MFR = 31) ------------------------------
+C-----------------------------------------------------------------------
+C NOM  :             ICT3, ICQ4, ICC8, ICT4, ICP6, ICY5/
+C     DATA   ICLINE / 69 ,  70 ,  73 ,  74 , 75 ,  273 /
+C NOM  :             ICT6, ICQ8, IC20, IC10, IC15, IC13/
+      DATA   ICQUAD / 71 ,  72 ,  76 ,  77 ,  78 , 274 /
+
+      SEGMENT MVAL
+        REAL*8  XVAL(NVAL)
+      ENDSEGMENT
+
+C     Resultat par defaut
+      IPCHA2 = IPCHA1
+
+C     Si element ICT3 ou ICT4, rien a faire
+      IF (MELE.EQ.69.OR.MELE.EQ.74) RETURN
+
+C     Element quadratique ?
+      QUAD = .FALSE.
+      DO IIC=1,NIC
+        IF (MELE.EQ.ICQUAD(IIC)) QUAD = .TRUE.
+      ENDDO
+
+C     Si element QUAD, on ne fait rien pour l'instant
+      IF (QUAD) RETURN
+
+C----------------------------------------------------------------------C
+C                          ELEMENTS LINEAIRES                          C
+C----------------------------------------------------------------------C
+
+C     Initialisation MCHAML de sortie
+      MCHAML = IPCHA1
+      SEGINI,MCHAM2 = MCHAML
+      IPCHA2 = MCHAM2
+
+C     Initialisations boucle sur les valeurs du champ
+      NCP1   = IELVAL(/1)
+      MELVAL = IELVAL(1)
+      NPG1   = VELCHE(/1)
+      NEL1   = VELCHE(/2)
+
+C     Activation du MINTE :
+      MINTE  = IPMINT
+      SEGACT,MINTE
+
+C     Segment de valeurs aux points de Gauss
+      NVAL   = NPG1
+      SEGINI,MVAL
+
+C     Boucle sur les elements :
+      DO 1 IEL1=1,NEL1
+
+C Calcul de la deformation volumique moyenne dans l'element
+C----------------------------------------------------------
+
+C       EPTVM1 : def. vol. moy. au pt de Gauss
+        EPTVM1 = 0.D0
+        SOMMG1 = 0.D0
+
+C       Boucle sur les points de Gauss
+        DO 10 IPG1=1,NPG1
+
+C         EPTV1  : def. vol. au pt de Gauss (Tr(epth))
+          EPTV1 = 0.D0
+
+C         Boucle sur les composantes du champ
+          NCEP1 = 0
+          DO 100 ICP1=1,NCP1
+            MOEP1 = NOMCHE(ICP1)(1:2)
+            IF (MOEP1.EQ.'EP') THEN
+              NCEP1 = NCEP1 + 1
+              MELVAL = IELVAL(ICP1)
+c      write(6,*) 'VELCHE(IPG1,IEL1)=',VELCHE(IPG1,IEL1)
+              EPTV1 = EPTV1 + VELCHE(IPG1,IEL1)
+            ENDIF
+ 100      CONTINUE
+          EPTV1  = EPTV1 / FLOAT(NCEP1)
+c      write(6,*) 'POIGAU(IPG1),EPTV1=',POIGAU(IPG1),EPTV1
+          EPTVM1 = EPTVM1 + POIGAU(IPG1)*EPTV1
+          SOMMG1 = SOMMG1 + POIGAU(IPG1)
+
+C         On stocke la valeur de EPTV1 a ce point de Gauss
+          XVAL(IPG1) = EPTV1
+
+ 10     CONTINUE
+        EPTVM1 = EPTVM1 / SOMMG1
+
+c       write(6,*) 'EPTV1,EPTVM1=',EPTV1,EPTVM1
+
+C "Affaiblissement" de la deformation thermique dans l'element (BBAR)
+C--------------------------------------------------------------------
+
+C       On travaille sur le champ resultat
+        MCHAML = IPCHA2
+
+C       Boucle sur les points de Gauss
+        DO 20 IPG1=1,NPG1
+
+C         Boucle sur les composantes du champ
+          DO 200 ICP1=1,NCP1
+            MOEP1 = NOMCHE(ICP1)(1:2)
+            IF (MOEP1.EQ.'EP') THEN
+              MELVAL = IELVAL(ICP1)
+              XVAL1  = VELCHE(IPG1,IEL1) - XVAL(IPG1) + EPTVM1
+              VELCHE(IPG1,IEL1) = XVAL1
+            ENDIF
+ 200      CONTINUE
+
+ 20     CONTINUE
+
+ 1    CONTINUE
+
+C     Menage memoire tableau MVAL
+      SEGSUP,MVAL
+
+      RETURN
+      END
+      
+ 

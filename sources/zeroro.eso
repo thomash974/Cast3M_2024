@@ -1,0 +1,51 @@
+C ZERORO    SOURCE    CB215821  19/08/01    21:16:48     10279          
+
+*_______________________________________________________________________
+*
+*            OPERATEUR MCHAML A ZERO
+*
+*            SYNTAXE :
+*            _________
+*
+*      CHAM1 = ZERO  MOT1 MODL1 ;
+*
+*            MOT1   Mot cle indiquant le sous-type de MCHAML voulu
+*            MODL1  Modele de calcul (type MMODEL)
+*            CHAM1  Champ par element resultat (type MCHAML)
+*_______________________________________________________________________
+
+      SUBROUTINE ZERORO
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+
+      CHARACTER*8 MOT
+C
+C     LECTURE DU TYPE DE CHAMP A CREER
+C
+      CALL LIRCHA(MOT,1,IRET)
+      IF (IERR.NE.0) RETURN
+C
+C     LECTURE DU MODELE
+C
+      CALL LIROBJ('MMODEL  ',IPMODL,1,IRET)
+      CALL ACTOBJ('MMODEL  ',IPMODL,1)
+      IF (IERR.NE.0) RETURN
+C
+C     CREATION DU MCHAML
+C
+      CALL ZEROP(IPMODL,MOT,IPCHEL)
+      IF (IERR.NE.0 .OR. IPCHEL.EQ.0) RETURN
+C
+C     ECRITURE DU RESULTAT
+C
+      CALL ACTOBJ('MCHAML  ',IPCHEL,1)
+      CALL ECROBJ('MCHAML  ',IPCHEL)
+
+      END
+
+ 

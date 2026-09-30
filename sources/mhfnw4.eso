@@ -1,0 +1,11 @@
+C MHFNW4    SOURCE    OF166741  24/03/28    21:15:07     11811          
+
+      SUBROUTINE mhfnw4
+
+      write(*,*) 'Subroutine MHFNW4 no longer used'
+      call erreur(5)
+
+c      return
+      END
+
+ 

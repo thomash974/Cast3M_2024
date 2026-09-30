@@ -1,0 +1,343 @@
+C SMDCHM    SOURCE    OF166741  24/03/28    21:15:10     11811          
+
+C***********************************************************************
+C NOM         : smdchm.eso
+C DESCRIPTION : Sortie des MCHELM dans un fichier au format MED
+C***********************************************************************
+C HISTORIQUE :  16/10/2017 : RPAREDES : CREATION
+C HISTORIQUE :  07/03/2019 : CB215821 : Compatibilite avec Salome > 9.2
+C HISTORIQUE :  20/10/2022 : OF       : Modifications diverses
+C HISTORIQUE :  10/01/2024 : OF       : Modifications diverses (2)
+C HISTORIQUE :  22/01/2024 : OF       : Modifications diverses (3)
+C HISTORIQUE :  31/01/2024 : OF       : Modifications diverses (4)
+C HISTORIQUE :  08/02/2024 : OF       : Correction numerotation profil
+C HISTORIQUE :  12/02/2024 : OF       : Passage a MED 64B
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : operateur (SORT 'MED') sormed.eso
+C***********************************************************************
+C ENTREES :   mfid    : Id du fichier
+C             name    : Nom du MAILLAGE MED courant
+C             IJFAM   : SEGMENT contenant la liste des FAMILLES
+C             IJGROU  : SEGMENT contenant la liste des GROUPES
+C             LISCHA  : SEGMENT contenant la liste des MCHAML
+C             ICPR8   : Segment numerotation noeud MED / Cast3M
+C SORTIES : aucune
+C***********************************************************************
+
+      SUBROUTINE smdchm (mfid, name, IJFAM, IJGROU, LISCHA, ICPR8)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCMED
+-INC CCGEOME
+
+-INC SMELEME
+-INC SMCHAML
+-INC SMINTE
+-INC SMLENTI
+-INC SMMED
+      SEGMENT ICPR8(nnic)
+
+      EXTERNAL LONG
+
+C-----Definition des reels
+      REAL*8    dt
+
+C-----Chaines de Caractere de longueur MED_NAME_SIZE=64
+      CHARACTER*(MED_NAME_SIZE) fname
+      CHARACTER*(MED_NAME_SIZE) lname
+      CHARACTER*(MED_NAME_SIZE) name
+      CHARACTER*(MED_NAME_SIZE) mname
+      CHARACTER*(MED_NAME_SIZE) pname
+
+C-----Chaines de Caractere de longueur MED_SNAME_SIZE=16
+      CHARACTER*(MED_SNAME_SIZE) dtunit
+
+      CHARACTER*16 TYPCH
+
+C-----Information sur les FAMILLES
+      SEGMENT IJFAM
+        INTEGER NFAM
+        INTEGER                   IFAM(jf)
+        INTEGER                   INUMF(jf)
+        INTEGER                   INOGRO(jf)
+        CHARACTER*(MED_NAME_SIZE) CNOMFA(jf)
+        INTEGER                   IPROF(jf)
+C       jf     : Entier de dimensionnement
+C       NFAM   : Nombre de familles
+C       IFAM   : Objet MELEME (simple normalement)
+C       INOGRO : pointeur sur un SEGMENT NOMGRO(Noms des groupes composes de cette famille)
+C       CNOMFA : Nom de la famille
+C       IPROF  : pointeur sur un SEGMENT IPROFI pour definir le PROFIL
+      ENDSEGMENT
+
+C-----SEGMENT pour stocker les profils des familles (numeros d'elements local)
+      SEGMENT IPROFI(nbelp)
+      SEGMENT IPROF1(nbelp)
+
+C-----Information sur les GROUPES
+      SEGMENT IJGROU
+        INTEGER                    ILENTI(nbgrou)
+        INTEGER                    IPMAIL(nbgrou)
+        CHARACTER*(MED_LNAME_SIZE) CNOMGR(nbgrou)
+C       nbgrou : Nombre de groupes
+C       ILENTI : pointeur LISTENTI des numeros de famille composant les groupes
+C       IPMAIL : pointeur MELEME du groupe en question
+C       CNOMGR : Noms des groupes
+      ENDSEGMENT
+
+C-----SCHMED : Proprietes des CHAMPS a sortir
+      SEGMENT SCHMED
+        CHARACTER*(MED_NAME_SIZE) CCHMED(nchmed)
+        CHARACTER*(MED_NAME_SIZE) CPRMED(nchmed)
+C       CCHMED : Nom du champ  MED a creer
+C       CPRMED : Nom du profil MED a creer
+      ENDSEGMENT
+
+      SEGMENT SLISCO
+        CHARACTER*(MED_SNAME_SIZE) LISSCP(nbcomp)
+        CHARACTER*(MED_SNAME_SIZE) LCUNIT(nbcomp)
+      ENDSEGMENT
+
+      SEGMENT LCCHAM
+        REAL*8  LCHAML(nbvals, nbcomp)
+      ENDSEGMENT
+
+C *** Initialisation du code de retour (=0 si ok, !=0 sinon)
+      mcret = 0
+
+C **********************************************************************
+C     Traitement des MCHAML : Champ, Profil et Valeurs
+C **********************************************************************
+      nbcomp = 0
+      SLISCO = 0
+      nbelp  = 0
+      IPROF1 = 0
+
+      nbgrou  = IJGROU.IPMAIL(/1)
+      nchmed  = LISCHA.NBENTI
+      SEGINI,SCHMED
+
+      nbch = 0
+      nbpr = 0
+      DO ia = 1, nchmed
+        fname  = LISCHA.NOCHAP(ia)
+        IPT1   = LISCHA.LIMAIL(ia)
+        MCHAML = LISCHA.LICHAP(ia)
+        nbc    = MCHAML.IELVAL(/1)
+
+C       On ne sort que les composantes de type 'REAL*8'
+        ic=0
+        DO ie = 1,nbc
+          TYPCH = MCHAML.TYPCHE(ie)
+          IF(TYPCH(1:8) .EQ. 'REAL*8  ') ic=ic+1
+        ENDDO
+        IF (ic .EQ. 0) GOTO 100
+        nbcomp=ic
+
+        CALL PLACE(SCHMED.CCHMED, nbch, iplace, fname)
+        IF (iplace .EQ. 0) THEN
+C-------- Creation du Champ
+          nbch = nbch + 1
+          SCHMED.CCHMED(nbch)=fname
+
+C         Recyclage eventuel du POINTEUR SLISCO
+          IF (SLISCO .GT. 0) THEN
+            IF (nbcomp .GT. SLISCO.LISSCP(/2)) SEGADJ,SLISCO
+          ELSE
+            SEGINI,SLISCO
+          ENDIF
+
+          ic = 0
+          DO ie = 1, nbc
+            TYPCH = MCHAML.TYPCHE(ie)
+            IF (TYPCH(1:8) .EQ. 'REAL*8  ') THEN
+              ic=ic+1
+              SLISCO.LISSCP(ic) = MCHAML.NOMCHE(ie)
+              SLISCO.LCUNIT(ic) = 'NO_UNIT'
+            ENDIF
+          ENDDO
+
+          mftype = MED_FLOAT64
+          n4     = nbcomp
+          dtunit = 'NO_UNIT'
+          mname  = name
+
+          CALL mfdcre(mfid, fname, mftype, n4,
+     &        SLISCO.LISSCP,SLISCO.LCUNIT, dtunit, mname, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'smdchm / mfdcre'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            RETURN
+          ENDIF
+        ENDIF
+
+C       Verification de controle au CAS OU on aurait oublie un MAILLAGE
+        CALL PLACE2(IJGROU.IPMAIL,nbgrou,IDANS,IPT1)
+        IF (IDANS .EQ. 0) THEN
+          CALL ERREUR(503)
+          RETURN
+        ENDIF
+
+        pname  = IJGROU.CNOMGR(IDANS)
+        NBNN   = IPT1.NUM(/1)
+        nbelp  = IPT1.NUM(/2)
+        nsize  = nbelp
+
+        CALL PLACE(SCHMED.CPRMED, nbpr, iplace, pname)
+        IF (iplace .EQ. 0) THEN
+C-------  Creation du Profil
+          nbpr = nbpr + 1
+          SCHMED.CPRMED(nbpr)=pname
+
+          MLENTI=IJGROU.ILENTI(IDANS)
+
+C         Recyclage eventuel du POINTEUR IPROF1
+          IF (IPROF1 .GT. 0) THEN
+            IF (nbelp .GT. IPROF1(/1)) SEGADJ,IPROF1
+          ELSE
+            SEGINI,IPROF1
+          ENDIF
+
+C         Remise dans l'ordre des familles du groupe sinon le champ est un melange...
+          jg=MLENTI.LECT(/1)
+          SEGINI,MLENT1
+          IJGROU.ILENTI(IDANS)=MLENT1
+          jg2 =0
+          iel1=1
+ 8        CONTINUE
+          DO ii = 1, jg
+            ifa   = MLENTI.LECT(ii)
+            IPT2  = IJFAM.IFAM(ifa)
+            NBEL2 = IPT2.NUM(/2)
+            DO jj = 1, NBNN
+              IF (IPT2.NUM(jj,1) .NE. IPT1.NUM(jj,iel1)) GOTO 10
+            ENDDO
+            jg2=jg2+1
+            MLENT1.LECT(jg2)=ifa
+            iel1=iel1+NBEL2
+            IF (jg2 .EQ. jg) GOTO 9
+            GOTO 8
+ 10         CONTINUE
+          ENDDO
+ 9        CONTINUE
+          SEGSUP,MLENTI
+          MLENTI=MLENT1
+
+          itot = 0
+          DO ii = 1, jg
+            ifa   =MLENTI.LECT(ii)
+            IPROFI=IJFAM.IPROF(ifa)
+            DO jj=1,IPROFI(/1)
+              itot         = itot+1
+              IPROF1(itot) = IPROFI(jj)
+            ENDDO
+          ENDDO
+
+          CALL mpfprw(mfid, pname, nsize, IPROF1(1), mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'smdchm / mpfprw'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            RETURN
+          ENDIF
+        ENDIF
+
+C------ Preparation & Ecriture des Valeurs du Champ
+        ISUPP  = LISCHA.ISUPOR(ia,1)
+        MINTE  = LISCHA.ISUPOR(ia,2)
+        IF    (ISUPP .EQ. 1) THEN
+C         Cas MCHAML aux NOEUDS
+          nnno   = NBNN
+          metype = MED_NODE_ELEMENT
+          IPER   = MEDPER(IPT1.ITYPEL)
+        ELSE
+C         Cas MCHAML possedant un SEGMENT MINTE
+          nnno   = MINTE.POIGAU(/1)
+          metype = MED_CELL
+          IPER   = -1
+        ENDIF
+        nbvals = nnno*nbelp
+
+C       Recyclage eventuel du POINTEUR LCCHAM
+        IF (LCCHAM .GT. 0) THEN
+          IF (nbvals.GT.LCCHAM.LCHAML(/1) .OR.
+     &        nbcomp.GT.LCCHAM.LCHAML(/2))    SEGADJ,LCCHAM
+        ELSE
+          SEGINI,LCCHAM
+        ENDIF
+
+        ic = 0
+        DO ie = 1,nbcomp
+          TYPCH = MCHAML.TYPCHE(ie)
+          IF (TYPCH(1:8) .NE. 'REAL*8  ') GOTO 130
+          ic = ic + 1
+
+          MELVAL = MCHAML.IELVAL(ie)
+          N1PTEL = MELVAL.VELCHE(/1)
+          N1EL   = MELVAL.VELCHE(/2)
+          MELVA1 = 0
+          IF (IPER .GE. 0 .AND. N1PTEL .GT. 1) THEN
+C           Permutation des noeuds pour correspondre au formalisme MED
+            N2PTEL = 0
+            N2EL   = 0
+            SEGINI,MELVA1
+            do iel = 1, N1EL
+              MELVA1.VELCHE(1,iel) = MELVAL.VELCHE(1,iel)
+              do ipt = 1,N1PTEL-1
+                jpt = IPERM(IPER+ipt)
+                MELVA1.VELCHE(ipt+1,iel)=MELVAL.VELCHE(jpt,iel)
+              enddo
+            enddo
+            MELVAL = MELVA1
+          ENDIF
+
+          idc = 0
+          DO iel = 1, nbelp
+            I1EL = MIN(iel, N1EL)
+            DO ino = 1,nnno
+              idc    = idc + 1
+              I1PTEL = MIN(ino, N1PTEL)
+              LCCHAM.LCHAML(idc, ic) = MELVAL.VELCHE(I1PTEL,I1EL)
+            ENDDO
+          ENDDO
+          IF (MELVA1 .GT. 0) SEGSUP,MELVA1
+ 130      CONTINUE
+        ENDDO
+
+        numdt  = LISCHA.PNUMDT(ia)
+        numit  = MED_NO_IT
+        dt     = LISCHA.XTEMPS(ia)
+        mgtype = MEDEL(IPT1.ITYPEL)
+        mtsf   = MED_COMPACT_STMODE
+        lname  = ' '
+        mswm   = MED_NO_INTERLACE
+        mcs    = MED_ALL_CONSTITUENT
+        n4     = nsize
+
+        CALL mfdrpw(mfid, fname, numdt, numit, dt, metype,mgtype, mtsf,
+     &        pname, lname, mswm, mcs, n4, LCCHAM.LCHAML, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'smdchm / mfdrpw'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          RETURN
+        ENDIF
+ 100    CONTINUE
+      ENDDO
+
+      SEGSUP,SCHMED
+      IF (SLISCO.GT.0) SEGSUP,SLISCO
+
+c      return
+      END
+
+ 

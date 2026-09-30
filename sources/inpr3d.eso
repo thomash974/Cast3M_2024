@@ -1,0 +1,31 @@
+C INPR3D    SOURCE    PV090527  23/01/27    21:15:43     11574          
+       subroutine inpr3d(x03,v33t,x16,gama)
+      
+c     retour de l increment principal dans la base fixe
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables externes      
+      real*8 v33t(3,3),x03(3),x16(6)
+c     variables logique pour savoir si les termes extra diagonaux sont
+c     des gama ou des epsilons      
+      logical gama
+c     variables locales
+      real*8 xp6(6)
+      integer i
+
+      do i=1,3
+         xp6(i)=x03(i)
+      end do
+      do i=4,6
+         xp6(i)=0.d0
+      end do
+      
+c     expression dans la nouvelle base
+      call chrep6(xp6,v33t,gama,x16)
+
+      return
+      end
+            
+ 

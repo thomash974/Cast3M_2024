@@ -1,0 +1,204 @@
+C TESJA2    SOURCE    GOUNAND   23/07/31    21:15:04     11713          
+      SUBROUTINE TESJA2(MYLRFS,MYPGS,
+     $     IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TESJA2
+C PROJET      : Noyau linéaire NLIN
+C DESCRIPTION : On vérifie le calcul de la matrice jacobienne et de son
+C               déterminant sur un segment...
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DRN/DMT/SEMT/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          :
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       : TESTJA
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C***********************************************************************
+C VERSION    : v1, 16/08/99, version initiale
+C HISTORIQUE : v1, 16/08/99, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC TNLIN
+*-INC SELREF
+      POINTEUR MYLRFS.ELREFS
+      POINTEUR MYLRF.ELREF
+*-INC SPOGAU
+      POINTEUR MYPGS.POGAUS
+      POINTEUR MYPG.POGAU
+*-INC SMCHAEL
+      INTEGER NBLIG,NBCOL,N2LIG,N2COL,NBPOI,NBELM
+      POINTEUR JCOOR.MCHEVA
+      POINTEUR JMAJAC.MCHEVA
+      POINTEUR JMIJAC.MCHEVA
+      POINTEUR JDTJAC.MCHEVA
+      POINTEUR FFGPG.MCHEVA
+      POINTEUR DFFGPG.MCHEVA
+*
+      INTEGER IMPR,IRET
+*
+      REAL*8 JXX(1,1),JIXX(1,1)
+      REAL*8 X1,X2
+      REAL*8 L,DETJXX,DETA,JXXA,JIXXA,XERR
+      INTEGER NPG,INPG,INBTES
+      LOGICAL LERJ
+*
+* Executable statements
+*
+      WRITE(IOIMP,*) 'Entrée dans tesja2'
+*
+* On teste sur un segment à deux noeuds (D&T p.96)
+* avec six points de Gauss (sens direct et indirect pour le segment).
+* Dimension des espaces de référence et réels : 1, 1
+*
+      CALL FILRF('H1D1SE2',MYLRFS,MYLRF,IMPR,IRET)
+      IF (IRET.NE.0) GOTO 9999
+      CALL FIPG('GAC1-11-6',MYPGS,MYPG,IMPR,IRET)
+      IF (IRET.NE.0) GOTO 9999
+      CALL KFNREF(MYLRF,MYPG,FFGPG,DFFGPG,IMPR,IRET)
+      IF (IRET.NE.0) GOTO 9999
+      DO 3 INBTES=1,2
+         IF (INBTES.EQ.1) THEN
+            X1=-2.D0*XPI
+            X2=XPI
+         ELSEIF (INBTES.EQ.2) THEN
+            X1=3.D0*XPI
+            X2=-XPI
+         ELSE
+            WRITE(IOIMP,*) 'Erreur dans le nombre de tests'
+            GOTO 9999
+         ENDIF
+         NBELM=1
+         NBPOI=1
+         N2COL=1
+         N2LIG=1
+         NBCOL=2
+         NBLIG=1
+         SEGINI JCOOR
+         JCOOR.WELCHE(1,1,1,1,1,1)=X1
+         JCOOR.WELCHE(1,2,1,1,1,1)=X2
+*     Echelle de valeurs pour les coordonnées
+         XYMAX=XZERO
+         do ibelm=1,nbelm
+            do ibpoi=1,nbpoi
+               do i2col=1,n2col
+                  do i2lig=1,n2lig
+                     do ibcol=1,nbcol
+                        do iblig=1,nblig
+                           XYMAX=MAX(abs(jcoor.welche(iblig,ibcol,i2lig
+     $                          ,i2col,ibpoi,ibelm)),xymax)
+                        enddo
+                     enddo
+                  enddo
+               enddo
+            enddo
+         enddo
+         xtprec=max(XYMAX*xzprec,sqrt(xpetit))
+         IF (IMPR.GT.3) THEN
+            WRITE(IOIMP,*) 'JCOOR'
+            CALL PRCHVA(JCOOR,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+         ENDIF
+         LERJ=.FALSE.
+         CALL GEOLIN(DFFGPG,JCOOR,NBELM,
+     $        JMAJAC,JMIJAC,JDTJAC,LERJ,
+     $        IMPR,IRET)
+         IF (IRET.NE.0) GOTO 9999
+*
+*     Test sur les valeurs de la matrice jacobienne, de son inverse
+*     et de son déterminant aux points de Gauss...
+*
+         SEGACT JMAJAC
+         SEGACT JMIJAC
+         SEGACT JDTJAC
+         L=(X2-X1)
+         JXX(1,1)=L/2.D0
+         JIXX(1,1)=2.D0/L
+         DETJXX=L/2.D0
+         DO INPG=1,JMAJAC.WELCHE(/5)
+            JXXA=JMAJAC.WELCHE(1,1,1,1,INPG,1)
+            XERR=ABS(JXX(1,1)-JXXA)
+            IF (XERR.GT.XTPREC) THEN
+               WRITE(IOIMP,*) 'Erreur calcul mat. jac.'
+               WRITE(IOIMP,*) 'XERR=',XERR, ' XTPREC=',XTPREC
+               WRITE(IOIMP,*) 'JXX=',JXX(1,1)
+               WRITE(IOIMP,*) 'JXXA=',JXXA
+               GOTO 9999
+            ENDIF
+         ENDDO
+         DO INPG=1,JMIJAC.WELCHE(/5)
+            JIXXA=JMIJAC.WELCHE(1,1,1,1,INPG,1)
+            XERR=ABS(JIXX(1,1)-JIXXA)
+            IF (XERR.GT.XTPREC) THEN
+               WRITE(IOIMP,*) 'Erreur calcul mat. jac.'
+               WRITE(IOIMP,*) 'XERR=',XERR, ' XTPREC=',XTPREC
+               WRITE(IOIMP,*) 'JIXX=',JIXX(1,1)
+               WRITE(IOIMP,*) 'JIXXA=',JIXXA
+               GOTO 9999
+            ENDIF
+         ENDDO
+         DO INPG=1,JDTJAC.WELCHE(/5)
+            DETA=JDTJAC.WELCHE(1,1,1,1,INPG,1)
+            XERR=ABS(DETJXX-DETA)
+            IF (XERR.GT.XTPREC) THEN
+               WRITE(IOIMP,*) 'Erreur calcul det. mat. jac.'
+               WRITE(IOIMP,*) 'XERR=',XERR, ' XTPREC=',XTPREC
+               WRITE(IOIMP,*) 'DETJXX=',DETJXX
+               WRITE(IOIMP,*) 'DETA=',DETA
+               GOTO 9999
+            ENDIF
+         ENDDO
+         SEGDES JDTJAC
+         SEGDES JMIJAC
+         SEGDES JMAJAC
+         IF (IMPR.GT.3) THEN
+            WRITE(IOIMP,*) 'JMAJAC'
+            CALL PRCHVA(JMAJAC,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+            WRITE(IOIMP,*) 'JMIJAC'
+            CALL PRCHVA(JMIJAC,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+            WRITE(IOIMP,*) 'JDTJAC'
+            CALL PRCHVA(JDTJAC,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+         ENDIF
+         WRITE(IOIMP,*) 'Test',INBTES,' successful'
+ 3    CONTINUE
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine tesja2'
+      RETURN
+*
+* End of subroutine tesja2
+*
+      END
+ 

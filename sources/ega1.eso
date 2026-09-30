@@ -1,0 +1,90 @@
+C EGA1      SOURCE    FANDEUR   22/05/03    21:15:02     11360          
+      LOGICAL FUNCTION EGA1 (IP1,IP2,EPS1)
+
+************************************************************************
+*
+*                             E G A 1
+*                             -------
+*
+* FONCTION:
+* ---------
+*
+*     INDIQUER SI 2 POINTS ONT MEME POSITION DANS L'ESPACE, A PEU DE
+*     CHOSES PRES
+*
+* ARGUMENTS:   (E)=ENTREE   (S)=SORTIE   (+ = PASSE PAR COMMUN)
+* ----------
+*
+*     IP1     (E)  1ER POINT.
+*     IP2     (E)  2EME POINT.
+*     EPS1    (E)  TOLERANCE POUR ANNONCER "MEME POSITION".
+*                  SI NEGATIF, AUCUNE TOLERANCE SPECIFIEE: ON PREND UN
+*                  SOUS-MULTIPLE DE LA DENSITE.
+*             (S)  TOLERANCE UTILISEE.
+*     EGA1    (S)  .TRUE. SI LES POINTS SONT A LA MEME POSITION.
+*                  .FALSE. SINON.
+*    +DENSIT  (E)  VOIR "CCGEOME".
+*    +IDIM    (E)  VOIR "CCOPTIO".
+*    +MCOORD  (E)  VOIR "SMCOORD".
+* ATTENTION : EPS1 est potentiellement modifie en SORTIE.
+*
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*     PASCAL MANIGOT     1ER OCTOBRE 1986
+*
+* LANGAGE:
+* --------
+*     ESOPE + FORTRAN77
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+-INC PPARAM
+
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMCOORD
+
+      INTEGER IP1,IP2
+      REAL*8 EPS1
+
+      IF (IP1 .EQ. IP2) THEN
+         EGA1 = .TRUE.
+         RETURN
+      END IF
+
+      SEGACT,MCOORD
+      IDIMP1 = IDIM + 1
+
+      ipt1 = (IP1-1)*IDIMP1
+      ipt2 = (IP2-1)*IDIMP1
+
+      eps_d = EPS1
+      IF (eps_d .LT. 0.D0) THEN
+         eps_d = (XCOOR(ipt1+IDIMP1) + XCOOR(ipt2+IDIMP1)) / 20.D0
+         IF (eps_d .LE. 0.D0) eps_d = DENSIT * 0.1D0
+         EPS1 = eps_d 
+      END IF
+
+      eps_d = eps_d * eps_d
+
+      IF      (IDIM .EQ. 3) THEN
+         DIST =   (XCOOR(ipt1+1) - XCOOR(ipt2+1))**2
+     &          + (XCOOR(ipt1+2) - XCOOR(ipt2+2))**2
+     &          + (XCOOR(ipt1+3) - XCOOR(ipt2+3))**2
+      ELSE IF (IDIM .EQ. 2) THEN
+         DIST =   (XCOOR(ipt1+1) - XCOOR(ipt2+1))**2
+     &          + (XCOOR(ipt1+2) - XCOOR(ipt2+2))**2
+      ELSE IF (IDIM .EQ. 1) THEN
+         DIST =   (XCOOR(ipt1+1) - XCOOR(ipt2+1))**2
+      ELSE
+         CALL ERREUR(5)
+      END IF
+
+      EGA1 = DIST .LE. eps_d
+
+      END
+
+ 

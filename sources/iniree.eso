@@ -1,0 +1,47 @@
+C INIREE    SOURCE    PV090527  23/08/01    21:15:02     11714          
+      SUBROUTINE INIREE
+c*************************************************************
+c  evalue xpetit et xgrand pour la machine
+c  on veut pouvoir prendre l 'inverse de xpetit et xgrand
+c*************************************************************
+      IMPLICIT INTEGER(I-N)
+      real*8 D1
+      real*4 E1
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC CCTRACE
+      D1=1.D0
+      E1=1.E0
+c  calcul ipetit,igrand
+      ipetit=-huge(0)/8
+      igrand=-ipetit
+c      write(6,*) ' ipetit,igrand ',ipetit,igrand
+c calcul xpetit
+      xpetit = tiny(D1)*2.d0
+c       write(6,*) 'xpetit', xpetit
+
+c calcul xgrand
+      xgrand = huge(D1)/2.d0
+c       write(6,*) 'xgrand', xgrand
+c
+c calcul xspeti
+      xspeti = tiny(E1)*2.e0
+c       write(6,*) 'xspeti', xspeti
+
+c calcul xsgran
+      xsgran = huge(E1)/2.e0
+c       write(6,*) 'xsgran', xsgran
+
+c calcul xzprec ,
+      xzprec=epsilon(D1)*2.D0
+c       write(6,*) 'xzprec', xzprec
+
+c calcul xszpre ,
+      xszpre=epsilon(E1)*2.E0
+c       write(6,*) 'xszpre', xszpre
+      return
+
+      END
+ 

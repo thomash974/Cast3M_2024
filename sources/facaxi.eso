@@ -1,0 +1,331 @@
+C FACAXI    SOURCE    MB234859  21/11/22    21:15:01     11194          
+      SUBROUTINE FACAXI (MYMOD,INFOEL,NPAX,NGAX,KACHE,INOR,ICHFAC
+     &     ,EXTINC)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C
+      LOGICAL ICOQ,BTHRD
+C----------------------------------------------------------------------
+C SP appele par FFORME
+C
+C     Calcul des facteurs de forme en axisymetrique
+C   Entree :
+C     MYMOD  : pointeur de l'objet modèle
+C     INFOEL : utile pour les coques ou quadratiques
+C     NPAX   : nombre de points d integration (disc.reguliere)
+C     NGAX   : nombre de points de Gauss
+C     KACHE  : 0 si option convexe, sinon option cache
+C     INOR   : 1 si normalisation, 0 sinon
+C     EXTINC : coefficient d'extinction (si cavite absorbante)
+C   sortie:
+C     ICHFAC : pointeur sur l'objet MCHAML resultat
+C
+C----------------------------------------------------------------------
+C     traitement des coques par dedoublement des elements a partir
+C     de la normale
+C                          ->
+C       A (inverse) = A - e*n  (e=1e-3)
+C     cas des boucles 1 sur k1 et 2 sur k2
+C     mais pas de la boucle 3 obstructeurs
+C
+C     bcl face k1
+C      ** face k1  **
+C            bcl face k2
+C            .. face k2 ..
+C                  bcl 3 obstructeurs
+C            .. si coq: inverse face k2 ..
+C                  les obstructeurs sont les memes que pour k2
+C            fin bcl face k2
+C
+C      ** si coq : inverse face k1 **
+C            bcl face k2
+C            .. face k2 ..
+C                  bcl 3 obstructeurs
+C            .. si coq: inverse face k2 ..
+C                  les obstructeurs sont les memes que pour k2
+C            fin bcl face k2
+C     fin bcl face k1
+C
+C Ajout de la parallelisation par les threads
+C Le travail sur chaque face k1 est realise dans la subroutine FFAXCA
+C----------------------------------------------------------------------
+C
+-INC CCREEL
+-INC SMELEME
+-INC SMMODEL
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+      POINTEUR MYMOD.MMODEL
+-INC CCASSIS
+C     Declaration du COMMON pour le travail en parallele
+      COMMON/FAFORM/IPARAL
+      EXTERNAL FFAXCi
+C
+C     SEGMENT POUR LA PARALLELISATION
+      SEGMENT SPARAL
+        INTEGER NBTHRD
+        INTEGER IAFAIR(NBEL2)
+        INTEGER IMYMOD,ISEGEL,KNPAX,KNGAX,KKACHE,IIFACFO
+        INTEGER KITYP,KNELT1,IWRKTH
+        REAL*8  XEXTINC,XRAD
+        LOGICAL BICOQ
+      ENDSEGMENT
+C
+C----------------------------------------------------------------------
+      SEGMENT , INFOEL
+        LOGICAL KCOQ(N1),KQUAD(N1)
+      ENDSEGMENT
+C----------------------------------------------------------------------
+C     FACTEURS DE FORME
+C           NNBEL1 = NOMBRE DE LIGNES + 1
+C           NBEL2  = NOMBRE DE COLONNES
+C     LFACT(NNBEL1) POINTE SUR LE TABLEAU DES SURFACES
+C
+      SEGMENT IFACFO
+        INTEGER   LFACT(NNBEL1)
+      ENDSEGMENT
+      SEGMENT LFAC
+        REAL*8    FACT(NBEL2)
+      ENDSEGMENT
+      POINTEUR PSUR.LFAC, PLIG.LFAC
+      POINTEUR PCOL.LFAC
+C----------------------------------------------------------------------
+C     coordonnees des obstructeurs
+      SEGMENT SFOBS
+        REAL*8 OBS(2,NTOBS)
+      ENDSEGMENT
+C----------------------------------------------------------------------
+      SEGMENT STRAV
+        REAL*8 A1(NA,NA),A2(NA,NA),A3(NA,NA),AA2(NA,NA)
+        REAL*8 U1(NA1),U2(NA1),UU2(NA1)
+      ENDSEGMENT
+C----------------------------------------------------------------------
+      SEGMENT SEGTH
+        INTEGER  SSFOBS(NTHRD)
+        INTEGER  SSTRAV(NTHRD)
+      ENDSEGMENT
+C
+      EPS = 1D-5
+      KIMP = IIMPI
+      NES = IDIM
+
+C... critere de dedoublement des coques
+      ECOQ=1.D-3
+      IF (INFOEL.EQ.0) THEN
+         ICOQ = .FALSE.
+      ELSE
+         ICOQ = .TRUE.
+         SEGACT INFOEL
+      ENDIF
+C...  quadratique
+      NSPA1=1
+      NSPA2=1
+      NSPA3=1
+      NS=2
+
+      RAD = 0
+C
+C     Calcul du nombre de faces NFACE et du rayon RAD
+      SEGACT MYMOD
+      NTYP = MYMOD.KMODEL(/1)
+      NFACE = 0
+      DO 10 ITYP=1,NTYP
+        IMODEL = MYMOD.KMODEL(ITYP)
+        SEGACT IMODEL
+        IPT1 = IMAMOD
+        SEGACT IPT1
+        NEL = IPT1.NUM(/2)
+        NSGEO  = IPT1.NUM(/1)
+C       Recherche du max sur Ox
+        DO 5 IEL = 1,NEL
+          DO 6 IPT = 1,NSGEO
+            IREF = (IDIM+1)*(IPT1.NUM(IPT,IEL)-1)
+            VALX = XCOOR(IREF+1)
+            IF (VALX.GT.RAD)  RAD = VALX
+ 6        CONTINUE
+ 5      CONTINUE
+        IF (ICOQ.AND.KCOQ(ITYP)) THEN
+          NFACE = NFACE + 2 * NEL
+        ELSE
+          NFACE = NFACE + NEL
+        ENDIF
+ 10   CONTINUE
+C
+      IF (KIMP.GE.3) THEN
+        WRITE( 6,*) ' DIMENSIONNEMENT : RAD =',RAD
+        WRITE( 6,*) ' NOMBRE TOTAL DE FACES ',NFACE
+      ENDIF
+C
+C>>>  FAUT-IL PARALLELISER AVEC LES THREADS
+C     -------------------------------------
+      NBTHR = NBTHRS
+      BTHRD = .TRUE.
+C
+      ITH = 0
+      IF (NBESC.NE.0) ITH=oothrd
+      IF ((NBTHRS.EQ.1).OR.(ITH.GT.0)) THEN
+        NBTHR = 1
+        BTHRD = .FALSE.
+      ENDIF
+CC    WRITE(*,*) 'NBTHRD=',NBTHR,'BTHRD=',BTHRD,'NBESC=',NBESC
+C
+C>>>  INITIALISATION SFOBS et STRAV
+C     -----------------------------
+      NTHRD=NBTHR
+      SEGINI,SEGTH
+      NA=2
+      NA1=3
+      DO IITH = 1,NTHRD
+        IF(KACHE.NE.0) THEN
+          NTOBS = 2*NFACE
+          SEGINI SFOBS
+          SSFOBS(IITH)=SFOBS
+        ENDIF
+        SEGINI STRAV
+        SSTRAV(IITH)=STRAV
+      ENDDO
+C
+C>>>  INITIALISATION OBJET FACFOR
+C     ---------------------------
+      NNBEL1=NFACE+1
+      NBEL2=NFACE
+      SEGINI IFACFO
+      DO 900 LS=1,NNBEL1
+        SEGINI PLIG
+        LFACT(LS)=PLIG
+        SEGACT PLIG*MOD
+ 900  CONTINUE
+      PSUR = LFACT(NNBEL1)
+      SEGACT PSUR*MOD
+C
+C     -------------------------------------------------------------
+C>>   BOUCLE FACE 1
+C
+      IF (BTHRD) THEN
+        CALL THREADII
+      ENDIF
+C
+      NELT1= 0
+      DO 100 ITYP = 1,NTYP
+C
+C       Initialisation segment thread
+        SEGINI,SPARAL
+        SPARAL.NBTHRD  = NBTHR
+        SPARAL.IMYMOD  = MYMOD
+        SPARAL.ISEGEL  = INFOEL
+        SPARAL.KNPAX   = NPAX
+        SPARAL.KNGAX   = NGAX
+        SPARAL.KKACHE  = KACHE
+        SPARAL.IIFACFO = IFACFO
+        SPARAL.KITYP   = ITYP
+        SPARAL.KNELT1  = NELT1 
+        SPARAL.IWRKTH  = SEGTH
+        SPARAL.XEXTINC = EXTINC
+        SPARAL.XRAD    = RAD
+        SPARAL.BICOQ   = ICOQ
+C
+        IF (BTHRD) THEN
+C         Remplissage du  COMMON/FAFORME/
+          IPARAL=SPARAL
+          DO ith=2,NBTHR
+            CALL THREADID(ith,FFAXCi)
+          ENDDO
+          CALL FFAXCi(1)
+
+C         Attente de la fin de tous les threads en cours de travail
+          DO ith=2,NBTHR
+            CALL THREADIF(ith)
+          ENDDO
+C
+C         On complete les trous dans la raquette
+          DO 13 ICMP = 1,NBEL2
+            NBK = IAFAIR(ICMP)
+            IF (NBK.NE.0) THEN
+              S1 = PSUR.FACT(ICMP)
+              PLIG = LFACT(ICMP)
+              DO 14 IREC = 1,NBK
+                S2=PSUR.FACT(IREC)
+                PCOL=LFACT(IREC)
+                PLIG.FACT(IREC)=(S2/S1)*PCOL.FACT(ICMP)
+ 14           CONTINUE
+            ENDIF
+ 13       CONTINUE
+C
+          SEGSUP,SPARAL
+C
+        ELSE
+C         Appel de la SUBROUTINE qui fait le travail
+          CALL FFAXCA(1,SPARAL)
+        ENDIF
+C
+        IF (ICOQ.AND.KCOQ(ITYP)) THEN
+          NELT1 = NELT1 + 2 * NEL1
+        ELSE
+          NELT1 = NELT1 + NEL1
+        ENDIF
+C
+ 100  CONTINUE
+C
+C     -------------------------------------------------------------
+C
+C     On libere les Threads
+      IF (BTHRD) THEN
+        CALL THREADIS
+      ENDIF
+C
+C     Desactivation des maillages elementaires
+      DO 920 ITYP = 1,NTYP
+        IMODEL = MYMOD.KMODEL(ITYP)
+        IPT1 = IMAMOD
+        SEGDES IPT1
+        SEGDES IMODEL
+ 920  CONTINUE
+      SEGDES MYMOD
+
+C>>>  SURFACES DIMENSIONNEES
+C     ----------------------
+      DO 910 LS=1,NFACE
+        PSUR.FACT(LS)=PSUR.FACT(LS)*RAD*RAD
+ 910  CONTINUE
+C
+C>>>  NORMALISATION,CACUL DES BILANS ET IMPRESSION
+C     --------------------------------------------
+      IF(EXTINC.GT.1D-3) THEN
+        INOR=0
+      ENDIF
+
+      CALL KFN(IFACFO,INOR,KIMP)
+
+C     Traduction puis suppression de IFACFO
+
+      IF (KIMP.GE.3) THEN
+        CALL PRFACF(IFACFO)
+      ENDIF
+
+      LTITR=1
+      CALL FFMCHA(MYMOD,INFOEL,IFACFO,ICHFAC,LTITR)
+
+C>>>  MENAGE AVANT DE QUITTER LA SOURCE
+C     ---------------------------------
+      SEGACT IFACFO
+      DO 930 NNEL = 1,LFACT(/1)
+        LFAC = LFACT(NNEL)
+        SEGSUP LFAC
+ 930  CONTINUE
+      SEGSUP IFACFO
+C
+      DO 940 IITH = 1,NTHRD
+        IF(KACHE.NE.0) THEN
+          SFOBS=SSFOBS(IITH)
+          SEGSUP,SFOBS
+        ENDIF
+        STRAV=SSTRAV(IITH)
+        SEGSUP,STRAV
+ 940  CONTINUE
+      SEGSUP,SEGTH
+C
+      RETURN
+      END
+ 

@@ -1,0 +1,89 @@
+C RELA3D    SOURCE    FD218221  24/02/07    21:15:25     11834          
+        subroutine rela3d(xmat,nmat,vnmat,nstype,nbelas,var0,varf,
+     #  nvari,vnvari,ndtens,ierr1,iso,cflux3,raideur66,sigm03,VS33)
+
+c       relaxation visco elastique des contraintes et deformations 
+c       associees pour un ecoulement sans increment de deformation 
+
+c       declarations externes
+        implicit integer(i-n)
+        implicit real*8(a-h,o-z)
+
+        logical iso
+        integer nmat,nstype,nbelas,nvari,ndtens,ierr1
+        integer vnvari(nstype,2)
+        integer VNMAT(NSTYPE)
+        real*8 xmat(nmat),var0(nvari),varf(nvari)
+        real*8 sigm03(3)
+        real*8 cflux3(NSTYPE,3),raideur66(6,6),psi
+        real*8 VS33(3,3)
+
+c       var locales
+        real*8 de3(4,3),E3(3),E33(3,3),O333(3,3,3),V33(3,3)
+        integer nE
+        real*8 X3(3),X33(3,3),X6(6),DX3(3)
+        real*8 K3(3),K33(3,3),K6(6),Kp6(6)
+        integer nX,nK
+        real*8 sigm06(6),xp6(6),TE33(3,3),sig33(3,3)
+
+        call xmat3d(psi,xmat,nmat,vnmat,nstype,nbelas,4,2)
+c       pour les deformations viscoelastique on prend varf qui ont
+c       deja ete actualise par hydr
+        call tvar3d(E3,E33,nE,varf,nvari,vnvari,nstype,ndtens,1,1)
+        call tvar3d(K3,K33,nK,varf,nvari,vnvari,nstype,ndtens,4,1)
+        call x12x6(K3,K33,K6)
+        call chrep6(K6,E33,.false.,Kp6)        
+c       increments des deformations viscoelastiques dues aux deformations initiales
+        do i=1,3
+         de3(2,i)=cflux3(2,i)*E3(i)
+         de3(3,i)=cflux3(3,i)*E3(i)
+         de3(4,i)=cflux3(4,i)*(E3(i)-psi*Kp6(i))
+         de3(1,i)=-(de3(4,i)+de3(3,i)+de3(2,i))
+        end do
+c       variations des contraintes dues a la relaxation visqueuse
+        if(iso) then
+            do i=1,3
+                do j=1,3
+                    sigm03(i)=sigm03(i)+raideur66(i,j)*de3(1,j)
+                end do
+            end do
+        else
+c           on se met dans la direction principale des deformations elastiques
+            call x12x6(sigm03,VS33,sigm06)
+            call chrep6(sigm06,E33,.false.,xp6)
+c           ajout des increments dues a la relaxation
+            do i=1,6
+                do j=1,3
+                    xp6(i)=xp6(i)+raideur66(i,j)*de3(1,j)
+                end do
+            end do
+c           retour de contraintes en base fixe
+            call traps1(TE33,E33,3) 
+            call chrep6(xp6,TE33,.false.,sigm06)             
+c           nouvelle base principale des contraintes
+            call x6x33(sigm06,sig33)
+            call b3_v33(sig33,sigm03,VS33)            
+        end if
+
+c       mise a jour des variables internes
+
+c       tenseurs d orientation des increments principaux i.e celui de epse
+        call orie3d(E33,O333)
+
+c       actualisation des deformations
+c        print*,'varf(10) avant actualisation ds rela3d',varf(10)
+        do ityp=1,4
+c            print*,'ds rela3d ityp',ityp
+            do i=1,3
+                dx3(i)=de3(ityp,i)
+c                print*,'increment ',ityp,i,dx3(i)
+            end do
+c            print*,'orientation utilisee',O333
+            call majt3d(DX3,O333,varf,nvari,vnvari,nstype,
+     #      ndtens,ityp,1)
+        end do
+c        print*,'ds rela3d varf(10) apres actualisation ds rela3d',
+c     #  varf(10)
+        return
+        end
+ 

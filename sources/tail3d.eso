@@ -1,0 +1,42 @@
+C TAIL3D    SOURCE    PV090527  23/01/27    21:16:04     11574          
+c***********************************************************************
+c       calcul de la taille associee au point de gauss dans la direction vf3
+       subroutine tail3d(l3,vsige33,Method_N,Method_H,
+     # XE3D,NBNMAX3D,NBNB3D,IDIMB3D,LcH,err1)
+
+c     evaluation de la taille dans 3 directions orthogonale de vsige33
+       
+c     variables externes
+      real*8 l3(3),vsige33(3,3)
+      logical Method_H,Method_N
+      integer NBNMAX3D,NBNB3D,IDIMB3D,err1
+      real*8  xe3d(3,NBNMAX3D)
+      real*8 LcH
+      
+c     variables internes
+      real*8 dir3(3) 
+      integer k,i 
+
+      err1=0
+c     methode des noeuds
+      do k=1,3 
+c           direction  
+            do i=1,3
+                dir3(i)=vsige33(i,k)
+            end do 
+c           taille dans cette direction 
+c           print*,'dans tail3d av 1d', Method_N,Method_H,LcH        
+            call tail1d(l3(k),dir3,Method_N,XE3D,NBNMAX3D,
+     #      NBNB3D,IDIMB3D,Method_H,LcH,err1)
+c           print*,'dans tail3d ap 1d', Method_N,Method_H,LcH
+c           traitement de l erreur
+            if(err1.eq.1) then
+                print*,'Pb de calcul de la taille dans tail3d'
+                return
+            end if 
+      end do                
+c     print*,'tailles ds tail3d:',l3  
+      return
+      end 
+c***********************************************************************      
+ 

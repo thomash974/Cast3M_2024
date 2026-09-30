@@ -1,0 +1,67 @@
+C COURB9    SOURCE    PV        20/03/24    21:16:25     10554          
+      SUBROUTINE COURB9 (ICOURB,IELEME)
+************************************************************************
+*
+*                             C O U R B 9
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     SUPPRIMER TOUTE TRACE DU MAILLAGE D'UNE COURBE PARAMETREE
+*     FRAICHEMENT MODELISEE, C'EST-A-DIRE:
+*     - LE "MAILLAGE" ASSOCIE A LA COURBE,
+*     - TOUS LES POINTS INTERIEURS DE LA COURBE (QUI SONT SUPPOSES ETRE
+*       LES DERNIERS POINTS CONSIGNES DANS LE TABLEAU "XCOOR").
+*
+* MODULES UTILISES:
+* -----------------
+*
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+-INC TMCOURB
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE   (+ = CONTENU DANS UN COMMUN)
+* -----------
+*
+*     ICOURB  (E)  POINTEUR DE COURBE PARAMETREE.
+*             (S)  CET OBJET N'EST PAS DETRUIT.
+*     IELEME  (E)  POINTEUR DU MAILLAGE DE LA COURBE PARAMETREE.
+*             (S)  = 0
+*    +IDIM    (E)  VOIR LE COMMUN "COPTIO".
+*    +MCOORD  (E)  VOIR LE COMMUN "COPTIO".
+*             (S)  SEGMENT RACCOURCI.
+*
+      INTEGER ICOURB,IELEME
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL MANIGOT     26 FEVRIER 1987
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE77 FORTRAN77
+*
+************************************************************************
+*
+      MELEME = IELEME
+      SEGSUP,MELEME
+      IELEME = 0
+*
+      SEGACT,MCOORD*md
+      NBPTA = nbpts
+      MCOURB = ICOURB
+      SEGACT,MCOURB
+      NBPTS = NBPTA - UCOU(/1)
+      SEGDES,MCOURB
+      SEGADJ,MCOORD
+*
+      END
+
+ 

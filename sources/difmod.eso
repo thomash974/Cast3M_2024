@@ -1,0 +1,100 @@
+C DIFMOD    SOURCE    PASCAL    20/12/02    21:15:00     10798          
+      SUBROUTINE DIFMOD(IPMOD1,IPMOD2)
+C----------------------------------------------------------------------C
+C    DIFFERENCE SYMETRIQUE ENTRE DEUX MODELES.
+C
+C    SYNTAXE : MOD1 = DIFF MOD2 MOD3
+
+C    Rq. : l'operation est faite sur les sous-zones
+C
+C    ENTREES :
+C      - IPMOD1 = MOD2
+C      - IPMOD2 = MOD3 
+
+C    SORTIE : le resultat est renvoye dans la pile.
+C
+C----------------------------------------------------------------------C
+
+      IMPLICIT INTEGER(I-N)
+
+      SEGMENT INTESZ(NSZ1)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+
+C Activation de l'objet :
+      MMODE1 = IPMOD1
+      MMODE2 = IPMOD2
+      SEGACT, MMODE1, MMODE2
+
+C---- CAS MODELE VIDE EN ARGUMENT ----C
+
+      NBS1 = MMODE1.KMODEL(/1)
+      IF (NBS1.EQ.0) THEN
+        CALL ECROBJ('MMODEL',IPMOD2)
+        RETURN
+      ENDIF
+
+      NBS2 = MMODE2.KMODEL(/1)
+      IF (NBS2.EQ.0) THEN
+        CALL ECROBJ('MMODEL',IPMOD1)
+        RETURN
+      ENDIF
+
+C---- CAS GENERAL ----C
+
+C Creation du MMODEL resultat :
+      N1   = NBS1 + NBS2
+      SEGINI,MMODEL
+
+C Identification des sous-zones communes :
+      NSZ1 = N1
+      SEGINI, INTESZ
+      DO 100 I1=1,NBS1
+        IMOD1 = MMODE1.KMODEL(I1)
+        DO 110 I2=1,NBS2
+          IF (INTESZ(I1).NE.0) GOTO 100
+          IMOD2 = MMODE2.KMODEL(I2)
+          IF (IMOD1.EQ.IMOD2) THEN
+            INTESZ(I1) = 1
+            INTESZ(NBS1+I2) = 1
+          ENDIF
+ 110    CONTINUE
+ 100  CONTINUE
+
+*     write(6,*) 'INTESZ =',(INTESZ(ii),ii=1,NSZ1)
+
+C Difference symetrique : union - intersection :
+      NBS0 = 0
+      DO 200 I1=1,NBS1
+*        write(6,*) 'MMODE1.KMODEL(I1) =',MMODE1.KMODEL(I1)
+        IF (INTESZ(I1).NE.0) GOTO 200
+        NBS0 = NBS0 + 1
+        KMODEL(NBS0) = MMODE1.KMODEL(I1)
+ 200  CONTINUE
+
+      DO 300 I2=1,NBS2
+*        write(6,*) 'MMODE2.KMODEL(I2) =',MMODE2.KMODEL(I2)
+        IF (INTESZ(NBS1+I2).NE.0) GOTO 300
+        NBS0 = NBS0 + 1
+        KMODEL(NBS0) = MMODE2.KMODEL(I2)
+ 300  CONTINUE
+
+C Ajustement segment MMODEL si besoin :
+      IF (NBS0.NE.N1) THEN
+        N1 = NBS0
+        SEGADJ, MMODEL
+      endif
+
+C Ecriture resultat dans la pile :
+      CALL ECROBJ('MMODEL',MMODEL)
+
+      RETURN
+      END
+
+ 
+ 
+ 
+ 

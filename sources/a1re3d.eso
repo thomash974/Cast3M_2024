@@ -1,0 +1,235 @@
+C A1RE3D    SOURCE    FD218221  24/02/07    21:15:02     11834          
+      subroutine a1re3d(NBRINC,NDIMG,NDIMA,NGF,AA,AK,BK,AM,JEA,
+     # AFFICHE,ERR1)
+      
+c     calcul du syteme d equations pour le retour avec une inclusion      
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     nbre d inc max et numero de la contrainte du critere actif de traction       
+      integer NBRINC,ERR1,NDIMG
+c     integer NBRACT  
+c     liste ordonnee des criteres (numa base generalisee  lnumcrt(nordre))
+c     nordre=1,NBRACT <=NDIMG     
+c     integer LNUMCRT(NDIMG)
+c     Jacobienne dVe/dVA
+      real*8 JEA(NDIMG,NDIMA)    
+c     fluage
+      real*8 ak(NDIMG),bk(NDIMG),am(NDIMG)
+
+c     systeme lineaire      
+      integer ngf
+      real*8 aa(ngf,ngf+1)
+c     controle de l affichage      
+      logical affiche,affiche_local
+    
+ 
+
+c     test taille matrice de couplage      
+      if((ngf.lt.ndimg).or.(NDIMG.ne.(9*NBRINC+3)))   then
+        print*,'Pb de dimension dans a1re3d'
+        print*,'Redimensionner ngf>=14 dans incl3d pour a1ti3d'
+        print*,'ou NDIMG ne 9*NBRINC+3'
+        err1=1
+        return
+      end if
+      
+c     option d affichage
+      affiche_local=affiche
+c      affiche_local=.true.
+    
+      
+      if(affiche_local) then
+          print*,'Dans a1re3d, AK BK AM'
+          do i=1,NDIMG
+                write(*,'(3E10.3)') AK(i),BK(i),AM(i)
+          end do
+          print*,'Dans a1re3d, JEA pour une inclusion'
+          do i=1,NDIMG
+            write (*,11) (JEA(i,j),j=1,24) 
+11              format (24E10.3)
+          end do
+      end if
+      
+      
+c     -----traction-refermeture et cisaillement couples ----------------
+
+      t2 = ak(1) + am(1) / 0.2D1
+      t6 = ak(2) + am(2) / 0.2D1
+      t9 = ak(3) + am(3) / 0.2D1
+      t12 = ak(4) + am(4) / 0.2D1
+      t15 = ak(5) + am(5) / 0.2D1
+      t18 = ak(6) + am(6) / 0.2D1
+      t21 = ak(7) + am(7) / 0.2D1
+      t24 = ak(8) + am(8) / 0.2D1
+      t27 = ak(9) + am(9) / 0.2D1
+      t30 = ak(10) + am(10) / 0.2D1
+      t33 = ak(11) + am(11) / 0.2D1
+      t36 = ak(12) + am(12) / 0.2D1
+      AA(1,1) = -t2 * JEA(1,1) + 0.1D1
+      AA(1,2) = -t6 * JEA(1,2)
+      AA(1,3) = -t9 * JEA(1,3)
+      AA(1,4) = -t12 * JEA(1,4)
+      AA(1,5) = -t15 * JEA(1,5)
+      AA(1,6) = -t18 * JEA(1,6)
+      AA(1,7) = -t21 * JEA(1,7)
+      AA(1,8) = -t24 * JEA(1,8)
+      AA(1,9) = -t27 * JEA(1,9)
+      AA(1,10) = -t30 * JEA(1,10)
+      AA(1,11) = -t33 * JEA(1,11)
+      AA(1,12) = -t36 * JEA(1,12)
+      AA(2,1) = -t2 * JEA(2,1)
+      AA(2,2) = -t6 * JEA(2,2) + 0.1D1
+      AA(2,3) = -t9 * JEA(2,3)
+      AA(2,4) = -t12 * JEA(2,4)
+      AA(2,5) = -t15 * JEA(2,5)
+      AA(2,6) = -t18 * JEA(2,6)
+      AA(2,7) = -t21 * JEA(2,7)
+      AA(2,8) = -t24 * JEA(2,8)
+      AA(2,9) = -t27 * JEA(2,9)
+      AA(2,10) = -t30 * JEA(2,10)
+      AA(2,11) = -t33 * JEA(2,11)
+      AA(2,12) = -t36 * JEA(2,12)
+      AA(3,1) = -t2 * JEA(3,1)
+      AA(3,2) = -t6 * JEA(3,2)
+      AA(3,3) = -t9 * JEA(3,3) + 0.1D1
+      AA(3,4) = -t12 * JEA(3,4)
+      AA(3,5) = -t15 * JEA(3,5)
+      AA(3,6) = -t18 * JEA(3,6)
+      AA(3,7) = -t21 * JEA(3,7)
+      AA(3,8) = -t24 * JEA(3,8)
+      AA(3,9) = -t27 * JEA(3,9)
+      AA(3,10) = -t30 * JEA(3,10)
+      AA(3,11) = -t33 * JEA(3,11)
+      AA(3,12) = -t36 * JEA(3,12)
+      AA(4,1) = -t2 * JEA(4,1)
+      AA(4,2) = -t6 * JEA(4,2)
+      AA(4,3) = -t9 * JEA(4,3)
+      AA(4,4) = -t12 * JEA(4,4) + 0.1D1
+      AA(4,5) = -t15 * JEA(4,5)
+      AA(4,6) = -t18 * JEA(4,6)
+      AA(4,7) = -t21 * JEA(4,7)
+      AA(4,8) = -t24 * JEA(4,8)
+      AA(4,9) = -t27 * JEA(4,9)
+      AA(4,10) = -t30 * JEA(4,10)
+      AA(4,11) = -t33 * JEA(4,11)
+      AA(4,12) = -t36 * JEA(4,12)
+      AA(5,1) = -t2 * JEA(5,1)
+      AA(5,2) = -t6 * JEA(5,2)
+      AA(5,3) = -t9 * JEA(5,3)
+      AA(5,4) = -t12 * JEA(5,4)
+      AA(5,5) = -t15 * JEA(5,5) + 0.1D1
+      AA(5,6) = -t18 * JEA(5,6)
+      AA(5,7) = -t21 * JEA(5,7)
+      AA(5,8) = -t24 * JEA(5,8)
+      AA(5,9) = -t27 * JEA(5,9)
+      AA(5,10) = -t30 * JEA(5,10)
+      AA(5,11) = -t33 * JEA(5,11)
+      AA(5,12) = -t36 * JEA(5,12)
+      AA(6,1) = -t2 * JEA(6,1)
+      AA(6,2) = -t6 * JEA(6,2)
+      AA(6,3) = -t9 * JEA(6,3)
+      AA(6,4) = -t12 * JEA(6,4)
+      AA(6,5) = -t15 * JEA(6,5)
+      AA(6,6) = -t18 * JEA(6,6) + 0.1D1
+      AA(6,7) = -t21 * JEA(6,7)
+      AA(6,8) = -t24 * JEA(6,8)
+      AA(6,9) = -t27 * JEA(6,9)
+      AA(6,10) = -t30 * JEA(6,10)
+      AA(6,11) = -t33 * JEA(6,11)
+      AA(6,12) = -t36 * JEA(6,12)
+      AA(7,1) = -t2 * JEA(7,1)
+      AA(7,2) = -t6 * JEA(7,2)
+      AA(7,3) = -t9 * JEA(7,3)
+      AA(7,4) = -t12 * JEA(7,4)
+      AA(7,5) = -t15 * JEA(7,5)
+      AA(7,6) = -t18 * JEA(7,6)
+      AA(7,7) = -t21 * JEA(7,7) + 0.1D1
+      AA(7,8) = -t24 * JEA(7,8)
+      AA(7,9) = -t27 * JEA(7,9)
+      AA(7,10) = -t30 * JEA(7,10)
+      AA(7,11) = -t33 * JEA(7,11)
+      AA(7,12) = -t36 * JEA(7,12)
+      AA(8,1) = -t2 * JEA(8,1)
+      AA(8,2) = -t6 * JEA(8,2)
+      AA(8,3) = -t9 * JEA(8,3)
+      AA(8,4) = -t12 * JEA(8,4)
+      AA(8,5) = -t15 * JEA(8,5)
+      AA(8,6) = -t18 * JEA(8,6)
+      AA(8,7) = -t21 * JEA(8,7)
+      AA(8,8) = -t24 * JEA(8,8) + 0.1D1
+      AA(8,9) = -t27 * JEA(8,9)
+      AA(8,10) = -t30 * JEA(8,10)
+      AA(8,11) = -t33 * JEA(8,11)
+      AA(8,12) = -t36 * JEA(8,12)
+      AA(9,1) = -t2 * JEA(9,1)
+      AA(9,2) = -t6 * JEA(9,2)
+      AA(9,3) = -t9 * JEA(9,3)
+      AA(9,4) = -t12 * JEA(9,4)
+      AA(9,5) = -t15 * JEA(9,5)
+      AA(9,6) = -t18 * JEA(9,6)
+      AA(9,7) = -t21 * JEA(9,7)
+      AA(9,8) = -t24 * JEA(9,8)
+      AA(9,9) = -t27 * JEA(9,9) + 0.1D1
+      AA(9,10) = -t30 * JEA(9,10)
+      AA(9,11) = -t33 * JEA(9,11)
+      AA(9,12) = -t36 * JEA(9,12)
+      AA(10,1) = -t2 * JEA(10,1)
+      AA(10,2) = -t6 * JEA(10,2)
+      AA(10,3) = -t9 * JEA(10,3)
+      AA(10,4) = -t12 * JEA(10,4)
+      AA(10,5) = -t15 * JEA(10,5)
+      AA(10,6) = -t18 * JEA(10,6)
+      AA(10,7) = -t21 * JEA(10,7)
+      AA(10,8) = -t24 * JEA(10,8)
+      AA(10,9) = -t27 * JEA(10,9)
+      AA(10,10) = -t30 * JEA(10,10) + 0.1D1
+      AA(10,11) = -t33 * JEA(10,11)
+      AA(10,12) = -t36 * JEA(10,12)
+      AA(11,1) = -t2 * JEA(11,1)
+      AA(11,2) = -t6 * JEA(11,2)
+      AA(11,3) = -t9 * JEA(11,3)
+      AA(11,4) = -t12 * JEA(11,4)
+      AA(11,5) = -t15 * JEA(11,5)
+      AA(11,6) = -t18 * JEA(11,6)
+      AA(11,7) = -t21 * JEA(11,7)
+      AA(11,8) = -t24 * JEA(11,8)
+      AA(11,9) = -t27 * JEA(11,9)
+      AA(11,10) = -t30 * JEA(11,10)
+      AA(11,11) = -t33 * JEA(11,11) + 0.1D1
+      AA(11,12) = -t36 * JEA(11,12)
+      AA(12,1) = -t2 * JEA(12,1)
+      AA(12,2) = -t6 * JEA(12,2)
+      AA(12,3) = -t9 * JEA(12,3)
+      AA(12,4) = -t12 * JEA(12,4)
+      AA(12,5) = -t15 * JEA(12,5)
+      AA(12,6) = -t18 * JEA(12,6)
+      AA(12,7) = -t21 * JEA(12,7)
+      AA(12,8) = -t24 * JEA(12,8)
+      AA(12,9) = -t27 * JEA(12,9)
+      AA(12,10) = -t30 * JEA(12,10)
+      AA(12,11) = -t33 * JEA(12,11)
+      AA(12,12) = -t36 * JEA(12,12) + 0.1D1
+
+
+
+
+
+
+      if(affiche_local) then
+        print*, 'Dans a1re3d : matrice de couplage'
+        do i=1,ndimg
+            write (*,'(12E10.3)') (AA(i,j),j=1,12)
+        end do      
+      end if
+      
+      return
+      end
+      
+
+
+
+
+ 
+ 

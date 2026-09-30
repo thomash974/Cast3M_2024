@@ -1,0 +1,34 @@
+C COLIMA    SOURCE    BP208322  20/09/18    21:15:04     10718          
+
+        SUBROUTINE COLIMA(N1,N2,A,B,COA,COB,C)
+*-----------------------------------------------------------------------
+c Combinaison de deux matrices (A,B) de taille N1*N2: C = COA*A + COB*B
+*-----------------------------------------------------------------------
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+        REAL*8 A(N1,N2),B(N1,N2),C(N1,N2),COA,COB
+        INTEGER N1,N2,I,J
+*        
+        IF (COA.EQ.0.) THEN
+          DO I = 1,N1 
+            DO J = 1,N2 
+              C(I,J) = COB*B(I,J)
+            ENDDO 
+          ENDDO
+        ELSEIF (COA.EQ.1.) THEN 
+          DO I = 1,N1 
+            DO J = 1,N2 
+              C(I,J) = A(I,J) + COB*B(I,J)
+            ENDDO 
+          ENDDO
+        ELSE 
+          DO I = 1,N1 
+            DO J = 1,N2 
+              C(I,J) = COA*A(I,J) + COB*B(I,J)
+            ENDDO 
+          ENDDO    
+        ENDIF
+*
+        END
+ 
+ 

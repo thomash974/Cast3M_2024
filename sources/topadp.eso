@@ -1,0 +1,159 @@
+C TOPADP    SOURCE    GOUNAND   21/04/06    21:15:26     10940          
+      SUBROUTINE TOPADP(TRAVJ,NPDONN,iopt,lchang,mmot)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPADP
+C DESCRIPTION : Ajustement (SEGADJ) du nombre de noeuds d'un
+C     segment TRAVJ et de ses éventuels sous-objets.
+C
+C     iopt=0 : on impose NPMAX à la valeur NPDONN donnée
+C              on ne modifie pas NPCOU      
+C     iopt=1 : on calcule un NPMAX automatiquement, éventuellement
+C     supérieur à la valeur NPDONN donnée et on modifie NPCOU qui
+C     devient égal à NPDONN
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 11/10/2017, version initiale
+C HISTORIQUE : v1, 11/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD      
+      POINTEUR JCOORD.MCOORD
+-INC SMLENTI
+      POINTEUR JNNO.MLENTI
+*del-INC SMELEME
+*del      POINTEUR JTOPO.MELEME
+-INC TMATOP2
+-INC TMATOP1
+*-INC STOPINV
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+*-INC STRAVJ
+      logical lchang
+      character*(*) mmot
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans topadp.eso'
+*
+      lchang=.false.
+      NPMAXO=TRAVJ.NPMAX
+      NPCOUO=TRAVJ.NPCOU
+      if (iopt.eq.0) then
+         NPCOUN=NPCOUO
+         NPMAXN=NPDONN
+         if (npmaxn.eq.npmaxo) then
+*     write(ioimp,*) 'pas besoin d''appeler topadp ???'
+*     goto 9999
+            return
+         endif
+      elseif (iopt.eq.1) then
+         NPCOUN=NPDONN
+         IF (NPCOUN.LE.NPMAXO) THEN
+*     write(ioimp,*) 'pas besoin d''appeler topadp ???'
+*     goto 9999
+            TRAVJ.NPCOU=NPCOUN
+            return
+         ELSE
+*            NPMAXN=NPDONN+0
+*     Stratégie d'augmentation
+            NPMAX1=NPDONN
+*            XCOF=1.414D0
+            XCOF=2.D0
+            NPMAX2=TRAVJ.NPINI+INT(((NPMAXO-TRAVJ.NPINI)*XCOF)+0.5D0)
+            NPMAXN=MAX(NPMAX1,NPMAX2)
+         ENDIF
+      endif
+      
+      IF (NPCOUN.LT.NPCOUO.or.NPMAXN.LT.NPCOUO) THEN
+         write(ioimp,*) 'On ne peut pas redimensionner à une ',
+     $        'valeur plus petite que npcou' 
+         goto 9999
+      endif
+
+      lchang=.true.
+         
+      TRAVJ.NPMAX=NPMAXN
+      if (isgadj.gt.0)
+*     $     write(ioimp,286) TRAVJ,NPMAXO,NPMAXN,NPCOUN
+     $     write(ioimp,286) mmot,NPMAXO,NPMAXN,NPCOUN
+*     
+      JCOORD=TRAVJ.COORD
+      if (jcoord.ne.0) then
+         NBPTS=NPMAXN
+         segadj jcoord
+      endif
+*     
+      JCMETR=TRAVJ.CMETR
+      if (jcmetr.ne.0) then
+         NNIN=JCMETR.XIN(/1)
+         NNNOE=NPMAXN
+         segadj jcmetr
+      endif
+*     
+      TOPINV=TRAVJ.TOPI
+      if (topinv.ne.0) then
+         IDIMP=IDIM+1
+         NBELEM=NVMAX
+         NBPTS=NPMAXN
+         SEGADJ TOPINV
+         DO IPTS=NPMAXO+1,NPMAXN
+            TIC(IPTS)=-1
+         ENDDO
+      endif
+*     
+      jnno=travj.nno
+      if (jnno.ne.0) then
+         jg=npmaxn-npini
+         segadj jnno
+      endif
+      TRAVJ.NPCOU=NPCOUN
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+* 286  FORMAT ('Segment TRAV=',I8,' nbno max ajusté de ',I6,' à ',I6,
+*     $     ' (nbno courant=',I6,')') 
+ 286  FORMAT (A25,' nbno max ajusté de ',I6,' à ',I6,
+     $     ' (nbno courant=',I6,')') 
+* 187  FORMAT (5X,10I8)
+* 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+* 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+*     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPADP  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TOPADP
+*
+      END
+
+ 

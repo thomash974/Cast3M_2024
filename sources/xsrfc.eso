@@ -1,0 +1,112 @@
+C XSRFC     SOURCE    PV090527  23/01/27    21:16:11     11574          
+      subroutine xsrfc(x,y,z,nobs,coeff,errmax,errmoy)
+c source : https://people.math.sc.edu/Burkardt/f_src/qrsolv/qrsolv.html
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+      integer ncoeff,n
+      parameter (ncoeff = 10,n=10)
+      integer nobs,i,ind,itask,jpvt(n),kr
+      
+
+c  nobs : nombre de lignes de la table des points de base x,y,z
+c  ncoeff : nombre de coefficients à déterminer.
+c  resi : residue de l'approximation
+      real*8 errmax,resi(nobs)
+      real*8 zc(nobs),zmin,zmax
+      real*8 x(nobs),y(nobs),z(nobs),a(nobs,ncoeff),coeff(ncoeff)
+      real*8 z0(nobs),a0(nobs,ncoeff),errmoy,qraux(n),tol,work(n)
+      
+c sauvegarde des z initiaux 
+      z0=z  
+
+c construct design matrix A
+      a(:,1) = 1.0d0 
+      a(:,2) = x
+      a(:,3) = y
+      a(:,4) = x**2
+      a(:,5) = y**2
+      a(:,6) = x*y
+      a(:,7) = x**2*y
+      a(:,8) = x*y**2
+      a(:,9) = x**3
+      a(:,10) = y**3
+
+      a0=a
+c print*,a
+c  call fit(a,z,coeff) ! need a subroutine that solves A*coeff = Z in the least-squares sense
+c 
+c  write ( *, '(a)' ) ' '
+c   write ( *, '(a)' ) 'DQRLS_TEST'
+c   write ( *, '(a)' ) '  DQRLS solves a linear system A*coeff = z '
+c   write ( *, '(a)' ) '  in the least squares sense.'
+
+      tol = 1.0D-8
+
+c    call r8mat_print ( nobs, n, a, '  Coefficient matrix A:' )
+c  
+c    call r8vec_print ( nobs, z, '  Right hand side z:' )
+c  
+c    Solve least-squares problem.
+
+      itask = 1
+      call dqrls (a,nobs,nobs,n,tol,kr,z,coeff,resi,jpvt,qraux,work,
+     #itask, ind )
+
+c  Print results.
+c
+c  write ( *, '(a)' ) ' '
+c  write ( *, '(a,i4)' ) '  Error code =', ind
+c  write ( *, '(a,i4)' ) '  Estimated matrix rank =', kr
+c
+c  call r8vec_print ( n, coeff, '  Least squares solution coeff:' )
+c 
+c x0=coeff(1)
+c x1=coeff(2)
+c y1=coeff(3)
+c x2=coeff(4)
+c y2=coeff(5)
+c xy1=coeff(6)
+c x2y=coeff(7)
+c xy2=coeff(8)
+c x3=coeff(9)
+c y3=coeff(10)
+  
+
+c  print*, "k0m(x,y)=",coeff(1),"+(",coeff(2),")*x+(",coeff(3),")*y+(",coeff(4),")*x**2+(",coeff(5),")*y**2+(",coeff(6),")*x*y"&
+c  ,"+(",coeff(7),")*x**2*y+(",coeff(8),")*x*y**2+(",coeff(9),")*x**3+(",coeff(10),")*y**3"
+
+
+c  call r8vec_print ( nobs, z, '  Residuals A*coeff-z' )
+
+      zc=matmul(a0,coeff)
+      zmin=minval(z0)
+      zmax=maxval(z0)
+      
+      do i=1,nobs
+        if(zc(i).lt.zmin) then
+        zc(i)=zmin
+        else if(zc(i).gt.zmax) then
+        zc(i)=zmax
+        end if
+      end do
+   
+c print*, zc 
+c print*, z0 
+c read*
+   
+      errmax =sqrt(maxval((zc-z0)**2/z0**2))
+      errmoy= sqrt(sum((zc-z0)**2/z0**2))/nobs
+
+  
+c erreur maximale
+c   errmax=maxval(resi/z)
+c   print*, errmax
+
+      return
+
+
+
+      end 
+ 

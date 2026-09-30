@@ -1,0 +1,64 @@
+C DBGV3D    SOURCE    PV090527  23/01/27    21:15:20     11574          
+       subroutine dbgv3d(NBRINC,NINC,NDIMG,GCH,FRAC,dbgVd,bg,
+     # DEPST,DEPSL,ERR1,AFFICHE)
+      
+c     calcul du volume de fissure accessible au gel de chaque phase      
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      integer NBRINC,NINC,NDIMG
+      real*8 GCH(0:NBRINC),FRAC(0:NBRINC),dbgVd(0:NBRINC)
+      real*8 bg(0:NBRINC,0:1)
+      real*8 DEPST(NDIMG),DEPSL(NDIMG)
+c     cf. Ecoulement_v18_plast_traction_seule.mw 
+      integer ERR1
+      logical AFFICHE,affiche_local
+      real*8 f
+      real*8 cg(2)
+
+
+      if(NINC.ne.1) then
+        print*,'Dans dbgv3d pb de nbr d inclusions',ninc,'.ne.',1
+        err1=1
+        return
+      end if
+
+      affiche_local=AFFICHE
+c      affiche_local=.true.
+       
+c     fraction 1 inclusion       
+      f=frac(1)
+
+      cg(1) = bg(0,1) * Gch(0) * (f / (0.1D1 - f) * (DEPSL(1) + DEPSL(2)
+     # + DEPSL(3)) + (0.1D1 - 0.3D1 / 0.2D1 * f) * (DEPST(10) + DEPST(11
+     #) + DEPST(12)))
+      cg(2) = bg(1,1) * Gch(1) * (DEPST(1) + DEPST(2) + DEPST(3) + (0.1D
+     #1 - f) * (DEPST(7) + DEPST(8) + DEPST(9)))
+
+
+
+
+
+      do iphase=0,ninc
+         dbgVd(iphase)=cg(iphase+1) 
+         if(affiche_local) then
+            write(*,'(A20,I2,A2,E10.3,2(1X,A4,E10.3))')
+     #      'Dans DbgVd3d, dbgVd(',iphase,')=', dbgVd(iphase),
+     #      'Gch:',Gch(iphase),'bg:',bg(iphase,1),'f:',frac(iphase)
+            do i=1,3
+                write(*,'(2(A6,I2,A2,E10.3,1X))')
+     #          'DEPST(',i,')=',DEPST(i),'DEPSL(',i,')=',DEPSL(i)
+            end do
+C             if(iphase.ne.0) then
+C                 read*
+C             end if
+         end if
+      end do
+
+      
+      return
+      end
+      
+      
+ 

@@ -1,0 +1,57 @@
+C KMKF3D    SOURCE    FD218221  24/02/07    21:15:17     11834          
+        subroutine kmkf3d(xmat,nmat,vnmat,nstype,nbelas,sim3,kmecap)
+
+c       amplification du fluage par exces de cisaillement entre rc3 et rc
+c       dans cette version kmecap passe de 1 pour Rc a (1+khif) pour Rc
+c       on a donc un fluage non lineaire mais jamais asymptotique 
+c       (contraitement a fluendo3d) cela pour eviter les divergence par
+c       fluage tertiaire qui sont gerees par la plasticite
+
+        IMPLICIT REAL*8 (A-H,O-Z)
+        IMPLICIT INTEGER (I-N)
+
+        integer nmat,nstype,nbelas
+        real*8 xmat(nmat),kmecap
+        integer vnmat(nstype)
+        real*8 sim3(3)
+
+        real*8 sim3d(3),devi,trac,press
+        real*8 xflu,Rc,delta,coeff1
+
+
+c       coeff de fluage non lineaire
+        call xmat3d(xflu,xmat,nmat,vnmat,nstype,nbelas,6,1)
+c       coeff d amplification par fluage
+        if (xflu.gt.0.) then
+c           invariants du tenseur des contraintes 
+            call tp3d(sim3,simd3,devi,trac,press)
+c           resitance  a la compression 
+            call xmat3d(Rc,xmat,nmat,vnmat,nstype,nbelas,6,1)
+c           coeff de confinement
+            call xmat3d(delta,xmat,nmat,vnmat,nstype,nbelas,6,4)
+c           cisaillement reduit de DP
+            taudp=max(devi-press*delta,0.d0)
+c           contrainte DP au pic
+            coeff1=(1.d0/sqrt(3.d0)-delta/3.d0)
+            taulim=rc*coeff1
+c           coeff de fluage (variation lineaire de 1 a 1+xflu entre rc/3 et rc)
+            if(taudp.gt.(taulim/3.d0)) then
+                if(taudp.lt.taulim) then
+                    kmecap=1.d0+xflu*(3.d0*taudp-taulim)/(2.d0*taulim)
+                else
+                    kmecap=1.d0+xflu
+                end if
+            else 
+                kmecap=1.d0
+            end if
+        else
+            kmecap=1.d0
+        end if
+
+        return
+        end
+
+                
+
+
+ 

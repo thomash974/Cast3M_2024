@@ -1,0 +1,96 @@
+C ETOIL2    SOURCE    GOUNAND   21/04/06    21:15:09     10940          
+      SUBROUTINE ETOIL2(NODE,IPT1,
+     $        TRAVL)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : ETOIL2
+C DESCRIPTION : Etant donné un contour IPT1 et un noeud NODE
+C               On construit le maillage obtenu par étoilement 
+C     de IPT1 avec NODE et on l'ajoute aux candidats dans TRAVL
+C     
+C               L'étoilement doit être fait avec les éléments de IPT1
+C               qui ne contiennent pas NODE.
+C               IPT1 est supposé actif.
+C               TRAVL actif en *MOD
+C
+C               Repris de ETOIL1
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 30/10/2017, version initiale
+C HISTORIQUE : v1, 30/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMELEME
+-INC TMATOP1
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+-INC SMLENTI
+      POINTEUR LIDXCA.MLENTI
+*-INC STRAVL
+      
+      LOGICAL LNODE,lchang
+*     
+* Executable statements
+*
+*     On extrait les éléments du bord qui ne s'appuient pas 
+*     sur NODE
+* +1 car ce seront des éléments volumiques
+*      NBNN=IPT1.NUM(/1)+1
+*      NBELEM=IPT1.NUM(/2)
+*      NBSOUS=0
+*      NBREF=0
+*      SEGINI IPT2
+*TRI3
+*      IF (IDIM.EQ.2) IPT2.ITYPEL=4
+*      IF (IDIM.EQ.3) IPT2.ITYPEL=23
+      
+      NCCOUO=TRAVL.NCCOU
+      LMCANS=TRAVL.MCANS
+      LIDXCA=TRAVL.IDXCA
+      NLCOUO=LMCANS.NLCOU
+      NNC=NCCOUO+1
+      NNL=NLCOUO+IPT1.NUM(/2)
+      CALL TRLADJ(TRAVL,NNC,NNL,lchang,'etoil2 : TRAVL_1')
+      if (ierr.ne.0) return
+      IDX=LIDXCA.LECT(NNC)
+*      NBELE2=0
+      DO IBELE1=1,IPT1.NUM(/2)
+         LNODE=.FALSE.
+         DO IBNN1=1,IPT1.NUM(/1)
+            INO=IPT1.NUM(IBNN1,IBELE1)
+            IF (INO.EQ.NODE) LNODE=.TRUE.
+*            IPT2.NUM(IBNN1,NBELE2+1)=INO
+            LMCANS.NUMX(IBNN1,IDX)=INO
+         ENDDO
+*         IPT2.NUM(NBNN,NBELE2+1)=NODE
+         LMCANS.NUMX(IPT1.NUM(/1)+1,IDX)=NODE
+         IF (.NOT.LNODE) IDX=IDX+1
+      ENDDO
+      LIDXCA.LECT(NNC+1)=IDX
+*     NBELEM=NBELE2
+*     SEGADJ IPT2
+      if (iveri.ge.1) then
+         do ibele2=lidxca.lect(nnc+1),lidxca.lect(nnc)+IPT1.num(/2)-1
+            DO IBNN2=1,IPT1.NUM(/1)+1
+               LMCANS.NUMX(IBNN2,ibele2)=0
+            ENDDO
+         enddo
+      endif
+      NNL=IDX-1
+      CALL TRLADJ(TRAVL,NNC,NNL,lchang,'etoil2 : TRAVL_2')
+      if (ierr.ne.0) return
+      RETURN
+*
+* End of subroutine ETOIL2
+*
+      END
+
+ 

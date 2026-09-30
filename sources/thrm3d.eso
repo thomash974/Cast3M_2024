@@ -1,0 +1,73 @@
+C THRM3D    SOURCE    PV090527  23/01/27    21:16:05     11574          
+      subroutine thrm3d(teta1,nrjm,tetas,tetar,DT80,
+     # dth0,DTH,CTHP,CTHV,poro,vw,nrjw)
+       
+c     influence de la temperature sur les parametres de fluage 
+c     et endommagement thermique   
+
+c     declarations externes
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+c     variables externes
+      real*8 theta,nrjm,taum00,taum,tauk00,tauk,
+     #epsk00,epsk,tetas,tetar,Srw,poro,vw,nrjw
+
+c     variables locales      
+      real*8 easurrm,easurrw,unsurtr,unsurts
+ 
+c***********************************************************************
+c     reglage des activation thermiques pour le fluage
+c     +++ les teta sont en degres Celsius +++
+c***********************************************************************
+ 
+c     calcul du terme d activation d Arrhenius pour le potentiel      
+      easurrm=nrjm/8.314D0
+c     cas de l'activation des viscostés
+      easurrw=nrjw/8.314D0
+c     la temperature de reference est tetar      
+      unsurtr=1.d0/(tetar+273.15d0)
+c     unsurts la temperature de seuil pour la modif du potentiel 
+      unsurts=1.d0/(tetas+273.15d0)
+c     calcul des coeff d activation thermique
+      unsurt=(1.D0/(teta1+273.15D0))   
+c     cas de l eau      
+      CTHV=exp(-easurrw*(unsurt-unsurtr)) 
+c     cas de l endommagement thermique 
+      if((dt80.gt.0.).and.(teta1.gt.tetas)) then      
+        xxx1=unsurts-unsurt      
+        xxx2=0.5D0*(xxx1+abs(xxx1))     
+        CTHP=exp(easurrm*xxx2)
+      else
+        CTHP=1.d0
+      end if
+c     saturation
+      Srw=max(min(vw/poro,1.d0),0.d0)    
+
+      
+************************************************************************
+*    endommagement thermique
+************************************************************************
+      if((tetas.lt.80.d0).and.(DT80.gt.0.).and.(teta1.gt.tetas)) then
+c         prise en compte de l attenuation du potentiel en cas
+c         de sechage      
+          unsurt80=2.8316d-3
+          xxx180=unsurts-unsurt80
+          xxx280=0.5D0*(xxx180+abs(xxx180))
+          Cth80=exp(easurrm*xxx280)
+          Ath=1.d0/(Cth80-1.d0)*(srw*DT80/(1.d0-Srw*DT80))
+          Dth=1.d0-1.d0/(1.d0+Ath*(CTHP-1.d0))
+      else
+          Dth=0.d0
+      end if
+      DTH=max(dth0,dth)
+c      print*,'DTH ds therma t3d',dth
+c      print*,teta1,nrjm,tetas,tetar,DT80,
+c     # dth0,DTH,CTHP,CTHV
+************************************************************************      
+
+      return
+      end
+      
+       
+ 

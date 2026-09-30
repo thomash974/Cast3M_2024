@@ -1,0 +1,450 @@
+C HHORIG    SOURCE    OF166741  24/05/06    21:15:14     11082          
+C HHORIG    SOURCE    FANDEUR                                           
+
+*----------------------------------------------------------------------*
+*   CALCUL DE LA RIGIDITE POUR LA FORMULATION 'HHO'                    *
+*----------------------------------------------------------------------*
+*   ENTREES :                                                          *
+*   ________                                                           *
+*        MATE     Numero du materiau                                   *
+*        IVAMAT   Pointeur sur un segment MPTVAL pour le materiau ou   *
+*        NVMAT    Nombre de composante de materiau                     *
+*                                                                      *
+*   SORTIES :                                                          *
+*   ________                                                           *
+*        IPMATR   pointeur sur la rigidite de la sous-zone             *
+*----------------------------------------------------------------------*
+
+      SUBROUTINE HHORIG (modHHO, IPRIGI,ISOU,
+     &                   MATE,IVAMAT,NVMAT, IVACAR,NVCAR, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMCHAML
+-INC SMELEME
+c!!-INC SMINTE
+-INC SMLENTI
+-INC SMLREEL
+      POINTEUR mlrmsh.mlreel, mlrmbh.mlreel
+-INC SMMODEL
+      POINTEUR nomidu.nomid, nomidf.nomid
+-INC SMRIGID
+
+      SEGMENT MWKMAT
+        REAL*8 VALMAT(NTMAT), HOELAS(lhook,lhook)
+c**        REAL*8 XLOC(3,3),XGLOB(3,3),TXR(IDIM,IDIM)
+      ENDSEGMENT
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS)
+        INTEGER IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      LOGICAL LDPGE
+
+      iret = 0
+
+      MRIGID = IPRIGI
+c*      segact,MRIGID*mod
+
+      IPMATR = 0
+      IPDSCR = 0
+
+      imodel = modHHO
+c*      segact,imodel <- actif en entree/sortie
+
+C- Premieres verifications :
+      CALL HHONOB(modHHO, nobHHO, iret)
+      IF (nobHHO.LE.0) THEN
+        write(ioimp,*) 'HHORIG: data not consistent !'
+        call erreur(5)
+        return
+      END IF
+
+C- Recuperation des donnees de infell en entree
+      meleme = imodel.IMAMOD
+      MELE  = imodel.NEFMOD
+      MFR   = imodel.infele(13)
+      CALL INFDPG(MFR,IFOUR,LDPGE,NDPGE)
+      IF (LDPGE) THEN
+        write(ioimp,*) 'HHORIG: PLAN GENE not implemented !'
+        iret = 21
+        RETURN
+      END IF
+
+C---- !!
+      mlenti = imodel.IVAMOD(nobHHO+1)
+c*      segact,mlenti
+
+c*      n_o_face = mlenti.lect(2)
+      n_d_face = mlenti.lect(3)
+c*      n_o_cell = mlenti.lect(4)
+      n_d_cell = mlenti.lect(5)
+      nb_faces = mlenti.lect(7)
+      NBPGAU   = mlenti.lect(8)
+      idifo    = mlenti.lect(9)
+      LRE      = mlenti.lect(11)
+      NDEPF    = idifo * n_d_face
+      NDEPC    = idifo * n_d_cell
+      NBDDL    = LRE
+c-dbg      write(ioimp,*) 'HHORIG:',ISOU,':',nb_faces,NBDDL,NBPGAU
+
+      IF (nb_faces.NE.meleme.NUM(/1)) THEN
+        write(ioimp,*) 'HHORIG: Bizarre nb_faces'
+      END IF
+      IF (LRE .NE. imodel.INFELE(9)) then
+        write(ioimp,*) 'HHORIG: Bizarre LRE'
+      END IF
+      IF (NBPGAU .NE. imodel.INFELE(6)) then
+        write(ioimp,*) 'HHORIG: Bizarre nb.p.gau'
+      END IF
+
+C- Verification des proprietes materielles : Champ CONSTANT par ELEMENT !
+      mptval = IVAMAT
+      NTMAT = mptval.IVAL(/1)
+      NUMAT = NTMAT - 4
+      lhook = 9
+
+C- Tableau de stockage des proprietes materielles
+      MWKMAT = 0
+      SEGINI,MWKMAT
+      IWKMAT = MWKMAT
+
+      isz = 0
+      iunif = 0
+      DO is = 1, NTMAT
+        IF (is.LE.(NVMAT-4) .OR. is.GT.NVMAT) THEN
+          melval = mptval.IVAL(is)
+          IGMN = melval.VELCHE(/1)
+          IEMN = melval.VELCHE(/2)
+          IF (IGMN.NE.1) isz = isz + 1
+          IF (IGMN.EQ.1 .AND. IEMN.EQ.1) iunif = iunif + 1
+          VALMAT(is) = melval.VELCHE(1,1)
+        END IF
+      END DO
+      IF (isz.NE.0) THEN
+        write(ioimp,*) 'HHORIG: Material properties must be constant ',
+     &                 'by element (for the moment) !'
+        iret = 21
+        RETURN
+      END IF
+* Le champ de proprietes est completement uniforme :
+      IF (iunif.NE.NUMAT) iunif = 0
+
+C- Materiau isotrope et proprietes uniformes : -> calcul de HOELAS
+      IF (MATE.EQ.1 .AND. iunif.NE.0) THEN
+        CALL DOHMAS(VALMAT,'ISOTROPE',IFOUR,lhook,1,HOELAS,iretc)
+        r_z = HOELAS(4,4) * 2.D0
+        DO i = 4, lhook
+          HOELAS(i,i) = r_z
+        END DO
+      END IF
+C - Materiaux orthotrope et anisotrope
+      IF (MATE.EQ.2.OR.MATE.EQ.3) THEN
+C** AFAIRE !!!        
+      END IF
+
+C- Les donnees liees a la formulation HHO :
+      IVCSTA = IVAL(NVMAT-3)
+      melval = IVCSTA
+      IGCS = melval.VELCHE(/1)
+      IECS = melval.VELCHE(/2)
+c-dbg      write(ioimp,*) 'IVCSTA',melval,igcs,iecs,tyval(nvmat-3)
+      IF (IGCS.NE.1) THEN
+        write(ioimp,*) 'HHORIG : Stabilization coefficient must be ',
+     &                 'constant by element'
+        iret = 21
+        RETURN
+      END IF
+
+      IVMSTA = IVAL(NVMAT)
+      melval = IVMSTA
+      IGMS = melval.IELCHE(/1)
+      IEMS = melval.IELCHE(/2)
+c-dbg      write(ioimp,*) 'IVMSTA',melval,igms,iems,tyval(nvmat)
+      IF (IGMS.NE.1) THEN
+        write(ioimp,*) 'HHORIG : Stabilization matrix must be ',
+     &                 'constant by element'
+        iret = 21
+        RETURN
+      END IF
+      mlrmsh = melval.IELCHE(1,1)
+c*      segact,mlrmsh
+c*      write(ioimp,*) 'HHORIG MSTAB SIZE:',mlrmsh.prog(/1), LRE,LRE*LRE,
+c*     &               mlenti.lect(16)
+      IF ((mlrmsh.prog(/1).NE.(LRE*LRE)) .OR. 
+     &    (mlrmsh.prog(/1).NE.mlenti.lect(16))) THEN
+        write(ioimp,*) 'HHORIG : Stabilization matrix size incorrect'
+        iret = 21
+        RETURN
+      END IF
+
+      IVPIHO = IVAL(NVMAT-2)
+      melval = IVPIHO
+      IGPI = melval.VELCHE(/1)
+      IEPI = melval.VELCHE(/2)
+c-dbg      write(ioimp,*) 'IVPIHO',melval,igpi,iepi,tyval(nvmat-2)
+
+      IVMBHO = IVAL(NVMAT-1)
+      melval = IVMBHO
+      IGMB = melval.IELCHE(/1)
+      IEMB = melval.IELCHE(/2)
+c-dbg      write(ioimp,*) 'IVMBHO',melval,igmb,iemb,tyval(nvmat-1)
+      mlrmbh = melval.IELCHE(1,1)
+c*      segact,mlrmbh
+c*      write(ioimp,*) 'HHORIG MSTAB SIZE:',mlrmsh.prog(/1), LRE,LRE*LRE,
+c*     &               mlenti.lect(16)
+      IF ((mlrmbh.prog(/1).NE.(9*LRE)) .OR. 
+     &    (mlrmbh.prog(/1).NE.mlenti.lect(14))) THEN
+        write(ioimp,*) 'HHORIG : BHHO matrix size incorrect'
+        iret = 21
+        RETURN
+      END IF
+
+C Le maillage support pour la rigidite est constitue du point support 
+C de la cellule et des points supports de chaque face de la cellule 
+C A FAIRE : ajouter le point support des DPGE !
+      NBNO   = meleme.NUM(/1)
+      NBNN   = 1 + NBNO
+      IF (LDPGE) NBNN = NBNN + 1
+      NBELEM = meleme.NUM(/2)
+      NBREF  = 0
+      NBSOUS = 0
+      SEGINI,ipt1
+      ipt1.ITYPEL = 28
+      IF (LDPGE) THEN
+        DO i = 1, NBELEM
+          ipt1.NUM(NBNN,i) = IIPDPG
+        END DO
+      END IF
+      mlent1 = imodel.IVAMOD(nobHHO+4)
+c*      segact,mlent1
+      nbel1 = mlent1.lect(/1) / 2
+      if (nbel1.ne.NBELEM) write(ioimp,*) 'Bizarre hhorig nbel1'
+      ipt2 = MPCHHO
+      SEGACT,ipt2
+      DO i = 1, nbel1
+        je = mlent1.lect(2*i-1)
+        ip = mlent1.lect(2*i)
+        if (ip.le.0) write(ioimp,*) 'HHORIG: Bizarre...',i,je,ip
+        jp = ip + NBCHHO(je-1)
+        ipt1.num(1,i) = ipt2.num(1,jp)
+      END DO
+      mlent1 = imodel.IVAMOD(nobHHO+3)
+c*      segact,mlent1
+      nbfac1 = mlent1.lect(/1) / 2
+c-dbg      write(ioimp,*) 'HHORIG:',nbelem,nbno,nbfac1,nbnn
+      ipt2 = MPFHHO
+      SEGACT,ipt2
+      DO jg1 = 1, nbfac1
+        i_z = (jg1 - 1) / nbno
+        ie1 = i_z + 1
+        ip1 = jg1 - (i_z * nbno) + 1
+        je = mlent1.lect(2*jg1-1)
+        ip = ABS(mlent1.lect(2*jg1))
+        if (ip.eq.0) write(ioimp,*) 'HHORIG: Bizarre...',i,je,ip
+        jp = ip + NBFHHO(je-1)
+        ipt1.num(ip1,ie1) = ipt2.num(1,jp)
+c-dbg      write(ioimp,*) 'LO',jg1,ie1,ip1,'--',jp,je
+c-dbg      write(ioimp,*) '  ',ipt2.num(1,jp)
+      END DO
+c*      SEGDES,ipt1
+
+C  REMPLISSAGE DU SEGMENT DESCRIPTEUR
+C
+c!         NSTRS = INFELE(16)
+c!         LW    = INFELE(7)
+c!         NDDL  = INFELE(15)
+c!         LHOOK = INFELE(10)
+
+C        RECHERCHE DES NOMS D'INCONNUES ET DES DUAUX
+C
+      nomidu = imodel.lnomid(1)
+      ndepl  = nomidu.lesobl(/2)
+c-      ndum   = nomidu.lesfac(/2)
+
+      nomidf = imodel.lnomid(2)
+      nforc  = nomidf.lesobl(/2)
+c-      ndum   = nomidf.lesfac(/2)
+
+      IF (NDEPL.EQ.0.OR.NFORC.EQ.0.OR.NDEPL.NE.NFORC) THEN
+        write(ioimp,*) 'HHORIG: data inconsistent PRIMAL/DUAL (1)'
+        iret = 5
+      END IF
+      IF (NDEPL.NE.(NDEPC+NDEPF)) THEN
+        write(ioimp,*) 'HHORIG: data inconsistent PRIMAL/DUAL (2)'
+        iret = 717
+      END IF
+      IF (NBDDL.NE.(NDEPC+(nb_faces*NDEPF))) THEN
+        write(ioimp,*) 'HHORIG: data inconsistent PRIMAL/DUAL (3)'
+        iret = 717
+      END IF
+      IF (iret.NE.0) RETURN
+
+      NLIGRP = LRE
+      NLIGRD = LRE
+      SEGINI,DESCR
+
+      iddl = 0
+c  Noeud support de la cellule :
+      INOE = 1
+      DO ic = 1, NDEPC
+        iddl = iddl + 1
+        LISINC(iddl) = nomidu.LESOBL(ic)
+        LISDUA(iddl) = nomidf.LESOBL(ic)
+        NOELEP(iddl) = INOE
+        NOELED(iddl) = INOE
+      END DO
+c  Noeuds supports des faces de la cellule :
+      DO in = 1, NBNO
+        INOE = in + 1
+        DO ic = 1, NDEPF
+          iddl = iddl + 1
+          LISINC(iddl) = nomidu.LESOBL(NDEPC+ic)
+          LISDUA(iddl) = nomidf.LESOBL(NDEPC+ic)
+          NOELEP(iddl) = INOE
+          NOELED(iddl) = INOE
+        END DO
+      END DO
+C CAS DE LA DEFORMATION PLANE GENERALISEE
+c!!      IF (LDPGE) THEN
+C!!        INOE = NBNN
+c!!        DO ic = (NDPGE-1),0,-1
+c!!          iddl = iddl + 1
+c!!          LISINC(iddl) = nomidu.LESOBL(NDEPL-ic)
+c!!          LISDUA(iddl) = nomidf.LESOBL(NFORC-ic)
+c!!          NOELEP(iddl) = INOE
+c!!          NOELED(iddl) = INOE
+c!!        END DO
+c!!      END IF
+      IF (iddl .NE. NBDDL) THEN
+        write(ioimp,*) 'HHORIG: NBDDL inconsistent',iddl,nbddl
+        iret = 717
+        RETURN
+      END IF
+
+      SEGDES,DESCR
+      IPDSCR = DESCR
+
+C    INITIALISATION DU SEGMENT  XMATRI
+C
+      NLIGRP = LRE
+      NLIGRD = LRE
+      NELRIG = NBELEM
+      SEGINI,XMATRI
+      XMATRI.SYMRE = 0
+
+C-------------------------
+C Boucle sur les cellules du modele
+C-------------------------
+      DO IEL = 1,NBELEM
+
+C- Recuperation des proprietes constantes par element :
+        IF (iunif.EQ.0) THEN
+          DO is = 1, NVMAT
+            IF (is.LE.(NVMAT-4) .OR. is.GT.NVMAT) THEN
+              melval = mptval.IVAL(is)
+              VALMAT(is) = melval.VELCHE(1,IEL)
+            END IF
+          END DO
+        END IF
+C- Materiau isotrope
+        IF (MATE.EQ.1 .AND. iunif.EQ.0) THEN
+          CALL DOHMAS(VALMAT,'ISOTROPE',IFOUR,lhook,1,HOELAS,iretc)
+          r_z = HOELAS(4,4) * 2.D0
+          DO i = 4, lhook
+            HOELAS(i,i) = r_z
+          END DO
+        ENDIF
+C - Calcul des axes locaux dans les cas orthotrope et anisotrope
+        IF (MATE.EQ.2.OR.MATE.EQ.3) THEN
+        ENDIF
+
+C- Initialisation de la matrice de rigidite avec la matrice de stabilisation
+        melval = IVCSTA
+        CSTAB  = melval.VELCHE(1,MIN(IEL,IECS))
+        melval = IVMSTA
+        mlrmsh = melval.IELCHE(1,MIN(IEL,IEMS))
+c*        segact,mlrmsh
+c* !! matrice SHHO stockee colonne par colonne : LRE*LRE (symetrique ?)
+        DO j = 1, LRE
+          jc = LRE * (j-1)
+          DO i = 1, LRE
+            RE(i,j,IEL) = CSTAB * mlrmsh.prog(jc+i)
+          END DO
+        END DO
+c*        segdes,mlrmsh
+
+        JEPI = MIN(IEL,IEPI)
+        JEMB = MIN(IEL,IEMB)
+C--  --  --  --  --  --  --  --  --
+C - Boucle sur les points de Gauss
+C--  --  --  --  --  --  --  --  --
+        DO IGAU = 1, NBPGAU
+
+C-AFAIRE C -- Recuperation des proprietes materielles (IGAU)
+C-AFAIRE           DO is = 1, NVMAT
+C-AFAIRE             IF (is.LE.(NVMAT-4) .OR. is.GT.NVMAT) THEN
+C-AFAIRE               melval = mptval.IVAL(is)
+C-AFAIRE               JEMN = MIN(IEL ,melval.VELCHE(/2))
+C-AFAIRE               JGMN = MIN(IGAU,melval.VELCHE(/1))
+C-AFAIRE               VALMAT(is) = melval.VELCHE(JGMN,JEMN)
+C-AFAIRE             END IF
+C-AFAIRE           END DO
+C-AFAIREC- Materiau isotrope
+C-AFAIRE           IF (MATE.EQ.1) THEN
+C-AFAIRE             CALL DOHMAS(VALMAT,'ISOTROPE',IFOUR,lhook,1,HOELAS,iretc)
+C-AFAIRE             r_z = HOELAS(4,4) * 2.D0
+C-AFAIRE             DO i = 4, lhook
+C-AFAIRE               HOELAS(i,i) = r_z
+C-AFAIRE             END DO
+C-AFAIRE           END IF
+
+          melval = IVPIHO
+          JGPI = MIN(IGAU,IGPI)
+          poig = melval.VELCHE(JGPI,JEPI)
+
+          melval = IVMBHO
+          JGMB = MIN(IGAU,IGMB)
+          mlrmbh = melval.IELCHE(JGMB,JEMB)
+c*          segact,mlrmbh
+c* !! matrice BHHO stockee colonne par colonne : lhook*LRE
+          CALL BDBST(mlrmbh.prog(1),poig,HOELAS,LRE,lhook,RE(1,1,IEL))
+
+C--  --  --  --  --  --  --  --  --
+        END DO
+C--  --  --  --  --  --  --  --  --
+C-------------------------
+      END DO
+C-------------------------
+
+      SEGDES,XMATRI
+      IPMATR = XMATRI
+
+      IRIGEL(1,ISOU) = ipt1
+      IRIGEL(2,ISOU) = 0
+      IRIGEL(3,ISOU) = IPDSCR
+      IRIGEL(4,ISOU) = IPMATR
+      IRIGEL(5,ISOU) = NIFOUR
+      IRIGEL(6,ISOU) = 0
+      IRIGEL(7,ISOU) = 0
+      COERIG(ISOU) = 1.D0
+
+      IF (MATE.EQ.2.OR.MATE.EQ.3) THEN
+      ENDIF
+      SEGSUP,MWKMAT
+
+*      RETURN
+      END
+
+ 

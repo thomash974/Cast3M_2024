@@ -1,0 +1,14 @@
+C LDPD3D    SOURCE    PV090527  23/01/27    21:15:47     11574          
+      SUBROUTINE LDPD3D(f1,K,G,b,d,Hdp,ldp)
+c     Multiplicateur plastique Drucker Prager seul actif (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 f1,K,G,b,d,Hdp,ldp
+c      print*,f1,K,b,d,G,Hdp
+      ldp = -f1 / (-K * b * d - G - Hdp)
+        
+      return
+      end
+        
+ 

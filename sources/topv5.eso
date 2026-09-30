@@ -1,0 +1,127 @@
+C TOPV5     SOURCE    GOUNAND   21/04/06    21:15:36     10940          
+      SUBROUTINE TOPV5(TRAVL,XVTOL,IMET,IMOMET,XDENS,KCMETR,KPVIRT)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPV5
+C DESCRIPTION :
+C
+*     
+*     Les candidats ayant le bon volume sont dans ITVOL
+*     On calcule les qualités de chaque élément des candidats et on ordonne.
+*     
+C      
+C     
+C     
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 09/11/2017, version initiale
+C HISTORIQUE : v1, 09/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMELEME
+      POINTEUR KELEM.MELEME
+      POINTEUR KEXTO.MELEME
+      POINTEUR IBTLOC.MELEME
+      POINTEUR IPBTL2.MELEME
+      POINTEUR KTBES.MELEME
+      POINTEUR KTBES2.MELEME
+*anc      POINTEUR IMCAND.MELEME
+-INC TMATOP1
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+      POINTEUR IPBTL.MELEMX
+-INC SMLENTI
+*anc      POINTEUR KNNO.MLENTI
+      POINTEUR LIDXCA.MLENTI
+      POINTEUR LOKVOL.MLENTI
+      POINTEUR LNQUAL.MLENTI
+      POINTEUR LINDI.MLENTI
+      POINTEUR LINDJ.MLENTI
+-INC SMLREEL
+      POINTEUR IQUAL.MLREEL
+      POINTEUR LQUALS.MLREEL
+-INC SMCOORD
+      POINTEUR KCOORD.MCOORD
+*-INC SMETRIQ
+      POINTEUR KCMETR.METRIQ
+*-INC STRAVJ
+      POINTEUR TRAVK.TRAVJ
+*-INC STRAVL
+*     
+      LOGICAL LOK
+*anc      LOGICAL LTOIBO
+*anc      LOGICAL LTOIBA
+      INTEGER JCAND
+      LOGICAL LCHANG
+      LOGICAL LCHTOP
+* Liste de topologies de maillages candidates
+*      SEGMENT ITCAND(0)
+* Liste de topologies de maillages candidats de plus petit volume non nul
+*      SEGMENT ITVOL(JG)
+* Liste de topologies de maillages candidats de plus petit volume
+* et de meilleure qualité
+*      SEGMENT ILQUAL(JG)
+*      SEGMENT ILIND(JG)
+*      SEGMENT JLIND(JG)
+*     
+* Executable statements
+*     
+*      WRITE(IOIMP,*) 'coucou topv5'
+*
+      LMCANS=TRAVL.MCANS
+      LIDXCA=TRAVL.IDXCA
+      LOKVOL=TRAVL.OKVOL
+      LQUALS=TRAVL.QUALS
+      LNQUAL=TRAVL.NQUAL
+*      
+*     
+*     Les candidats ayant le bon volume sont dans ITVOL
+*     On calcule les qualités de chaque élément des candidats et on ordonne.
+*     
+      DO JVOCOU=1,NVOCOU
+*
+         IVOCOU=JVOCOU
+         ICAND=LOKVOL.LECT(IVOCOU)
+         IELDEB=LIDXCA.LECT(ICAND)
+         IELFIN=LIDXCA.LECT(ICAND+1)-1
+*     NDQC : nombre de qualités calculés
+*     peut être différente de IELFIN-IELDEB+1
+*     car on ne calcule pas la qualité des éléments contenant le noeud
+*     virtuel         
+         CALL QUALI6(LMCANS,IELDEB,IELFIN,IMET,IMOMET,XDENS,KCMETR
+     $        ,KPVIRT,XVTOL,LQUALS,NDQC)
+         IF (IERR.NE.0) RETURN
+         LNQUAL.LECT(ICAND)=NDQC
+*            Write(ioimp,*) 'Calcul qualite candidat 2 i=',jvocou
+*            Write(ioimp,*) (lquals.prog(iii),iii=ieldeb,ielfin)
+*     Algo de tri pas terrible ? (cf. ordon1.eso merge sort) mais en place
+*faux         CALL ORDO01(LQUALS.PROG(IELDEB),IELFIN-IELDEB+1,.TRUE.)
+         CALL ORDO01(LQUALS.PROG(IELDEB),LNQUAL.LECT(ICAND),.TRUE.)
+         IF (IERR.NE.0) RETURN
+*            Write(ioimp,*) 'Calcul qualite candidat 2 i=',jvocou
+*            Write(ioimp,*) (lquals.prog(iii),iii=ieldeb,ielfin)
+      ENDDO
+      RETURN
+*     
+*     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPV5   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*     
+* End of subroutine TOPV5
+*     
+      END
+
+ 

@@ -1,0 +1,73 @@
+$$$$ PILOINDI
+* PILOINDI  PROCEDUR  HO261890  20/12/22    21:15:08     10832          
+'DEBP' PILOINDI PRECED*'TABLE' U*'CHPOINT' DU*'CHPOINT' DUI*'CHPOINT' DUII*'CHPOINT' DTAU*'FLOTTANT' ;
+
+WTAB=PRECED.'WTABLE';
+
+REGION = WTAB . 'ZONE_DE_PILOTAGE' ;
+'SI' ('EGA' REGION FAUX) ; 
+   MODTOT =  WTAB.'MO_TOT'  ;
+'SINON' ;
+   MODTOT = REDU WTAB.'MO_TOT' REGION ;
+'FINSI' ;
+
+lis1 = Extr Modtot 'DEFO';
+lis2 = Extr Modtot 'CONT';
+
+*   --- equation de pilotage indirecte --------
+CHATAU = 'MANU' 'CHML' MODTOT 'SCAL' DTAU 'STRESSES';
+
+EPS_TOT = 'EPSI' 'LINE' MODTOT dU;
+def_I   = 'EPSI' 'LINE' MODTOT duI ;
+CH_A_0  = EPS_TOT + def_I;
+CH_A_1  = 'EPSI' 'LINE' MODTOT duII ;
+
+EPS_TOT1 = 'EPSI' 'LINE' MODTOT u;
+dir1  = CHAN 'TYPE' EPS_TOT1 'CONTRAINTES';
+dir1  = CHAN 'COMP' lis1 lis2 dir1;
+norm1 = ENER  MODTOT dir1  EPS_TOT1  ;
+norm1 = norm1**0.5;
+
+petit1 = 1.E-20;
+normnul = ((maxi norm1) < petit1);
+
+SI (normnul);
+  REPE BC1 (DIME(lis2));
+    SI (&bc1 EGA 1);
+      chm =         'MANU' 'CHML' MODTOT (EXTR lis2 (&BC1)) 1.0 'STRESSES';
+    SINON;
+      chm = chm et ('MANU' 'CHML' MODTOT (EXTR lis2 (&BC1)) 1.0 'STRESSES');
+    FINSI;
+  FIN BC1;
+SINON;
+  REPE BC1 (DIME(lis2));
+    SI (&bc1 EGA 1);
+      aux1 = 'CHAN' 'COMP' (EXTR lis2 (&BC1)) norm1;
+      nm1 = aux1;
+    SINON;
+      aux1 = 'CHAN' 'COMP' (EXTR lis2 (&BC1)) norm1;
+      nm1 = nm1 et aux1;
+    FINSI;
+  FIN BC1;
+  chm = dir1*(nm1**(-1.0));
+FINSI;
+
+CH_A_1  = ENER  MODTOT chm CH_A_1 ;
+CH_A_0  = ENER  MODTOT chm CH_A_0 ;
+
+CH_ETA  = (CHATAU - CH_A_0)*(CH_A_1**(-1.0));
+
+MA1 = 'MASQ' CH_A_1 'SUPERIEUR' 0. ;
+CH_LAMB_MAX = (MA1*CH_ETA);
+MA2 = 'MASQ' CH_A_1 'EGINFE' 0. ;
+CH_LAMB_MIN = (MA2*CH_ETA);
+
+big_value = 1.0E20;
+CH_LAMB_MAX = CH_LAMB_MAX + (big_value*MA2);
+CH_LAMB_MIN = CH_LAMB_MIN - (big_value*MA1);
+LIM_INF = 'MAXI' CH_LAMB_MIN 'AVEC' (MOTS 'SCAL');
+LIM_SUP = 'MINI' CH_LAMB_MAX 'AVEC' (MOTS 'SCAL');
+
+D_ETA = LIM_SUP;
+
+'FINPROC' D_ETA ;

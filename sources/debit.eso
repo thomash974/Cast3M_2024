@@ -1,0 +1,103 @@
+C DEBIT     SOURCE    OF166741  23/06/21    21:15:03     11690          
+      SUBROUTINE DEBIT
+*_______________________________________________________________________
+*
+*                     OPERATEUR DEBIT  ( Inspire de PRESSI )
+*
+*       FQ = DEBIT MODEL I D MAIL I   (MOT1)
+*                        I CHPDEB I
+*
+*            FQ        CHPOINT CONTENANT LES FORCES NODALES EQUIVALENTES
+*            MODEL     OBJET MMODEL ,MASSIF , SUR LEQUEL S'APPLIQUE
+*                      LA CONDITION DE DEBIT
+*            D         VALEUR ALGEBRIQUE DU DEBIT
+*            MAIL      POUR LES MASSIFS ,OBJET MAILLAGE REPRESENTANT
+*                      LA FACE SUR LAQUELLE S'APPLIQUE LA CONDITION
+*                      DE DEBIT
+*            CHPOT     CHPOINT CONTENANT LES VALEURS ALGEBRIQUES
+*                      DES DEBITS AUX NOEUDS
+*            MOT1      NOM DONNE AU RESULAT ( PAR DEFAUT , CELUI DU MODELE)
+*______________________________________________________________________
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCHPOI
+
+      CHARACTER*(4) MOSCAL,MOT1
+      CHARACTER*(8) TYPO
+
+      REAL*8 XXX
+
+      DATA MOSCAL/'SCAL'/
+
+      MOT1 = '    '
+      TYPO = '        '
+
+      IPTFP = 0
+*
+*     ON LIT UN MMODEL
+*
+      TYPO = 'MMODEL  '
+      CALL LIROBJ(TYPO,IPMODL,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+*
+*     ON LIT SOIT UN FLOTTANT ET UN MAILLAGE ,SOIT UN CHPOINT
+*
+      CALL LIRREE(XXX,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+      IF (IRETOU.NE.0) THEN
+         TYPO = 'MAILLAGE'
+         CALL LIROBJ(TYPO,IPTGEO,1,IRETOU)
+         IF (IERR.NE.0) RETURN
+         CALL ECRREE(XXX)
+         CALL ECRCHA(MOSCAL)
+         CALL ECRENT(1)
+         CALL ECROBJ(TYPO,IPTGEO)
+         CALL MANUCH
+         IF (IERR.NE.0) RETURN
+         TYPO = 'CHPOINT '
+         CALL LIROBJ(TYPO,ICHPOP,1,IRETOU)
+         IF (IERR.NE.0) RETURN
+      ELSE
+         TYPO = 'CHPOINT '
+         CALL LIROBJ(TYPO,ICHPOP,1,IRETOU)
+         IF (IERR.NE.0) RETURN
+      ENDIF
+*
+      CALL LIRCHA(MOT1,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+*
+      CALL FDEBIT(ICHPOP,IPMODL,IPTFP,MOT1,IRET)
+      IF (IRET.EQ.0) RETURN
+*
+*        LE NUMERO DE L HARMONIQUE EST PRIS EGAL A NIFOUR
+*        POUR TOUTES LES COMPOSANTES DU CHPOINT
+*
+      MCHPOI=IPTFP
+      SEGACT MCHPOI*MOD
+*         ATTRIBUTION D'UNE NATURE DISCRETE AU CHPO SORTANT
+      NAT = MAX ( 1 , JATTRI(/1) )
+      NSOUPO = IPCHP(/1)
+      SEGADJ MCHPOI
+      JATTRI(1) = 2
+
+      DO IA=1,IPCHP(/1)
+         MSOUPO=IPCHP(IA)
+         SEGACT MSOUPO*mod
+         DO NC=1,NOHARM(/1)
+            NOHARM(NC)=NIFOUR
+         ENDDO
+      ENDDO
+
+      TYPO = 'CHPOINT '
+      CALL ACTOBJ(TYPO,IPTFP,1)
+      CALL ECROBJ(TYPO,IPTFP)
+
+C      RETURN
+      END
+
+ 

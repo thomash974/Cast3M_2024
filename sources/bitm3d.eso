@@ -1,0 +1,43 @@
+C BITM3D    SOURCE    PV090527  23/01/27    21:15:09     11574          
+       subroutine bitm3d(K,G,p,biot,err1,precision3d)
+      
+c     calcul du coeff de biot par la methode de Mori Tanaka
+
+c     calcul des matrices d influence des inclusions
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     coeffs de compressibilite ; cisaillement, dilatation thermique
+      real*8 p,k,g
+      real*8 biot
+      integer err1
+      real*8 precision3d      
+
+c     variables locales      
+      err1=0
+      
+      t5 = 0.8D1 * g
+      t7 = k / 0.2D1
+      t9 = (g - t7) ** 2
+      t10 = p ** 2
+      t13 = 0.9D1 / 0.8D1 * k
+      t20 = (g + t13) ** 2
+      t21 =0.144D3 * t10 * t9 + 0.192D3 * p * (g + t7) * (g - t13)
+     # + 0.64D2 * t20
+      t23 = sqrt(t21)
+      t22=t23 + (0.12D2 * g + 0.6D1 * k) * p + t5 - 0.9D1 * k
+      t33 = 0.1D1 / (t22
+     #) * (0.12D2 * g * p - 0.6D1 * k * p + 0.3D1 * k + t23 + t5) * p
+      biot=t33
+      if((t21.lt.0.).or.(t22.lt.precision3d).or.biot.lt.0.) then
+         print*,'Donnees incoherentes pour Biot ds biotm3d phase:',i
+         print*,'porosite',p,'K',k,'G',g,'Biot=',biot
+         err1=1
+         return
+      end if      
+
+
+      return
+      end
+      
+ 

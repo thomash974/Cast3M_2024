@@ -1,0 +1,199 @@
+C HHOPRM    SOURCE    OF166741  24/05/06    21:15:14     11082          
+
+      SUBROUTINE HHOPRM (charHHO, modlHHO, nobHHO, lentHHO, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMMODEL
+-INC SMELEME
+-INC SMLENTI
+-INC SMLREEL
+
+      EXTERNAL LONG
+
+      CHARACTER*(*) charHHO
+
+      CHARACTER*(6) nomsg
+      CHARACTER*(LOCHAI) charerr
+
+      iret = 0
+
+C= La chaine charHHO est de la forme : "hho_cc_ff_hyp" (suite a HHOPRE)
+      n_c = LONG(charHHO)
+      if (iimpi.eq.1972)
+     &   write(ioimp,*) 'HHOPRM =',charHHO(1:n_c)
+
+      imodel = modlHHO
+c*      segact,imodel*nomod (segment actif en entree)
+
+      mlent2 = lentHHO
+c*      segact,mlent2*nomod (segment actif en entree)
+
+      mailHHO = imodel.IMAMOD
+      meleme  = mailHHO
+c*      segact,meleme*nomod (segment actif en entree)
+
+      ity   = meleme.ITYPEL
+      nbnoe = meleme.NUM(/1)
+c* pour l'instant poly03->tri3 et poly04->qua4
+      ityl = ity
+      IF (ity.EQ.32) THEN
+        if (nbnoe.eq.3) ityl = 4
+        if (nbnoe.eq.4) ityl = 8
+      END IF
+      nomsg = '      '
+      CALL CHCASS(NOMS(ityl),0,nomsg(1:4))
+      IF (ityl.EQ.32) THEN
+        WRITE(nomsg(5:6),'(I2.2)') nbnoe
+      END IF
+      n_s = LONG(nomsg)
+      if (iimpi.eq.1972)
+     &  write(ioimp,*) 'HHOPRM =',nomsg(1:n_s),'=',nbnoe,ity,ityl
+
+      JG = 20 + HHO_MAX_EDGE
+      SEGINI,mlenti
+      DO i = 1, JG
+        mlenti.lect(i) = -999
+      END DO
+      ile = JG
+
+      mlenti.lect( 1) = mlent2.lect(1)
+      mlenti.lect( 2) = mlent2.lect(2)
+      mlenti.lect( 3) = mlent2.lect(3)
+      mlenti.lect( 4) = mlent2.lect(4)
+      mlenti.lect( 5) = mlent2.lect(5)
+      mlenti.lect( 6) = nbnoe
+      mlenti.lect( 7) = nbnoe
+
+C= Tableau de flottants : inutilise ici
+      JG = 1
+      SEGINI,mlreel
+      ilr = JG
+
+      iretc = 0
+C= On complete le tableau mlenti.LECT
+      CALL HHOC3M('INIT',charHHO(1:n_c)//'_'//nomsg(1:n_s),
+     &                   mlenti.lect,ile, mlreel.prog,ilr,
+     &                   iretc,charerr)
+
+C= Suppression du tableau de flottants
+      SEGSUP,MLREEL
+
+C= Erreur dans HHOC3M : A affiner
+      IF (iretc.NE.0) THEN
+        write(ioimp,*) 'HHO -> HHOPRM - ERROR ='
+        write(ioimp,*) charerr(1:LONG(charerr))
+        iret = 21
+        return
+      END IF
+
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'RETOUR de HHOC3M-INIT'
+        write(ioimp,*) (mlenti.lect(i),i=1,20)
+        write(ioimp,*) (mlenti.lect(i),i=20+1,JG)
+      endif
+
+c-dbg      segini,mlent3=mlenti
+c-dbg      mlent3.lect( 8) = 3*nbnoe
+c-dbg      mlent3.lect( 9) = IDIM
+c-dbg      mlent3.lect(10) = 9
+c-dbg      mlent3.lect(11) = mlent3.lect( 9) * 
+c-dbg     &      ( mlent3.lect( 5) + mlent3.lect( 7) * mlent3.lect( 3) )
+c-dbg      mlent3.lect(12) = mlent3.lect( 9) * 
+c-dbg     &      ( mlent3.lect( 7) * mlent3.lect( 3) )
+c-dbg      mlent3.lect(13) = mlent3.lect( 9) * mlent3.lect( 5)
+c-dbg      mlent3.lect(14) = 9 * mlent3.lect(11)
+c-dbg      mlent3.lect(15) = mlent3.lect(14) * mlent3.lect( 8)
+c-dbg      mlent3.lect(16) = mlent3.lect(11) * mlent3.lect(11)
+c-dbg      mlent3.lect(17) = mlent3.lect(13) * mlent3.lect(13)
+c-dbg      mlent3.lect(18) = mlent3.lect(13) * mlent3.lect(12)
+c-dbg      mlent3.lect(19) = mlent3.lect(13)
+c-dbgccccc      mentl3.lect(20+1:20+d % num_faces) = d % num_vertices_per_face(1:d%num_faces)
+c-dbg      write(ioimp,*) 'RETOUR de HHOC3M-INIT (bis)'
+c-dbg      write(ioimp,*) (mlenti.lect(i)-mlent3.lect(i),i=1,20)
+c-dbg      segsup,mlent3
+
+C= On recherche les faces du maillage dans sa totalite :
+      CALL ECROBJ('MAILLAGE',mailHHO)
+      IF (IDIM.EQ.2) THEN
+        CALL CHANLG
+      ELSE 
+        CALL ECRCHA('NOID')
+        CALL ENVVO2(1)
+      END IF
+      CALL LIROBJ('MAILLAGE',mailSQE,1,iretc)
+      IF (IERR.NE.0) THEN
+        iret = 21
+        RETURN
+      END IF
+
+      CALL ACTOBJ('MAILLAGE',mailHHO,1)
+      CALL HHOLIM('CELL',mailHHO,lentHHO,iret)
+      IF (iret.NE.0) RETURN
+
+      CALL ACTOBJ('MAILLAGE',mailHHO,1)
+      CALL HHOLIM('FAEL',mailHHO,lentHHO,iret)
+      IF (iret.NE.0) RETURN
+
+      CALL ACTOBJ('MAILLAGE',mailSQE,1)
+      CALL HHOLIM('FACE',mailSQE,lentHHO,iret)
+      IF (iret.NE.0) RETURN
+
+C= Pour memoire      mlent2 = lentHHO
+
+C= On stocke dans le IMODEL le nombre de ddls par face et par cellule
+C= Pour eviter souci dans ACTOBJ : entier < ou = 0 !
+      imodel.INFMOD( 9) = -1 * mlenti.lect(3)
+      imodel.INFMOD(12) = -1 * mlenti.lect(5)
+
+C= Chaine pour les informations HHO
+      CALL POSCHA(charHHO(1:n_c)//'_'//nomsg(1:n_s),I_POS)
+      imodel.TYMODE(nobHHO+1) = 'MOT     '
+      imodel.IVAMOD(nobHHO+1) = I_POS
+
+C= Le tableau des donnees de mlenti :
+      imodel.TYMODE(nobHHO+2) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+2) = mlenti
+
+C Liste entiers de chaque arete de la zone 
+      imodel.TYMODE(nobHHO+3) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+3) = mlent2.lect(8)
+
+C Liste entiers donnant les aretes pour chaque cellule de la zone
+      imodel.TYMODE(nobHHO+4) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+4) = mlent2.lect(9)
+
+C Liste entiers donnant les cellules de la zone
+      imodel.TYMODE(nobHHO+5) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+5) = mlent2.lect(10)
+
+c-dbgC Construction du maillage des points supports :
+c-dbg      mlent3 = mlent2.lect(8)
+c-dbg      CALL HHOMPO('FACE',mlent3,ipt3)
+c-dbg      imodel.TYMODE(nobHHO+6) = 'MAILLAGE'
+c-dbg      imodel.IVAMOD(nobHHO+6) = ipt3
+c-dbg
+c-dbgC Maillage des points supports :
+c-dbg      mlent3 = mlent2.lect(10)
+c-dbg      CALL HHOMPO('CELL',mlent3,ipt3)
+c-dbg      imodel.TYMODE(nobHHO+7) = 'MAILLAGE'
+c-dbg      imodel.IVAMOD(nobHHO+7) = ipt3
+
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'TYMODE IVAMOD'
+        do i=nobHHO+1,nobHHO+5
+          write(ioimp,*) imodel.tymode(i),imodel.ivamod(i)
+        enddo
+      endif
+
+c      RETURN
+      END
+

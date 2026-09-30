@@ -1,0 +1,19 @@
+C GRACO9    SOURCE    PV        21/10/12    21:15:08     11118          
+      SUBROUTINE GRACO9(ith)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+*  extrait de graco7 pour pouvoir //
+*
+-INC SMVECTD
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SILICRE
+      common/cgraco9c/ilicre,mvect1,mvect2,nbthrl,nbinc
+      ligcre=ligcrp
+      call graco10(ith,ilideb(1),posm(1),valm(1),
+     >  mvect1.vectbb(1),mvect2.vectbb(1))
+      end
+
+ 

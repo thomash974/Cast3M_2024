@@ -1,0 +1,211 @@
+C TESJA3    SOURCE    GOUNAND   23/07/31    21:15:04     11713          
+      SUBROUTINE TESJA3(MYLRFS,MYPGS,
+     $     IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TESJA3
+C PROJET      : Noyau linéaire NLIN
+C DESCRIPTION : On vérifie le calcul de la matrice jacobienne et de son
+C               déterminant sur un triangle...
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DRN/DMT/SEMT/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          :
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       : TESTJA
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C***********************************************************************
+C VERSION    : v1, 16/08/99, version initiale
+C HISTORIQUE : v1, 16/08/99, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC TNLIN
+*-INC SELREF
+      POINTEUR MYLRFS.ELREFS
+      POINTEUR MYLRF.ELREF
+*-INC SPOGAU
+      POINTEUR MYPGS.POGAUS
+      POINTEUR MYPG.POGAU
+*-INC SMCHAEL
+      INTEGER NBLIG,NBCOL,N2LIG,N2COL,NBPOI,NBELM
+      POINTEUR JCOOR.MCHEVA
+      POINTEUR JMAJAC.MCHEVA
+      POINTEUR JMIJAC.MCHEVA
+      POINTEUR JDTJAC.MCHEVA
+      POINTEUR FFGPG.MCHEVA
+      POINTEUR DFFGPG.MCHEVA
+*
+      INTEGER IMPR,IRET
+*
+      REAL*8 JXX(2,2)
+      REAL*8 X1,X2,X3
+      REAL*8 Y1,Y2,Y3
+      REAL*8 DETJXX,DETA,JXXA,XERR
+      INTEGER NPG,INPG,ICOL,ILIG,INBTES
+      LOGICAL LERJ
+*
+* Executable statements
+*
+      WRITE(IOIMP,*) 'Entrée dans tesja3'
+*
+* On teste sur un triangle à trois noeuds (D&T p.108)
+* avec douze points de Gauss (sens direct et indirect pour le triangle).
+* Dimension des espaces de référence et réels : 2, 2
+*
+      CALL FILRF('H1D1TR3',MYLRFS,MYLRF,IMPR,IRET)
+      IF (IRET.NE.0) GOTO 9999
+      CALL FIPG('GAT2-7-12',MYPGS,MYPG,IMPR,IRET)
+      IF (IRET.NE.0) GOTO 9999
+      CALL KFNREF(MYLRF,MYPG,FFGPG,DFFGPG,IMPR,IRET)
+      IF (IRET.NE.0) GOTO 9999
+      DO 3 INBTES=1,2
+         IF (INBTES.EQ.1) THEN
+            X1=1.01D0
+            Y1=0.98D0
+            X2=2.02D0
+            Y2=1.99D0
+            X3=3.03D0
+            Y3=4.03D0
+         ELSEIF (INBTES.EQ.2) THEN
+            X1=1.01D0
+            Y1=0.98D0
+            X2=3.03D0
+            Y2=4.03D0
+            X3=2.02D0
+            Y3=1.99D0
+         ELSE
+            WRITE(IOIMP,*) 'Erreur dans le nombre de tests'
+            GOTO 9999
+         ENDIF
+         NBELM=1
+         NBPOI=1
+         N2COL=2
+         N2LIG=1
+         NBCOL=3
+         NBLIG=1
+         SEGINI JCOOR
+         JCOOR.WELCHE(1,1,1,1,1,1)=X1
+         JCOOR.WELCHE(1,1,1,2,1,1)=Y1
+         JCOOR.WELCHE(1,2,1,1,1,1)=X2
+         JCOOR.WELCHE(1,2,1,2,1,1)=Y2
+         JCOOR.WELCHE(1,3,1,1,1,1)=X3
+         JCOOR.WELCHE(1,3,1,2,1,1)=Y3
+*     Echelle de valeurs pour les coordonnées
+         XYMAX=XZERO
+         do ibelm=1,nbelm
+            do ibpoi=1,nbpoi
+               do i2col=1,n2col
+                  do i2lig=1,n2lig
+                     do ibcol=1,nbcol
+                        do iblig=1,nblig
+                           XYMAX=MAX(abs(jcoor.welche(iblig,ibcol,i2lig
+     $                          ,i2col,ibpoi,ibelm)),xymax)
+                        enddo
+                     enddo
+                  enddo
+               enddo
+            enddo
+         enddo
+         xtprec=max(XYMAX*xzprec,sqrt(xpetit))
+         IF (IMPR.GT.3) THEN
+            WRITE(IOIMP,*) 'JCOOR'
+            CALL PRCHVA(JCOOR,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+         ENDIF
+         LERJ=.FALSE.
+         CALL GEOLIN(DFFGPG,JCOOR,NBELM,
+     $        JMAJAC,JMIJAC,JDTJAC,LERJ,
+     $        IMPR,IRET)
+         IF (IRET.NE.0) GOTO 9999
+*
+*     Test sur les valeurs de la matrice jacobienne et de son
+*     déterminant aux points de Gauss...
+*
+         SEGACT MYPG
+         SEGACT JMAJAC
+         SEGACT JDTJAC
+         JXX(1,1)=X2-X1
+         JXX(1,2)=X3-X1
+         JXX(2,1)=Y2-Y1
+         JXX(2,2)=Y3-Y1
+         DETJXX=((X2-X1)*(Y3-Y1))-((X3-X1)*(Y2-Y1))
+         DO INPG=1,JMAJAC.WELCHE(/5)
+            DO 322 ILIG=1,2
+               DO 3222 ICOL=1,2
+                  JXXA=JMAJAC.WELCHE(1,1,ILIG,ICOL,INPG,1)
+                  XERR=ABS(JXX(ILIG,ICOL)-JXXA)
+                  IF (XERR.GT.XTPREC) THEN
+                     WRITE(IOIMP,*) 'Erreur calcul mat. jac.'
+                     WRITE(IOIMP,*) 'XERR=',XERR, ' XTPREC=',XTPREC
+                     WRITE(IOIMP,*) 'JXX=',JXX(ILIG,ICOL)
+                     WRITE(IOIMP,*) 'JXXA=',JXXA
+                     GOTO 9999
+                  ENDIF
+ 3222          CONTINUE
+ 322        CONTINUE
+         ENDDO
+         DO INPG=1,JDTJAC.WELCHE(/5)
+            DETA=JDTJAC.WELCHE(1,1,1,1,INPG,1)
+            XERR=ABS(DETJXX-DETA)
+            IF (XERR.GT.XTPREC) THEN
+               WRITE(IOIMP,*) 'Erreur calcul det. mat. jac.'
+               WRITE(IOIMP,*) 'XERR=',XERR, ' XTPREC=',XTPREC
+               WRITE(IOIMP,*) 'DETJXX=',DETJXX
+               WRITE(IOIMP,*) 'DETA=',DETA
+               GOTO 9999
+            ENDIF
+         ENDDO
+         SEGDES MYPG
+         SEGDES JDTJAC
+         SEGDES JMAJAC
+         IF (IMPR.GT.3) THEN
+            WRITE(IOIMP,*) 'JMAJAC'
+            CALL PRCHVA(JMAJAC,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+            WRITE(IOIMP,*) 'JMIJAC'
+            CALL PRCHVA(JMIJAC,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+            WRITE(IOIMP,*) 'JDTJAC'
+            CALL PRCHVA(JDTJAC,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+         ENDIF
+         WRITE(IOIMP,*) 'Test',INBTES,' successful'
+ 3    CONTINUE
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine tesja3'
+      RETURN
+*
+* End of subroutine tesja3
+*
+      END
+ 

@@ -1,0 +1,20 @@
+C DISI3D    SOURCE    PV090527  23/01/27    21:15:26     11574          
+      subroutine disi3d(NdimG,FthR,DIRT,lt,dissipT)
+c     calcul des direction d ecoulement pour la plasticite de traction
+c     pour incl3d 
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      integer NdimG
+      real*8 FthR(NdimG),DIRT(NdimG),lt,dissipT  
+      
+      dissipT=0.d0
+      do i=1,NdimG
+        dissipT=dissipT+FthR(i)*lt*DIRT(i)
+      end do
+      return
+      end
+      
+      
+ 

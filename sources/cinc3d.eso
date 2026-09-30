@@ -1,0 +1,520 @@
+C CINC3D    SOURCE    PV090527  23/02/10    21:15:03     11592          
+c A.Sellier avril jeu. 09 sept. 2010 11:55:47 CEST        
+      SUBROUTINE cinc3d(WRK52,WRK53,WRK54,MWRKXE,
+     # nbnb,idimb,teta13d,teta23d,nvarib,nstrsb,ifourb,dtb)
+      
+C     WRK52,53,54 segments déclarés dans le common DECHE
+     
+C     XMAT(NCOMAT)  =  COMPOSANTES DE MATERIAU
+C     IVAL(NCOMAT)  =  INDICE DES COMPOSANTES DE MATERIAU
+C     NCOMAT        = NOMBRE DE COMPOSANTES DE MATERIAU
+C     XCAR(ICARA)   =  CARACTERISTIQUES
+C     MFR           =  NUMERO DE LA FORMULATION DE L'ELEMENT FINI
+C                   = 1       MASSIF
+C                   = 3       COQUE MINCE ( COQ2 , COQ3  ET DKT )
+C                   = 5       COQUE EPAISSE ( COQ6 , COQ8 )
+C                   = 7       POUTRE
+C                   = 9       COQUE MINCE AVEC CISAILLEMENT TRANSVERSE  ( COQ4 ET DST )
+C                   = 11      LIQUIDE
+C                   = 13      TUYAU
+C                   = 15      LINESPRING
+C                   = 17      TUYAU FISSURE
+C                   = 19      RACCORD MASSIF
+C                   = 21      RACCORD COQUE
+C                   = 23      SURFACE LIBRE
+C                   = 25      MEMBRANE
+C                   = 27      UNIAXIALE
+C                   = 29      THERMIQUE
+C                   = 31      INCOMPRESSIBLES
+C                   = 33      POREUX
+C                   = 35      JOINT
+C                   = 37      HOMOGENEISE
+C                   = 39      TUYO
+C                   = 41      TUYAU ACOUSTIQUE PURE
+C                   = 43      RACCORD TUYAU FLUIDE
+c*    DDAUX = MATRICE DE HOOKE ELASTIQUE
+c*    NSTRS = NBRE DE COMPOSANTES DES DEFORMATIONS
+c*    CMATE = NOM DU MATERIAU
+c*    VALMAT= TABLEAU DE CARACTERISTIQUES DU MATERIAU
+c*    VALCAR= TABLEAU DE CARACTERISTIQUES GEOMETRIQUES
+c*    N2EL  = NBRE D ELEMENTS DANS SEGMENT DE HOOKE
+c*    N2PTEL= NBRE DE POINTS DANS SEGMENT DE HOOKE
+c*    MFR   = NUMERO DE LA FORMULATION
+c*    IFOU  = type de formulation
+c*    IB    = NUMERO DE L ELEMENT COURANT
+c*    IGAU  = NUMERO DU POINT COURANT
+c*    EPAIST= EPAISSEUR
+c*    NBPGAU= NBRE DE POINTS DE GAUSS
+c*    MELE  = NUMERO DE L ELEMENT FINI
+c*    NPINT = NBRE DE POINTS D INTEGRATION
+c*    NBGMAT= NBRE DE POINTS DANS SEGMENT DE CARACTERISTIQUES
+c*    NELMAT= NBRE D ELEMENTS DANS SEGMENT DE CARACTERISTIQUES
+c*    SECT  = SECTION
+c*    LHOOK = TAILLE DE LA MATRICE DE HOOKE
+c*    TXR,XLOC,XGLOB,D1HOOK,ROTHOO,DDHOMU,CRIGI = TABLEAUX UTILISES
+c*    POUR LE CALCUL DE LA MATRICE DE HOOKE
+C-----------------------------------------------------------------------    
+C      VARIABLES PASSEES PAR LES COMMONS COPTIO , ECOU  ET NECOU             
+C                                                                           
+C  IFOUR    INDICE DU TYPE DE PROBLEME
+C            -3  DEFORMATIONS PLANES GENERALISEES
+C            -2  CONTRAINTES PLANES                                         
+C            -1  DEFORMATIONS PLANES                                       
+C             0  AXISYMETRIQUE                                             
+C             1  SERIE DE FOURIER                                          
+C             2  TRIDIMENSIONNEL                                      
+C  ITYP      TYPE DE FORMULATION MECANIQUE                              
+C  --------------- ATTENTION ---------------
+C     IL EST ACTIF APRES L APPEL DE VISAVI
+C  -----------------------------------------
+C       ITYP=1   CAS DES ELEMENTS MASSIFS                          
+C       ITYP=2   CAS DES COQUES
+C       ITYP=3   CAS DES MEMBRANES                               
+C       ITYP=4   CAS DES CABLES ET DES BARRES                       
+C       ITYP=5   CAS QUELCONQUE                                          
+C       ITYP=6   CAS DES CONTRAINTES PLANES                      
+C       ITYP=7   CAS DES COQUES A NU=0. OU CONTRAINTES PLANES        
+C       ITYP=8   CAS DES MEMBRANES A NU=0. OU CONTRAINTES PLANES   
+C       ITYP=9   CAS DES COQUES EPAISSES                           
+C       ITYP=10  CAS DES JOINTS                                          
+C       ITYP=11  CAS DES POUTRES                                            
+C       ITYP=12  CAS DES TUYAUX                                              
+C       ITYP=13  CAS DES COQUES AVEC CISAILLEMENT TRANSVERSE    
+C            
+C     ISTEP      flag utilise pour separer les etapes dans un calcul non local
+C                ISTEP=0 -----> calcul local
+C                ISTEP=1 -----> calcul non local etape 1 on calcule les seuils
+C                ISTEP=2 -----> calcul non local etape 2 on continue le calcul
+C                               a partir des seuils moyennes
+C                ISTEP est défini par DEFINI.ESO      
+C                                                                 
+C     EPIN0      déformations inélastiques initiales
+C     EPINF      déformations inélastiques finales
+C     epst0      déformation totale initiale
+C     EPSTF      déformation totale finale
+C
+C-----------------------------------------------------------------------    
+C  SORTIES                                                                   
+C     SIGF(NSTRS)   = CONTRAINTES FINALES                                    
+C     VARF(NVARI)   = VARIABLES INTERNES FINALES
+C     DEFP          = DEFORMATIONS PLASTIQUES                               
+C     KERRE         = 0    TOUT OK
+
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+-INC PPARAM
+-INC CCOPTIO
+-INC DECHE
+*
+      SEGMENT IECOU
+*      COMMON/IECOU/NYOG,NYNU,NYALFA,NYSMAX,NYN,NYM,NYKK,
+       INTEGER icow1,icow2,icow3,icow4,icow5,icow6,icow7,
+C      INTEGER NYOG, NYNU, NYALFA,NYSMAX,NYN, NYM,  NYKK,
+     1  icow8,icow9,icow10,icow11,icow12,icow13,icow14,icow15,icow16,
+C    .  NYALF1,NYBET1,NYR,  NYA,   NYRHO,NSIGY,  NNKX,  NYKX,  IND,
+     2 icow17,icow18,icow19,icow20,icow21,icow22,icow23,icow24,
+C    .  NSOM,  NINV, NINCMA,NCOMP, JELEM, LEGAUS,INAT,  NCXMAT,
+     3 icow25,icow26,icow27,icow28,icow29,icow30,ICARA,
+C    .  LTRAC, MFR,  IELE,  NHRM,   NBNN, NBELEM,ICARA,
+     4  icow32,icow33,NSTRS1,MFR1,icow36,icow37,icow38,
+C    .  LW2,   NDEF,  NSTRSS,MFR1,  NBGMAT,NELMAT,MSOUPA,
+     5  icow39,icow40,icow41,icow42,icow43,icow44
+C    .  NUMAT1,LENDO, NBBB,  NNVARI,KERR1, MELEME
+        INTEGER icow45,icow46,icow47,icow48,icow49,icow50,
+     .          icow51,icow52,icow53,icow54,icow55,icow56
+     .          icow57,icow58
+      ENDSEGMENT
+      SEGMENT XECOU
+*      COMMON/XECOU/DTOPTI,TSOM,TCAR,DTT,DT,TREFA,TEMP00
+      REAL*8 xcow1, xcow2,xcow3,xcow4,DT,xcow6, xcow7
+C     REAL*8 DTOPTI,TSOM, TCAR, DTT,  DT,TREFA,TEMP00
+      ENDSEGMENT
+      
+c     segment de coordonnees des noeuds de l element
+      integer nbnb,insb,idimb
+      SEGMENT MWRKXE
+        REAL*8 XE(3,nbnb)
+      ENDSEGMENT     
+      
+c     segment des numero des variables a moyenner
+      integer NBVIA      
+      SEGMENT WR14
+        INTEGER INLVIA(NBVIA)
+      ENDSEGMENT  
+
+    
+      
+c     temperatures debut et fin de pas , moyenne, pas de temps, volume rgi     
+      real*8 teta13d,teta23d,temp3d,dt3d
+c     variables de transfert de donnees ( a declarer suivant idvar4 et idvisc)
+      integer nstrs3d,nvari3d,ierr1,mfr11
+c     variable pour passer le numero de l etape non locale      
+      integer istep3d ,nvarib,nstrsb,ifourb
+
+
+c     ******** dimension des tableaux parametres materiau ************** 
+     
+c     nombre de parametres materiau du modele (cf coherence avec idvisc)      
+      integer NBELAS3D,NBPARC3D,NBRINC3D,NBPPARP3D,NBRTAIL3D
+c     nmat1 nombre de parametres materiau sans la taille nmat3d-nbrtail3d      
+      integer NMAT1,NMAT3D    
+c     nombre de parametres materiaux
+
+c     
+c     nombre d inclusions maximum **************************************
+c     a regeler aussi dans idvisc et idvar4
+      parameter (NBRINC3D=1)
+c     ******************************************************************      
+     
+c     nombre de parametres par phases **********************************  
+c     NBELAS3D nb elastique commun a tout les modeles meca (cf idvisc.eso)
+c     NBPARC3D nb de parametres commun   
+c     NBPPARP3D nb de parametres par phase  
+      parameter (NBELAS3D=4,NBPARC3D=4,NBPPARP3D=26) 
+c     nb parametres materiaux maxi pour inclure la taille des elements finis      
+      parameter (NBRTAIL3D=1)
+c     nbre de parametres materiaux sans les tailles des elements      
+      parameter (NMAT1=NBELAS3D+NBPARC3D+(NBRINC3D+1)*NBPPARP3D)
+c     nombre total de parametres       
+      parameter (NMAT3D=NMAT1+NBRTAIL3D+3)
+c     declaration du nombre totale de materiaux      
+      real*8 xmat3d(NMAT3D)   
+c     ******************************************************************      
+      
+c     ******** dimension des tableaux variables internes ***************      
+c     nombre de variables globales isotropes
+      parameter (NBVARISOG=1)
+c     nombre de variable globales tensorielles
+      parameter (NBVARTENG=2)
+c     nombre total de variables globales--------------------------------          
+      parameter (NBVIND3D=NBVARISOG+6*NBVARTENG)
+c     ---cas des variables existantes pour toutes les phases -----------       
+c     nombre de variable isotropes 
+      parameter (NBVARISOPP=7)
+c     nombre de variable tensorielle  
+      parameter (NBVARTENPP=8)         
+c     nombre de variables par phase commune a toutes les phases 
+      parameter (NBVPARP3D=NBVARISOPP+6*NBVARTENPP)
+c     --sous total des varis globales et communes-----------------------
+      parameter (NVTOT1=NBVIND3D+(NBRINC3D+1)*NBVPARP3D)         
+c     nombre de variables supplementaires que pour les inclusions-------
+c     isotrope 
+      parameter (NBVARISOPI=0)
+c     nombre de variables tensorielles         
+      parameter (NBVARTENPI=12)          
+c     nombre total de variables propres aux interfaces
+      parameter (NBVPARI3D=NBVARISOPI+6*NBVARTENPI)
+c     nombre de variables totales         
+      parameter (NVARI3D=NVTOT1+NBVPARI3D*NBRINC3D)         
+c     declaration des tableaux locaux des  variables internes ---------          
+      real*8 VAR03D(NVARI3D),VARF3D(NVARI3D)
+c     ******************************************************************      
+      
+c     ******** dimensionde la table des coordonnees des noeuds *********     
+c     nbr de noeuds maxi par element 
+      integer NBNMAX3D
+      parameter (NBNMAX3D=20)
+      real*8 XE3D(3,NBNMAX3D) 
+            
+c     ********  taille des pseudo vecteurs *****************************
+c     tjrs 6 en raison de son utilisation dans incl3d  
+      parameter (nstrs3d=6)   
+c     contrainteq      
+      real*8 sig03d(nstrs3d),sigf3d(nstrs3d)
+c     deformations      
+      real*8 epst03d(nstrs3d),epstf3d(nstrs3d)
+c     increments de deformations      
+      real*8 depst3d(nstrs3d)
+c     pas de temps      
+      real*8 dtb
+ 
+c     variables logiques : 
+c     isotropie initiale, 
+      logical iso1
+c     traitement de Gf en  local
+      logical local11
+      
+c     ifou type d element cf au debut du fichier
+C            -1  DEFORMATIONS PLANES                                       
+C             0  AXISYMETRIQUE                                                                                    
+C             2  TRIDIMENSIONNEL
+      integer ifou11
+c     taille du psudo vecteur des tailles       
+      integer ntail3d
+      
+c     dimension de l espace physique (1d, 2d ou 3d)
+      integer idimb3d      
+
+c     variable a vrai si il est effectivement prevu de passer
+
+c***********************************************************************
+c remarque : parametres elastiques en formulation poreux massif (mfr=33)
+c    en debut de xmat :
+c   'YOUN'  :  module d'Young
+c   'NU  '  :  coefficient de poisson
+c   'RHO '  :  masse volumique (a la fin en non poreux)
+c   'ALPH'  :  coefficient de dilatation thermique
+c    à la fin de xmat :
+c   'MOB '  :  module de Biot
+c   'COB '  :  coefficient de Biot
+c   'PERM'  :  perméabilité intrinsèque
+c   'VISC'  :  viscosité dynamique du fluide
+c   'ALPM'  :  coefficient de couplage pression - température
+c   l ordre n est pas le meme si le materiau est orthotrope 
+c   cf deche.inc pour recuperer les noms exacts des variables
+c   transfert des variables dans les tableaux du modele
+c*********************************************************************** 
+      
+c     ***** valeur de ntail3d 
+      ntail3d=1
+ 
+          
+c***********************************************************************       
+c      transfert des parametres materiaux dans le tableau de as3d
+       if(mfr.ne.33) then
+c       on est pas en poro meca       
+        if(NMAT3D.lt.nmatt) then
+             print*,'pb dimension de xmat dans cinc3d'
+             print*,'nmatt',nmatt,'nmat3d',NMAT3D,'nmat1',NMAT1
+             do i=1,nmatt
+                 print*,'xmat(',i,')=',xmat(i)
+             enddo
+             read*
+             kerre=1
+             return
+        end if
+c       recuperation des parametres materiau        
+        do i=1,NMAT1
+             xmat3d(i)=xmat(i)
+        end do
+c       recuperation des parametres de taille        
+        if(ntail3d.ne.0) then
+         do i=(NMAT1+1),(NMAT1+ntail3d)
+             xmat3d(i)=xmat(i)
+         end do
+         if (ntail3d.lt.NBRTAIL3D) then
+          do i=(NMAT1+ntail3d+1),(NMAT1+NBRTAIL3D)
+             xmat3d(i)=0.d0
+          end do  
+         else
+          if(ntail3d.gt.NBRTAIL3D) then
+            print*,'pb de dimension de ntail3d ds cinc3d'
+            kerre=1
+            return
+          end if
+         end if
+        else
+          do i=(NMAT1+1),(NMAT1+NBRTAIL3D)
+             xmat3d(i)=0.d0
+          end do 
+        end if         
+       else
+c       traiter ici la formulation poreux suivant les formulations       
+        if(NMAT3D.lt.(nmatt-8)) then
+         print*,'on est en poreux'
+         print*,'Pb affectation des caracteristiques dans cinc3d'
+         do i=1,nmatt
+             print*,'xmat(',i,')=',xmat(i)
+         end do
+         kerre=1
+         return
+        else
+c         recuperation des parametres dans le cas poro meca        
+          do i=1,NMAT3D
+             xmat3d(i)=xmat(i)
+          end do   
+        end if
+       end if                 
+       
+c      **** recuperation des variables internes debut de pas ***********       
+       if(nvari3d.ne.nvarib) then
+             print*,'Pb dimension de var0 dans cinc3d'
+             print*,'Verifier dimension table des variables internes'
+             print*,'et compatibilite avec idvar4 et incl3d'
+             read*
+             kerre=1
+             return
+       end if
+c      transfert vers le tableau de fldo3d      
+       do i=1,nvari3d
+c            indicateur de passage de 1er pas       
+             if(var0(1).ne.1.) then
+                 var0(i)=0.d0
+             end if
+c            autres variables internes             
+             var03d(i)=var0(i)
+c            initialisation de variable internes finales aux initiales             
+             varf3d(i)=var03d(i)            
+       end do
+       
+c      ***** recuperation des contraintes totales debut de pas *********
+       if(mfr.ne.33) then 
+c       on est pas en poreux       
+        if(nstrsb.lt.nstrs3d) then
+            do i=1,nstrsb
+                sig03d(i)=sig0(i)
+                sigf3d(i)=sigf(i)
+c               !!!! ATTENTION les depst 3-6 doivent etre des gamas !!!!                
+                depst3d(i)=depst(i)
+                epst03d(i)=epst0(i)
+                epstf3d(i)=epstf(i)
+            end do
+            do i=nstrsb+1,nstrs3d
+                sig03d(i)=0.d0
+                sigf3d(i)=0.d0
+c               !!!! ATTENTION les depst 3-6 doivent etre des gamas !!!!                 
+                depst3d(i)=0.d0
+                epst03d(i)=0.d0
+                epstf3d(i)=0.d0
+            end do
+        else
+            do i=1,nstrs3d
+                sig03d(i)=sig0(i)
+                sigf3d(i)=sigf(i)
+c               !!!! ATTENTION les depst 3-6 doivent etre des gamas !!!!                 
+                depst3d(i)=depst(i)
+                epst03d(i)=epst0(i)
+                epstf3d(i)=epstf(i)
+            end do
+        end if
+       else
+         print*,'On est en poreux'
+         print*,'Pb affectation des contraintes dans cinc3d'
+         print*,'a terminer...'
+         do i=1,nstrsb
+             print*,'sig(',i,')=',sig0(i)
+         end do
+         kerre=1
+         return
+       end if         
+      
+
+c      ********   autres parametres a renseigner ***********************
+
+c      initialisation indicateur d erreur       
+       ierr1=0
+c      indicateur isostropie initiale (elastique et de resistance)
+       iso1=.true.
+c      numero de la formulation (33 pour poreux)
+       mfr11=mfr 
+c      type de formulation
+       ifour11=ifourb        
+c      controle de regularisation en cas d endommagement par methode locale
+       local11=.true. 
+c      pas de temps
+       dt3d=dtb
+c       if(dt3d.eq.0.) then
+c        print*,'ds CINC3D: dt t0 tf', dt3d,tempf,temp0
+c       end if     
+c      numero  pour le traitement local/non local eventuel       
+       istep3d=istep
+c      test de compatibilite
+       if(local11.and.(istep3d.gt.0)) then
+            print*,'Dans inclusion3d, on ne peut pas avoir local=vrai'
+            kerre=1
+            return 
+       end if            
+       
+c      ******* recuperation des coordonnees de noeuds ******************
+c      boucle sur les noeuds
+       if(nbnb.le.NBNMAX3D) then
+           NBNB3D=nbnb
+           if(idimb.le.3) then
+              idimb3d=idimb
+           else
+              print*,'pb table de coord des neouds ds cflu3d'
+              kerre=1
+              return
+           end if
+       else
+          print*,'Element avec + de noeuds que capacite de cflu3d'
+          kerre=1
+          return
+       end if
+c      chargement des coordonnees des  noeuds       
+       do insb=1,NBNB3D
+          do j=1,idimb3d       
+c            print*,'xe(',j,insb,')=',xe(j,insb)   
+             xe3d(j,insb)=xe(j,insb)
+          end do
+          if (idimb.lt.3) then           
+            do j=idimb+1,3
+              xe3d(j,insb)=0.d0
+            end do
+          end if            
+       end do
+c      on double les noeuds si le probleme est 2D       
+       if ((ifourb.eq.0).or.(ifourb.eq.-1)) then
+c        on double les noeuds avec dimension 3 recupere en xmat(nmat1+8)
+         dimension3=xmat3d(nmat1+1)
+c        verif presence de la 3eme dimension         
+         if(dimension3.eq.0.) then
+           if(ifourb.eq.0) then
+c             cas axi           
+              print*,'Ds Cincl3d il manque la dimension DIMT'
+              kerre=1
+              return
+           else if (ifourb.eq.-1) then
+c             cas def plane           
+              print*,'Ds Cincl3d il manque la dimension DIMZ'
+              kerre=1
+              return  
+           else
+c             cas inconnu d incl3d           
+              print*,'Ds Cincl3d EF incompatible'
+              kerre=1
+              return 
+           end if
+         end if           
+         NBNB3D=2*nbnb
+         do insb=nbnb+1,NBNB3D
+            do j=1,2       
+c               print*,'xe(',j,insb,')=',xe(j,insb)   
+                xe3d(j,insb)=xe3d(j,(insb-nbnb))
+            end do
+            xe3d(3,insb)=dimension3
+         end do
+       end if
+c      ******* appel a incl3d *************************************
+c
+c      ne pas effacer nom des vraibles originales (pour memoire)       
+c      call fluag3D(xmat,nmatt,var0,varf,nvari,dt1,DEPST,
+c     #nstrs,sigf,mfr,errfluag3D,teta1,teta2)   
+     
+       call incl3d(xmat3d,NMAT3D,sig03d,sigf3d,depst3d,NSTRS3D,
+     # var03d,varf3d,NVARI3D,NBELAS3D,teta13d,teta23d,dt3d,ierr1,iso1,
+     # MFR11,local11,NMAT1,ifour11,istep3d,epst03d,epstf3d,NBRTAIL3D,
+     # NBNMAX3D,NBNB3D,IDIMB3D,XE3D,NBRINC3D,NBPARC3D,NBPPARP3D,
+     # NBVARISOG,NBVARTENG,NBVARISOPP,NBVARTENPP,NVTOT1,NBVARISOPI,
+     # NBVARTENPI)     
+            
+c      ****** re-affectation des tableaux de variables internes ********
+       do i=1,nvarib
+            varf(i)=varf3d(i)
+c            print*,'cas3d f(',i,')=',varf(i),' i',var0(i)
+       end do
+c       read*
+c      ecriture des contraintes totales fin de pas       
+       do i=1,nstrsb
+          sigf(i)=sigf3d(i)
+       end do        
+
+c***********************************************************************
+c       traitement de l erreur d ecoulement
+        if(ierr1.eq.0)then
+            kerre=0 
+        else
+            kerre=1
+        end if
+1000  return
+      end
+      
+c***********************************************************************      
+
+       
+
+
+ 
+ 
+ 

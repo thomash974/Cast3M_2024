@@ -1,0 +1,163 @@
+C TCUB8     SOURCE    OF166741  23/12/04    21:15:12     11800          
+
+C=======================================================================
+C=                            T C U B 8                                =
+C=                            ---------                                =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=   Acquisition des caracteristiques d'integration aux noeuds, aux    =
+C=   points d'integration (Gauss) ou au centre de gravite pour         =
+C=   l'element thermique support CUB8.                                 =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   ISUPTH  (E)   Indique le support d'integration demande            =
+C=   IPINTE  (S)   Pointeur sur le segment MINTE associe (ACTIF en S)  =
+C=======================================================================
+
+      SUBROUTINE TCUB8 (ISUPTH,IPINTE)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC SMINTE
+
+      PARAMETER ( O0 = 0.D0, O1=1.D0, O8=8.D0, O125=0.125D0 )
+      PARAMETER ( X=0.577350269189625764509148780501957D0 )
+
+      NBNO = 8
+      IF      (ISUPTH.EQ.1 .OR. ISUPTH.EQ.2) THEN
+        NBPGAU = 8
+      ELSE IF (ISUPTH.EQ.3) THEN
+        NBPGAU = 1
+      ELSE
+        RETURN
+      ENDIF
+      SEGINI,MINTE
+
+C COORDONNEES ET POIDS DES 8 NOEUDS
+      IF (ISUPTH.EQ.1) THEN
+
+        QSIGAU(1) = -O1
+        QSIGAU(2) = +O1
+        QSIGAU(3) = +O1
+        QSIGAU(4) = -O1
+        QSIGAU(5) = -O1
+        QSIGAU(6) = +O1
+        QSIGAU(7) = +O1
+        QSIGAU(8) = -O1
+
+        ETAGAU(1) = -O1
+        ETAGAU(2) = -O1
+        ETAGAU(3) = +O1
+        ETAGAU(4) = +O1
+        ETAGAU(5) = -O1
+        ETAGAU(6) = -O1
+        ETAGAU(7) = +O1
+        ETAGAU(8) = +O1
+
+        DZEGAU(1) = -O1
+        DZEGAU(2) = -O1
+        DZEGAU(3) = -O1
+        DZEGAU(4) = -O1
+        DZEGAU(5) = +O1
+        DZEGAU(6) = +O1
+        DZEGAU(7) = +O1
+        DZEGAU(8) = +O1
+
+        DO I = 1, NBPGAU
+          POIGAU(I) = O1
+        ENDDO
+
+C COORDONNEES ET POIDS DES 8 POINTS DE GAUSS
+      ELSE IF (ISUPTH.EQ.2) THEN
+        QSIGAU(1) = -X
+        QSIGAU(2) = +X
+        QSIGAU(3) = +X
+        QSIGAU(4) = -X
+        QSIGAU(5) = -X
+        QSIGAU(6) = +X
+        QSIGAU(7) = +X
+        QSIGAU(8) = -X
+
+        ETAGAU(1) = -X
+        ETAGAU(2) = -X
+        ETAGAU(3) = +X
+        ETAGAU(4) = +X
+        ETAGAU(5) = -X
+        ETAGAU(6) = -X
+        ETAGAU(7) = +X
+        ETAGAU(8) = +X
+
+        DZEGAU(1) = -X
+        DZEGAU(2) = -X
+        DZEGAU(3) = -X
+        DZEGAU(4) = -X
+        DZEGAU(5) = +X
+        DZEGAU(6) = +X
+        DZEGAU(7) = +X
+        DZEGAU(8) = +X
+
+        DO I = 1, NBPGAU
+          POIGAU(I) = O1
+        ENDDO
+
+C COORDONNEES ET POIDS DU CENTRE DE GRAVITE
+      ELSE IF (ISUPTH.EQ.3) THEN
+        QSIGAU(1) = O0
+        ETAGAU(1) = O0
+        DZEGAU(1) = O0
+        POIGAU(1) = O8
+      ENDIF
+
+* FONCTIONS DE FORME ET LEURS DERIVEES AU(X) NBPGAU POINT(S)
+      DO I = 1, NBPGAU
+        XI = QSIGAU(I)
+        YI = ETAGAU(I)
+        ZI = DZEGAU(I)
+
+        SHPTOT(1,1,I) = O125*(O1-XI)*(O1-YI)*(O1-ZI)
+        SHPTOT(1,2,I) = O125*(O1+XI)*(O1-YI)*(O1-ZI)
+        SHPTOT(1,3,I) = O125*(O1+XI)*(O1+YI)*(O1-ZI)
+        SHPTOT(1,4,I) = O125*(O1-XI)*(O1+YI)*(O1-ZI)
+        SHPTOT(1,5,I) = O125*(O1-XI)*(O1-YI)*(O1+ZI)
+        SHPTOT(1,6,I) = O125*(O1+XI)*(O1-YI)*(O1+ZI)
+        SHPTOT(1,7,I) = O125*(O1+XI)*(O1+YI)*(O1+ZI)
+        SHPTOT(1,8,I) = O125*(O1-XI)*(O1+YI)*(O1+ZI)
+
+        SHPTOT(2,1,I) = -O125*(O1-YI)*(O1-ZI)
+        SHPTOT(2,2,I) =  O125*(O1-YI)*(O1-ZI)
+        SHPTOT(2,3,I) =  O125*(O1+YI)*(O1-ZI)
+        SHPTOT(2,4,I) = -O125*(O1+YI)*(O1-ZI)
+        SHPTOT(2,5,I) = -O125*(O1-YI)*(O1+ZI)
+        SHPTOT(2,6,I) =  O125*(O1-YI)*(O1+ZI)
+        SHPTOT(2,7,I) =  O125*(O1+YI)*(O1+ZI)
+        SHPTOT(2,8,I) = -O125*(O1+YI)*(O1+ZI)
+
+        SHPTOT(3,1,I) = -O125*(O1-XI)*(O1-ZI)
+        SHPTOT(3,2,I) = -O125*(O1+XI)*(O1-ZI)
+        SHPTOT(3,3,I) =  O125*(O1+XI)*(O1-ZI)
+        SHPTOT(3,4,I) =  O125*(O1-XI)*(O1-ZI)
+        SHPTOT(3,5,I) = -O125*(O1-XI)*(O1+ZI)
+        SHPTOT(3,6,I) = -O125*(O1+XI)*(O1+ZI)
+        SHPTOT(3,7,I) =  O125*(O1+XI)*(O1+ZI)
+        SHPTOT(3,8,I) =  O125*(O1-XI)*(O1+ZI)
+
+        SHPTOT(4,1,I) = -O125*(O1-XI)*(O1-YI)
+        SHPTOT(4,2,I) = -O125*(O1+XI)*(O1-YI)
+        SHPTOT(4,3,I) = -O125*(O1+XI)*(O1+YI)
+        SHPTOT(4,4,I) = -O125*(O1-XI)*(O1+YI)
+        SHPTOT(4,5,I) =  O125*(O1-XI)*(O1-YI)
+        SHPTOT(4,6,I) =  O125*(O1+XI)*(O1-YI)
+        SHPTOT(4,7,I) =  O125*(O1+XI)*(O1+YI)
+        SHPTOT(4,8,I) =  O125*(O1-XI)*(O1+YI)
+
+      ENDDO
+
+      IPINTE = MINTE
+
+c      RETURN
+      END
+
+ 

@@ -1,0 +1,809 @@
+C HHOPRE    SOURCE    OF166741  24/05/06    21:15:13     11082          
+
+      SUBROUTINE HHOPRE (charHHO, mailHHO, lentHHO, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMELEME
+-INC SMLENTI
+      POINTEUR mleCEL.mlenti,mleSQE.mlenti
+
+      EXTERNAL LONG
+
+      CHARACTER*(*) charHHO
+      CHARACTER*(3) hyp_z
+
+      iret = 0
+
+C=----------------------------------------------------------------------
+C= ORDRE DES CELLULES ET DES FACES :
+C=----------------------------------------------------------------------
+C= Decodage de la chaine pour avoir ordre des cellules et des faces :
+      n_z = LONG(charHHO)
+      l_z = LEN(charHHO)
+c-AV      IF (l_z.LT.13) THEN
+      IF (l_z.LT.11) THEN
+        write(ioimp,*) 'LENGTH charHHO incorrect (PBM 10)'
+        iret = 5
+        RETURN
+      END IF
+C= Passage en minuscules :
+      CALL CHCASS(charHHO(1:n_z),0,charHHO(1:n_z))
+C= Transformation des " " en "_" --> "hho_c_f" ou "hho_c_f_hyp" ?
+      DO i = 1, n_z
+        IF (charHHO(i:i).EQ.' ') charHHO(i:i) = '_'
+      END DO
+c-dbg      write(ioimp,*) 'charHHO =>'//charHHO(1:n_z)//'<=',n_z,l_z
+C= La chaine charHHO doit etre de la forme :
+C= "hho_c_f" ou "hho_c_f_hyp" avec c et f entiers positifs, et hyp=sp/ft
+C= Petits tests :
+      IF (n_z.LT.7) THEN
+        write(ioimp,*) 'String HHO too short (PBM 0)'
+        iret = 5
+        RETURN
+      END IF
+      IF (charHHO(1:3).NE.'hho') THEN
+        write(ioimp,*) 'String HHO incorrect (PBM 1)'
+        iret = 21
+        RETURN
+      END IF
+      i_c = INDEX(charHHO(1:n_z),'_')
+      IF (i_c.NE.4) THEN
+        write(ioimp,*) 'String HHO incorrect (PBM 2)',i_c
+        iret = 21
+        RETURN
+      END IF
+      i_f = INDEX(charHHO(i_c+1:n_z),'_')
+      IF (i_f.LT.1) THEN
+        write(ioimp,*) 'Sring HHO incorrect (PBM 3)',i_f
+        iret = 21
+        RETURN
+      END IF
+      i_f = i_f + i_c
+      i_h = INDEX(charHHO(i_f+1:n_z),'_')
+      IF (i_h.LT.1) THEN
+        i_h = n_z + 1
+        i_3 = 0
+      ELSE
+        i_h = i_f + i_h
+        i_3 = n_z
+      ENDIF
+c-dbg      write(ioimp,*) 'HHOPRE 1 ',i_c,i_f,i_h,i_3
+
+      i_z = (i_f - 1) - (i_c + 1) + 1
+      IF (i_z.LT.1) THEN
+        write(ioimp,*) 'CELL ORDER undefined (PBM 4)'
+        iret = 21
+        RETURN
+      END IF
+      i_z = (i_h - 1) - (i_f + 1) + 1
+      IF (i_z.LT.1) THEN
+        write(ioimp,*) 'FACE ORDER undefined (PBM 5)'
+        iret = 21
+        RETURN
+      END IF
+
+      n_o_cell = -999
+      n_o_face = -999
+      READ(charHHO(i_c+1:i_f-1),*,ERR=901) n_o_cell
+ 901  CONTINUE
+      READ(charHHO(i_f+1:i_h-1),*,ERR=902) n_o_face
+ 902  CONTINUE
+      IF (n_o_cell.LT.0 .OR. n_o_face.LT.0) THEN
+        write(ioimp,*) 'CELL/FACE ORDER incorrect (PBM 6)'
+        write(ioimp,*) '   =>',charHHO(i_c+1:i_f-1),'<=',
+     &                 '   =>',charHHO(i_f+1:i_h-1),'<='
+        iret = 21
+        RETURN
+      END IF
+C= Test de coherence :
+      IF (IDIM.EQ.1) THEN
+        IF (n_o_face.NE.0) THEN
+          write(ioimp,*) 'IDIM = 1 : FACE ORDER must be 0 (PBM 7)'
+          iret = 21
+        END IF
+      END IF
+      IF ( (IDIM.EQ.2) .OR. (IDIM.EQ.3) ) THEN
+        IF ( n_o_cell.LT.(n_o_face-1) .OR.
+     &       n_o_cell.GT.(n_o_face+1) ) THEN
+          write(ioimp,*) 'IDIM = 2/3 : CELL ORDER uncorrect (PBM 8)'
+          write(ioimp,*) '  l cell in [ k face - 1 ; k face + 1]'
+          iret = 21
+        END IF
+      END IF
+C= Validation de l'hypothese de calcul ("sp" ou "ft")
+      IF (i_3.GT.0) THEN
+        hyp_z = '   '
+        hyp_z = charHHO(i_h:n_z)
+        IF (hyp_z.NE.'_ft' .AND. hyp_z.NE.'_sp') THEN
+          write(ioimp,*) 'HYPOTHESIS SP/FT incorrect (PBM 9)'
+          iret = 21
+          RETURN
+        END IF
+      ELSE
+        hyp_z = '_sp'
+      END IF
+*AV      charHHO(1:13) = 'hho_00_00_** '
+*AV      WRITE(charHHO(5:6),'(I2.2)') n_o_cell
+*AV      WRITE(charHHO(8:9),'(I2.2)') n_o_face
+*AV      charHHO(10:12) = hyp_z
+*AVC= La chaine charHHO est de la forme : "hho_cc_ff_hy ".
+      charHHO(1:11) = 'hho_0_0_** '
+      WRITE(charHHO(5:5),'(I1.1)') n_o_cell
+      WRITE(charHHO(7:7),'(I1.1)') n_o_face
+      charHHO(8:10) = hyp_z
+C= La chaine charHHO est de la forme : "hho_c_f_hy ".
+C= Elle sera utile pour appeler les fonctions HHO adequates.
+
+C= Nombre de ddl par face et par cellule selon ordre et dime
+C= Attention pour les faces : dime = idim - 1 !
+C= nddl_dir = Produit(i = 1 a dime) [ (ordre + dime + 1 - i) / i ]
+      IF (IDIM.EQ.1) THEN
+        n_d_face = 1
+        n_d_cell = n_o_cell + 1
+      ELSE IF (IDIM.EQ.2) THEN
+        n_d_face = n_o_face + 1
+        n_d_cell = (n_o_cell + 2) * (n_o_cell + 1) / 2
+      ELSE IF (IDIM.EQ.3) THEN
+        n_d_face = (n_o_face + 2) * (n_o_face + 1) / 2
+        n_d_cell = (n_o_face + 3) * (n_o_face + 2) * (n_o_face + 1) / 6
+      END IF
+C= nddl tot = nddl_dir * idfo (idfo = idim pour MECA, = 1 pour THER ou PFM)
+
+C= Quelques restrictions qui pourront etre levees par la suite :
+      IF (n_o_face.NE.1) THEN
+        write(ioimp,*) 'FACE ORDER must be equal to 1 for the moment'
+        iret = 21
+        RETURN
+      END IF
+      IF (n_d_face.GT.10) THEN
+        write(ioimp,*) 'FACE ORDER is too big (PBM 12F)'
+        iret = 21
+        RETURN
+      END IF
+      IF (n_d_cell.GT.10) THEN
+        write(ioimp,*) 'CELL ORDER is too big (PBM 12C)'
+        iret = 21
+        RETURN
+      END IF
+
+c-dbg      write(ioimp,*)
+c-dbg      write(ioimp,*) 'HHO : IDIM, IFOUR =', IDIM,IFOUR
+c-dbg      write(ioimp,*) '      =>'//charHHO(1:LONG(charHHO))//'<='
+c-dbg      write(ioimp,*) '      FACE ORDER / DOF DIR = ',n_o_face,n_d_face
+c-dbg      write(ioimp,*) '      CELL ORDER / DOF DIR = ',n_o_cell,n_d_cell
+c-dbg      write(ioimp,*) '      HYPOTHESIS = ', hyp_z(2:3)
+
+C=----------------------------------------------------------------------
+C= Traitement du maillage total du modele (fourni en entree) :
+C=----------------------------------------------------------------------
+      meleme  = mailHHO
+c*      segact,meleme*nomod (segment actif en entree)
+
+C=----------------------------------------------------------------------
+C= Construction du maillage des faces :
+C=----------------------------------------------------------------------
+      CALL ECROBJ('MAILLAGE',mailHHO)
+      IF (IDIM.EQ.2) THEN
+        CALL CHANLG
+      ELSE IF (IDIM.EQ.3) THEN
+        CALL ECRCHA('NOID')
+        CALL ENVVO2(1)
+      ELSE
+        IERR = 5
+      END IF
+      IF (IERR.NE.0) THEN
+        iret = 21
+        RETURN
+      END IF
+      CALL LIROBJ('MAILLAGE',mailSQE,1,iretc)
+
+C= On reactive les maillages :
+      CALL ACTOBJ('MAILLAGE',mailHHO,1)
+      CALL ACTOBJ('MAILLAGE',mailSQE,1)
+
+C= ---------------------------
+C= Compatibilite des maillages avec la formulation HHO
+C= ---------------------------
+C= Les elements geometriques (cellules/faces) autorises :
+      IF (IDIM.EQ.3) THEN
+        indc = IC3MAX+1
+        lonc = NC3MAX
+        indf = IF3MAX+1
+        lonf = NF3MAX
+      ELSE IF (IDIM.EQ.2) THEN
+        indc = IC2MAX+1
+        lonc = NC2MAX
+        indf = IF2MAX+1
+        lonf = NF2MAX
+c-      ELSE IF (IDIM.EQ.1) THEN
+      ELSE
+        indc = IC1MAX+1
+        lonc = NC1MAX
+        indf = IF1MAX+1
+        lonf = NF1MAX
+      END IF
+
+C= Verifications du maillage :
+C= ---------------------------
+      meleme  = mailHHO
+      nbsCEL = meleme.LISOUS(/1)
+      ipt1 = meleme
+      nbs1 = MAX(1,nbsCEL)
+      n_z = 0
+      DO i = 1, nbs1
+        IF (nbsCEL.NE.0) ipt1 = meleme.LISOUS(i)
+        ity1 = ipt1.itypel
+        if (ity1.eq.32) ity1 = ity1 * 100 + ipt1.num(/1)
+        i_z = 0
+        CALL PLACE2(LICHHO(indc),lonc,i_z,ity1)
+        IF (i_z.EQ.0) THEN
+          write(ioimp,*) 'HHOPRE: cell not defined',ipt1,NOMS(ity1),ity1
+          n_z = n_z + 1
+        END IF
+      END DO
+      IF (n_z.GT.0) THEN
+        iret = 251
+        RETURN
+      END IF
+
+      meleme = mailSQE
+      nbsSQE = meleme.lisous(/1)
+      if (nbsSQE.ne.0) then
+        IF (IDIM.EQ.1 .OR. IDIM.EQ.2) THEN
+          write(ioimp,*) 'HHO 1D/2D : skeleton not simple'
+          iret = 5
+          return
+        END IF
+      end if
+      ipt1 = meleme
+      nbs1 = MAX(1,nbsSQE)
+      n_z = 0
+      DO i = 1, nbs1
+        IF (nbsSQE.NE.0) ipt1 = meleme.lisous(i)
+        ity1 = ipt1.itypel
+c*face3Dpoly : inconnu a ce jour       if (ity1.eq.  ) ity1 = formule a ecrire si necessaire
+        i_z = 0
+        CALL PLACE2(LIFHHO(indf),lonf,i_z,ity1)
+        IF (i_z.EQ.0) THEN
+          write(ioimp,*) 'HHOPRE: face not defined',ipt1,NOMS(ity1),ity1
+          n_z = n_z + 1
+        END IF
+      END DO
+      IF (n_z.GT.0) THEN
+        iret = 5
+        RETURN
+      END IF
+
+C=----------------------------------------------------------------------
+C= Initialisations/Verifications DIMENSION et MODE DE CALCUL HHO
+C=----------------------------------------------------------------------
+      i1_HHO = 0
+      IF (IDIHHO.LT.0) THEN
+        i1_HHO = 1
+        IDIHHO = IDIM
+        IFOHHO = IFOUR
+      END IF
+      IF (IDIHHO .NE. IDIM) THEN
+        write(ioimp,*) 'HHOPRE: IDIM cannot be changed'
+        iret = 5
+        RETURN
+      END IF
+      IF (IFOHHO .NE. IFOUR) THEN
+        write(ioimp,*) 'HHOPRE: IFOUR cannot be changed'
+        iret = 5
+        RETURN
+      END IF
+
+C- Juste pour le debogage :
+      if (nbchho(0).ne.0) then
+        write(ioimp,*) 'HHOPRE: nbchho(0) not 0'
+        iret = 5
+      end if
+      if (nbfhho(0).ne.0) then
+        write(ioimp,*) 'HHOPRE: nbfhho(0) not 0'
+        iret = 5
+      end if
+      if (iret.ne.0) return
+
+c-dbg c Si on souhaite surveiller un maillage
+c-dbg      CALL OOOSUR(M..HHO)
+c-dbg      msurve = M...HO
+
+C= Construction du maillage HHO global MCEHHO :
+C= --------------------------------------------
+      JG = 2 * NCEMAX
+      SEGINI,mleCEL
+      DO i = 1, NCEMAX
+        mleCEL.lect(i) = NBCHHO(i)
+        mleCEL.lect(i+NCEMAX) = 0
+      END DO
+
+C= Remplissage initial de MCEHHO :
+      IF (MCEHHO.LT.0) THEN
+c-dbg        write(ioimp,*) 'HHOPRE: Initialisation MCEHHO'
+C= Petites verifications juste pour le debogage :
+        if (i1_HHO.NE.1) then
+          write(ioimp,*) 'HHOPRE-MCEHHO: Bad initialization (1)'
+          iret = 5
+          return
+        end if
+        n_z = 0
+        DO i = 1, NCEMAX
+          IF (MACHHO(i).GT.0 .OR. NBCHHO(i).NE.0) THEN
+            n_z = n_z + 1
+            write(ioimp,*) 'HHOPRE-MCEHHO: Init.',i,MACHHO(i),NBCHHO(i)
+          END IF
+        END DO
+        if (n_z.gt.0) then
+          iret = 5
+          return
+        end if
+
+C- Si plusieurs zones, on duplique entete du maillage
+        IF (nbsCEL.GT.1) THEN
+          ipt1 = mailHHO
+          SEGINI,meleme=ipt1
+          MCEHHO = meleme
+        ELSE
+          MCEHHO = mailHHO
+        END IF
+
+        meleme = MCEHHO
+        ipt1 = meleme
+        nbs1 = MAX(1,nbsCEL)
+        DO i = 1, nbs1
+          IF (nbsCEL.NE.0) ipt1 = meleme.lisous(i)
+          ity1 = ipt1.itypel
+          if (ity1.eq.32) ity1 = ity1 * 100 + ipt1.num(/1)
+          i_z = 0
+          CALL PLACE2(LICHHO(indc),lonc,i_z,ity1)
+          nbe1 = ipt1.num(/2)
+c* a revoir quand il y aura cumul
+          NBCHHO(i_z) = nbe1
+          MACHHO(i_z) = ipt1
+          if (mleCEL.lect(i_z+NCEMAX).ne.0)
+     &      write(ioimp,*) 'HHOPRE: bizarre',i,i_z,ipt1,ity1
+          mleCEL.lect(i_z+NCEMAX) = nbe1
+        END DO
+
+C= Mise a jour de MCEHHO :
+      ELSE
+        if (i1_HHO.NE.0) then
+          write(ioimp,*) 'HHOPRE-MCEHHO: Bad initialization (2)'
+          iret = 5
+          return
+        end if
+        write(ioimp,*) 'MCEHHO deja defini --> A completer'
+        write(ioimp,*) 'MAIS CAS EN COURS D IMPLEMENTATION'
+        iret = 5
+        RETURN
+      END IF
+
+      nelCEL = 0
+      nbsCEL = 0
+      DO i = 1, NCEMAX
+        nelCEL = nelCEL + NBCHHO(i)
+        IF (MACHHO(i).GT.0) nbsCEL = nbsCEL + 1
+      END DO
+      NCEHHO = nelCEL
+      NUCHHO = nbsCEL
+c-dbg      write(ioimp,*) 'HHOPRE-MCEHHO:',NCEHHO,NUCHHO
+
+C* On reordonne MCEHHO selon liste type :
+      ipt2 = MCEHHO
+      IF (nbsCEL.GT.1) THEN
+        segact,ipt2*MOD
+        isou = 0
+        DO i = 1, NCEMAX
+          ipt1 = MACHHO(i)
+          IF (ipt1.GT.0) THEN
+            isou = isou + 1
+            ipt2.lisous(isou) = ipt1
+          END IF
+        END DO
+        segact,ipt2*NOMOD
+      END IF
+C= Doit-on faire un savseg de MCEHHO et des sous-zones eventuelles ?
+      DO i = 1, NCEMAX
+        NBCHHO(i) = NBCHHO(i) + NBCHHO(i-1)
+      END DO
+      if (nbchho(ncemax).ne.NCEHHO)
+     &  write(ioimp,*) 'Bizarre nbchho(ncemax) != NCEHHO'
+
+C= Construction du squelette HHO global MSQHHO :
+C= ---------------------------------------------
+c== Remplissage de ...HHO : l'indice i correspond aux donnees des faces
+C== qui sont des polygones a i cotes (indice =1 fixe a 0, =2 pour 2D, 
+C== =3 et superieurs pour 3D, limite = faces a moins de hho_max_edge cotes)
+      IF (IDIM.EQ.3) THEN
+        idebf = 3
+        ifinf = NFAMAX
+      ELSE IF (IDIM.EQ.2) THEN
+        idebf = 2
+        ifinf = 2
+      ELSE IF (IDIM.EQ.1) THEN
+        idebf = 1
+        ifinf = 1
+      END IF
+
+      JG = 2 * NFAMAX
+      SEGINI,mleSQE
+      DO i = 1, NFAMAX
+        mleSQE.lect(i) = NBFHHO(i)
+        mleSQE.lect(i+NFAMAX) = 0
+      END DO
+
+C= Remplissage initial de MSQHHO :
+      IF (MSQHHO.LT.0) THEN
+c-dbg        write(ioimp,*) 'HHOPRE: Initialisation MSQHHO'
+C= Petites verifications juste pour le debogage :
+        if (i1_HHO.NE.1) then
+          write(ioimp,*) 'HHOPRE-MSQHHO: Bad initialization (1)'
+          iret = 5
+          return
+        end if
+        n_z = 0
+        DO i = 1, NFAMAX
+          IF (MAFHHO(i).GT.0 .OR. NBFHHO(i).NE.0) THEN
+            n_z = n_z + 1
+            write(ioimp,*) 'HHOPRE-MSQHHO: Init.',i,MAFHHO(i),NBFHHO(i)
+          END IF
+        END DO
+        if (n_z.gt.0) then
+          iret = 5
+          return
+        end if
+
+C- Si plusieurs zones, on duplique entete du maillage
+        IF (nbsSQE.GT.1) THEN
+          ipt1 = mailSQE
+          SEGINI,meleme=ipt1
+          MSQHHO = meleme
+        ELSE
+          MSQHHO = mailSQE
+        END IF
+
+        meleme = mailSQE
+        ipt1 = meleme
+        nbs1 = MAX(1,nbsSQE)
+        DO i = 1, nbs1
+          IF (nbsSQE.NE.0) ipt1 = meleme.lisous(i)
+          nbn1 = ipt1.num(/1)
+          nbe1 = ipt1.num(/2)
+          if (mleSQE.lect(NFAMAX+nbn1).ne.0)
+     &      write(ioimp,*) 'HHOPRE: bizarre SQE',i,nb1,ipt1,nbe1
+          mleSQE.lect(NFAMAX+nbn1) = nbe1
+          JG = 2
+          SEGINI,mlent1
+          mlent1.lect(1) = -nbe1
+          mlent1.lect(2) = n_o_face
+          NBFHHO(nbn1) = nbe1
+          MAFHHO(nbn1) = ipt1
+          LOFHHO(nbn1) = mlent1
+        END DO
+
+C= Mise a jour de MSQHHO :
+      ELSE
+        if (i1_HHO.NE.0) then
+          write(ioimp,*) 'HHOPRE-MSQHHO: Bad initialization (2)'
+          iret = 5
+          return
+        end if
+        write(ioimp,*) 'MSQHHO deja definie --> A completer'
+        write(ioimp,*) 'MAIS CAS EN COURS D IMPLEMENTATION'
+        iret = 5
+        RETURN
+
+C----        meleme = mailSQE
+C----        ipt1 = meleme
+C----        DO i = 1, MAX(1,nbsSQE)
+C----          IF (nbsSQE.NE.0) ipt1 = meleme.lisous(i)
+C----          nbn1 = ipt1.num(/1)
+C----          nbe1 = ipt1.num(/2)
+C----          IF (MAFHHO(nbn1).GT.0) THEN
+C----* il faut fusionner les maillages de maniere unique...
+C----* en n'ajoutant que les nouvelles faces a la suite des existantes !
+C----            ipt2   = MAFHHO(nbn1)
+C----            mlent2 = LOFHHO(nbn1)
+C----            segact,mlent2*MOD
+C----            iadj2 = 0
+C----            IF (mlent2.lect(1).LT.0) THEN
+C----            END IF
+C----c*            CALL INTERB(ipt2,ipt1,ipti,ivid)
+C----c*            CALL OUEXCL(ipt1,ipti,iptc,ivid)
+C----c*            nbec = iptc.num(/2)
+C----c*            CALL FUSMAIL(ipt2,iptc,ipt3,ivid)
+C----c*
+C----c*            nbe1 = nbe1 + nbec
+C----          ELSE
+C----            JG = 2
+C----            SEGINI,mlent1
+C----            mlent1.lect(1) = -nbe1
+C----            mlent1.lect(2) = n_o_face
+C----          END IF
+C----          NBFHHO(nbn1) = nbe1
+C----          MAFHHO(nbn1) = ipt1
+C----          LOFHHO(nbn1) = mlent1
+C----        END DO
+C----
+C----        nbs1 = 0
+C----        DO i = idebf, ifinf
+C----          IF (MAFHHO(i).GT.0) nbs1 = nbs1 + 1
+C----        END DO
+C----        if (nbs1.le.0) then
+C----          write(ioimp,*) 'HHOPRE : MSQHHO update incorrect (1)'
+C----          iret = 5
+C----          return
+C----        end if
+C----        if (nbs1.lt.MAX(1,nbsSQE)) then
+C----          write(ioimp,*) 'HHOPRE : MSQHHO update incorrect (2)'
+C----          iret = 5
+C----          return
+C----        end if
+      END IF
+
+C= Verification du tableau NBFHHO
+      IF (IDIM.EQ.1) THEN
+        if (nbfhho(1).le.0) then
+          write(ioimp,*) 'HHOPRE: no POI1 in DIME 1?'
+          iret = 5
+        end if
+        do i = 2, NFAMAX
+          if (nbfhho(i).gt.0) then
+            write(ioimp,*) 'HHOPRE:',i,'-side face in DIME 1'
+            iret = 5
+          end if
+        end do
+      END IF
+      IF (IDIM.EQ.2) THEN
+        if (nbfhho(1).ne.0) then
+          write(ioimp,*) 'HHOPRE: POI1 in DIME 2'
+          iret = 5
+        end if
+        NBFHHO(1) = 0
+        if (nbfhho(2).le.0) then
+          write(ioimp,*) 'HHOPRE: no SEG2 in DIME 2 ?'
+          iret = 5
+        end if
+        do i = 3, NFAMAX
+          if (nbfhho(i).gt.0) then
+            write(ioimp,*) 'HHOPRE: polygonal face in DIME 2',i,' sides'
+            iret = 5
+          end if
+        end do
+      END IF
+      IF (IDIM.EQ.3) THEN
+        if (nbfhho(1).ne.0) then
+          write(ioimp,*) 'HHOPRE: POI1 in DIME 3 ?'
+          iret = 5
+        end if
+        if (nbfhho(2).ne.0) then
+          write(ioimp,*) 'HHOPRE: SEG2 in DIME 3 ?'
+          iret = 5
+        end if
+        NBFHHO(1) = 0
+        NBFHHO(2) = 0
+      END IF
+      if (iret.gt.0) return
+
+      nfaSQE = 0
+      nbsSQE = 0
+      DO i = idebf, ifinf
+        nfaSQE = nfaSQE + NBFHHO(i)
+        IF (MAFHHO(i).GT.0) nbsSQE = nbsSQE + 1
+      END DO
+      NFAHHO = nfaSQE
+      NUFHHO = nbsSQE
+c-dbg      write(ioimp,*) 'HHOPRE-MSQHHO:',NFAHHO,NUFHHO
+
+C* On reordonne MSQHHO par faces de sommets croissants :
+      ipt2 = MSQHHO
+      IF (nbsSQE.GT.1) THEN
+        segact,ipt2*MOD
+        isou = 0
+        DO i = idebf, ifinf
+          ipt1 = MAFHHO(i)
+          IF (ipt1.GT.0) THEN
+            isou = isou + 1
+            ipt2.lisous(isou) = ipt1
+          END IF
+        END DO
+        segact,ipt2*NOMOD
+      END IF
+C= Doit-on faire un savseg de MSQHHO et des sous-zones eventuelles ?
+
+      NBNN   = 1
+      NBELEM = NCEHHO
+      NBSOUS = 0
+      NBREF  = 0
+      IF (i1_HHO.EQ.1) THEN
+c-dbg        write(ioimp,*) 'HHOPRE: Initialisation MPCHHO',NCEHHO
+        SEGINI,ipt2
+        ipt2.itypel = 1
+        MPCHHO = ipt2
+        NBNEWP = NBELEM
+      ELSE
+c-dbg        write(ioimp,*) 'HHOPRE: Ajustement MPFHHO'
+        ipt2 = MPCHHO
+        segact,ipt2*MOD
+        NBNEWP = NBELEM - ipt2.num(/2)
+        SEGADJ,ipt2
+c* Il faut tout decaler par type de face i !
+      END IF
+      ipoi1 = nbpts
+      nbpts = nbpts + NBNEWP
+      SEGADJ,MCOORD
+      iel2 = 0
+      DO i = 1, NCEMAX
+        ipt1 = MACHHO(i)
+        IF (ipt1.LE.0) GOTO 100
+        nel1 = ipt1.num(/2)
+c*        nel1 = mleCEL.lect(i+NCEMAX)
+c*        jel1 = 1 + mleCEL.lect(i)
+        jel1 = 1
+        nbn1 = ipt1.num(/1)
+c-dbg        write(ioimp,*) 'MACHHO',i,ipt1,nel1,nbn1,iel2,ipoi1
+        DO j = jel1, nel1
+          jpoi1 = (IDIM+1)*ipoi1
+          ipoi1 = ipoi1 + 1
+          DO k = 1, IDIM
+            r_z = 0.D0
+            DO l = 1, nbn1
+              lpoi1 = (IDIM+1)*(ipt1.num(l,j)-1)
+              r_z = r_z + XCOOR(lpoi1+k)
+            END DO
+            XCOOR(jpoi1+k) = r_z / nbn1
+          END DO
+          iel2 = iel2 + 1
+          ipt2.num(1,iel2) = ipoi1
+        END DO
+c-dbg          write(ioimp,*) 'HHOPRE: Verif.',i,iel2,nbchho(i),ipoi1
+c---        if (iel2.ne.nbfhho(i)) then
+c---          write(ioimp,*) 'HHOPRE(1): inconsistent iel2'
+c---        end if
+ 100    CONTINUE
+      END DO
+      if (iel2.ne.NCEHHO) then
+        iret = 5
+        return
+      end if
+
+      NBNN   = 1
+      NBELEM = NFAHHO
+      NBSOUS = 0
+      NBREF  = 0
+      IF (i1_HHO.EQ.1) THEN
+c-dbg        write(ioimp,*) 'HHOPRE: Initialisation MPFHHO',NFAHHO
+        SEGINI,ipt2
+        ipt2.itypel = 1
+        MPFHHO = ipt2
+        NBNEWP = NBELEM
+      ELSE
+c-dbg        write(ioimp,*) 'HHOPRE: Ajustement MPFHHO'
+        ipt2 = MPFHHO
+        segact,ipt2*MOD
+        NBNEWP = NBELEM - ipt2.num(/2)
+        SEGADJ,ipt2
+c* Il faut tout decaler par type de face i !
+      END IF
+      ipoi1 = nbpts
+      nbpts = nbpts + NBNEWP
+      SEGADJ,MCOORD
+      iel2 = 0
+      DO i = idebf, ifinf
+        ipt1 = MAFHHO(i)
+        IF (ipt1.LE.0) GOTO 200
+c*        nel1 = NBFHHO(i)
+        nel1 = ipt1.num(/2)
+c*        jel1 = 1 + mlent2.lect(i)
+        jel1 = 1
+        nbn1 = i
+        DO j = jel1, nel1
+          jpoi1 = (IDIM+1)*ipoi1
+          ipoi1 = ipoi1 + 1
+          DO k = 1, IDIM
+            r_z = 0.D0
+            DO l = 1, nbn1
+              lpoi1 = (IDIM+1)*(ipt1.num(l,j)-1)
+              r_z = r_z + XCOOR(lpoi1+k)
+            END DO
+            XCOOR(jpoi1+k) = r_z / nbn1
+          END DO
+          iel2 = iel2 + 1
+          ipt2.num(1,iel2) = ipoi1
+        END DO
+c-dbg          write(ioimp,*) 'HHOPRE: Verif.',i,iel2,nbfhho(i),ipoi1
+c---        if (iel2.ne.nbfhho(i)) then
+c---          write(ioimp,*) 'HHOPRE(1): inconsistent iel2'
+c---        end if
+ 200    CONTINUE
+      END DO
+      if (iel2.ne.NFAHHO) then
+        iret = 5
+        return
+      end if
+
+      SEGACT,MCOORD*NOMOD
+
+C= Remplissage de segments :
+      IPOSR = 0
+
+      i_z = 0
+      CALL HHOLI2('INIT_IPOS',i_z,IPOSR,i_z,iret)
+      if (iret.ne.0) return
+
+      NMAXR = 0
+      DO i = idebf, ifinf
+        ipt1 = MAFHHO(i)
+        IF (ipt1.GT.0) THEN
+          CALL HHOLI2('REMP_IPOS',ipt1,IPOSR,i_z,iret)
+          if (iret.ne.0) return
+          NMAXR = MAX(NMAXR,i_z)
+        END IF
+      END DO
+      NISFHO = NMAXR
+
+      NMAXR = 0
+      DO i = 1, NCEMAX
+        ipt1 = MACHHO(i)
+        IF (ipt1.GT.0) THEN
+          CALL HHOLI2('REMP_IPOS',ipt1,IPOSR,i_z,iret)
+          if (iret.ne.0) return
+          NMAXR = MAX(NMAXR,i_z)
+        END IF
+      END DO
+      NISCHO = NMAXR
+
+      i_z = 0
+      INDSR = 0
+      NMAXR = MAX(NISCHO,NISFHO)
+      CALL HHOLI2('INIT_INDS',i_z,NMAXR,INDSR,iret)
+      if (iret.ne.0) return
+
+c== Remplissage de lentHHO :
+      JG = 10
+      SEGINI,mlenti
+      DO i = 1, JG
+        mlenti.lect(i) = -999
+      END DO
+C= Dimension du probleme :
+      mlenti.lect(1) = IDIM
+C= Ordre et ddl par face  :
+      mlenti.lect(2) = n_o_face
+      mlenti.lect(3) = n_d_face
+C= Ordre et ddl par cellule :
+      mlenti.lect(4) = n_o_cell
+      mlenti.lect(5) = n_d_cell
+C= Segments de travail :
+      mlenti.lect(6) = IPOSR
+      mlenti.lect(7) = INDSR
+C= Indices utilises ulterieurement :
+c-dbg      mlenti.lect( 8) = ...
+c-dbg      mlenti.lect( 9) = ...
+c-dbg      mlenti.lect(10) = ...
+
+      lentHHO = mlenti
+
+      SEGSUP,mleCEL,mleSQE
+
+c-dbgC= Test independant de la bibliotheque :
+c-dbg      write(ioimp,*)
+c-dbg      write(ioimp,*) 'HHOPRE - DEBUT TEST_HHO'
+c-dbg      CALL TEST_HHO
+c-dbg      write(ioimp,*)
+c-dbg      write(ioimp,*) 'HHOPRE - FIN TEST_HHO'
+c-dbg      write(ioimp,*)
+
+      RETURN
+      END
+

@@ -1,0 +1,39 @@
+C MODDIF    SOURCE    CB215821  22/04/01    14:03:12     11326          
+
+C=======================================================================
+C=  Objet MODELE  -  Cas de la formulation 'DIFFUSION'                 =
+C=                                                                     =
+C=   Definition des MODELEs de COMPORTEMENT associes a la formulation  =
+C=======================================================================
+
+      SUBROUTINE MODDIF (MOMODL,NMOD)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+
+      CHARACTER*16 MOMODL(*)
+
+      NMOD=7
+C -----------------
+C  Modele LINEAIRE (par defaut)
+C -----------------
+      MOMODL(1)='FICK            '
+
+C -----------------------
+C  MODELEs NON LINEAIREs
+C -----------------------
+      MOMODL(2)='SORET           '
+      MOMODL(3)='UTILISATEUR     '
+      MOMODL(4)='DISSIPATION     '
+      MOMODL(5)='AFFINE          '
+      MOMODL(6)='VISQUEUSE       '
+      MOMODL(7)='ADVECTION       '
+
+      RETURN
+      END
+ 
+ 

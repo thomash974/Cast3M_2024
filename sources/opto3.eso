@@ -1,0 +1,405 @@
+C OPTO3     SOURCE    GOUNAND   21/04/06    21:15:19     10940          
+      SUBROUTINE OPTO3(TRAVJ,TRAVX,JELEM,TRAVK,TRAVL,ICPRX,IDCPX,KELEMX
+     $     ,JTBES,JCAND)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : OPTO3 (anciennement optt3d)
+C DESCRIPTION : Une implémentation de l'amélioration d'une topologie
+C               autour d'un élément. On reprend OPTITOPO pour le corps
+C     du programme. On reprend l'extraction et la topologie inverse de
+C     EXTO. Le point crucial sera d'implémenter la modification de la
+C     topologie : enlever les anciens éléments et mettre les nouveaux.
+C     
+C
+C     Ici, on passe dans une deuxième numérotation locale à JEXTO avant
+C     d'interfacer à TOPV2
+C
+C     On ressemble fortement à opto1.eso
+C     optt3 -> optt3d : TRAVX devient un segment TRAVJ
+C     optt3c -> optt3d : on interface à TOPV2 au lieu de TOPVOL
+C          du coup on ressemble à topv1
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : TOPV2
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       : OPTO2
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            : JCOORD, TRAVX, JELEM
+C ENTREES/SORTIES    :
+C SORTIES            : JTBES,JCAND
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 11/11/2017, version initiale
+C HISTORIQUE : v1, 11/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMELEME
+*
+*     Le nombre d'éléments de JTOPO et le nombre de points de JCOORD
+*     vont être variables. Pour ne pas avoir à ajuster ces segments en
+*     permanence, on va dimensionner plus large, mais du coup, il faut
+*     aussi maintenir à la main le nombre de noeuds et d'éléments
+*     courants.
+*
+*     Le nombre d'éléments courants est NVCOU et le nombre d'éléments
+*     max est NVMAX. Idem pour le nombre de noeuds courants et max :
+*     NPCOU et NPMAX.
+*      
+      POINTEUR JELEM.MELEME
+*      POINTEUR KELEM.MELEME
+      POINTEUR JEXTO.MELEME,KEXTO.MELEME
+      POINTEUR JTBES.MELEME,KTBES.MELEME
+-INC SMCOORD
+* Numerotation locale (de 1 à NBPTS)
+      POINTEUR JCOORD.MCOORD
+      POINTEUR KCOORD.MCOORD
+-INC TMATOP1
+*-INC STOPINV
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+      POINTEUR KCMETR.METRIQ
+*-INC STRAVJ
+      POINTEUR TRAVX.TRAVJ
+      POINTEUR TRAVK.TRAVJ
+*-INC STRAVL
+*
+      
+*
+* Passage de numerotation globale -> locale
+*   et locale -> globale    
+*      SEGMENT ICPR(XCOOR(/1)/(IDIM+1))
+*      SEGMENT IDCP(NPTINI)
+*-INC SMLENTX
+      POINTEUR ICPRX.MLENTX
+      POINTEUR IDCPX.MLENTX
+*-INC SMELEMX
+      POINTEUR KELEMX.MELEMX
+      
+      logical lchang,lchtop
+*     
+* Executable statements
+*
+      if (impr.ge.3) WRITE(IOIMP,*) 'Entrée dans opto3.eso'
+*
+* Initialisation et extension des segments JTOPO et JCOORD
+*
+      IDIMP=IDIM+1
+*
+      JCOORD=TRAVJ.COORD
+      JCMETR=TRAVJ.CMETR
+      JEXTO=TRAVX.TOPO
+      KEXTO=TRAVK.TOPO
+      KCOORD=TRAVK.COORD
+      KCMETR=TRAVK.CMETR
+* Correspondances de numérotation
+      JGDONN=XCOOR(/1)/(IDIM+1)
+      CALL mtxadj(ICPRX,JGDONN,lchang,'opto3 : ICPRX_dim')
+      if (ierr.ne.0) return
+*     Ici, on met le IDCP à la même dimension pour simplifier le
+*     remplissage (fait en une passe)
+      CALL mtxadj(IDCPX,JGDONN,lchang,'opto3 : IDCPX_dim1')
+      if (ierr.ne.0) return
+*      SEGINI ICPR
+      IK=0
+      DO 23 IEL=1,TRAVX.NVCOU
+         DO 230 INO=1,JEXTO.NUM(/1)
+            IP=JEXTO.NUM(INO,IEL)
+            IF (ICPRX.LECTX(IP).EQ.0) THEN
+               IK=IK+1
+*               ICPR(IP)=IK
+               ICPRX.LECTX(IP)=IK
+               IDCPX.LECTX(IK)=IP
+            ENDIF
+ 230     CONTINUE
+ 23   CONTINUE
+*
+      NPTINI=IK
+      CALL mtxadj(IDCPX,NPTINI,lchang,'opto3 : IDCPX_dim2')
+      if (ierr.ne.0) return
+*      SEGINI IDCP
+      NPTBAS=TRAVJ.NPCOU
+**      write(ioimp,*) 'mcoord,jcoord,npt,npcou,ik=',mcoord,jcoord,xcoor(
+**     $     /1)/idimp,npcou,ik
+*      DO 500 I=1,NPTBAS
+**         if (icpr(i).ne.0) IDCP(ICPR(I))=I
+*         if (icprx.lectx(i).ne.0) IDCPx.lectx(ICPRx.lectx(I))=I
+* 500  CONTINUE
+      if (impr.ge.4) then 
+         write(ioimp,*) 'Nb noeud locaux, tlocaux=',NPTBAS,IK
+*         write(ioimp,*) 'ICPR'
+*         write(ioimp,187) (ICPR(I),I=1,ICPR(/1))
+*         write(ioimp,*) 'IDCP'
+*         write(ioimp,187) (IDCP(I),I=1,IDCP(/1))
+         write(ioimp,*) 'IDCPX'
+         write(ioimp,187) (IDCPX.LECTX(I),I=1,IDCPX.JGCOU)
+      endif
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*)
+     $        'opto3.eso : topologie ext. en coord locales : '
+         call ecmai1(jexto,0)
+         segact jexto*mod
+      ENDIF
+*
+* Melemes en coordonnées tlocales
+*
+      NBLEXT=TRAVX.NVCOU
+      CALL TOPADV(TRAVK,NBLEXT,1,lchang,'opto3 : TRAVK')
+      IF (IERR.NE.0) RETURN
+* KEXTO en nouvelle numérotation      
+      DO 33 IEL=1,travk.nvcou
+*anc         DO 330 INO=1,KEXTO.NUM(/1)
+         DO 330 INO=1,IDIMP
+            IP=JEXTO.NUM(INO,IEL)
+*            JP=ICPR(IP)
+            JP=ICPRX.LECTX(IP)
+            IF (JP.NE.0) THEN
+               KEXTO.NUM(INO,IEL)=JP
+            ELSE
+               WRITE(IOIMP,*) 'Erreur de programmation'
+               GOTO 9999
+            ENDIF
+ 330     CONTINUE
+ 33   CONTINUE
+*tmp      if (iveri.ge.2.and.lchang) then
+*tmp         call vetopi(travk,'opto3 : Apres extension elem travk')
+*tmp         if (ierr.ne.0) return
+*tmp      endif            
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*)
+     $        'opto3.eso : topologie ext. en coord tlocales : '
+         call ecmai1(kexto,0)
+         segact kexto*mod
+      ENDIF
+*     Noeud virtuel en coordonnées locales
+      JPVIRT=TRAVJ.PVIRT
+      IF (JPVIRT.NE.0) THEN
+*         KPVIRT=ICPR(JPVIRT)
+         KPVIRT=ICPRX.LECTX(JPVIRT)
+* Ici, c'est normal de ne pas être inclus         
+*         IF (KPVIRT.EQ.0) THEN
+*            write(ioimp,*)
+*     $           'Noeud virtuel non inclus dans la topologie ?'
+*            goto 9999
+*         ENDIF
+      ELSE
+         KPVIRT=0
+      ENDIF
+      TRAVK.PVIRT=KPVIRT
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*)
+     $        'opto3.eso : noeud virtuel en coord tlocales : ',KPVIRT
+      ENDIF
+* Vérifier que JELEM n'a qu'un élément et en supprimer les noeuds nuls ?
+      NBELEM=JELEM.NUM(/2)
+      IF (NBELEM.NE.1) THEN
+         write(ioimp,*) 'on veut que jelem n''ait qu''un element'
+         goto 9999
+      ENDIF
+      nbnn=0
+      do ino=1,jelem.num(/1)
+         ip=jelem.NUM(ino,1)
+         if (ip.ne.0) then
+            IF (IP.LT.0.OR.IP.GT.NPTBAS) THEN
+               write(ioimp,*) 'ip=',ip,' noeud hors bornes dans jelem'
+               goto 9999
+            ELSE
+*               JP=ICPR(IP)
+               JP=ICPRX.LECTX(IP)
+               IF (JP.EQ.0) then
+*                  WRITE(IOIMP,*)
+*     $                 'La topologie extraite devrait contenir',
+*     $                 'le noeud de ielem ip,jp=',ip,jp
+*     goto 9999
+               ELSE   
+                  nbnn=nbnn+1
+                  kelemx.numx(nbnn,1)=jp
+               ENDIF
+            ENDIF
+         endif
+      enddo
+      kelemx.nncou=nbnn
+*      nbsous=0
+*      nbref=0
+*     Element autour duquel on extrait
+*      SEGINI KELEM
+*      ibnn=0
+*      DO INO=1,JELEM.NUM(/1)
+*         IP=JELEM.NUM(INO,1)
+*         IF (IP.NE.0) THEN
+**            JP=ICPR(IP)
+*            JP=ICPRX.LECTX(IP)
+*            IF (JP.NE.0) then
+*               ibnn=ibnn+1
+*               KELEM.NUM(ibnn,1)=jp
+*            ENDIF
+*         ENDIF
+*      ENDDO
+*                 
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*) 'opto3.eso : element en coord tlocales : '
+*         call ecmai1(kelem,0)
+*         segact kelem*mod
+         call ecmelx(kelemx,0)
+      ENDIF         
+* Passage des coordonnées en tlocale
+*     NBPTS=NPTINI
+*      NBPTS=TRAVK.NPMAX
+*      SEGINI,KCOORD
+*     TRAVK.COORD=KCOORD
+      
+      CALL TOPADP(TRAVK,NPTINI,1,lchang,'opto3 : TRAVK')
+      IF (IERR.NE.0) RETURN
+      
+      DO 53 IPL=1,TRAVK.NPCOU
+         IREFL=IDIMP*(IPL-1)
+*         IP=IDCP(IPL)
+         IP=IDCPX.LECTX(IPL)
+         IREF=IDIMP*(IP-1)
+         DO 530 IC=1,IDIMP
+            KCOORD.XCOOR(IREFL+IC)=JCOORD.XCOOR(IREF+IC)
+ 530     CONTINUE
+         IF (JCMETR.NE.0) THEN
+            DO 540 ININ=1,JCMETR.XIN(/1)
+               KCMETR.XIN(ININ,IPL)=JCMETR.XIN(ININ,IP)
+ 540        CONTINUE
+         ENDIF
+ 53   CONTINUE
+*tmp      if (iveri.ge.2.and.lchang) then
+*tmp         call vetopi(travk,'opto3 : Apres extension noeud travk')
+*tmp         if (ierr.ne.0) return
+*tmp      endif            
+
+*tst      WRITE(IOIMP,185) 'SEGMENT KCOORD ',KCOORD
+*tst         WRITE(FORMA,FMT='("(1(",I1,"(1PG12.5,2X)))")') IDIMP
+*tst         write(ioimp,*) 'forma=',forma
+*tst         write(ioimp,*) 'XCOOR'
+*tst         write(ioimp,forma)  (kcoord.xcoor(I),I=1,kcoord.xcoor(/1))
+*
+*     La numérotation globale devient la locale dans ce bloc  !!!
+      MCOORD=KCOORD
+*ijob      CALL TOPV2(TRAVK,KELEM,IJOB,XVTOL,QTOL,IMET,XDENS,
+*      CALL TOPV2(TRAVK,KELEM,IALGO,IAJNO,XVTOL,QTOL,IMET,XDENS,INCMA
+      CALL TOPV2(TRAVK,KELEMX,IALGO,IAJNO,XVTOL,QTOL,IMET,IMOMET,XDENS
+     $     ,INCMA,ISTMA,KTBES,JCAND,JNASCM,iveri,impr,TRAVL,LCHTOP)
+*     write(ioimp,*) 'jcand=',jcand
+*     Point de branchement si erreur pendant le bloc en numérotation
+*     locale
+ 555  CONTINUE
+*     On rétablit la numérotation globale originelle et on rajoute les
+*     noeuds nouvellement créés
+      MCOORD=JCOORD
+*     On part en erreur après le rétablissement du MCOORD global
+      IF (IERR.NE.0) RETURN
+*!!!changé      NPTFIN=KCOORD.XCOOR(/1)/IDIMP
+      NPTFIN=travk.npcou
+      IF (NPTINI.NE.NPTFIN) THEN
+         if (impr.ge.4)
+     $        write(ioimp,*) nptfin-nptini,' nouveaux noeuds crees'
+*         if (ktbes.eq.kexto) then
+         if (.not.lchtop) then
+            write(ioimp,*) 'kexto non ameliore mais...'
+            write(ioimp,*) nptfin-nptini,' nouveaux noeuds crees'
+            write(ioimp,*) 'pas logique...'
+            goto 9999
+         endif
+         NBPTA=NPTBAS
+         NPCOUN=NBPTA+NPTFIN-NPTINI
+*
+         CALL TOPADP(TRAVJ,NPCOUN,1,lchang,'opto3 : TRAVJ')
+         if (ierr.ne.0) return
+*
+         DO 5000 I=NPTINI+1,NPTFIN
+            DO 5010 J=1,IDIMP
+               JCOORD.XCOOR(NBPTA*IDIMP+J)=KCOORD.XCOOR((I-1)*IDIMP
+     $              +J)
+ 5010       CONTINUE
+            IF (JCMETR.NE.0) THEN
+               DO 5020 ININ=1,JCMETR.XIN(/1)
+                  JCMETR.XIN(ININ,NBPTA+1)=KCMETR.XIN(ININ,I)
+ 5020          CONTINUE
+            ENDIF
+            NBPTA=NBPTA+1
+ 5000    CONTINUE
+         if (iveri.ge.2.and.lchang) then
+            call vetopi(travj,'opto3 : Apres extension travj')
+            if (ierr.ne.0) return
+         endif            
+      ENDIF
+*      
+*      IF (KTBES.EQ.KEXTO) THEN
+      IF (.not.lchtop) THEN
+         JTBES=JEXTO
+      ELSE
+* En place
+         JTBES=KTBES
+         SEGACT JTBES*MOD
+         DO 63 IEL=1,JTBES.NUM(/2)
+            DO 630 INO=1,JTBES.NUM(/1)
+               IPL=JTBES.NUM(INO,IEL)
+               IF (IPL.LE.NPTINI) THEN
+*                  IP=IDCP(IPL)
+                  IP=IDCPX.LECTX(IPL)
+               ELSE
+                  IP=IPL-NPTINI+NPTBAS
+               ENDIF
+               JTBES.NUM(INO,IEL)=IP
+ 630        CONTINUE
+ 63      CONTINUE
+         IF (IMPR.GE.4) THEN
+            write(ioimp,*) 'opto3.eso : topologie amelioree : '
+            call ecmai1(jtbes,0)
+            segact jtbes*mod
+         ENDIF
+      ENDIF
+*     SEGSUP KELEM
+      kelemx.nncou=0
+*
+* RAZ IDCPX et ICPRX
+*      SEGSUP IDCP
+*     SEGSUP ICPR
+      DO 1500 I=1,IDCPX.JGCOU
+         ICPRX.LECTX(IDCPX.LECTX(I))=0
+         IDCPX.LECTX(I)=0
+ 1500 CONTINUE
+      CALL mtxadj(ICPRX,0,lchang,'opto3 : ICPRX_sup')
+      if (ierr.ne.0) return
+      CALL mtxadj(IDCPX,0,lchang,'opto3 : IDCPX_sup')
+      if (ierr.ne.0) return
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 186  FORMAT ('Segment ',A6,' ',A6,' ajusté de ',I6,' à ',I6)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='OPTO3  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine OPTO3
+*
+      END
+
+ 

@@ -1,0 +1,379 @@
+C ENDORF    SOURCE    PV090527  23/01/27    21:15:30     11574          
+           subroutine endorf(sigref,eplrf,syr,sur,epsrf,epu,hplr,
+     #     yor,wpr,lcr,damrt0,damrtf,damrt1,damrt2,damrc0,damrcf,refr1,
+     #     epsrt,epsrc,plr_iso,diff0,difff,Er,Dr,Hi,grad_sigr,
+     #     tauie,tyr,dami0,damif,epsmf,eplr0,sigr0,METHODNL,epsm0,epsr0,
+     #     depsa,Et0,Etf,Hs0,Hsf,sigrf,spref,epart,eparv,source_nl,
+     #     coeff_nlr,taui0,tauif,coeff_nli,eprkf,eprmf,
+     #     hypo,istep,err1,garder,endo_interface_explicit)  
+     
+c          tables de dimension fixe pour resolution des sytemes lineaires 
+           implicit real*8 (a-h,o-z)
+           implicit integer (i-n)     
+     
+c          variables externes     
+           real*8 sigref,eplrf,syr,sur,epu,hplr,yor,wpr,lcr,coeff_nlr
+           real*8 damrt1,damrt2,refr1,epsrt,epsrf,diff0,difff
+           real*8 Er,Dr,Hi,lcgr,grad_sigr,dami0,damif,taui,tyr,damrtf
+           real*8 eplr0,epsmf,damrcf,sigr0,depsa,epsm0,epsr0,eparv
+           real*8 Et0,Etf,Hs0,Hsf,damrt0,damrc0,sigrf,source_nl,spref
+           real*8 eprkf,eprmf,depspl,hypo,epsrc
+           logical plr_iso,METHODNL,garder
+c          variables locales           
+           real*8 damrt3,damrt4,epr,dmax,xref,epse,epart
+           integer irest0
+           real*8 precision1,epse_max,damrc3,damrt5,Hid,drf,dr0,Ert
+           real*8 tauie,taui0,tauif,coeff_nli,eppr_et,coeffd
+c          coeff de reduction d ecrouissage pour la phase 2           
+           real*8 deplrdt2,eprk
+           integer err1,istep
+           parameter (precision1=1.0d-5,dmax=1.d0-precision1)
+           real*8 DPI,xx,depsrr
+           PARAMETER (DPI=3.141592653589793D0)
+c          gestion de la methode de calcul du module du renfort 
+           logical tangent,endo_interface_explicit
+           parameter (tangent=.false.)
+c          coeff correcteur de la longeur pour prendre en compte
+c          l elargissement de la zone plasqtique endommagee
+c          due a l intrpoation des contraintes non locales lorsque
+c          l endo est local
+           real*8 coeff_lc
+           parameter (coeff_lc=1.0d0)     
+           
+c*************** test des hypotheses de calculs prevues  ***************
+c          test calcul en module tangent          
+           if(tangent) then
+                print*,'Module tangent non disponible'
+                print*,'dans endorf'
+                err1=1
+                return
+           end if                
+           
+c          test option de plasticite du renfort           
+           if  (plr_iso) then
+             print*,'Plasticite isotrope des renforts'
+             print*,'incompatible avec endo des des renfort'
+             print*,'dans endorf'
+             err1=1
+             return
+           end if 
+
+c**************** initialisation *************************************** 
+           err1=0            
+
+c**************** endommagement du renfort *****************************           
+           
+           if (sur.ge.syr) then         
+c           endommagement de palier d ecrouissage 
+            if(garder) then
+c              la solution actuelle est issue d'hypotheses coherentes            
+               if(sigref.gt.sur) then
+c                   pas d endo de compression                    
+                    damrc3=0.d0               
+c                   cas de la traction               
+                    damrt3=1.d0-sur/sigref   
+               else 
+                    if(sigref.lt.-sur) then
+c                       pas d endo de traction                        
+                        damrt3=0.d0                    
+c                       cas de la compression                    
+                        damrc3=1.d0+sur/sigref
+                    else
+c                       pas d endo                    
+                        damrt3=0.d0
+                        damrc3=0.d0
+                    end if
+               end if
+               damrt1=max(damrt1,damrt3)
+               damrcf=max(damrc0,damrc3)
+            else
+c              une hypothese incoherente detecteee            
+c              on reprend les endos initiaux           
+               damrcf=damrc0
+            end if
+           else
+                print*,'Dans endorf il faur sur > syr'
+                err1=1
+                return
+           end if
+           
+c          increment de deformation plastique           
+           depspl=eplrf-eplr0 
+           
+           if((epu.ge.0.).and.(wpr.gt.0.)) then
+c           les donnees pour la rupture sont coherentes  
+c           deformation caracteristique de rupture en traction
+c           en fonction de la longueur caracteristique d integration lcr
+c           - decroissance Gaussienne
+c           eprk=epu+(wpr/(lcr*sur))*sqrt(2.d0/DPi)*(yor/(yor+hplr))
+c           - decroissance exponentielle
+           eprk=epu+(wpr/(coeff_lc*lcr*sur))*(yor/(yor+hplr))
+c           - decroissance parabolique
+c            eprk=epu+(3.d0*wpr/(2.d0*lcr*sur))*(yor/(yor+hplr))
+            if (garder) then 
+c              les hypotheses d ecoulement etaient coherentes            
+               if(depspl.gt.0.d0) then
+c                    cumul des deformation positive pour endo tract               
+                     epsrt=epsrt+depspl
+c                    remise a zero de la def de refermeture                     
+                     epsrc=0.d0
+               else
+c                    actualisation de la refermeture               
+                     epsrc=epsrc+depspl
+               end if
+c              evolution de l endo de traction
+               if(epsrt.gt.epu) then
+c                    - endo Gaussien               
+c                     xx=((epsrt-epu)/(eprk-epu))**2
+c                     damrt5=1.d0-exp(-0.5d0*xx)
+c                    - endo exponentielle
+                     xx=((epsrt-epu)/(eprk-epu))
+                     damrt5=1.d0-exp(-xx)
+c                    - endo parabolique
+c                     if(epsrt.lt.eprk) then
+c                         damrt5=((epsrt-epu)/(eprk-epu))**2
+c                     else
+c                         damrt5=dmax
+c                     end if
+                      damrt5=min(damrt5,dmax)
+               else
+                     damrt5=damrt2
+               end if
+c              actualisation endo de traction localise               
+               damrt2=max(damrt5,damrt2)
+            else
+c              les hypotheses d ecoulement etaient incoherentes            
+c              on reprend le cas converge precedent
+               continue
+            end if                              
+           else
+               print*,'Pas de donnees pour la rupture du renfort'
+               print*,'dans endorf'
+               err1=1
+               return
+           end if
+           
+c          endommagement resultant en traction        
+           damrt4=1.d0-(1.d0-damrt1)*(1.d0-damrt2)
+           
+c          condition de croissance pour l endo de traction           
+           damrtf=max(damrt0,damrt4)
+           
+c          endommagement maximum autorisé           
+           damrtf=min(damrtf,dmax)
+           
+c**********  coeff de refermeture de fissure ***************************
+
+c       increment total de def plastique necessaire pour refermer
+c       - cas de l endo Gaussien                
+c        depsrr=sqrt(0.2D1)*sqrt(-log((1.d0-damrt2))*(eprk-epu)**2)
+c       - cas de l endo exponentiel  
+        depsrr=(epu-eprk)*log(1.d0-damrt2)
+c       - cas de l endo parabolique   
+c        depsrr=sqrt(damrt2*((eprk-epu)**2))
+c       test somme des increments neg - somme des incr positifs               
+        if(epsrc.gt.-depsrr) then               
+c            le cumul est en faveur de l ouverture  
+c            - endo Gaussien          
+c             xx=((depsrr+epsrc)/(eprk-epu))**2
+c             refr1=exp(-0.5d0*xx)
+c            - endo exponentiel 
+             xx=((depsrr+epsrc)/(eprk-epu))
+             refr1=exp(-xx)
+c            - endo parabolique
+c             refr1=1.d0-((depsrr+epsrc)/(eprk-epu))**2
+c            bornes de la fonction de refermeture
+             refr1=min(1.d0,max(precision1,refr1))             
+        else
+c            le cumul est une refermeture               
+             refr1=1.d0
+        end if             
+           
+c**************** endommagement de l  interface ************************ 
+
+        if((METHODNL.and.(istep.gt.1).and.(garder).and.
+     #     (.not.endo_interface_explicit)).or.
+     #     ((METHODNL.and.(istep.eq.1).and.
+     #     (endo_interface_explicit))))then
+c          les hypotheses etaient coherentes        
+c          approximation de la contrainte de cisaillement actuelle
+           taui=-grad_sigr*Dr/4.d0
+c          test de plasticification de l interface
+           if((tyr.eq.0.).and.(taui.ne.0.)) then
+                 print*,'Dans endorf'
+                 print*,'Resistance de l interface non fournie'
+                 print*,'pour endorf appele par fldo3d'
+                 print*,'fournir TYRi non nul pour continuer...'
+                 err1=1
+                 return
+           else  
+c               contrainte effective d interface           
+                tauie=taui/coeff_nli
+                if(abs(tauie).gt.tyr) then
+                    damif=1.d0-tyr/abs(tauie)
+c                   condition de croissance de lendo de l interface                 
+                    damif=max(damif,dami0)
+                    damif=min(damif,dmax)
+                else
+                    damif=dami0
+                end if                 
+c               raideur de l interface endommagee
+                Hid=Hi*(1.d0-damif) 
+           end if
+        else if (METHODNL)then             
+            if(((.not.endo_interface_explicit).and. 
+     #            ((istep.eq.1).or.(.not.garder))).or. 
+     #            (endo_interface_explicit.and.(istep.ne.1)))then
+c                 on reprend la valeur convergee
+                  damif=dami0            
+                  Hid=Hi*(1.d0-dami0)
+                  tauie=taui0/coeff_nli
+            else
+                  print*,'endorf: Cas non prevu / interface'
+                  print*,METHODNL,endo_interface_explicit
+                  print*,istep,garder
+                  err1=1
+                  return
+            end if                        
+        else if(.not.METHODNL) then
+c           calcul local            
+            Hid=Hi
+            dami0=0.d0
+            damif=dami0 
+            taui=0.d0                
+            tauie=taui 
+        else                
+c           on initialise a la valeur convergee precedente 
+            tauie=taui0/coeff_nli           
+            damif=dami0            
+            Hid=Hi*(1.d0-damif)
+        end if
+c       module de l interface        
+        if(METHODNL) then 
+c           module secant        
+            Hsf=Hid
+        else 
+c           module initial        
+            Hsf=Hi
+        end if
+c       contrainte dans l interface apres endommagement
+        coeff_nli=(1.d0-damif) 
+        tauif=tauie*coeff_nli
+
+        
+c********** coeff de diffusion pour l adherence ************************
+
+c       calcul en module secant
+        if(.not.garder) then
+c           on reprend la contrainte convergee pour calculer les coeffs
+c           non lineaires necessaire au calcul de diffusion
+            sigref=sigr0
+        end if            
+        if (sigref.ge.0.d0) then 
+c            avec l endo de traction
+             coeff_nlr=(1.0d0-damrtf)                         
+        else
+c            avec l endo de compression et la refermeture
+             coeff_nlr=(1.0d0-damrcf)*refr1
+        end if
+          
+
+c       module endommagee actuel pour le renfort 
+        Ert=Er*coeff_nlr
+            
+c       coeff de diffusion
+        if(METHODNL) then
+c            .and.(istep.ne.1)) then
+c            actualisation du coeff pour le pas suivant
+             difff=(Ert*Dr)/(4.d0*Hid)    
+c            calcul suivant hypothese d ecoulement                    
+             difff=difff*(hplr/(hplr+yor*abs(hypo)))
+c             difff=4.0d-2             
+c         else if (METHODNL) then
+c             print*,'Cas imprevu sur lnl dans endorf'
+c             err1=1
+c             return
+         else if ((istep.eq.0).or.(.not.METHODNL)) then
+c            calcul local                 
+             difff=0.d0 
+             Etf=Et0
+             Hsf=Hs0 
+         else 
+             print*,'Cas imprevu sur lnl dans endorf'
+             err1=1
+             return                 
+         end if
+c        print*,'endo renfort lnl',lnl,' istep',istep                
+
+c        module actuel du renfort       
+         if(METHODNL) then       
+            Etf=Ert
+         else
+            Etf=Er
+         end if          
+
+c*********** contraintes apparentes dans les renforts ******************
+
+c        calcul des contraintes apparentes dans les renforts        
+         sigrf=sigref*coeff_nlr
+c        test coherence de la contrainte        
+         if(abs(sigrf).gt.sur*(1.d0+precision1)) then
+c            incoherence detectee         
+             print*,'Contrainte anormale dans dans endorf'
+             print*,'|sirf|>sur',sigrf,sur
+             print*,'Coeff de non linearite',coeff_nlr
+             print*,'valeur des endommagements'
+             print*,'damrt1',damrt1
+             print*,'damrt2',damrt2
+             print*,'damrtf',damrtf 
+             print*,'damrcf',damrcf
+             print*,'refermeture',refr1
+             print*,'Def plastique actuelle',eplrf
+             print*,'Def totale actuelle',epsrf
+             if(damrt2.ge.dmax) then
+                 print*,'Def de refermeture actuelle',epsrt
+             end if
+             err1=1
+             return
+         end if
+         if(difff.lt.0.) then
+          print*,'diffusion negative dans endorf'
+          err1=1
+          return
+         end if
+         
+c*********** source non locale *****************************************
+
+         if(METHODNL) then 
+             if (hypo.ne.0.) then
+c               hypothese avec ecoulement plastique
+                eppr_et=syr/hplr
+                if (hypo.eq.1.) then                
+                    source_nl=Hid*(epsmf-(eparv -eppr_et))                              
+                else if(hypo.eq.-1.) then
+                    source_nl=Hid*(epsmf-(eparv+eppr_et))             
+                else
+                    print*,'valeur anormale de hypo ds endorf'
+                    err1=1
+                    return
+                end if 
+             else           
+c               hypothese tir visco elastique                
+                source_nl=Hid*(epsmf-epart)            
+             end if          
+c            coeff multiplicateur des sources
+             coeffd=4.d0*difff/Dr    
+             source_nl=(epsmf-epart)*Ert
+c            print*,'endorf, source_nl=',source_nl
+c             print*,'endorf, Difff=',difff  
+         else
+c            calcul local: source inutile         
+             source_nl=0.d0
+         end if
+
+c***********************************************************************
+            
+         return
+         end
+           
+ 

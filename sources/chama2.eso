@@ -1,0 +1,152 @@
+C CHAMA2    SOURCE    CB215821  21/03/03    21:15:09     10910          
+
+C=======================================================================
+C=                            C H A M A 2                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=   Calcul du MCHAML (champ par element aux noeuds) des flux nodaux   =
+C=   equivalents a des sources volumiques. Cas BIDIMENSIONNEL MASSIF   =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   IPSONO   (E)   Pointeur sur le segment MELVAL des SOURCES         =
+C=   IPGEOM   (E)   Pointeur sur un objet MAILLAGE elementaire         =
+C=   IPINTE   (E)   Pointeur sur un segment MINTE contenant les        =
+C=                  caracteristiques d'integration                     =
+C=   IPCHEQ   (S)   Pointeur sur un segment MELVAL contenant les       =
+C=                  flux de chaleur nodaux equivalents                 =
+C=                                                                     =
+C=  Variables locales :                                                =
+C=  -------------------                                                =
+C=   XEL(3,NBPTEL)  Coordonnees GLOBALES des noeuds d'un element       =
+C=   Surf           Surface elementaire au point de Gauss              =
+C=   AEL            Vecteur de travail                                 =
+C=                                                                     =
+C=  Denis ROBERT, le 16 fevrier 1988.                                  =
+C=======================================================================
+
+      SUBROUTINE CHAMA2 (IPSONO,IPGEOM,IPINTE, IPCHEQ)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC SMCHAML
+-INC SMELEME
+-INC SMINTE
+-INC SMCOORD
+
+      SEGMENT MMAT1
+        REAL*8 XEL(3,NBPTEL), AEL(NBPTEL)
+      ENDSEGMENT
+
+C= Quelques constantes (2.Pi)
+      PARAMETER (X2Pi=6.283185307179586476925286766559D0)
+
+C  1 - INITIALISATION
+C ====================
+C  1.1 - Recuperation d'informations sur le maillage elementaire
+C =====
+      MELEME=IPGEOM
+      NBPTEL=NUM(/1)
+      NbElt=NUM(/2)
+C =====
+C  1.2 - Recuperation d'informations sur l'element fini du maillage
+C =====
+      MINTE=IPINTE
+      NBPGAU=POIGAU(/1)
+C*      NBNO=SHPTOT(/2)
+C* On doit avoir -> NBNO = NBPTEL
+C =====
+C  1.3 - Activation du MCHAML contenant les valeurs des sources
+C =====
+      MELVA1=IPSONO
+      NBPTE1=MELVA1.VELCHE(/1)
+      NEL1=MELVA1.VELCHE(/2)
+* IPSONO s'appuie normalement sur IPINTE
+* On doit avoir : NBPGAU = NBPTE1 si NBPTE1 != 1 (champ constant par element)
+*                 NEL1 = NELT si NEL1 != 1 (champ uniforme)
+C =====
+C  1.4 - Initialisation du segment de travail MMAT1
+C =====
+      SEGINI,MMAT1
+C =====
+C  1.5 - Initialisation du segment resultat MELVAL contenant les valeurs
+C        des flux nodaux pour chaque element du maillage (IPGEOM)
+C =====
+      N1PTEL=NBPTEL
+      N1EL  =NbElt
+      N2PTEL=0
+      N2EL  =0
+      SEGINI,MELVAL
+      IPCHEQ=MELVAL
+
+C  2 - BOUCLE SUR LES ELEMENTS DU MAILLAGE ELEMENTAIRE IMAMOD
+C ============================================================
+      DO iElt=1,NbElt
+
+        IEMIN1 = MIN(NEL1,iElt)
+C =====
+C  2.1 - Mise a zero de la source nodale equivalente AEL
+C =====
+        DO iNoe = 1, NBPTEL
+          AEL(iNoe) = XZero
+        ENDDO
+C =====
+C  2.2 - Recuperation des coordonnees GLOBALES des noeuds de l'element
+C =====
+        CALL DOXE(XCOOR,IDIM,NBPTEL,NUM,iElt,XEL)
+C =====
+C  2.3 - Boucle sur les points de Gauss de l'element iElt
+C =====
+        DO iGau=1,NBPGAU
+C =======
+C  2.3.1 - Calcul du volume associe au point de Gauss iGau
+C          Pour les elements MASSIFs, traitement du cas axisymetrique
+C =======
+          S1=XZERO
+          S2=XZERO
+          S3=XZERO
+          S4=XZERO
+          DO iNoe = 1, NBPTEL
+            S1=S1+SHPTOT(2,iNoe,iGau)*XEL(1,iNoe)
+            S2=S2+SHPTOT(3,iNoe,iGau)*XEL(1,iNoe)
+            S3=S3+SHPTOT(3,iNoe,iGau)*XEL(2,iNoe)
+            S4=S4+SHPTOT(2,iNoe,iGau)*XEL(2,iNoe)
+          ENDDO
+          VOLU=S1*S3-S2*S4
+          IF (IFOMOD.EQ.0) THEN
+            CALL DISTRR(XEL,SHPTOT(1,1,iGau),NBPTEL,RR)
+            VOLU=X2Pi*RR*VOLU
+          ENDIF
+          VOLU=ABS(VOLU)*POIGAU(iGau)
+C =======
+C  2.3.2 - Calcul de la contribution du point de Gauss a AEL
+C          pour cet element (MCHAML aux noeuds)
+C =======
+          IGMIN1 = MIN(iGau,NBPTE1)
+          R_z = VOLU * MELVA1.VELCHE(IGMIN1,IEMIN1)
+          DO iNoe = 1, NBPTEL
+            AEL(iNoe) = AEL(iNoe) + SHPTOT(1,iNoe,iGau) * R_z
+          ENDDO
+        ENDDO
+C =====
+C  2.4 - Calcul des flux equivalents sur cet element (MCHAML aux noeuds)
+C =====
+        DO iNoe = 1,NBPTEL
+          VELCHE(iNoe,iElt) = AEL(iNoe)
+        ENDDO
+      ENDDO
+
+C  3 - MENAGE : DESACTIVATION/DESTRUCTION DE SEGMENTS
+C ====================================================
+      SEGSUP,MMAT1
+
+      END
+ 

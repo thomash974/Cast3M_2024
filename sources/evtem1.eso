@@ -1,0 +1,221 @@
+C EVTEM1    SOURCE    CB215821  20/11/25    13:28:23     10792          
+      subroutine EVTEM1(icoul)
+      implicit integer(i-n)
+      implicit real*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC SMCHAML
+-INC SMCHPOI
+-INC SMTABLE
+-INC SMLREEL
+-INC SMEVOLL
+-INC SMELEME
+
+      logical login
+      character*8 typobj
+      character*18 charin,chalu
+      character*1 charre
+      character*(LOCOMP) compo,noco
+      character*(LONOM)  nompoi
+      call lirobj ('TABLE   ',mtable,1,iretou)
+      if(ierr.ne.0) return
+      ilo=0
+      call lircha(chalu,1,ilo)
+      TYPOBJ='TABLE'
+      charin='TEMPS'
+      segact mtable
+      call acctab(mtable,'MOT',ivalin,xvalin,charin(1:5),login,iobi,
+     $   TYPOBJ,ivalin,xvalin,charre,login,mtab1)
+      if( ierr.ne.0) return
+      segact mtable
+      call acctab(mtable,'MOT',ivalin,xvalin,chalu(1:ilo),login,iobi,
+     $   TYPOBJ,ivalin,xvalin,charre,login,mtab2)
+      if( ierr.ne.0) return
+      compo=' '
+      call lircha (compo,0,ilp)
+      segact mtab1,mtab2
+      typobj=mtab2.mtabtv(1)
+
+C----------------------------------------------------------------------
+      if(typobj.eq.'CHPOINT ') then
+        call lirobj('POINT' , IP1,1,iretou)
+        call quenom(nompoi)
+        if(ierr.ne.0) then
+          moterr(1:8)='TABLE'
+          segdes mtab1,mtab2
+          return
+        endif
+        jg = mtab1.mlotab
+        if(mtab2.mlotab.ne.jg) then
+          segdes mtab1,mtab2
+          call erreur ( 1015 )
+          return
+        endif
+        segini mlree1,mlree2
+        do 10 ia=1,mtab1.mlotab
+          mlree1.prog(ia)= mtab1.rmtabv(ia)
+          mchpoi=mtab2.mtabiv(ia)
+          call actobj('CHPOINT ',mchpoi,1)
+
+          if( ipchp(/1).eq.0.and.ia.eq.1) then
+            mlree2.prog(ia)=0.D0
+            goto 15
+          endif
+          do 11 isou=1,ipchp(/1)
+            msoupo = ipchp(isou)
+            meleme =igeoc
+            noco   =nocomp(1)
+            icomp  =1
+            do  12 iel=1,num(/2)
+              if(num(1,iel).eq.ip1) then
+                if(ilp.eq.0.and.nocomp(/2).ne.1) then
+                  MOTERR(1:8)='CHPOINT'
+                  INTERR(1)=NOCOMP(/2)
+                  call erreur(761)
+                  goto 100
+                endif
+                do 13 icomp=1,nocomp(/2)
+                  noco=nocomp(icomp)
+                  if(nocomp(icomp).eq.compo) goto 14
+   13           continue
+
+                MOTERR(1:4)=COMPO
+                moterr(5:12)='CHPOINT'
+                interr(1)=ip1
+                call erreur(65)
+                goto 100
+   14           continue
+                mpoval=ipoval
+                segact mpoval
+                noco=nocomp(icomp)
+                mlree2.prog(ia)=vpocha(iel,icomp)
+                goto 15
+              endif
+   12       continue
+   11     continue
+          interr(1) = ip1
+          moterr(1:)='CHPOINT'
+          call erreur(64)
+          goto 100
+          
+   15     continue
+C         Desactivation car la boucle peut etre tres longue
+          call actobj('CHPOINT ',mchpoi,0)
+   10   continue
+
+        N=1
+
+        segini mevoll
+        ityevo='REEL'
+        IEVTEX=chalu(1:ilo)//' '//noco//' fonction du temps du point '
+     $   //nompoi
+        segini kevoll
+        ievoll(1)=kevoll
+        iprogx=mlree1
+        iprogy=mlree2
+        numevx=icoul
+        NUMEVY='REEL'
+        NOMEVY=chalu(1:6) // '  '//noco
+        NOMEVX='TEMPS'
+        TYPX='LISTREEL'
+        TYPY='LISTREEL'
+        KEVTEX=chalu(1:ilo)//' fonction du temps du point '//nompoi
+  101   format (I6)
+        call actobj('EVOLUTIO',mevoll,1)
+        call ecrobj('EVOLUTIO',mevoll)
+        return
+
+C----------------------------------------------------------------------
+      elseif(typobj.eq.'MCHAML' )then
+        call lirent ( izo,1,iretou)
+        if(ierr.ne.0) return
+        call lirent(iel,1,iretou)
+        if(ierr.ne.0) return
+        call lirent(iga,1,iretou)
+        if(ierr.ne.0) return
+        jg = mtab1.mlotab
+        if(mtab2.mlotab.ne.jg) then
+          segdes mtab1,mtab2
+          call erreur ( 1015 )
+          goto 100
+        endif
+        segini mlree1,mlree2
+
+        do 20 ia = 1, mtab2.mlotab
+          mlree1.prog(ia)= mtab1.rmtabv(ia)
+          mchelm=mtab2.mtabiv(ia)
+          call actobj('MCHAML  ',mchelm,1)
+          if( ichaml(/1).lt.izo) then
+            call erreur(279)
+            goto 100
+          endif
+          mchaml=ichaml(izo)
+          meleme=imache(izo)
+          icomp =1
+          if(ilp.eq.0 .and. nomche(/2).ne.1) then
+             MOTERR(1:8)='MCHAML'
+             INTERR(1)  = NOMCHE(/2)
+             call erreur(761)
+             goto 100
+          endif
+          if(num(/2).lt.iel) then
+            call erreur(262)
+            goto 100
+          endif
+          noco =nomche(1)
+          icomp=1
+          do 23 icomp=1,nomche(/2)
+            noco=nomche(icomp)
+            if(noco.eq.compo) goto 24
+   23     continue
+          MOTERR(1:4) = COMPO
+          moterr(5:12)='MCHAML'
+          interr(1)=ip1
+          call erreur(65)
+          goto 100
+          
+   24     continue
+          melval=ielval(icomp)
+          mlree2.prog(ia)=velche(min(velche(/1),iga),
+     &                           min(velche(/2),iel) )
+
+C         Desactivation car la boucle peut etre tres longue
+          call actobj('MCHAML  ',mchelm,0)
+   20   continue
+      endif
+C----------------------------------------------------------------------
+
+      N=1
+      segini mevoll,kevoll
+      ityevo='REEL'
+      if    (typobj.eq.'CHPOINT ') then
+        IEVTEX=chalu(1:ilo)//' '//noco//' fonction du temps du point '
+     $   //nompoi
+      elseif(typobj.eq.'MCHAML  ') then
+        IEVTEX=chalu(1:ilo)//' '//noco//' zone '
+        write(ievtex(ilo+12:ilo+36),102)izo,' elem ',iel,' gauss ',iga
+      endif
+  102 format (I4,A6,i6,a7,i2)
+
+      KEVTEX   = IEVTEX
+      ievoll(1)= kevoll
+      iprogx   = mlree1
+      iprogy   = mlree2
+      numevx   = icoul
+      NUMEVY   ='REEL'
+      NOMEVY   = chalu(1:6) // '  '//noco
+      NOMEVX   ='TEMPS'
+      TYPX     ='LISTREEL'
+      TYPY     ='LISTREEL'
+      call actobj('EVOLUTIO',mevoll,1)
+      call ecrobj('EVOLUTIO',mevoll)
+      return
+
+100   continue
+      segsup mlree1,mlree2
+      return
+      end
+ 
+ 

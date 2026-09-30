@@ -1,0 +1,102 @@
+C TRACHP    SOURCE    CB215821  20/12/18    21:15:12     10823          
+      SUBROUTINE TRACHP(MCHPOI,MTRAV)
+*
+*   MET UN CHAMP POINT SOUS FORME DE TRAVAIL
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC SMCOORD
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMELEME
+-INC TMTRAV
+
+      SEGMENT ITRAV
+          CHARACTER*(LOCOMP) INC(NN)
+          INTEGER            IHAR(NN)
+      ENDSEGMENT
+
+      CHARACTER*(LOCOMP)     MOCOMP
+
+
+      NN = 0
+*
+*  ON ACTIVE TOUS LES SEGMENTS  MSOUPO
+*
+      DO 1 I=1,IPCHP(/1)
+        MSOUPO=IPCHP(I)
+        NN = NN + NOCOMP(/2)
+   1  CONTINUE
+*
+*    CREATION DE ITRAV ET REMPLISSAGE
+*
+      NNNOE=0
+      SEGINI ITRAV
+      NNIN=0
+      DO 2 I=1,IPCHP(/1)
+        MSOUPO=IPCHP(I)
+        DO 3 J=1,NOCOMP(/2)
+          MOCOMP=NOCOMP(J)
+          NHARMO=NOHARM(J)
+          DO 4 K=1,NNIN
+            IF(INC(K) .NE.MOCOMP) GOTO 4
+            IF(IHAR(K).EQ.NHARMO) GOTO 3
+    4     CONTINUE
+          NNIN=NNIN+1
+          INC(NNIN) =MOCOMP
+          IHAR(NNIN)=NHARMO
+   3    CONTINUE
+        MELEME=IGEOC
+        NNNOE =NNNOE+NUM(/2)
+   2  CONTINUE
+*
+*   CREATION DE MTRAV ET REMPLISSAGE
+*
+      NDEJ=0
+      SEGINI MTRAV
+      DO 7 I=1,IPCHP(/1)
+        MSOUPO=IPCHP(I)
+        MPOVAL=IPOVAL
+        MELEME=IGEOC
+        NBEL  =NUM(/2)
+        DO 8 J=1,NOCOMP(/2)
+          MOCOMP=NOCOMP(J)
+          NHARMO=NOHARM(J)
+          DO 9 K=1,NNIN
+            IF(INC(K) .NE.MOCOMP) GOTO 9
+            IF(IHAR(K).EQ.NHARMO) GOTO 10
+   9      CONTINUE
+          CALL ERREUR(5)
+
+  10      CONTINUE
+          KK=K
+          DO 11 K=1,NBEL
+            BB(KK,K+NDEJ)  =VPOCHA(K,J)
+            IBIN(KK,K+NDEJ)=1
+            IGEO(K+NDEJ)   =NUM(1,K)
+  11      CONTINUE
+   8    CONTINUE
+        NDEJ=NDEJ+NBEL
+   7  CONTINUE
+
+      DO 13 I=1,NNIN
+        INCO(I)=INC(I)
+        NHAR(I)=IHAR(I)
+  13  CONTINUE
+
+*     WRITE(6,30) (INCO(I),I=1,NNIN)
+*     WRITE(6,31) (NHAR(I),I=1,NNIN)
+*     WRITE(6,32) (( IBIN(I,J),I=1,NNIN),J=1,NNNOE)
+*     WRITE(6,33) (( BB(I,J),I=1,NNIN),J=1,NNNOE)
+*     WRITE(6,36) ( IGEO(I),I=1,NNNOE)
+* 36  FORMAT('  IGEO ', /,(20I4))
+* 30  FORMAT('  INCO ', 6A6)
+* 31  FORMAT('  NHAR ', 6I6)
+* 32  FORMAT('  IBIN  ',/,(20I4))
+* 33  FORMAT('  BB    ',/,(1X,6E12.5))
+      SEGSUP ITRAV
+      END
+
+ 

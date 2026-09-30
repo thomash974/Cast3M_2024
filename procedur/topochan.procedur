@@ -1,0 +1,26 @@
+$$$$ TOPOCHAN
+* TOPOCHAN  PROCEDUR  FD218221  23/11/29    21:15:06     11799          
+
+************************************************************************
+** Procedure called by TOPOPTIM for switching the associated model of an
+** element field expressed at the barycenter of the elements.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 1.1 2021/04/20 Fixing a minor issue by adding 'SCALAIRE' type
+** 1.0 2017/04/18
+************************************************************************
+
+DEBP TOPOCHAN chlm0*'MCHAML' mod0*'MMODEL' bmsh0*'MAILLAGE' ;
+*   Switch from element field to node field
+    chlm0 = PROI bmsh0 chlm0 ;
+*   Switch from node field to element field associated to the given model
+    chlm0 = MANU 'CHML' mod0 'REPA' 'SCAL' (EXTR chlm0 'VALE') 'TYPE' 'SCALAIRE' 'GRAVITE' ;
+*   In thermal mode, 'GRAVITE' option is not respected
+*   If needed, this problem can be solved by using INTG 'ELEM'
+FINP chlm0 ;
+
+$$$$
+ 

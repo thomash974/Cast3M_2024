@@ -1,0 +1,99 @@
+C ORDVEC    SOURCE    BP208322  19/04/29    21:15:12     10213          
+************************************************************************
+*
+*                                ORDVEC
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     TRI D'UNE LISTE DE VECTEURS PROPRES. LES VECEURS PROPRES DONT
+*     LES VALEURS PROPRES ASSOCIEES SONT LES PLUS PETITES EN MODULE
+*     SONT PLACES EN PREMIER DANS LA LISTE
+*
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPLVAL  ENTIER    (E)  POINTEUR DE L'OBJET 'LISTREEL' CONTENANT
+*                            LA SUITE DE 'FLOTTANTS' A TRIER
+*                       (S)  POINTEUR DE L'OBJET 'LISTREEL' CONTENANT
+*                            LA SUITE DE 'FLOTTANTS' TRIES
+*
+*     IPLVEC  ENTIER    (E)  POINTEUR DE L'OBJET 'LISTCHPO' CONTENANT
+*                            LA SUITE DE 'CHPOINT' ASSOCIE A IPLVAL.
+*                       (S)  MEME CHOSE, MAIS TRIEE.
+*
+*
+* MODE DE FONCTIONNEMENT:
+* -----------------------
+*
+*           TRI A BULLES.  ( LA LISTE EST PETITE ! )
+*
+* SUBROUTINES APPELEES :
+* -----------------------
+*           SWAP           ( ECHANGE DES TERMES DANS LES LISTES )
+*
+************************************************************************
+      SUBROUTINE ORDVEC ( IPLVAL, IPLVEC , ZABS )
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      
+-INC PPARAM
+-INC CCOPTIO
+-INC  SMLCHPO
+-INC  SMLREEL
+
+      POINTEUR IPLVAL.MLREEL, IPLVEC.MLCHPO
+      REAL*8   XVAL1, XVAL2
+      INTEGER  ILDIM, IB100
+      LOGICAL  BSWAP,ZABS
+
+      SEGACT ,IPLVAL*MOD,IPLVEC*MOD
+      ILDIM = IPLVAL.PROG(/1)
+      
+c     --------------------------------------------------------      
+c     cas ou on trie selon les valeurs absolues des frequences
+c     --------------------------------------------------------      
+      IF(ZABS) THEN
+      
+ 10      CONTINUE
+            BSWAP = .FALSE.
+            DO 100 IB100 = 1, ILDIM - 1
+               XVAL1 = IPLVAL.PROG( IB100 )
+               XVAL2 = IPLVAL.PROG( IB100 + 1 )
+               IF ( ABS(XVAL1) .GT. ABS(XVAL2) ) THEN
+                  CALL SWAP( IB100, IPLVAL, IPLVEC )
+                  IF ( IERR .NE. 0 ) RETURN
+                  BSWAP = .TRUE.
+               ENDIF
+ 100        CONTINUE
+         IF ( BSWAP ) GOTO 10
+      
+c     --------------------------------------------------------      
+c     tri selon la valeur algebrique des frequences (>0 ou <0)
+c     --------------------------------------------------------      
+      ELSE
+      
+ 20      CONTINUE
+            BSWAP = .FALSE.
+            DO 200 IB100 = 1, ILDIM - 1
+               XVAL1 = IPLVAL.PROG( IB100 )
+               XVAL2 = IPLVAL.PROG( IB100 + 1 )
+               IF ( XVAL1 .GT. XVAL2 ) THEN
+                  CALL SWAP( IB100, IPLVAL, IPLVEC )
+                  IF ( IERR .NE. 0 ) RETURN
+                  BSWAP = .TRUE.
+               ENDIF
+ 200        CONTINUE
+         IF ( BSWAP ) GOTO 20
+         
+      ENDIF
+      
+      SEGDES, IPLVAL,IPLVEC
+
+      RETURN
+      END
+
+ 

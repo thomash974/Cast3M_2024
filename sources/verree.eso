@@ -1,0 +1,119 @@
+C VERREE    SOURCE    CB215821  20/03/02    21:15:19     10540          
+*  verification reel
+*
+      subroutine verree(xval,resul)
+      implicit real*8 (a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+      logical resul
+*
+      resul = .false.
+      if (xval .le. xgrand .and. xval .ge. -xgrand) resul = .true.
+      end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 

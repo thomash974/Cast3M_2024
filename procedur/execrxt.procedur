@@ -1,0 +1,4818 @@
+$$$$ EXECRXT
+* EXECRXT   PROCEDUR  FD144363  24/04/02    21:15:13     11889          
+'DEBP' EXECRXT nbit*'ENTIER ' rxt*'TABLE   ' ;
+*
+* E/  nbit : Nombre de pas de temps
+* E/S rxt  : Interface avec l'utilisateur
+*
+WWW = 'CHAI' 'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW';
+WWW = 'CHAI' WWW 'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW' ;
+
+'MESS' ' ' ;
+'MESS' WWW ;
+'MESS' 'DEBUT PROCEDURE EXECRXT : CHOIX DES PRINCIPAUX PARAMETRES';
+'MESS' WWW ;
+
+*
+* Détection 2D/3D
+idim = 'VALE' 'DIME' ;
+'SI' ('EGA' idim 2) ;
+  DIM3D = FAUX ;
+'SINO' ;
+  'SI' ('EGA' idim 3) ;
+    DIM3D = VRAI ;
+  'SINO' ;
+    'ERRE' 219 ;
+    'QUIT' EXECRXT ;
+  'FINS' ;
+'FINS' ;
+
+*
+* Gestion des indices de rxt
+*
+* listentr = table dont les indices sont ceux autorisés dans rxt
+* (est complété durant le décodage par les indices optionnels lus)
+* listand  = liste des options surchargées par l'utilisateur
+* (correspond aux valeurs par défaut modifiées par l'utilisateur)
+*
+*FD Ne sert à rien ? TPAROIS non pris en compte ?
+* listchp  = liste des indices pouvant contenir un CHPO (FLOTTANT sinon)
+*FD 
+listentr = 'TABL' ;
+listand  = 'MOTS' ;
+listchp  = 'MOTS' ;
+
+listentr . 'VERSION'  = '' ;
+listentr . 'vtf'      = '' ;
+listentr . 'TF0'      = '' ;
+listentr . 'PT0'      = '' ;
+* Relatif à la thermiqe des parois
+listentr . 'THERMP'   = '' ;
+listentr . 'PAROIS'   = '' ;
+listentr . 'THERCO'   = '' ;
+listentr . 'vtp'      = '' ;
+listentr . 'ROCP'     = '' ;
+listentr . 'LAMBDA'   = '' ;
+listentr . 'Tp0'      = '' ;
+listentr . 'ECHAN'    = '' ;
+listentr . 'ECHEXT'   = '' ;
+listentr . 'parext'   = '' ;
+listentr . 'HEXT'     = '' ;
+listentr . 'TPEXT'    = '' ;
+listentr . 'TIMP'     = '' ;
+listentr . 'ECHANP'   = '' ;
+* Relatif aux E/S fluide
+listentr . 'XFIMP'    = '' ;
+listentr . 'Sorties'  = '' ;
+listentr . 'Breches'  = '' ;
+listentr . 'axe'      = '' ;
+listentr . 'epsi'     = '' ;
+listentr . 'pi'       = '' ;
+* Table utilisée pour la définition de recombineurs
+listentr . 'RECOMB'   = '' ;
+* Table de travail ajoutées par la procédure
+listentr . 'REINIT'   = '' ;
+listentr . 'TIC'      = '' ;
+listentr . 'GEO'      = '' ;
+listentr . 'TBT'      = '' ;
+* Paramètres numériques / algorithmes
+listentr . 'DISCR'    = '' ;
+listentr . 'KPRE'     = '' ;
+listentr . 'MAXELPRE' = '' ;
+listentr . 'STAB'     = '' ;
+listentr . 'ALGO'     = '' ;
+* Paramètres de fonctionnement
+listentr . 'CATHARE2' = '' ;
+listentr . 'DT0'      = '' ;
+listentr . 'PERSO'    = '' ;
+listentr . 'TABPERSO' = '' ;
+listentr . 'GRAPH'    = '' ;
+listentr . 'RENU'     = '' ;
+listentr . 'TYPINV'   = '' ;
+listentr . 'IMPR'     = '' ;
+listentr . 'FRPREC'   = '' ;
+listentr . 'PPDT'     = '' ;
+listentr . 'RESIDU'   = '' ;
+listentr . 'NTIT'     = '' ;
+listentr . 'TCPT'     = '' ;
+listentr . 'TKPR'     = '' ;
+listentr . 'TRESOU'   = '' ;
+listentr . 'IMPARA'   = '' ;
+listentr . 'TRTF'     = '' ;
+listentr . 'TRrvap'   = '' ;
+listentr . 'TRrhe'    = '' ;
+listentr . 'TRrh2'    = '' ;
+listentr . 'TRro2'    = '' ;
+listentr . 'TRrn2'    = '' ;
+listentr . 'TRrco2'   = '' ;
+listentr . 'TRrair'   = '' ;
+listentr . 'TRrco'    = '' ;
+* Constituant (air par défaut ) vapeur et incondensables
+listentr . 'LOI-ETAT' = '' ;
+listentr . 'VAPEUR'   = '' ;
+listentr . 'YBRO'     = '' ;
+listentr . 'V1alfa'   = '' ;
+listentr . 'TAUXcm'   = '' ;
+listentr . 'HE'       = '' ;
+listentr . 'H2'       = '' ;
+listentr . 'O2'       = '' ;
+listentr . 'N2'       = '' ;
+listentr . 'CO'       = '' ;
+listentr . 'CO2'      = '' ;
+listentr . 'AIR'      = '' ;
+* Modèles de turbulence
+listentr . 'MODTURB'  = '' ;
+listentr . 'FPAROI'   = '' ;
+* Modèle de condensation en masse
+listentr.'MODCOND'  = '' ;
+
+*
+* On (re)crée les tables si l'utilisateur le demande où si elles
+* n'existent pas (premier passage) -> TPREPA=VRAI
+'SI' ('EXIS' rxt 'REINIT') ;
+  vertytab rxt 'REINIT' 'LOGIQUE' ;
+  REINIT = rxt . 'REINIT' ;
+'SINO' ;
+  REINIT = 'NON' ('EXIS' rxt 'TBT') ;
+'FINS' ;
+
+'SI' (('EXIS' rxt 'TBT') 'ET' ('NON' REINIT)) ;
+  vertytab rxt 'TBT' 'TABLE   ' ;
+  vertytab rxt 'GEO' 'TABLE   ' ;
+  TPREPA = FAUX ;
+  TBT = rxt . 'TBT' ;
+  GEO = rxt . 'GEO' ;
+'SINO' ;
+  TPREPA = VRAI ;
+  TBT = 'TABLE' ;
+  GEO = 'TABLE' ;
+  rxt . 'GEO' = GEO ;
+'FINS' ;
+
+*
+* epsi = tolérance pour les maillages (ELIM)
+GEO . 'epsi' = 1.e-4 ;
+'SI' ('EXIS' rxt 'epsi') ;
+  vertytab rxt 'epsi' 'FLOTTANT' ;
+  GEO . 'epsi' = rxt . 'epsi' ;
+'FINS' ;
+
+*
+* ndl = nbre de temps connus
+* Tps = dernier temps connu (début du pas de temps)
+'SI' ('EXIS' rxt 'TIC') ;
+  vertytab rxt 'TIC' 'TABLE   ' ;
+  vertytab (rxt . 'TIC') 'LTPS' 'LISTREEL' ;
+  tic = rxt . 'TIC' ;
+'SINO' ;
+  tic = 'TABLE' 'INCO' ;
+  rxt . 'TIC'  = tic  ;
+  tic . 'LTPS' = 'PROG' 0.0 ;
+'FINS' ;
+ndl = 'DIME' tic . 'LTPS' ;
+Tps = 'EXTR' tic . 'LTPS' ndl ;
+'MESS' 'Le calcul demarre a partir du temps' ' ' Tps ;
+
+*
+* Liste des Gaz pris en compte
+LINCOND = 'MOTS' 'N2' 'H2' 'HE' 'O2' 'CO' 'CO2' 'VAPE' ;
+
+*
+*FD A commenter
+'SI' ('NON' ('EXIS' tic 'Lg0D')) ;
+  tic . 'Lg0D' = 'MOTS' ;
+  tic . 'Li0D' = 'PROG' ;
+'FINS' ;
+*
+*-------------------------------------------------------------
+* Les données de l'utilisateur (table rxt) sont décodées,
+* vérifiées et dupliquées (tables tbt et geo)
+*-------------------------------------------------------------
+*
+* Conditions initiales
+vertytab rxt 'TF0' 'FLOTTANT' ;
+vertytab rxt 'PT0' 'FLOTTANT' ;
+
+*
+* Maillage fluide
+vertytab rxt 'vtf' 'MAILLAGE' ;
+vtf = rxt . 'vtf' ;
+vertytab 0 GEO vtf ;
+GEO . 'Mvtf' = 'CHAN' 'QUAF' rxt . 'vtf' ;
+
+*
+* DT0 = pas de temps
+vertytab rxt 'DT0' 'FLOTTANT' ;
+tic . 'DT' = rxt . 'DT0' ;
+
+*
+* Couplage éventuel avec CATHARE2
+TBT . 'CATHARE2' = FAUX ;
+'SI' ('EXIS' rxt 'CATHARE2') ;
+  vertytab rxt 'CATHARE2' 'LOGIQUE' ;
+  TBT . 'CATHARE2' = rxt . 'CATHARE2' ;
+'FINS' ;
+
+*
+* On interdit VERSION = V1
+TBT . 'VERSION' = 0 ;
+'SI' ('EXIS' rxt 'VERSION') ;
+  lxt  = 'MOTS' 'V0' 'V1' ;
+  vertytab lxt (rxt . 'VERSION') 'MOT' ;
+  tbvs = 'TABL' ;
+  tbvs . 'V0' = 0 ;
+  tbvs . 'V1' = 1 ;
+  TBT . 'VERSION' = tbvs . (rxt . 'VERSION') ;
+'SI' ('EGA' TBT . 'VERSION' 1) ;
+'MESS'                                                             ;
+'MESS' '*********************************************************' ;
+'MESS' ' ERREUR   ERREUR   ERREUR   ERREUR   ERREUR   ERREUR     ' ;
+'MESS' '                                                         ' ;
+'MESS' '                                                         ' ;
+'MESS' '      Pas de VERSION V1 pour l instant                   ' ;
+'MESS' '                                                         ' ;
+'MESS' '*********************************************************' ;
+'ERRE' 19 ;
+'QUIT' EXECRXT ;
+'FINS' ;
+'FINS' ;
+
+'SI' ('EGA' TBT . 'VERSION' 1) ;
+  TBT . 'YBRO'   = 1.e-4 ;
+  TBT . 'V1alfa' = 0.8   ;
+  TBT . 'TAUXcm' = 1.    ;
+ 'SI' ('EXIS' rxt 'YBRO') ;
+   vertytab rxt 'YBRO' 'FLOTTANT' ;
+   TBT . 'YBRO' = rxt . 'YBRO' ;
+ 'FINS' ;
+ 'SI' ('EXIS' rxt 'V1alfa') ;
+   vertytab rxt 'V1alfa' 'FLOTTANT' ;
+   TBT . 'V1alfa' = rxt . 'V1alfa' ;
+ 'FINS' ;
+ 'SI' ('EXIS' rxt 'TAUXcm') ;
+   vertytab rxt 'TAUXcm' 'FLOTTANT' ;
+   TBT . 'TAUXcm' = rxt . 'TAUXcm' ;
+ 'FINS' ;
+'FINS' ;
+
+*
+* On interdit LOI-ETAT = GR
+TBT . 'LOI-ETAT' = 'GP' ;
+'SI' ('EXIS' rxt 'LOI-ETAT') ;
+  lxt = 'MOTS' 'GP' 'GR' ;
+  vertytab lxt (rxt . 'LOI-ETAT') 'MOT' ;
+  TBT . 'LOI-ETAT' = rxt . 'LOI-ETAT' ;
+'SI' ('EGA' TBT . 'LOI-ETAT' 'GR')                                 ;
+'MESS'                                                             ;
+'MESS' '*********************************************************' ;
+'MESS' ' ERREUR   ERREUR   ERREUR   ERREUR   ERREUR   ERREUR     ' ;
+'MESS' '                                                         ' ;
+'MESS' '                                                         ' ;
+'MESS' '      Pas de loi d etat gaz reel pour l instant          ' ;
+'MESS' '                                                         ' ;
+'MESS' '*********************************************************' ;
+'ERRE' 19 ;
+'QUIT' EXECRXT ;
+'FINS' ;
+'FINS' ;
+
+*
+* GRAPH = Logique permettant les dessins
+TBT . 'GRAPH' = FAUX ;
+'SI' ('EXIS' rxt 'GRAPH') ;
+  vertytab rxt 'GRAPH' 'LOGIQUE ' ;
+  TBT . 'GRAPH' = rxt . 'GRAPH' ;
+'FINS' ;
+
+*
+* Niveau d'impression = 0 pour les supprimer et 2 pour le mode DEBUG
+TBT . 'nimpr' = 0 ;
+TBT . 'IMPR'  = 2 ;
+'SI' ('EXIS' rxt 'IMPR') ;
+  vertytab rxt 'IMPR' 'ENTIER' ;
+  TBT . 'IMPR' = rxt . 'IMPR' ;
+'FINS' ;
+
+*
+* STAB = coefficient de Stabilisation pour les MACRO
+TBT . 'STAB' = 1. ;
+'SI' ('EXIS' rxt 'STAB') ;
+  vertytab rxt 'STAB' 'FLOTTANT' ;
+  TBT . 'STAB' = rxt . 'STAB' ;
+  listand = listand 'ET' ('MOTS' 'STAB') ;
+'FINS' ;
+
+*
+* FRPREC = fréquence de recalcul du préconditionnement
+'SI' ('EXIS' rxt 'FRPREC') ;
+  vertytab rxt 'FRPREC' 'ENTIER' ;
+  TBT . 'FRPREC' = rxt . 'FRPREC' ;
+'FINS' ;
+
+*
+* DETMAT = vrai si on détruit les matrices à la fin du calcul
+TBT . 'DETMAT' = VRAI ;
+'SI' ('EXIS ' rxt 'DETMAT') ;
+  vertytab rxt 'DETMAT' 'LOGIQUE' ;
+  listentr . 'DETMAT'   = '' ;
+  TBT . 'DETMAT' = rxt . 'DETMAT' ;
+'FINS' ;
+
+*
+* CORTEMP = vrai si on controle le bilan d'énergie
+TBT . 'CORTEMP' = vrai ;
+'SI' ('EXIS' rxt 'CORTEMP') ;
+  vertytab rxt 'CORTEMP' 'LOGIQUE' ;
+  listentr . 'CORTEMP'  = '' ;
+  TBT . 'CORTEMP' = rxt . 'CORTEMP' ;
+  listand = listand 'ET' (MOTS 'CORTEMP') ;
+'FINS' ;
+
+*
+* CORLIM = vrai si on controle le bilan de masse en incorporant les points de la frontière où sont
+* définies les conditions aux limites (sinon ces points sont exclus)
+TBT . 'CORLIM' = vrai ;
+'SI' ('EXIS' rxt 'CORLIM') ;
+  vertytab rxt 'CORLIM' 'LOGIQUE' ;
+  listentr . 'CORLIM'  = '' ;
+  TBT . 'CORLIM' = rxt . 'CORLIM' ;
+  listand = listand 'ET' (MOTS 'CORLIM') ;
+'FINS' ;
+corlim = tbt . 'CORLIM' ;
+
+*
+* RENU = Type de renumérotation pour les méthodes d'inversion
+TBT . 'RENU' = 'SLOA' ;
+'SI' ('EXIS' rxt 'RENU') ;
+  vertytab rxt 'RENU' 'MOT' ;
+  lxt = 'MOTS' 'RIEN' 'SLOA' 'GIBR' 'GIBA' ;
+  vertytab lxt (rxt . 'RENU') 'MOT' ;
+  TBT . 'RENU' = rxt . 'RENU' ;
+  listand = listand 'ET' ('MOTS' 'RENU') ;
+'FINS' ;
+
+*
+* TYPINV = Type d'inversion et paramètres pour les méthodes itératives
+* (cf notice KRES)
+TBT . 'TYPINV' = 3 ;
+'SI' ('EXIS' rxt 'TYPINV') ;
+  vertytab rxt 'TYPINV' 'ENTIER' ;
+  TBT . 'TYPINV' = rxt . 'TYPINV' ;
+  listand = listand 'ET' ('MOTS' 'TYPINV') ;
+'FINS' ;
+
+TBT . 'RESIDU' = 1.E-20 ;
+'SI' ('EXIS' rxt 'RESIDU') ;
+  vertytab rxt 'RESIDU' 'FLOTTANT' ;
+  TBT . 'RESIDU' = rxt . 'RESIDU' ;
+  listand = listand 'ET' (MOTS 'RESIDU') ;
+'FINS' ;
+
+TBT . 'NTIT' = 800 ;
+'SI' ('EXIS' rxt 'NTIT') ;
+  vertytab rxt 'NTIT' 'ENTIER' ;
+  TBT .'NTIT' = rxt . 'NTIT' ;
+  listand = listand 'ET' ('MOTS' 'NTIT') ;
+'FINS' ;
+
+*
+* TRESOU = vrai si RESO est le solveur linéaire
+TBT . 'TRESOU' = FAUX ;
+'SI' ('EXIS' rxt 'TRESOU') ;
+  vertytab rxt 'TRESOU' 'LOGIQUE' ;
+  TBT . 'TRESOU' = rxt . 'TRESOU' ;
+  listand = listand 'ET' ('MOTS' 'TRESOU') ;
+'FINS' ;
+
+*
+* TCPT = vrai si les matrices élémentaires sont calclées en //
+TBT . 'TCPT' = FAUX ;
+'SI' ('EXIS' rxt 'TCPT') ;
+  vertytab rxt 'TCPT' 'LOGIQUE' ;
+  TBT . 'TCPT' = rxt . 'TCPT' ;
+  listand = listand 'ET' ('MOTS' 'TCPT') ;
+'FINS' ;
+
+*
+* TKPR = vrai si la résolution des champs scalaires est en //
+* Le // est effectif si au moins un champ est // (TRTOUT = vrai)
+TBT . 'TKPR' = FAUX ;
+'SI' ('EXIS' rxt 'TKPR') ;
+  vertytab rxt 'TKPR' 'LOGIQUE' ;
+  TBT . 'TKPR' = rxt . 'TKPR' ;
+  listand = listand 'ET' ('MOTS' 'TKPR') ;
+'FINS' ;
+
+TBT . 'IMPARA' = FAUX ;
+'SI' ('EXIS' rxt 'IMPARA') ;
+  vertytab rxt 'IMPARA' 'LOGIQUE' ;
+  TBT . 'IMPARA' = rxt . 'IMPARA' ;
+  listand = listand 'ET' (MOTS 'IMPARA') ;
+'FINS' ;
+
+TBT . 'TRTF'  = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRTF') ;
+  vertytab rxt 'TRTF' 'LOGIQUE' ;
+  TBT . 'TRTF' = rxt . 'TRTF' ;
+  listand = listand 'ET' (MOTS 'TRTF') ;
+'FINS' ;
+
+TBT . 'TRrvap' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrvap') ;
+  vertytab rxt 'TRrvap' 'LOGIQUE' ;
+  TBT . 'TRrvap' = rxt . 'TRrvap' ;
+  listand = listand 'ET' ('MOTS' 'TRrvap') ;
+'FINS' ;
+
+TBT . 'TRrhe' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrhe') ;
+  vertytab rxt 'TRrhe'  'LOGIQUE' ;
+  TBT . 'TRrhe' = rxt . 'TRrhe' ;
+  listand = listand 'ET' ('MOTS' 'TRrhe')  ;
+'FINS' ;
+
+TBT . 'TRrh2' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrh2') ;
+  vertytab rxt 'TRrh2' 'LOGIQUE' ;
+  TBT . 'TRrh2' = rxt . 'TRrh2' ;
+  listand = listand 'ET' ('MOTS' 'TRrh2') ;
+'FINS' ;
+
+TBT . 'TRro2' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRro2') ;
+  vertytab rxt 'TRro2' 'LOGIQUE' ;
+  TBT . 'TRro2' = rxt . 'TRro2' ;
+  listand = listand 'ET' ('MOTS' 'TRro2') ;
+'FINS' ;
+
+TBT . 'TRrn2' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrn2') ;
+  vertytab rxt 'TRrn2'  'LOGIQUE' ;
+  TBT . 'TRrn2' = rxt . 'TRrn2' ;
+  listand = listand 'ET' ('MOTS' 'TRrn2')  ;
+'FINS' ;
+
+TBT . 'TRrco' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrco') ;
+  vertytab rxt 'TRrco'  'LOGIQUE' ;
+  TBT . 'TRrco' = rxt . 'TRrco' ;
+  listand = listand 'ET' (MOTS 'TRrco') ;
+'FINS' ;
+
+TBT . 'TRrco2' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrco2') ;
+  vertytab rxt 'TRrco2'  'LOGIQUE' ;
+  TBT . 'TRrco2' = rxt . 'TRrco2' ;
+  listand = listand 'ET' ('MOTS' 'TRrco2') ;
+'FINS' ;
+
+TBT . 'TRrair' = TBT . 'TKPR' ;
+'SI' ('EXIS' rxt 'TRrair') ;
+  vertytab rxt 'TRrair'  'LOGIQUE' ;
+  TBT . 'TRrair'  = rxt . 'TRrair' ;
+  listand = listand 'ET' ('MOTS' 'TRrair') ;
+'FINS' ;
+
+TBT . 'TRTOUT' =
+TBT . 'TRTF'  'OU' TBT . 'TRrvap' 'OU' TBT . 'TRrhe' 'OU'
+TBT . 'TRrh2' 'OU' TBT . 'TRro2'  'OU' TBT . 'TRrn2' 'OU'
+TBT . 'TRrco' 'OU' TBT . 'TRrco2' 'OU' TBT . 'TRrair' ;
+
+*
+* PPDT  formulation conservative ou non conservative
+* (désignée petits/grands pas de temps)
+TBT . 'PPDT' = FAUX ;
+'SI' ('EXIS' rxt 'PPDT') ;
+  vertytab rxt 'PPDT' 'LOGIQUE' ;
+  TBT . 'PPDT' = rxt . 'PPDT' ;
+  listand = listand 'ET' ('MOTS' 'PPDT') ;
+'FINS' ;
+'SI' TBT . 'PPDT' ;
+  TBT . 'FCONS' = 'CONS2' ;
+'SINO' ;
+  TBT . 'FCONS' = 'NOCONS' ;
+'FINS' ;
+
+*
+* ALGO = choix de l'algorithme implicite / explicite
+* (IMPL  = semi implicite / EFM1  = semi explicite)
+TBT . 'ALGO'  = 'IMPL' ;
+TBT . 'SPGNU' = 'CHAI' 'SOMMET' ;
+TBT . 'FEF'   = 'EF' ;
+TBT . 'FIMPL' = 'IMPL' ;
+'SI' ('EXIS' rxt 'ALGO') ;
+  vertytab rxt 'ALGO' 'MOT' ;
+  lxt = 'MOTS' 'IMPL' 'EFM1' ;
+  vertytab lxt (rxt . 'ALGO') 'MOT' ;
+  TBT . 'ALGO' = rxt . 'ALGO' ;
+  'SI' ('EGA' TBT . 'ALGO' 'EFM1') ;
+    TBT . 'SPGNU' = 'CHAI' 'CENTRE' ;
+    TBT . 'FEF'   = 'EFM1' ;
+    TBT . 'FIMPL' = 'EXPL' ;
+  'FINS' ;
+  listand = listand 'ET' ('MOTS' 'ALGO') ;
+'FINS' ;
+'MESS' '==> Algorithme choisi' ' ' TBT . 'ALGO' ;
+
+*
+* DISCR = Eléments pour la vitessse et les scalaires autres que P
+* (LINE = linéaires / MACRO (par DEFAUT) / QUAF = quadratiques fluide)
+TBT . 'discr' = 'MACRO' ;
+'SI' ('EXIS' rxt 'DISCR') ;
+  vertytab rxt 'DISCR' 'MOT' ;
+  lxt = 'MOTS' 'MACRO' 'LINE' 'QUAF' ;
+  vertytab lxt (rxt . 'DISCR') 'MOT' ;
+  TBT . 'discr' = rxt . 'DISCR' ;
+  listand = listand 'ET' ('MOTS' 'DISCR') ;
+'FINS' ;
+'MESS' '==> Discretisation choisie pour la vitesse' ' ' TBT . 'discr' ;
+TBT . 'discrH' = TBT . 'discr' ;
+'SI' (('EGA' TBT . 'discr' 'QUAF') 'ET' DIM3D) ;
+  TBT . 'discrH' = 'MACRO' ;
+'FINS' ;
+
+*
+* KPRE = Eléments pour la pression
+TBT . 'KPRE' = 'CENTRE' ;
+'SI' ('EXIS' rxt 'KPRE') ;
+  vertytab rxt 'KPRE' 'MOT' ;
+  lxt = 'TABL' ;
+  lxt . 'CENTRE'   = ' ' ;
+  lxt . 'CENTREP1' = ' ' ;
+  lxt . 'MSOMMET'  = ' ' ;
+  vertytab lxt (rxt . 'KPRE') 'MOT' ;
+  TBT . 'KPRE' = rxt . 'KPRE' ;
+  listand = listand 'ET' ('MOTS' 'KPRE') ;
+'FINS'                                                   ;
+'MESS' '==> Discretisation choisie pour la pression' ' ' TBT . 'KPRE' ;
+
+*
+* MAXELPRE = nombre maximum d'éléments pour lequel on utilise
+* une méthode directe (Cholesky) pour inverser la matrice.
+TBT . 'MAXELPRE' = 150000 ;
+'SI' ('EXIS' rxt 'MAXELPRE') ;
+  vertytab rxt 'MAXELPRE' 'ENTIER' ;
+  TBT . 'MAXELPRE' = rxt . 'MAXELPRE' ;
+  listand = listand 'ET' ('MOTS' 'MAXELPRE') ;
+'FINS' ;
+'MESS' '==> Resolution directe pour la pression jusqu à' ' ' 
+TBT . 'MAXELPRE' ' ' 'elements' ;
+
+*
+* Definition des grandeurs Physiques :
+* Rabs = constante universel des GP (J/mol/K)
+* Rgi  = constante des gaz (J/kg/K)
+* Mki  = masse molaire (kg/mol)
+*
+* Cpvap/Cvvap = Chaleur specifique à pression/volume constant supposé 
+* constant durant le calcul + hypothèse vapeur gaz parfait (J/kg/K)
+* Lv = Chaleur Latente supposée constante (J/kg)
+Rabs = 6.022*1.38066 ;
+TBT . 'Rabs'  = Rabs ;
+TBT . 'Rgh2'  = Rabs '/' 2.E-3  ; TBT . 'Mkh2'  = 2.016E-3 ;
+TBT . 'Rghe'  = Rabs '/' 4.E-3  ; TBT . 'Mkhe'  = 4.003E-3 ;
+TBT . 'Rgo2'  = Rabs '/' 3.2E-2 ; TBT . 'Mko2'  = 32.00E-3 ;
+TBT . 'Rgn2'  = Rabs '/' 2.8E-2 ; TBT . 'Mkn2'  = 28.02E-3 ;
+TBT . 'Rgco2' = Rabs '/' 4.4E-2 ; TBT . 'Mkco2' = 44.01E-3 ;
+TBT . 'Rgco'  = Rabs '/' 2.8E-2 ; TBT . 'Mkco'  = 28.01E-3 ;
+TBT . 'Rgar'  = Rabs '/' 4.E-2  ; TBT . 'Mkar'  = 39.94E-3 ;
+TBT . 'Rgch4' = Rabs '/' 16.E-3 ; TBT . 'Mkch4' = 16.04E-3 ;
+
+TBT . 'Rgvap' = Rabs '/' 1.8E-2 ; TBT . 'Mkvap' = 18.02E-3 ;
+
+*Rabs = 6.02214076 '*' 1.380649 ;
+*TBT . 'Mkh2'  = 2.D0 * 0.00100794D0 ;
+*TBT . 'Rgh2'  = Rabs '/' TBT . 'Mkh2'  ; 
+*TBT . 'Mkhe'  = 0.004002602D0 ;
+*TBT . 'Rghe'  = Rabs '/' TBT . 'Mkhe'  ; 
+*TBT . 'Mko2'  = 2.D0 * 0.0159994D0 ;
+*TBT . 'Rgo2'  = Rabs '/' TBT . 'Mko2'  ; 
+*TBT . 'Mkn2'  = 2.D0 * 0.0140067D0 ;
+*TBT . 'Rgn2'  = Rabs '/' TBT . 'Mkn2'  ; 
+*TBT . 'Mkco2' = 2.D0 * 0.0159994D0 + 0.0120107D0 ;
+*TBT . 'Rgco2' = Rabs '/' TBT . 'Mkco2' ; 
+*TBT . 'Mkco'  = 0.0120107D0 + 0.0159994D0 ;
+*TBT . 'Rgco'  = Rabs '/' TBT . 'Mkco'  ; 
+*TBT . 'Mkvap' = 2.D0 * 0.00100794D0 + 0.0159994D0 ;
+*TBT . 'Rgvap' = Rabs '/' TBT . 'Mkvap' ;
+*
+*TBT . 'Mkar'  = 39.94E-3 ; TBT . 'Rgar'  = Rabs '/' TBT . 'Mkar'  ; 
+*TBT . 'Mkch4' = 16.04E-3 ; TBT . 'Rgch4' = Rabs '/' TBT . 'Mkch4' ; 
+
+'SI' ('EXIS' rxt 'Cpvap') ;
+  vertytab rxt 'Cpvap' 'FLOTTANT' ;
+  Cpvap = rxt . 'Cpvap' ;
+'SINO' ;
+  Cpvap = 1700. ;
+  'MESS' '==> Cpvap mis par defaut a 1700 J/kg/K' ;
+'FINS' ;
+TBT . 'Cpvap' = Cpvap ;
+TBT . 'Cvvap' = TBT . 'Cpvap' - TBT . 'Rgvap' ;
+
+'SI' ('EXIS' rxt 'Lv') ;
+  vertytab rxt 'Lv' 'FLOTTANT' ;
+  Lv = rxt . 'Lv' ;
+'SINO' ;
+  Lv = 2.3E6 ;
+  'MESS' '==> Chaleur latente Lv mise par defaut a 2.3E6 J/kg' ;
+'FINS' ;
+TBT . 'Lv' = Lv ;
+
+TBT . 'Rgair' = 287.1           ; TBT . 'Mkair' = 28.97E-3 ;
+TBT . 'lamair' = 2.580e-2 ;
+
+*
+* Coefficients pour les tables de l'eau
+TBT . 'B0' = -4512.70756 ; TBT . 'B1' = 4245585.9 ;
+TBT . 'B2' = -1584624342.;
+
+*
+* DB = coefficient de diffusion Brownienne
+'SI' ('EXIS' rxt 'db') ;
+  vertytab rxt 'db' 'FLOTTANT' ;
+  db = rxt . 'db' ;
+'SINO' ;
+  db = 1.000e-5 ;
+'FINS' ;
+TBT . 'db' = db ;
+
+*
+* Définition de l'axe (ou du plan) de symétrie
+TBT . 'Taxe' = FAUX ;
+'SI' ('EXIS' rxt 'axe') ;
+  vertytab rxt 'axe' 'MAILLAGE' ;
+  TBT . 'Taxe' = VRAI ;
+'FINS' ;
+
+*
+* Définition des Sorties
+TBT . 'TTsortie' = FAUX ;
+'SI' ('EXIS' rxt 'Sorties') ;
+  vertytab rxt 'Sorties' 'TABLE' ;
+  TBT . 'TTsortie' = VRAI ;
+  NBR = 'DIME' rxt . 'Sorties' ;
+  mess ' Il y a' ' ' NBR ' ' 'Sortie(s)' ;
+  ibr = 'INDE' rxt . 'Sorties' ;
+  'REPE' BBRS NBR ;
+    Sriches = rxt . 'Sorties' . (ibr . &BBRS) ;
+    'MESS' 'Verification Sortie' ' ' (ibr . &BBRS) ;
+    vertytab Sriches 'Maillage' 'MAILLAGE' ;
+    vertytab Sriches 'scenario' 'TABLE   ' ;
+    scn = Sriches . 'scenario' ;
+    Sriches . 'Modinj' = 'MOT' 'A' ;
+    'SI' ('EXIS' Sriches . 'scenario' 'Modinj') ;
+      Sriches . 'Modinj' = Sriches . 'scenario' . 'Modinj' ;
+    'FINS' ;
+*FD
+* Quid si reprise ?
+*FD
+'SI' ('NON' ('EXIS' Sriches 'Qj')) ;
+    Sriches . 'guj'   = 'PROG' 0. ;
+    Sriches . 'Qj'    = 'PROG' 0. ;
+    Sriches . 'Ksi'   = 'PROG' 0. ;
+    Sriches . 'Hj'    = 'PROG' 0. ;
+    Sriches . 'Ej'    = 'PROG' 0. ;
+    Sriches . 'Ltbp1' = 'PROG' 0. ;
+    Sriches . 'Qlj'   = 'PROG' 0. ;
+    Sriches . 'Hlj'   = 'PROG' 0. ;
+    Sriches . 'Tinj'  = 'PROG' 0. ;
+'FINS' ;
+  'FIN' BBRS ;
+  TBT . 'Sorties' = rxt . 'Sorties' ;
+'FINS' ;
+
+*
+* Définition des Breches
+TBT . 'TTbreche' = FAUX ;
+'SI' ('EXIS' rxt 'Breches') ;
+  vertytab rxt 'Breches' 'TABLE' ;
+  TBT . 'TTbreche' = VRAI ;
+  NBR = 'DIME' rxt . 'Breches' ;
+  'MESS' ' Il y a' ' ' NBR ' ' 'Brèche(s)' ;
+  ibr = 'INDE' rxt . 'Breches' ;
+  'REPE' BBRS NBR ;
+    Briches = rxt . 'Breches' . (ibr . &BBRS) ;
+    'MESS' 'Verification Breche' ' ' (ibr . &BBRS) ;
+    vertytab Briches 'diru' 'POINT   ' ;
+    Briches . 'diru' = Briches . 'diru' '/' ('NORM' Briches . 'diru') ;
+    vertytab Briches 'Maillage' 'MAILLAGE' ;
+    vertytab Briches 'scenario' 'TABLE   ' ;
+    scn = Briches . 'scenario' ;
+    Briches . 'Modinj' = 'MOT' 'A' ;
+    'SI' ('EXIS' Briches . 'scenario' 'Modinj') ;
+      Briches . 'Modinj' = Briches . 'scenario' . 'Modinj' ;
+    'FINS' ;
+*FD
+* Quid si reprise ?
+*FD
+'SI' ('NON' ('EXIS' Briches 'Qj')) ;
+    Briches . 'guj'   = 'PROG' 0. ;
+    Briches . 'Qj'    = 'PROG' 0. ;
+    Briches . 'Ksi'   = 'PROG' 0. ;
+    Briches . 'Hj'    = 'PROG' 0. ;
+    Briches . 'Ej'    = 'PROG' 0. ;
+    Briches . 'Ltbp1' = 'PROG' 0. ;
+    Briches . 'Qlj'   = 'PROG' 0. ;
+    Briches . 'Hlj'   = 'PROG' 0. ;
+    Briches . 'Tinj'  = 'PROG' 0. ;
+'FINS' ;
+  'FIN' BBRS ;
+  TBT . 'Breches' = rxt . 'Breches' ;
+*
+  'SI' ('NON' ('EXIS' tic 'Breches')) ;
+    tic . 'Breches' = 'TABLE' ;
+  'FINS' ;
+'FINS' ;
+
+*
+* Définition des Flux de masse imposés
+TBT . 'TFIMP' = FAUX ;
+'SI' ('EXIS' rxt 'XFIMP') ;
+  TBT . 'TFIMP' = VRAI ;
+  vertytab rxt 'XFIMP' 'TABLE' ;
+  NBFIMP = 'DIME' rxt . 'XFIMP' ;
+  ifimp  = 'INDE' rxt . 'XFIMP' ;
+  'REPE' BBFIMP NBFIMP ;
+    Bfimp = rxt . 'XFIMP' . (ifimp . &BBFIMP) ;
+    vertytab (rxt.'XFIMP') (ifimp . &BBFIMP) 'TABLE' ;
+    vertytab Bfimp 'MAILLAGE' 'MAILLAGE' ;
+    vertytab Bfimp 't'        'LISTREEL' ;
+*FD
+* A mettre dans prepaenc ?
+*FD
+    nds = 'DIME' Bfimp . 't' ;
+    'SI' ('EXIS' Bfimp 'qt') ;
+      vertytab Bfimp 'qt'   'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qt'   = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qeau') ;
+      vertytab Bfimp 'qeau' 'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qeau' = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qair') ;
+      vertytab Bfimp 'qair' 'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qair' = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qhe') ;
+      vertytab Bfimp 'qhe'  'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qhe'  = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qh2') ;
+      vertytab Bfimp 'qh2'  'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qh2'  = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qo2') ;
+      vertytab Bfimp 'qo2'  'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qo2'  = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qn2') ;
+      vertytab Bfimp 'qn2'  'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qn2'  = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qco') ;
+      vertytab Bfimp 'qco'  'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qco'  = 'PROG' nds*0. ;
+    'FINS' ;
+    'SI' ('EXIS' Bfimp 'qco2');
+      vertytab Bfimp 'qco2' 'LISTREEL' ;
+    'SINO' ;
+      Bfimp . 'qco2' = 'PROG' nds*0. ;
+    'FINS' ;
+    Bfimp . 'Kqt'   = 'CHAI' 'Kqt'   &BBTIMP ;
+    Bfimp . 'Kqeau' = 'CHAI' 'Kqeau' &BBTIMP ;
+    Bfimp . 'Kqair' = 'CHAI' 'Kqair' &BBTIMP ;
+    Bfimp . 'Kqhe'  = 'CHAI' 'Kqhe'  &BBTIMP ;
+    Bfimp . 'Kqh2'  = 'CHAI' 'Kqh2'  &BBTIMP ;
+    Bfimp . 'Kqo2'  = 'CHAI' 'Kqo2'  &BBTIMP ;
+    Bfimp . 'Kqn2'  = 'CHAI' 'Kqn2'  &BBTIMP ;
+    Bfimp . 'Kqco'  = 'CHAI' 'Kqco'  &BBTIMP ;
+    Bfimp . 'Kqco2' = 'CHAI' 'Kqco2' &BBTIMP ;
+    Bfimp . 'KFL1'  = 'CHAI' 'KFL1'  &BBTIMP ;
+  'FIN' BBFIMP ;
+  TBT . 'XFIMP' = rxt . 'XFIMP' ;
+'FINS' ;
+
+*
+* THERMP  = vrai si Problème couplé Fluide-Structure
+* THERCO  = vrai si couplage implicite Fluide-Structure
+TBT . 'THERMP' = FAUX ;
+TBT . 'THERCO' = FAUX ;
+TBT . 'ECHEXT' = FAUX ;
+
+'SI' ('EXIS' rxt 'THERMP') ;
+  vertytab rxt 'THERMP' 'LOGIQUE' ;
+  TBT . 'THERMP' = rxt . 'THERMP' ;
+'FINS' ;
+
+'SI' ('EXIS' rxt 'THERCO') ;
+  vertytab rxt 'THERCO' 'LOGIQUE' ;
+  TBT . 'THERCO' = rxt . 'THERCO' ;
+  'SI' TBT . 'THERCO' ;
+    TBT . 'THERMP' = VRAI ;
+    listand = listand 'ET' ('MOTS' 'THCO') ;
+  'FINS' ;
+'FINS' ;
+
+*
+* TPAROIS = vrai si résolution thermique dans les parois
+* (nouvelle définition des parois thermiques)
+TBT . 'TPAROIS' = FAUX ;
+'SI' ('EXIS' rxt 'PAROIS') ;
+  vertytab rxt 'PAROIS' 'TABLE' ;
+*FD
+* ECHAN est défini globalement au lieu de localement pour chaque PAROI
+* (héritage de l'époque ou on avait une seulle paroi ?)
+*FD
+  vertytab rxt 'ECHAN' 'FLOTTANT' 'CHPOINT' ;
+  NPAR = 'DIME' rxt . 'PAROIS' ;
+  'MESS' 'Il y a' ' ' NPAR ' ' 'Parois(s)' ;
+  ipr  = 'INDE' rxt . 'PAROIS' ;
+  Mvtp = 'VIDE' 'MAILLAGE' ;
+  'REPE' BPRS NPAR ;
+    Parois = rxt . 'PAROIS' . (ipr . &BPRS) ;
+    vertytab (rxt . 'PAROIS') (ipr . &BPRS) 'TABLE' ;
+    'MESS' ' Verification Paroi' ' ' (ipr . &BPRS) ;
+    vertytab Parois 'vtp' 'MAILLAGE' ;
+    Mvtp = Mvtp 'ET' Parois . 'vtp' ;
+    vertytab Parois 'ROCP' 'FLOTTANT' 'CHPOINT' ;
+    vertytab Parois 'LAMBDA' 'FLOTTANT' 'CHPOINT' ;
+    vertytab Parois 'Tp0' 'FLOTTANT' 'CHPOINT' ;
+*? vertytab Parois 'ECHAN'    'FLOTTANT' 'CHPOINT'       ;
+    CROCP   = 'CHAI' 'ROCP' &BPRS ;
+    CLAMBDA = 'CHAI' 'LAMBDA' &BPRS ;
+    CTP0    = 'CHAI' 'Tp0' &BPRS ;
+    'SI' ('NON' ('EXIS' tic CROCP)) ;
+      tic . CROCP = Parois . 'ROCP' ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' tic CLAMBDA)) ;
+      tic . CLAMBDA = Parois . 'LAMBDA' ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' tic CTp0)) ;
+      tic . CTp0 = Parois . 'Tp0' ;
+    'FINS' ;
+  'FIN' BPRS ;
+  vertytab 1 GEO Mvtp ;
+  GEO . 'Mvtp' = 'CHAN' 'QUAF' Mvtp ;
+  'ELIM' GEO . 'Mvtp' rxt . 'epsi' ;
+  'ELIM' GEO . 'Mvtf' GEO . 'Mvtp' rxt . 'epsi' ;
+  TBT . 'PAROIS' = rxt . 'PAROIS' ;
+  TBT . 'THERMP' = VRAI ;
+  TBT . 'TPAROIS' = VRAI ;
+'FINS' ;
+
+'SI' TBT . 'THERMP' ;
+*FD
+* Ancienne définition d'une PAROI : à detruire ?
+*FD
+*
+* TPAROIS = faux mais THERMP = vrai (ancienne définition de LA paroi thermique)
+  'SI' ('NON' (TBT . 'TPAROIS')) ;
+    vertytab rxt 'vtp' 'MAILLAGE' ;
+    vertytab 1 GEO (rxt . 'vtp') ;
+    GEO . 'Mvtp' = 'CHAN' 'QUAF' rxt . 'vtp' ;
+    'ELIM' GEO . 'Mvtf' GEO . 'Mvtp' rxt . 'epsi' ;
+    vertytab rxt 'ROCP' 'FLOTTANT' 'CHPOINT' ;
+    vertytab rxt 'LAMBDA' 'FLOTTANT' 'CHPOINT' ;
+    vertytab rxt 'Tp0' 'FLOTTANT' 'CHPOINT' ;
+    vertytab rxt 'ECHAN' 'FLOTTANT' 'CHPOINT' ;
+    listchp = listchp 'ET' ('MOTS' 'ROCP')   ;
+    listchp = listchp 'ET' ('MOTS' 'LAMBDA') ;
+    listchp = listchp 'ET' ('MOTS' 'Tp0'   ) ;
+    listchp = listchp 'ET' ('MOTS' 'ECHAN' ) ;
+    'SI' ('NON' ('EXIS' tic 'ROCP')) ;
+      tic . 'ROCP' = rxt . 'ROCP' ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' tic 'LAMBDA')) ;
+      tic . 'LAMBDA' = rxt . 'LAMBDA' ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' tic 'Tp0')) ;
+      tic . 'Tp0' = rxt . 'Tp0' ;
+    'FINS' ;
+  'FINS' ;
+
+*
+* Initialisation de KHW à ECHAN
+  'SI' ('NON' ('EXIS' tic 'KHW')) ;
+    tic . 'KHW' = rxt . 'ECHAN' ;
+  'FINS' ;
+  
+*
+* ECHEXT = vrai si échange thermique avec l'extérieur
+  'SI' ('EXIS' rxt 'ECHEXT') ;
+    vertytab rxt 'ECHEXT' 'LOGIQUE' ;
+    TBT . 'ECHEXT' = rxt . 'ECHEXT' ;
+  'FINS' ;
+
+  'SI' TBT . 'ECHEXT' ;
+    vertytab rxt 'parext' 'MAILLAGE' ;
+    GEO . 'Mparext' = 'CHAN' 'QUAF' rxt . 'parext' ;
+    'ELIM' GEO . 'Mvtp' GEO . 'Mparext' rxt . 'epsi' ;
+    vertytab rxt 'HEXT' 'FLOTTANT' 'CHPOINT' ;
+    vertytab rxt 'TPEXT' 'FLOTTANT' 'CHPOINT' ;
+    listchp = listchp 'ET' ('MOTS' 'HEXT') ;
+    listchp = listchp 'ET' ('MOTS' 'TPEXT') ;
+    'SI' ('NON' ('EXIS' tic 'HEXT'));
+      tic . 'HEXT' = rxt . 'HEXT' ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' tic 'TPEXT')) ;
+      tic . 'TPEXT' = rxt . 'TPEXT' ;
+    'FINS' ;
+  'FINS' ;
+  
+  'MESS' ': ==> Scenario avec thermique paroi' ;
+
+'SINO' ;
+  'MESS' ' : ==> Scenario sans thermique paroi ' ;
+'FINS' ;
+
+*
+* TTIMP = vrai si parois à température imposée
+TBT . 'TTIMP' = FAUX ;
+'SI' ('EXIS' rxt 'TIMP') ;
+  TBT . 'TTIMP' = VRAI ;
+  vertytab rxt 'TIMP'  'TABLE' ;
+  NBTIMP = 'DIME' rxt . 'TIMP' ;
+  itimp  = 'INDE' rxt . 'TIMP' ;
+  'REPE' BBTIMP NBTIMP ;
+    'MESS' 'Verification TIMP ->' ' ' (itimp . &BBTIMP) ;
+    Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+    vertytab (rxt . 'TIMP') (itimp . &BBTIMP) 'TABLE' ;
+    vertytab Btimp 'MAILLAGE' 'MAILLAGE' ;
+    vertytab Btimp 'ECHAN' 'FLOTTANT' ;
+    vertytab Btimp 't' 'LISTREEL' ;
+    vertytab Btimp 'TIMP' 'LISTREEL' ;
+    Btimp . 'KKC1'  = 'CHAI' 'KKC1'   &BBTIMP ;
+    Btimp . 'ROVI1' = 'CHAI' 'ROVI1'  &BBTIMP ;
+    Btimp . 'FHP1'  = 'CHAI' 'FHP1'   &BBTIMP ;
+    Btimp . 'KH1'   = 'CHAI' 'KH1'    &BBTIMP ;
+    Btimp . 'Fcond1'= 'CHAI' 'Fcond1' &BBTIMP ;
+    Btimp . 'Mcond1'= 'CHAI' 'Mcond1' &BBTIMP ;
+    Btimp . 'TPI1'  = 'CHAI' 'TPI1'   &BBTIMP ;
+    Btimp . 'TBP1'  = 'CHAI' 'TBP1'   &BBTIMP ;
+    Btimp . 'KHE1'  = 'CHAI' 'KHE1'   &BBTIMP ;
+    Btimp . 'Qc1'   = 'CHAI' 'Qc1'    &BBTIMP ;
+*    Btimp . 'Ltbpi' = 'PROG' ('IPOL' tps Btimp . 't' Btimp . 'TIMP') ;
+    Btimp . 'Ltbpi' = 'IPOL' tic . 'LTPS' Btimp . 't' Btimp . 'TIMP' ;
+  'FIN' BBTIMP ;
+  TBT . 'TIMP' = rxt . 'TIMP' ;
+'FINS' ;
+
+*
+* TECHANP = vrai si paroi à T constant ou imposé via une procédure personnelle
+TBT . 'TECHANP' = FAUX ;
+'SI'  ('EXIS' rxt 'ECHANP') ;
+  TBT . 'TECHANP' = VRAI ;
+  vertytab rxt 'ECHANP' 'TABLE' ;
+  vertytab (rxt . 'ECHANP') 'MAILLAGE' 'MAILLAGE' ;
+  vertytab (rxt . 'ECHANP') 'ECHAN' 'FLOTTANT' ;
+  vertytab (rxt . 'ECHANP') 'TMUR' 'FLOTTANT' ;
+'FINS' ;
+
+*
+* TRECOMB = vrai si présence de PARs (recombineurs)
+TBT . 'TRECOMB' = FAUX ;
+'SI' ('EXIS' rxt 'RECOMB') ;
+   vertytab rxt 'RECOMB' 'TABLE   ' ;
+   NBREC = 'DIME' rxt . 'RECOMB' ;
+   'REPE' BCL1 NBREC ;
+      TRECI = rxt . 'RECOMB' . &BCL1 ;
+      lxt = 'TABL' ;
+      lxt . 'PAREXT'   = ' ' ;
+      lxt . 'ENTREE'   = ' ' ;
+      lxt . 'SORTIE'   = ' ' ;
+      lxt . 'direntr'  = ' ' ;
+      lxt . 'dirsort'  = ' ' ;
+      lxt . 'NSECTION' = ' ' ;
+      lxt . 'TYPR'     = ' ' ;
+      vertytab TRECI 'PAREXT' 'MAILLAGE' ;
+      vertytab TRECI 'ENTREE' 'MAILLAGE' ;
+      vertytab TRECI 'SORTIE' 'MAILLAGE' ;
+      vertytab TRECI 'direntr' 'POINT   ' ;
+      vertytab TRECI 'dirsort' 'POINT   ' ;
+      'SI' ('EXIS' TRECI 'NSECTION') ;
+         vertytab TRECI 'NSECTION' 'ENTIER  ' ;
+      'SINO' ;
+         TRECI . 'NSECTION' = 1 ;
+      'FINS' ;
+      'SI' ('EXIS' TRECI 'TYPR') ;
+         vertytab TRECI 'TYPR' 'MOT' ;
+         lm1 = 'MOTS' 'SIEMENS' 'HEATER' ;
+         vertytab lm1 (TRECI . 'TYPR') 'MOT' ;
+      'SINO' ;
+         TRECI . 'TYPR' = 'SIEMENS' ;
+      'FINS' ;
+      typr = TRECI . 'TYPR' ;
+      'SI' ('EGA' typr 'SIEMENS') ;
+         lxt . 'A'        = ' ' ;
+         lxt . 'B'        = ' ' ;
+         lxt . 'XH2ON'    = ' ' ;
+         lxt . 'XH2OFF'   = ' ' ;
+         lxt . 'BETA'     = ' ' ;
+         'SI' ('EXIS' TRECI 'A') ;
+            vertytab TRECI 'A' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'A' = 0.48D-8 ;
+         'FINS' ;
+         'SI' ('EXIS' TRECI 'B') ;
+            vertytab TRECI 'B' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'B' = 0.58D-3 ;
+         'FINS' ;
+         'SI' ('EXIS' TRECI 'XH2ON') ;
+            vertytab TRECI 'XH2ON' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'XH2ON' = 0.005D0 ;
+         'FINS' ;
+         'SI' ('EXIS' TRECI 'XH2OFF') ;
+            vertytab TRECI 'XH2OFF' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'XH2OFF' = 0.005D0 ;
+         'FINS' ;
+         'SI' ('EXIS' TRECI 'BETA') ;
+            vertytab TRECI 'BETA' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'BETA' = 0.2D0 ;
+         'FINS' ;
+      'SINO' ;
+         lxt . 'PUISSANCE' = ' ' ;
+         lxt . 'QHOUSING'  = ' ' ;
+         lxt . 'HRAPP'     = ' ' ;
+         lxt . 'CRAPP'     = ' ' ;
+         vertytab TRECI 'PUISSANCE' 'EVOLUTIO' ;
+         'SI' ('EXIS' TRECI 'QHOUSING') ;
+            vertytab TRECI 'QHOUSING' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'QHOUSING' = 0.1D0 ;
+         'FINS' ;
+         'SI' ('EXIS' TRECI 'HRAPP') ;
+            vertytab TRECI 'HRAPP' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'HRAPP' = 1.7D0 ;
+         'FINS' ;
+         'SI' ('EXIS' TRECI 'CRAPP') ;
+            vertytab TRECI 'CRAPP' 'FLOTTANT' ;
+         'SINO' ;
+            TRECI . 'CRAPP' = 136.0868234D0 ;
+         'FINS' ;
+      'FINS' ;
+      indtrec = 'INDE' treci ;
+      nind    = 'DIME' indtrec ;
+      'REPE' bouind nind ;
+'SI' ('NON' ('EXIS' lxt ('MOT' indtrec . &bouind))) ;
+'MESS' ' ' ;
+'MESS' '*********************************************************' ;
+'MESS' ' ERREUR   ERREUR   ERREUR   ERREUR   ERREUR   ERREUR     ' ;
+'MESS' '                                                         ' ;
+'MESS' '                                                         ' ;
+'MESS' 'Il y a un indice non reconnu :' ' ' (indtrec . &bouind)
+       ' ' ' dans la table RECOMB .' ' ' &bcl1 ;
+'MESS' '                                                         ' ;
+'MESS' '*********************************************************' ;
+'ERRE' 21 ;
+'QUIT' EXECRXT ;
+'FINS' ;
+      'FIN' bouind ;
+   'FIN' BCL1 ;
+   TBT . 'TRECOMB' = VRAI ;
+   TBT . 'RECOMB'  = rxt . 'RECOMB' ;
+'FINS' ;
+
+*
+* Gestion du modèle de turbulence MODTURB
+* (NUTURB ou LMEL ou KEPSILON)
+'SI' ('EXIS' rxt 'MODTURB') ;
+   vertytab rxt 'MODTURB' 'MOT' ;
+   TBT . 'MODTURB' = rxt . 'MODTURB' ;
+   lxt = 'TABL' ;
+   lxt . 'NUTURB'   = ' ' ;
+   lxt . 'LMEL'     = ' ' ;
+   lxt . 'KEPSILON' = ' ' ;
+   vertytab lxt rxt . 'MODTURB' 'MOT' ;
+   
+   'SI' ('EGA' rxt . 'MODTURB' 'NUTURB') ;
+     listentr . 'NUT' = '' ;
+     vertytab rxt 'NUT' 'FLOTTANT' ;
+     TBT . 'NUT' = rxt  .'NUT' ;
+   'FINS' ;
+
+   'SI' ('EGA' rxt . 'MODTURB' 'LMEL') ;
+     listentr . 'LMEL' = '' ;
+     vertytab rxt 'LMEL' 'FLOTTANT' ;
+     TBT . 'LMEL' = rxt . 'LMEL' ;
+   'FINS' ;
+
+   'MESS' ': ==> Scenario avec modèle de turbulence'
+   ' ' rxt . 'MODTURB' ;
+'SINO' ;
+   'MESS' ': ==> Scenario sans modèle de turbulence' ;
+'FINS' ;
+
+*
+* FPAROI = vrai si utilisation de fonctions de paroi
+TBT . 'FPAROI' = FAUX ;
+'SI' ('EXIS' rxt 'FPAROI') ;
+  vertytab rxt 'FPAROI' 'LOGIQUE' ;
+  TBT . 'FPAROI' = rxt . 'FPAROI' ;
+'FINS' ;
+
+'SI' TBT . 'FPAROI' ;
+  'MESS' ': ==> Scenario avec fonction de paroi ' ;
+   listentr . 'YP'  = '' ;
+   vertytab rxt 'YP' 'FLOTTANT' ;
+   TBT . 'YP' = rxt . 'YP' ;
+'FINS' ;
+
+*
+* Gestion du modèle de condensation en paroi MODCOND
+* (CHIL0 ou CHIL1)
+TBT . 'MODCOND' = 'CHIL0' ;
+'SI' ('EXIS' rxt 'MODCOND') ;
+  vertytab rxt 'MODCOND' 'MOT' ;
+  TBT . 'MODCOND' = rxt . 'MODCOND' ;
+  lxt = 'TABL' ;
+  lxt . 'CHIL0' = ' ' ;
+  lxt . 'CHIL1' = ' ' ;
+  vertytab lxt rxt . 'MODCOND' 'MOT' ;
+'FINS'                                                  ;
+'MESS' ': ==> Scenario avec flux de condensation' ' ' TBT . 'MODCOND' ;
+
+*
+* PERSO = vrai si une procédure personnelle est indiquée
+TBT . 'PERSO' = FAUX ;
+'SI' ('EXIS' rxt 'PERSO') ;
+   vertytab rxt 'PERSO' 'LOGIQUE' ;
+   TBT . 'PERSO' = rxt . 'PERSO'  ;
+'FINS' ;
+
+'SI' TBT . 'PERSO' ;
+  'MESS' ': ==> Scenario avec execution d une procedure personnelle' ;
+  listentr . 'PRCPERSO' = '' ;
+  vertytab rxt 'PRCPERSO' 'MOT' ;
+  TBT . 'PRCPERSO' = rxt . 'PRCPERSO' ;
+'FINS' ;
+
+'SI' ('EXIS' rxt 'TABPERSO') ;
+  vertytab rxt 'TABPERSO' 'TABLE' ;
+  TBT . 'TABPERSO' = rxt . 'TABPERSO' ;
+'FINS'                                                  ;
+
+*
+* Identification des incondensables et des entrées associées
+* (à choisir parmi H2, HE, O2, N2, CO, CO2)
+LINCOND = 'MOTS' ;
+
+TBT . 'TH2' = FAUX  ;
+'SI' ('EXIS' rxt 'H2') ;
+  vertytab rxt 'H2' 'LOGIQUE' ;
+  TBT . 'TH2' = rxt . 'H2' ;
+  'SI' TBT . 'TH2' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'H2') ;
+    vertytab rxt 'Yh20' 'FLOTTANT' ;
+    listentr . 'Yh20' = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qh2' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+TBT . 'THE' = FAUX  ;
+'SI' ('EXIS' rxt 'HE') ;
+  vertytab rxt 'HE' 'LOGIQUE' ;
+  TBT . 'THE' = rxt . 'HE' ;
+  'SI' TBT . 'THE' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'HE') ;
+    vertytab rxt 'Yhe0' 'FLOTTANT' ;
+    listentr.'Yhe0' = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qhe' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+TBT . 'TO2' = FAUX  ;
+'SI' ('EXIS' rxt 'O2' ) ;
+  vertytab rxt 'O2' 'LOGIQUE' ;
+  TBT . 'TO2' = rxt . 'O2' ;
+  'SI' TBT . 'TO2' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'O2') ;
+    vertytab rxt 'Yo20' 'FLOTTANT' ;
+    listentr . 'Yo20' = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qo2' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+TBT . 'TN2' = FAUX  ;
+'SI' ('EXIS' rxt 'N2') ;
+  vertytab rxt 'N2' 'LOGIQUE' ;
+  TBT . 'TN2' = rxt . 'N2' ;
+  'SI' TBT . 'TN2' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'N2') ;
+    vertytab rxt 'Yn20' 'FLOTTANT' ;
+    listentr . 'Yn20' = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qn2' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+TBT . 'TCO' = FAUX  ;
+'SI' ('EXIS' rxt 'CO') ;
+  vertytab rxt 'CO' 'LOGIQUE' ;
+  TBT . 'TCO' = rxt . 'CO' ;
+  'SI' TBT . 'TCO' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'CO') ;
+    vertytab rxt 'Yco0' 'FLOTTANT' ;
+    listentr . 'Yco0' = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qco' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+TBT . 'TCO2' = FAUX  ;
+'SI' ('EXIS' rxt 'CO2') ;
+  vertytab rxt 'CO2' 'LOGIQUE' ;
+  TBT . 'TCO2' = rxt .'CO2' ;
+  'SI' TBT . 'TCO2' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'CO2') ;
+    vertytab rxt 'Yco20' 'FLOTTANT' ;
+    listentr . 'Yco20' = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qco2' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+*FD
+* Quid de l'injection d'air sans transport de l'air
+*FD
+TBT . 'TAIR' = FAUX  ;
+'SI' ('EXIS' rxt 'AIR') ;
+  vertytab rxt 'AIR' 'LOGIQUE' ;
+  TBT . 'TAIR' = rxt . 'AIR' ;
+  'SI' TBT . 'TAIR' ;
+    LINCOND = LINCOND 'ET' ('MOTS' 'AIR') ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qair' 'LISTREEL' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+'SI' (('EGA' ('DIME' LINCOND) 0) 'OU' ('NON' tbt . 'TAIR'));
+   LINCOND = LINCOND 'ET' ('MOTS' 'AIR') ;
+'FINS' ;
+'MESS' ' Liste des incondensables : ' ;
+'LIST' LINCOND ;
+
+*
+* VAPEUR = vrai en présence de vapeur dans le mélange
+TBT . 'VAPEUR' = FAUX ;
+'SI' ('EXIS' rxt 'VAPEUR') ;
+  vertytab rxt 'VAPEUR' 'LOGIQUE' ;
+  TBT . 'VAPEUR' = rxt . 'VAPEUR' ;
+  'SI' TBT . 'VAPEUR' ;
+    vertytab rxt 'Yvap0' 'FLOTTANT' ;
+    listentr .'Yvap0'  = '' ;
+    'SI' ('EXIS' rxt 'scenario') ;
+      vertytab (rxt . 'scenario') 'qeau' 'LISTREEL' ;
+    'FINS' ;
+    listentr .'Mliq0'  = '' ;
+    listentr .'Lv'     = '' ;
+    listentr .'Cpvap'  = '' ;
+  'FINS' ;
+'FINS' ;
+
+*
+* CONDMAS = vrai si condensation en masse et présence de VAPEUR
+TBT . 'CONDMAS' = FAUX ;
+'SI' TBT . 'VAPEUR' ;
+  'SI' ('EXIS' rxt 'CONDMAS') ;
+    vertytab rxt 'CONDMAS' 'LOGIQUE' ;
+    listentr . 'CONDMAS'  = '' ;
+    TBT . 'CONDMAS' = rxt . 'CONDMAS' ;
+    listand = listand 'ET' (MOTS 'CONDMAS') ;
+  'FINS' ;
+'FINS' ;
+*
+* ASPER = vrai aspersion et présence de VAPEUR
+TBT . 'ASPER' = FAUX ;
+'SI' TBT . 'VAPEUR' ;
+   'SI' ('EXIS' rxt 'ASPER') ;
+     vertytab rxt 'ASPER' 'LOGIQUE' ;
+     listentr . 'ASPER' = '' ;
+     TBT . 'ASPER' = rxt . 'ASPER' ;
+     'SI' TBT . 'ASPER' ;
+       vertytab rxt 'scenasp' 'TABLE   ' ;
+       listentr . 'scenasp' = '' ;
+       vertytab rxt 'aspinj' 'MAILLAGE' ;
+       listentr . 'aspinj' = '' ;
+       vertytab rxt 'toitf' 'MAILLAGE' ;
+       listentr . 'toitf' = '' ;
+       vertytab rxt 'rod' 'FLOTTANT' ;
+       listentr . 'rod' = '' ;
+       vertytab rxt 'Cpd' 'FLOTTANT' ;
+       listentr . 'Cpd' = '' ;
+     'FINS' ;
+   'FINS' ;
+'FINS' ;
+
+*
+* TRECOMB possible si présence de H2, O2, N2 et VAPEUR
+'SI' TBT . 'TRECOMB' ;
+  LOG0  = TBT . 'TH2' 'ET' TBT . 'VAPEUR' 'ET'
+          TBT . 'TN2' 'ET' TBT . 'TO2' ;
+  NBREC = 'DIME' rxt . 'RECOMB' ;
+'SI' ('NON' LOG0) ;
+'MESS' ' ' ;
+'MESS' '*********************************************************' ;
+'MESS' ' ERREUR   ERREUR   ERREUR   ERREUR   ERREUR   ERREUR     ' ;
+'MESS' '                                                         ' ;
+'MESS' '                                                         ' ;
+    'SI' ('NON' tbt . 'TH2')
+      'MESS' 'RECOMBINEUR ==> H2 est obligatoire' ;
+    'FINS' ;
+    'SI' ('NON' tbt . 'TO2')
+      'MESS' 'RECOMBINEUR ==> O2 est obligatoire' ;
+    'FINS' ;
+    'SI' ('NON' tbt . 'TN2')
+      'MESS' 'RECOMBINEUR ==> N2 est obligatoire' ;
+    'FINS' ;
+    'SI' ('NON' tbt . 'VAPEUR')
+      'MESS' 'RECOMBINEUR ==> H2O est obligatoire' ;
+    'FINS' ;
+'MESS' '                                                         ' ;
+'MESS' '*********************************************************' ;
+'ERRE' 5 ;
+'FINS' ;
+'FINS' ;
+
+*
+* Vérification des entrées de RXT
+lindex = 'INDE' rxt ;
+n = 'DIME' lindex ;
+'REPE' Bver n ;
+tae = 'TYPE' lindex . &bver ;
+
+'SI' ('NON' ('EGA' tae 'MOT')) ;
+'MESS'                                                             ;
+'MESS' '*********************************************************' ;
+'MESS' ' ERREUR   ERREUR   ERREUR   ERREUR   ERREUR   ERREUR     ' ;
+'MESS' '                                                         ' ;
+'MESS' '                                                         ' ;
+'MESS' ' Un des indices de la table rxt n est pas de type MOT    ' ;
+'MESS' '                                                         ' ;
+'MESS' '*********************************************************' ;
+'ERRE' 21 ;
+'QUIT' EXECRXT ;
+'FINS' ;
+
+'SI' ('NON' ('EXIS' listentr lindex . &bver)) ;
+'MESS'                                                             ;
+'MESS' '*********************************************************' ;
+'MESS' ' ERREUR   ERREUR   ERREUR   ERREUR   ERREUR   ERREUR     ' ;
+'MESS' '                                                         ' ;
+'MESS' '                                                         ' ;
+'MESS' ' Il y a un indice non reconnu :' ' ' lindex . &bver        ;
+'MESS' '                                                         ' ;
+'MESS' '*********************************************************' ;
+'ERRE' 21 ;
+'QUIT' EXECRXT ;
+'FINS' ;
+
+'FIN' Bver ;
+
+*
+* Affichage des options surchargées
+n = 'DIME' listand ;
+'SI' ('NON' ('EGA' n 0)) ;
+  'MESS' ' ' ;
+  'MESS' ' Liste des options surchargees :' ;
+  'LIST' listand ;
+  'SI' ('EXIS' listand 'THCO') ;
+    'MESS' ' ' ;
+    'MESS' 'Commentaire : le couplage fluide/paroi est implicite' ;
+  'FINS' ;
+  'MESS' ' ' ;
+'FINS' ;
+
+*
+* Vérification des compatibilités entre entrées
+
+'SI' (('EGA' TBT . 'ALGO' 'EFM1') 'ET' ('EGA' TBT . 'discr' 'QUAF')) ;
+  vertytab 'ERREUR' 'ERREUR'
+           ('CHAI' 'Options QUAF et EFM1 incompatibles');
+'FINS' ;
+
+
+'SI' ('EXIS' TBT 'MODTURB') ;
+  'SI' (('EGA' TBT . 'MODTURB' 'KEPSILON')
+  'ET' ('NON' ('EGA' TBT . 'ALGO' 'EFM1')));
+    vertytab 'ERREUR' 'ERREUR'
+             ('CHAI' 'Option EFM1 necessaire pour le modèle K-epsilon');
+  'FINS' ;
+'FINS' ;
+
+
+'MESS' WWW ;
+'MESS' '----------- FIN DES INITIALISATIONS ET VERIFICATIONS ---------';
+'MESS' '----------------------- DEBUT DU CALCUL ----------------------';
+'MESS' WWW ;
+'MESS' ' ' ;
+
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+* ------------- FIN DES INITIALISATIONS ET VERIFICATIONS ---------------
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+
+'SI' TPREPA ;
+  PREPAENC rxt TBT GEO TIC ;
+'FINS' ;
+rxt . 'TBT' = TBT ;
+GEO = rxt  .'GEO' ;
+tic = rxt . 'TIC' ;
+
+vtf     = GEO . 'vtf' ;
+$vtf    = GEO . '$vtf' ;
+'SI' TBT . 'THERMP' ;
+  $vtp    = GEO . '$vtp' ;
+  $paroif = GEO . '$paroif' ;
+  paroif  = GEO . 'paroif' ;
+'FINS' ;
+Diag   = 'DOMA' $vtf 'XXDIAGSI' ;
+Volvtf = 'DOMA' $vtf 'VOLUME' ;
+VTotal = GEO . 'VTotal' ;
+
+'MESS' ' ************* GEOMETRIE  *********************' ;
+'MESS' ' **********************************************' ;
+'DOMA' $vtf 'IMPR' ;
+'SI' TBT . 'THERMP' ;
+  'DOMA' $vtp 'IMPR' ;
+'FINS' ;
+
+'MESS' ' ************* DISCRETISATION *****************' ;
+'MESS' ' **********************************************' ;
+'MESS' ' Discr =' ' ' tbt . 'discr' ' ' 'Pression =' ' ' tbt . 'KPRE' ;
+'MESS' ' Algo  =' ' ' algo ' ' 'Niveau impression =' ' ' nimpr ;
+'MESS' ' Pas de temps DT =' ' ' rxt . 'DT0' ;
+
+'MESS' ' **** PROPRIETES PHYSIQUES INITIALISATIONS ****' ;
+'MESS' ' **********************************************' ;
+
+Tfm = 'EXTR' (tic . 'Tfm') ndl ;
+Tkm = Tfm '+' 273.15 ;
+
+*
+* Initialisation et affichage des propriétés physiques
+* (Cp (Tfm), Cv et Mu (Tkm))
+Rgh2   = TBT . 'Rgh2'  ;
+Rghe   = TBT . 'Rghe'  ;
+Rgo2   = TBT . 'Rgo2'  ;
+Rgn2   = TBT . 'Rgn2'  ;
+Rgco   = TBT . 'Rgco'  ;
+Rgco2  = TBT . 'Rgco2' ;
+Rgvap  = TBT . 'Rgvap' ;
+Rgair  = TBT . 'Rgair' ;
+
+Cph2 Cphe Cpo2 Cpn2 Cpco2 Cpco Cpair = CALCP Tfm ;
+Cpvap  = TBT . 'Cpvap'  ;
+
+Cvair  = Cpair '-' Rgair ;
+Cvvap  = Cpvap '-' Rgvap ;
+Cvhe   = Cphe  '-' Rghe  ;
+Cvh2   = Cph2  '-' Rgh2  ;
+Cvo2   = Cpo2  '-' Rgo2  ;
+Cvn2   = Cpn2  '-' Rgn2  ;
+Cvco   = Cpco  '-' Rgco  ;
+Cvco2  = Cpco2 '-' Rgco2 ;
+Cvair  = Cpair '-' Rgair ;
+
+Muh2 Muhe Muo2 Mun2 Muco2 Muco Muvap Muair = CALMU Tkm ;
+
+Lv     = TBT . 'Lv'    ;
+
+'MESS' ' ***** Air ***** ' ;
+'MESS' '==> Cpair =' ' ' Cpair ' ' 'J/kg/K' ;
+'MESS' '==> Cvair =' ' ' Cvair ' ' 'J/kg/K' ;
+'MESS' '==> Rgair =' ' ' Rgair ' ' 'J/kg/K' ;
+
+'SI' TBT . 'VAPEUR' ;
+'MESS' ' ***** Vapeur H2o ***** ' ;
+'MESS' '==> Cpvap =' ' ' Cpvap ' ' 'J/kg/K' ;
+'MESS' '==> Cvvap =' ' ' Cvvap ' ' 'J/kg/K' ;
+'MESS' '==> Rgvap =' ' ' Rgvap ' ' 'J/kg/K' ;
+'MESS' '==> Lv    =' ' ' Lv    ' ' 'J/kg/K' ;
+'FINS' ;
+
+'SI' TBT . 'THE' ;
+'MESS' ' ***** He  ***** ' ;
+'MESS' '==> Cphe  =' ' ' Cphe ' ' 'J/kg/K' ;
+'MESS' '==> Cvhe  =' ' ' Cvhe ' ' 'J/kg/K' ;
+'MESS' '==> Rghe  =' ' ' Rghe ' ' 'J/kg/K' ;
+'FINS' ;
+
+'SI' TBT . 'TH2' ;
+'MESS' ' ***** H2  ***** ' ;
+'MESS' '==> Cph2  =' ' ' Cph2 ' ' 'J/kg/K' ;
+'MESS' '==> Cvh2  =' ' ' Cvh2 ' ' 'J/kg/K' ;
+'MESS' '==> Rgh2  =' ' ' Rgh2 ' ' 'J/kg/K' ;
+'FINS' ;
+
+'SI' TBT . 'TO2' ;
+'MESS' ' ***** O2  ***** ' ;
+'MESS' '==> Cpo2  =' ' ' Cpo2 ' ' 'J/kg/K' ;
+'MESS' '==> Cvo2  =' ' ' Cvo2 ' ' 'J/kg/K' ;
+'MESS' '==> Rgo2  =' ' ' Rgo2 ' ' 'J/kg/K' ;
+'FINS' ;
+
+'SI' TBT . 'TN2' ;
+'MESS' ' ***** N2  ***** ' ;
+'MESS' '==> Cpn2  =' ' ' Cpn2 ' ' 'J/kg/K' ;
+'MESS' '==> Cvn2  =' ' ' Cvn2 ' ' 'J/kg/K' ;
+'MESS' '==> Rgn2  =' ' ' Rgn2 ' ' 'J/kg/K' ;
+'FINS' ;
+
+'SI' TBT . 'TCO' ;
+'MESS' ' ***** CO  ***** ' ;
+'MESS' '==> Cpco  =' ' ' Cpco ' ' 'J/kg/K' ;
+'MESS' '==> Cvco  =' ' ' Cvco ' ' 'J/kg/K' ;
+'MESS' '==> Rgco  =' ' ' Rgco ' ' 'J/kg/K' ;
+'FINS' ;
+
+'SI' TBT . 'TCO2' ;
+'MESS' ' ***** CO2 ***** '    ;
+'MESS' '==> Cpco2 =' ' ' Cpco2 ' ' 'J/kg/K'   ;
+'MESS' '==> Cvco2 =' ' ' Cvco2 ' ' 'J/kg/K'   ;
+'MESS' '==> Rgco2 =' ' ' Rgco2 ' ' 'J/kg/K'   ;
+'FINS' ;
+
+***'SI' TBT . 'TAIR' ;
+'MESS' ' ***** AIR ***** ' ;
+'MESS' '==> Cpair =' ' ' Cpair ' ' 'J/kg/K'   ;
+'MESS' '==> Cvair =' ' ' Cvair ' ' 'J/kg/K'   ;
+'MESS' '==> Rgair =' ' ' Rgair ' ' 'J/kg/K'   ;
+***'FINS' ;
+
+'MESS' ' *************** ' ;
+'MESS' ' Diffusion browniene db = ' db ;
+'SI' TBT . 'THERMP' ;
+  'SI' ('EGA' ('TYPE' tic . 'KHW') 'CHPOINT') ;
+    'MESS' ' Coefficient d echange ECHAN (Min/Max)=' ' '
+    ('MINI' tic . 'KHW') ' ' ('MAXI' tic . 'KHW') ' ' 'W/m2/K' ;
+  'SINO' ;
+    'MESS' ' Coefficient d echange ECHAN=' ' ' tic . 'KHW' ' ' 'W/m2/K';
+  'FINS' ;
+'FINS' ;
+
+*
+* Initialisation et affichage des bilans initiaux 0D/CFD
+
+'MESS' '*** Bilans initiaux 0D-MultiD ***'      ;        
+'MESS' '_____________________________________________'
+       '____________________'    ;
+  'MESS' '___Bilans 0D_________Bilans MultiD _____ Erreur Relative (%)';
+
+Rhomn = 'EXTR' (tic . 'Rhomn') ndl ;
+M0D   = Rhomn '*' Vtotal ;
+MMD   = 'SOMT' (Diag '*' rxt . 'TIC' . 'RHO') ;
+
+'SI' TBT . 'VAPEUR' ;
+  Rhomv  = 'EXTR' (tic . 'Rhomv') ndl ;
+  MV0D   = Rhomv '*' Vtotal ;        
+  MVMD   = 'SOMT' (Diag '*' rxt . 'TIC' . 'ROVP') ;
+  Rhomvg = 'EXTR' (tic . 'Rhomvg') ndl ;        
+  MVG0D  = Rhomvg '*' Vtotal ;
+  MVGMD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RVP') ;
+'FINS' ;
+'SI' TBT . 'THE' ;
+  Rhomhe = 'EXTR' (tic . 'Rhomhe') ndl ;
+  MHE0D  = Rhomhe '*' Vtotal ;
+  MHEMD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RHE') ;
+'FINS' ;
+'SI' TBT . 'TH2' ;
+  Rhomh2 = 'EXTR' (tic . 'Rhomh2') ndl ;
+  MH20D  = Rhomh2 '*' Vtotal ;
+  MH2MD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RH2') ;
+'FINS' ;
+'SI' TBT . 'TO2' ;
+  Rhomo2 = 'EXTR' (tic . 'Rhomo2') ndl ;
+  MO20D  = Rhomo2 '*' Vtotal        ;
+  MO2MD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RO2') ;
+'FINS'    ;
+'SI' TBT . 'TN2' ;
+  Rhomn2 = 'EXTR' (tic . 'Rhomn2') ndl ;
+  MN20D  = Rhomn2 '*' Vtotal ;
+  MN2MD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RN2') ;
+'FINS'    ;
+'SI' TBT . 'TCO' ;
+  Rhomco = 'EXTR' (tic . 'Rhomco') ndl ;        
+  MCO0D  = Rhomco '*' Vtotal ;
+  MCOMD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RCO') ;
+'FINS' ;
+'SI' TBT . 'TCO2' ;
+  Rhomco2 = 'EXTR' (tic . 'Rhomco2') ndl ;        
+  MCO20D  = Rhomco2 '*' Vtotal ;
+  MCO2MD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RCO2') ;
+'FINS' ;
+***'SI' TBT . 'TAIR' ;
+  Rhomair = 'EXTR' (tic . 'Rhomair') ndl ;
+  MAIR0D  = Rhomair '*' Vtotal ;
+  MAIRMD  = 'SOMT' (Diag '*' rxt . 'TIC' . 'RAIR') ;
+***'FINS' ;
+
+'SI' ('EGA' ndl 1) ;
+  Cvm = 'EXTR' (tic . 'Cvm') ndl ;
+'SINO' ;
+  Cvm = 'EXTR' (tic . 'Cvm') (ndl '-' 1) ;
+'FINS' ;
+Remn = 'EXTR' (tic . 'Remn') ndl ;
+E0D  = Remn ;
+EMD  = ('SOMT' (Diag '*' Cvm '*' rxt . 'TIC' . 'RHO' '*'
+       (rxt . 'TIC' . 'TF' '+' 273.15)) ) '/' Vtotal ;
+       
+'MESS' ' Masse   (kg)' '  ' M0D '_______' MMD '________'
+(100. '*'(M0D '-' MMD) '/'M0D) ;
+'MESS' ' Energie (J/m3)' E0D '_______' EMD '________'
+(100. '*' (E0D '-' EMD) '/' E0D) ;
+
+'SI' (TBT . 'VAPEUR' 'ET' ('NON' ('EGA' MV0D 0.0))) ;
+'MESS' ' M Vapeur(kg)  ' MV0D '_______' MVMD '_______'
+(100. '*' (MV0D '-' MVMD) '/' MV0D) ;
+'FINS' ;
+'SI' (TBT . 'THE' 'ET' ('NON' ('EGA' MHE0D 0.0))) ;
+'MESS' ' M Helium (kg)  ' MHE0D '_______' MHEMD '_______'
+(100. '*' (MHE0D '-' MHEMD) '/' MHE0D) ;
+'FINS' ;
+'SI' (TBT . 'TH2' 'ET' ('NON' ('EGA' MH20D 0.0))) ;
+'MESS' ' M Hydrogene (kg)  ' MH20D '_______' MH2MD '_______'
+(100. '*' (MH20D '-' MH2MD) '/' MH20D) ;
+'FINS' ;
+'SI' (TBT . 'TO2' 'ET' ('NON' ('EGA' MO20D 0.0))) ;
+'MESS' ' M Oxygene (kg)  ' MO20D '_______' MO2MD '_______'
+(100. '*' (MO20D '-' MO2MD) '/' MO20D) ;
+'FINS' ;
+'SI' (TBT . 'TN2' 'ET' ('NON' ('EGA' MN20D 0.0))) ;
+'MESS' ' M Azote (Kk)  ' MN20D '_______' MN2MD '_______'
+(100. '*' (MN20D '-' MN2MD) '/' MN20D) ;
+'FINS'    ;
+'SI' (TBT . 'TCO' 'ET' ('NON' ('EGA' MCO0D 0.0))) ;
+'MESS' ' M CO (kg)  ' MCO0D '_______' MCOMD '_______'
+(100. '*' (MCO0D '-' MCOMD) '/' MCO0D) ;
+'FINS' ;
+'SI' (TBT . 'TCO2' 'ET' ('NON' ('EGA' MCO20D 0.0))) ;
+'MESS' ' M CO2 (kg)  ' MCO20D '_______' MCO2MD '_______'
+(100. '*' (MCO20D '-' MCO2MD) '/' MCO20D) ;
+'FINS' ;
+***'SI' (TBT . 'TAIR' 'ET' ('NON' ('EGA' MAIR0D 0.0))) ;
+'SI' ('NON' ('EGA' MAIR0D 0.0)) ;
+'MESS' ' M AIR (kg)  ' MAIR0D '_______' MAIRMD '_______'
+(100. '*' (MAIR0D '-' MAIRMD) '/' MAIR0D) ;
+'FINS' ;
+
+'MESS' '_____________________________________________'
+       '____________________' ;
+'SI' TBT . 'THERMP' ;
+Emurn  = 'EXTR' (tic . 'Emur')    ndl ;
+'MESS' ' Energie Stockee Mur (J) ' Emurn ;
+'MESS' '_____________________________________________'
+       '____________________' ;
+'FINS' ;
+
+'MESS' ' ' ;
+'MESS' ' *** Divers **** ' ;
+'MESS' ' Dimension espace: ' idim ;
+'MESS' ' Nombre d elements/noeuds' ' ' ('NBEL' vtf) ' ' ('NBNO' vtf) ;
+
+'MESS' ' ' ;
+'MESS' ' *** Volumes' ;
+'MESS' ' VTotal=' VTotal ' ' 'm3' ;
+'SI' TBT . 'THERMP' ;
+  'MESS' ' VTotal paroi =' GEO . 'VTotalp' ' '
+  'm3  Sparoif =' GEO . 'Sparoif' ' ' 'm2' ;
+'FINS' ;
+'SI' TBT . 'TTIMP' ;
+  NBTIMP = 'DIME' rxt . 'TIMP'  ;
+  itimp  = 'INDE' rxt . 'TIMP'  ;
+  'REPE' BBTIMP NBTIMP ;
+    Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+    'MESS' ' Surface T imposee' ' ' (itimp . &BBTIMP) ' ' '=' ' '
+    Btimp . 'Smtpi' ' ' 'm2' ;
+  'FIN' BBTIMP ;
+'FINS' ;
+'MESS' ' ************************************************************' ;
+
+*----------------------------------------------------------
+*----- BOUCLE PRINCIPALE DE RESOLUTION SUR LE NB ----------
+*----- TOTAL DE PAS DE TEMPS A REALISER -------------------
+*----------------------------------------------------------
+
+*
+* Initialisation du pas de temps
+'SI' ('NON' ('EXIS' tic 'DT')) ;
+  tic . 'DT' = rxt . 'DT0' ;
+'FINS' ;
+
+*
+* Initialisation pour le bilan de masse en vapeur
+'SI' TBT . 'VAPEUR' ;
+  'SI' ('NON' ('EXIS' TIC 'Mcondm')) ;
+    tic . 'Mcondm' = 'PROG' 0. ;
+  'FINS' ;
+  'SI' ('NON' ('EXIS' TIC 'Qcm')) ;    
+     tic . 'Qcm' = 'PROG' 0. ;    
+  'FINS' ;
+  'SI' TBT . 'TPAROIF' ;
+    'SI' ('NON' ('EXIS' TIC 'Mcondw')) ;
+      tic . 'Mcondw' = 'PROG' 0. ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' TIC 'Qcw')) ;
+      tic . 'Qcw' = 'PROG' 0. ;    
+    'FINS' ;
+  'FINS' ;
+  'SI' TBT . 'TTIMP' ;
+    NBTIMP = 'DIME' rxt . 'TIMP' ;
+    itimp  = 'INDE' rxt . 'TIMP' ;
+    'REPE' BBTIMP NBTIMP ;
+       Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+       CQc1  = Btimp . 'Qc1' ;
+       'SI' ('NON' ('EXIS' TIC CQc1)) ;
+         tic . CQc1 = 'PROG' 0. ;
+       'FINS'        ;
+       CMcond1 = Btimp . 'Mcond1' ;
+       'SI' ('NON' ('EXIS' tic CMcond1)) ;
+         tic . CMcond1 = 'PROG' 0. ;
+       'FINS' ;
+    'FIN' BBTIMP ;
+  'FINS' ;
+  'SI' TBT . 'TECHANP' ;
+    'SI' ('NON' ('EXIS' TIC 'Mcond0')) ;
+      tic . 'Mcond0' = 'PROG' 0. ;
+    'FINS' ;
+    'SI' ('NON' ('EXIS' TIC 'Qc0')) ;    
+      tic . 'Qc0' = 'PROG' 0. ;    
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+*
+* Initialisation systématique à 0. pour tous les constituants
+* (correction de masse, densité, fraction massique, densité moyenne)
+*dRhoair= 0. ;
+dRhov  = 0. ;
+dRhohe = 0. ;
+dRhoh2 = 0. ;
+dRhoo2 = 0. ;
+dRhon2 = 0. ;
+dRhoco = 0. ;
+dRhoco2= 0. ;
+*
+*rair = 0. ;
+rvp  = 0. ;
+rhe  = 0. ;
+rh2  = 0. ;
+ro2  = 0. ;
+rn2  = 0. ;
+rco  = 0. ;
+rco2 = 0. ;
+*
+*Yair = 0. ;
+Yvap = 0. ;
+Yhe  = 0. ;
+Yh2  = 0. ;
+Yo2  = 0. ;
+Yn2  = 0. ;
+Yco  = 0. ;
+Yco2 = 0. ;
+*
+Rmvn   = 0. ; 
+Rmvgn  = 0. ;
+Rmliqn = 0. ;
+Rmbron = 0. ;
+Rmhen  = 0. ;
+Rmh2n  = 0. ;
+Rmn2n  = 0. ;
+Rmo2n  = 0. ;
+Rmcon  = 0. ;
+Rmco2n = 0. ;
+*
+drclair = 0. ;
+drclvp = 0. ;
+drclhe = 0. ;
+drclh2 = 0. ;
+drclo2 = 0. ;
+drcln2 = 0. ;
+drclco = 0. ;
+drclco2 = 0. ;
+*
+Emurn   = 0. ;
+Mcondmn = 0. ;
+Mliqn   = 0. ;
+*
+* Valeurs moyennes au début de pas de temps
+Rgpn = tic . 'Rgp' ;
+Tfn  = tic . 'TF'  ;
+Tkn  = Tfn '+' 273.15 ;
+Rhon = tic . 'RHO' ;
+*
+ndl    = 'DIME' tic . 'LTPS'  ;
+Cvmn   = 'EXTR' tic . 'Cvm'     ndl ;
+Gamn   = 'EXTR' tic . 'Gamm'    ndl ;      
+Cpmn   = 'EXTR' tic . 'Cpm'     ndl ;
+Ptmn   = 'EXTR' tic . 'PT'      ndl ;    
+Rhomn  = 'EXTR' tic . 'Rhomn'   ndl ;
+Remn   = 'EXTR' tic . 'Remn'    ndl ;    
+Rmairn = 'EXTR' tic . 'Rhomair' ndl ;
+*
+'SI' TBT . 'VAPEUR' ;
+  Rmvn    = 'EXTR' tic . 'Rhomv'  ndl ;
+  Rmvgn   = 'EXTR' tic . 'Rhomvg' ndl ;
+  Mcondmn = 'EXTR' tic . 'Mcondm' ndl ;
+  'SI' TBT . 'CONDMAS' ;
+    Rmliqn = 'EXTR' tic . 'Rliqm' ndl ;
+    Rmbron = 'EXTR' tic . 'Rbrom' ndl ;
+  'FINS' ;
+  'SI' ('EXIS' tic 'drclvp') ;
+    drclvp = tic . 'drclvp' ;
+  'FINS' ;
+'FINS' ;
+'SI' TBT . 'THE'     ;
+  Rmhen  = 'EXTR' tic . 'Rhomhe' ndl ;
+  'SI' ('EXIS' tic 'drclhe') ;
+    drclhe = tic . 'drclhe' ;
+  'FINS' ;
+'FINS' ;
+'SI' TBT.'TH2'       ;
+  Rmh2n  = 'EXTR' tic . 'Rhomh2' ndl ;
+  'SI' ('EXIS' tic 'drclh2') ;
+    drclh2 = tic . 'drclh2' ;
+  'FINS' ;
+'FINS' ;
+'SI' TBT.'TO2'       ;
+  Rmo2n  = 'EXTR' tic . 'Rhomo2' ndl ;
+  'SI' ('EXIS' tic 'drclo2') ;
+    drclo2 = tic . 'drclo2' ;
+  'FINS' ;
+'FINS' ;
+'SI' TBT.'TN2'       ;
+  Rmn2n  = 'EXTR' tic . 'Rhomn2' ndl ;
+  'SI' ('EXIS' tic 'drcln2') ;
+    drcln2 = tic . 'drcln2' ;
+  'FINS' ;
+'FINS' ;
+'SI' TBT.'TCO'       ;
+  Rmcon  = 'EXTR' tic . 'Rhomco' ndl ;
+  'SI' ('EXIS' tic 'drclco') ;
+    drclco = tic . 'drclco' ;
+  'FINS' ;
+'FINS' ;
+'SI' TBT.'TCO2'      ;
+  Rmco2n = 'EXTR' tic . 'Rhomco2' ndl ;
+  'SI' ('EXIS' tic 'drclco2') ;
+    drclco2 = tic . 'drclco2' ;
+  'FINS' ;
+'FINS' ;
+*
+'SI' TBT . 'THERMP'  ;
+  Emurn  = 'EXTR' tic . 'Emur' ndl ;
+'FINS'     ; 
+Qcn    = 'EXTR' tic . 'Qc'    ndl ;    
+Econdn = 'EXTR' tic . 'Econd' ndl ;
+Econvn = 'EXTR' tic . 'Econv' ndl ;
+Hcondn = 'EXTR' tic . 'Hcond' ndl ;
+Mlq    = 0. ;
+Mbron  = Rmbron '*' Vtotal ;
+*
+drhpar = 0. ;
+*
+*
+*>> Boucle en temps
+*   On va de (n-1) à (n)
+*
+*
+'REPE' BCLTPS nbit ; 
+
+Tknm   = Tkn ;
+Tfnm   = Tfn ;
+Rhonm  = Rhon;
+MaxRho = ('MAXI' Rhonm) '*' 10. ;
+*
+*>>1 Gestion de la fréquence de préconditionnement
+'SI' ('OU' ('EGA' &BCLTPS 1) ('MULT' &BCLTPS RXT . 'FRPREC')) ;
+  calprec = VRAI ;
+'SINO' ;
+  calprec = FAUX ;
+'FINS' ;
+'SI' ('EGA' nbit 0) ;
+   'QUIT' BCLTPS ;
+'FINS' ;
+*>>1 Gestion de la fréquence de préconditionnement FIN
+*
+
+*
+*>>2 Gestion du rang du pas de temps, de sa valeur, de la liste des temps
+tic . 'NUPADT' = tic . 'NUPADT' '+' 1   ;
+ndl   = 'DIME' tic . 'LTPS'    ;
+Tps   = tic . 'Tps' '+' tic . 'DT'      ;
+tic . 'Tps' = Tps  ;
+tic . 'LTPS' = tic . 'LTPS' 'ET' ('PROG' Tps ) ;
+*
+'SI' ( TBT . 'IMPR' '>EG' 1)      ;
+ 'MESS' '*************************************************************'
+        '***********************' ;
+ 'MESS' '*************************************************************'
+        '***********************' ;
+ 'MESS' '==> Pas de temps ' tic . 'NUPADT'
+       ' Temps = ' tps 'Secondes     Pas de temps : DT= ' tic . 'DT' ;
+'FINS' ;
+*>>2 Gestion du rang du pas de temps, etc  FIN 
+*
+
+*
+*>>3 Gestion des E/S
+*
+*FD 
+* Il n'y a pas de Sorties et de Breches évanescentes contrairement aux
+* anciennes syntaxe de Breche, Breche2 et Breche3 (Tbrechei=FAUX et tic
+* . 'Qj' existe) où on complète par 0.
+*FD
+*
+* Accumulation du débit massique (en kg/s) de chaque espèce xxx dans qoxxx
+Qovp  = 0. ; Qlovp = 0. ;
+Qohe  = 0. ;
+Qoh2  = 0. ;
+Qon2  = 0. ;
+Qoo2  = 0. ;
+Qoco  = 0. ;
+Qoco2 = 0. ;
+* Débits de vapeur et de liquide pour les bilans (Minj et Mrest) 
+Qeau  = 0. ;
+Qlj   = 0. ;
+* Accumulation du débit massique dans Qtot (kg/s), du débit volumique
+* dans srcs (m3/s), du débit enthalpique dans drh (J/s)
+Qtot = 0. ;    
+drh  = 0. ;    
+srcs = 0. ;    
+hmn  = 0. ;
+*
+'SI' TBT . 'TTsortie'    ;
+  NBR = 'DIME' rxt . 'Sorties'    ;
+  ibr = 'INDE' rxt . 'Sorties'    ;
+  'REPE' BBRS NBR        ;
+     Qeau Qlj Qair Qhe Qh2 Qo2 Qn2 Qco Qco2
+     = broche 'KAS1' &BBRS rxt ;
+     Qovp  = Qovp  '+' Qeau ; Qlovp = Qlovp '+' Qlj ;
+     Qohe  = Qohe  '+' Qhe  ;
+     Qoh2  = Qoh2  '+' Qh2  ;
+     Qon2  = Qon2  '+' Qn2  ;
+     Qoo2  = Qoo2  '+' Qo2  ;
+     Qoco  = Qoco  '+' Qco  ;
+     Qoco2 = Qoco2 '+' Qco2 ;
+  'FIN' BBRS    ;
+'FINS' ;
+
+'SI' TBT . 'TTsortie'     ;    
+  NBR = 'DIME' rxt . 'Sorties' ;
+  ibr = 'INDE' rxt . 'Sorties' ;
+  'REPE' BBRS NBR ;
+     Rvapj Rairj Rhej Rh2j Ro2j Rn2j Rco2j Rcoj Rgj Hj Ej
+     Tj aex Qj Roj gj guj unvf0 src = broche 'KAS2' &BBRS rxt ;    
+     asrc = Roj  '*' ('ABS' src) ;
+     Qtot = Qtot '+' (aex '*' asrc) ;    
+     drh  = drh  '+' (Qj '*' (Hj - Hmn) '*' aex) ;
+     srcs = srcs '+' (aex '*' src) ;
+
+     Briches = rxt . 'Sorties' . (ibr . &BBRS) ;
+     'SI' ('EXIS' Briches 'Qj') ;
+       Briches . 'guj' = Briches . 'guj' 'ET' ('PROG' guj) ;
+       Briches . 'Qj'  = Briches . 'Qj'  'ET' ('PROG' asrc) ;
+     'FINS' ; 
+  'FIN' BBRS ;
+'FINS' ;
+
+'SI' TBT . 'TTbreche' ;
+   Qeau Qlj Qair Qhe Qh2 Qo2 Qn2 Qco Qco2 Qtotb srcb drhb = bruche rxt ;
+   Qovp  = Qovp  '+' Qeau ; Qlovp = Qlovp '+' Qlj ;
+   Qohe  = Qohe  '+' Qhe  ;
+   Qoh2  = Qoh2  '+' Qh2  ;
+   Qon2  = Qon2  '+' Qn2  ;
+   Qoo2  = Qoo2  '+' Qo2  ; 
+   Qoco  = Qoco  '+' Qco  ;
+   Qoco2 = Qoco2 '+' Qco2 ;
+   Qtot  = Qtot  '+' Qtotb ;    
+   drh   = drh   '+' drhb ;
+   srcs  = srcs  '+' srcb ;
+'FINS' ;
+*
+Qeau = Qovp  ;
+Qlj  = Qlovp ;
+*>>3 Gestion des E/S FIN
+*
+
+*
+*>>4 Gestion des sources diffuses
+*    Accumulation du débit massique (en kg/s) de chaque espèce xxx dans qoxxx
+'SI' TBT . 'TFIMP'       ;
+  NBFIMP = 'DIME' rxt . 'XFIMP' ;
+  ifimp  = 'INDE' rxt . 'XFIMP' ;
+  'REPE' BBFIMP NBFIMP ;
+     Bfimp = rxt . 'XFIMP' . (ifimp . &BBFIMP) ;
+     Smfpi = Bfimp . 'Smfpi' ;
+     
+     CKqt   = Bfimp . 'Kqt' ;
+     qft    = 'IPOL' tps Bfimp . 't' Bfimp . 'qt' ;
+     tic . CKqt = qft '/' Smfpi ;
+
+     CKqeau = Bfimp . 'Kqeau' ;
+     qfeau  = 'IPOL' tps Bfimp . 't' Bfimp . 'qeau' ;
+     tic . CKqeau = qfeau '/' Smfpi        ;
+
+     CKqair = Bfimp . 'Kqair' ;
+     qfair  = 'IPOL' tps Bfimp . 't' Bfimp . 'qair' ;
+     tic . CKqair = qfair '/' Smfpi        ;
+
+     CKqhe  = Bfimp . 'Kqhe' ;
+     qfhe   = 'IPOL' tps Bfimp . 't' Bfimp . 'qhe'  ;
+     tic . CKqhe  = qfhe '/' Smfpi;
+
+     CKqh2  = Bfimp . 'Kqh2' ;
+     qfh2   = 'IPOL' tps Bfimp . 't' Bfimp . 'qh2'  ;
+     tic . CKqh2 = qfh2 '/' Smfpi ;
+
+     CKqn2  = Bfimp . 'Kqn2' ;
+     qfn2   = 'IPOL' tps Bfimp . 't' Bfimp . 'qn2'  ;
+     tic . CKqn2 = qfn2 '/' Smfpi ;
+
+     CKqo2  = Bfimp . 'Kqo2' ;
+     qfo2   = 'IPOL' tps Bfimp . 't' Bfimp . 'qo2'  ;
+     tic . CKqo2 = qfo2 '/' Smfpi ;
+
+     CKqco  = Bfimp . 'Kqco' ;
+     qfco   = 'IPOL' tps Bfimp . 't' Bfimp . 'qco'  ;
+     tic . CKqco = qfco '/' Smfpi ;
+
+     CKqco2 = Bfimp . 'Kqco2' ;
+     qfco2  = 'IPOL' tps Bfimp . 't' Bfimp . 'qco2' ;
+     tic . CKqco2 = qfco2 '/' Smfpi        ;
+
+     Qovp  = Qovp  '+' Qfeau ;
+     Qohe  = Qohe  '+' Qfhe  ;
+     Qoh2  = Qoh2  '+' Qfh2  ;
+     Qon2  = Qon2  '+' Qfn2  ;
+     Qoo2  = Qoo2  '+' Qfo2  ;
+     Qoco  = Qoco  '+' Qfco  ;
+     Qoco2 = Qoco2 '+' Qfco2 ;
+     
+  'FIN' BBFIMP  ;
+'FINS';
+*>>4 Gestion des sources diffuses FIN
+*
+
+*
+*>>5 Gestion du flux de chaleur en paroi
+*    phi = h(t)(Tg-Tw(t)), mise à jour de Tw(t) et [h si h donné]
+*FD
+*    (h(t) par une PROCPERSO ou la condensation en paroi)
+*FD
+'SI' TBT . 'TTIMP' ;
+  NBTIMP = 'DIME' rxt . 'TIMP' ;
+  itimp  = 'INDE' rxt . 'TIMP' ;
+  'REPE' BBTIMP NBTIMP ;
+     Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+     CTBP1 = Btimp . 'TBP1' ;
+     CKH1  = Btimp . 'KH1' ;
+     tic . CTBP1 = 'IPOL' tps Btimp . 't' Btimp . 'TIMP' ;
+     'SI' ('NON' ((TBT . 'VAPEUR') 'ET' ('EXIS' tic CKH1))) ;
+       tic . CKH1 = Btimp . 'ECHAN' ;
+     'FINS' ;
+     Btimp . 'Ltbpi'
+     = Btimp . 'Ltbpi' 'ET' ('PROG' tic . (Btimp . 'TBP1')) ;
+  'FIN' BBTIMP ;
+'FINS' ;
+
+'SI' TBT . 'TECHANP' ;
+  'SI' ('NON' ('EXIS' TIC 'TBP0')) ;
+    tic . 'TBP0' = 'KCHT' RXT . 'GEO' . '$mtp0'
+    'SCAL' 'SOMMET' rxt . 'ECHANP' . 'TMUR' ;
+  'FINS' ;
+  'SI' ('NON' ((TBT . 'VAPEUR') 'ET' ('EXIS' tic 'KH0'))) ;
+    tic . 'KH0'  = 'KCHT' RXT . 'GEO' . '$mtp0'
+    'SCAL' 'CENTRE' rxt . 'ECHANP' . 'ECHAN' ;
+  'FINS' ;
+'FINS' ;
+*>>5 Gestion du flux de chaleur en paroi   FIN
+*
+
+*
+*>>6 Traitement de l'aspersion
+
+'SI' TBT . 'ASPER '    ;
+  t       =  rxt.'scenasp'.'t'  ;
+  vzinj   = 'IPOL' tps t (rxt.'scenasp'.'vzinj')  ;
+  xdinj   = 'IPOL' tps t (rxt.'scenasp'.'xdinj')  ;
+  tdinj   = 'IPOL' tps t (rxt.'scenasp'.'tdinj')  ;
+  ddinj   = 'IPOL' tps t (rxt.'scenasp'.'ddinj')  ;
+  $aspinj = GEO.'$aspinj' ;
+  $toitf  = GEO.'$toitf'  ;
+*   vnj     = 'KCHT' $aspinj 'VECT' 'SOMMET' 'COMP'
+*      ('MOTS' 1VN 2VN 3VN) (0.0 0.0 vzinj) ;
+  'SI' (DIM3D) ;
+   vnj     = 'KCHT' $aspinj 'VECT' 'SOMMET' 'COMP'
+    ('MOTS' 1VN 2VN 3VN) (0.0 0.0 vzinj) ;
+  'SINO' ;
+*--------------------------------------------------------------
+*  modif Tojo 12/07/2007  *
+*
+*   mise en place de vecteurs inclinés conformément
+*   à l'angle d'ouverture du jet
+*   ici l'inclinaison est fixée à 30°
+*   une prochaine évolution pourrait consister à mettre
+*   l'angle d'ouverture comme donnée d'entrée
+*   dans la table scenasp
+*
+*--------------------------------------------------------------
+*
+cc1 = coor 1 rxt.'aspinj' ;
+z0 = (sin(300. '*' cc1)) '*' ((cos(300. '*' cc1)) '**' (-1.0));
+z0 = z0 '*' (vzinj '*' -1.)        ;
+z0 = chan attribut z0 nature diffus;
+z1 = z0 '*' 0.   ;
+ux0 = nomc '1VN' z0       ;
+z1 = z1 '+' vzinj;
+z1 = chan attribut z1 nature diffus;
+uy0 = nomc '2VN' z1       ;
+vnj1 = ux0 et uy0;
+vnj  = 'KCHT' $aspinj 'VECT' 'SOMMET' 'COMP'
+('MOTS' '1VN' '2VN') vnj1 ;
+*
+*--------------------------------------------------------------
+   'FINS' ;
+*--------------------fin modif Tojo Juillet 2007---------------
+
+   xdj     = 'KCHT' $aspinj 'SCAL' 'SOMMET' 'COMP'
+       ('MOT'  'XD') xdinj        ;
+   tdj     = 'KCHT' $aspinj 'SCAL' 'SOMMET' 'COMP'
+       ('MOT'  'TD') tdinj        ;
+   ddj     = 'KCHT' $toitf  'SCAL' 'SOMMET' 'COMP'
+       ('MOT'  'DD') ddinj        ;
+'FINS';
+*>>6 Traitement de l'aspersion    FIN
+*
+
+*
+*>>7 Initialisation aux valeurs de début de pas de temps (n-1)
+
+Rgpnm   = Rgpn   ;
+Cvmnm   = Cvmn   ;
+Gamnm   = Gamn   ;      
+Cpmnm   = Cpmn   ;
+
+Ptmnm   = Ptmn   ;    
+Rhomnm  = Rhomn  ;
+
+Remnm   = Remn   ;    
+Rmairnm = Rmairn ;
+Rmvnm   = Rmvn   ;    
+Rmvgnm  = Rmvgn  ;   
+Rmliqnm = Rmliqn ;   
+Rmbronm = Rmbron ; Mbronm = Mbron ;
+Rmhenm  = Rmhen  ;   
+Rmh2nm  = Rmh2n  ;   
+Rmn2nm  = Rmn2n  ;   
+Rmo2nm  = Rmo2n  ;   
+Rmconm  = Rmcon  ;   
+Rmco2nm = Rmco2n ;   
+Emurnm  = Emurn  ; 
+
+'SI' TBT.'ASPER ' ;
+   Qasp = 'EXTR' (tic.'Qaspe') ndl      ;
+   Easp = 'EXTR' (tic.'Easpe') ndl      ;
+   Hasp = 'EXTR' (tic.'Haspe') ndl      ;
+'SINO'       ;
+   Qasp = 0.0 ;
+   Easp = 0.0 ;
+   Hasp = 0.0 ;
+'FINS'  ;
+
+Qcnm     = Qcn     ;
+Econdnm  = Econdn  ;
+Econvnm  = Econvn  ;
+Hcondnm  = Hcondn  ;
+
+MinjT   = 'EXTR' tic . 'Minj'  ndl ;
+McondT  = 'EXTR' tic . 'Mcond' ndl ;
+Mcondmnm = Mcondmn     ;
+
+'SI' TBT . 'VAPEUR'    ;
+  'SI' TBT . 'TPAROIF' ;
+      McondTw = 'EXTR' tic . 'Mcondw' ndl ;
+  'FINS'     ;
+* FD : Ne sert a rien
+  'SI' TBT . 'TTIMP' ;
+     NBTIMP = 'DIME' rxt . 'TIMP' ;
+     itimp  = 'INDE' rxt . 'TIMP' ;
+     'REPE' BBTIMP NBTIMP       ;
+        Btimp   = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+        CMcond1 = Btimp . 'Mcond1' ;
+        McondT1 = 'EXTR' tic . CMcond1 ndl ;
+     'FIN' BBTIMP      ;
+  'FINS'     ;
+  'SI' TBT . 'TECHANP' ;
+    McondT0 = 'EXTR' tic . 'Mcond0' ndl  ;
+  'FINS'     ;
+* FD : Ne sert a rien
+'FINS'       ;
+MrestT = 'EXTR' tic . 'Mrest' ndl        ;
+*>>7 Initialisation au début de pas de temps (n-1)FIN
+*
+
+*
+*>>8 Initialisation des champs variables pour TF
+'SI' TBT . 'THERMP' ;
+  tic . 'KHEW' = tic . 'KHW' /  (Rhomnm '*' Cpmnm) ;
+  tic . 'LHEW' = -1.0 * tic . 'KHEW' ;
+  tic . 'LHW'  = -1.0 * tic . 'KHW' ;
+  'SI' ('NEG' ('TYPE' tic . 'KHW') 'FLOTTANT') ;
+    'SI' tbt . 'THERCO'      ;
+      tic . 'KHEW' = 'KCHT' $paroif 'SCAL' 'SOMMET' tic . 'KHEW' ;
+      tic . 'LHEW' = 'KCHT' $paroif 'SCAL' 'SOMMET' tic . 'LHEW' ;
+      tic . 'LHW'  = 'KCHT' $paroif 'SCAL' 'SOMMET' tic . 'LHW'  ;
+    'SINO' ;
+      tic . 'KHEW' = 'KCHT' $paroif 'SCAL' 'CENTRE' tic . 'KHEW' ;
+      tic . 'LHEW' = 'KCHT' $paroif 'SCAL' 'CENTRE' tic . 'LHEW' ;
+    'FINS' ;
+  'FINS' ;
+'FINS' ;
+
+'SI' TBT . 'TTIMP' ;
+  NBTIMP = 'DIME' rxt . 'TIMP' ;
+  itimp  = 'INDE' rxt . 'TIMP' ;
+  'REPE' BBTIMP NBTIMP ;
+     Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+     CKHE1 = Btimp . 'KHE1' ;
+     CKH1  = Btimp . 'KH1' ;
+     tic . CKHE1 = tic . CKH1 '/' (Rhomnm '*' Cpmnm) ;
+  'FIN' BBTIMP  ;
+'FINS';
+
+'SI' TBT . 'TECHANP' ;
+  tic . 'KHE0' = tic . 'KH0' '/' (Rhomnm '*' Cpmnm) ;
+'FINS';
+*>>8 Initialisation des champs variables pour TF    FIN
+*
+
+
+*
+*>>10 Gestion des recombineurs :
+*
+* Bilan 0D : Débit enthalpique (drhpar) et bilans de masse à cause de la
+* combustion et de la décomposition de l'air en N2 et O2. Comme Qin=Qout
+* aucune variation globale de la masse globale.
+*
+* Les conditions aux limites sont stockées dans rxt . 'RECOMB' . indice
+* pour la vitesse et les densités partielles.   
+'SI' TBT . 'TRECOMB' ;
+  QO_H2p QO_O2p QO_H2Op QO_N2p drhpar = MDRECOMB RXT ;
+  'SI' TBT . 'VAPEUR' ;    
+    Qovp = Qovp '+' QO_H2Op ;
+  'FINS' ;
+  'SI' TBT . 'TH2' ;
+    Qoh2 = Qoh2 '+' QO_H2p ;
+  'FINS' ;
+  'SI' TBT . 'TN2' ;
+    Qon2 = Qon2 '+' QO_N2p ;
+  'FINS' ;
+  'SI' TBT . 'TO2' ;
+    Qoo2 = Qoo2 '+' QO_O2p ;
+  'FINS' ;
+'FINS' ;
+*>>10 Gestion des recombineurs        FIN
+*
+
+*
+*>>11 Avancement et stockage des grandeurs moyennes 0D au temps (n)
+*     à partir de l'intégrale des conditions aux limites
+*     (E/S, parois, PAR)
+drh  = drh  '-' (Econvnm '-' Easp) '-' (Hcondnm '-' Hasp) '+' drhpar ;
+Qtot = Qtot '+' Qasp '-' Qcnm    ;
+
+'MESS' ' Debit condensation Fin pas de temps precedent  Qcnm=' Qcnm ;
+'MESS' ' Etot ' (Econvnm '-' Easp)
+       ' Htot ' (Hcondnm '-' Hasp)
+       ' drh=' drh     ;
+
+*
+*>>11.1 Calcul par bilan 0D de Rhomn et Remn au temps (n) 
+*FD
+*WARNING : On suppose que la masse est constante en ouvert
+*WARNING : et Remn = Rho(n-1) Cv(n-1) Tk(n-1) en ouvert
+*'SI' TBT . 'Tsortie' ;
+*  Rhomn = Rhomnm     ;
+*  Remn  = ('SOMT' (Diag * Rhonm * cvmnm * Tknm)) '/' VTotal       ;
+*  tic . 'Rhomn' = tic . 'Rhomn' 'ET' ('PROG' Rhomn)      ;
+*  tic . 'Remn'  = tic . 'Remn'  'ET' ('PROG' Remn)       ;
+*'SINO'      ;
+  Rhomn = 'MAXI' ('PROG' 0.
+  (Rhomnm '+' (tic . 'DT' '*' Qtot '/' VTotal))) ;
+*DEBUG
+*'MESS' 'DEBUG Rhomnm Qtot Rhomn' ;
+*'MESS' rhomnm ' ' (rhomnm '*' Vtotal) ;
+*'MESS' qtot   ' ' (tic . 'DT' '*' Qtot) ;
+*'MESS' rhomn  ' ' (rhomn  '*' Vtotal) ;
+*DEBUG
+  Remn  = 'MAXI' ('PROG' 0.
+  (Remnm  '+' (tic . 'DT' '*'  drh '/' VTotal)));
+  'MESS' 'VERIF: densite et energie moyennes au pas de temps (n)' ; 
+  'MESS' 'VERIF: &BCLTPS : Rhomn=' Rhomn ' ' 'Remn=' Remn ;
+*'FINS'      ;
+*>>11.1 Calcul Rhomn et Remn  FIN
+*
+
+*
+*>>11.2 Calcul de l'énergie par condensation (il manque la convection)
+* WARNING : Lorsque Lv dépendra de Tw on ne pourra pas
+'SI' TBT.'THERMP'      ;    
+  Emurn = Emurnm '+' ( tic . 'DT' '*' Qcnm '*' TBT . 'Lv') ;    
+  tic . 'Emur' = tic . 'Emur' 'ET' ('PROG' Emurn) ;    
+'FINS'       ;    
+*>>11.2 Calcul de l'énergie par condensation (il manque la convection)
+*
+
+*
+*>>11.3 Calcul par bilan 0D des densités moyennes au temps (n)
+*FD
+*WARNING Pourquoi s'intéresser au brouillard en suspension ?
+*WARNING C'est bien Rmbronm car le brouillard est en (n-1)
+*FD
+Rmairn = Rhomn ;
+'SI' TBT . 'VAPEUR' ;
+  Rmvgn = 'MAXI' ('PROG' 0.
+  (Rmvgnm '+' (tic . 'DT' '*' (Qovp '-' Qcnm '+' Qasp) '/' VTotal ))) ;
+  Rmvn = Rmvgn '-' Rmbronm ;
+  Rmairn = Rmairn '-' Rmvn ; 
+'FINS' ;
+'SI' TBT . 'THE' ;
+  Rmhen = 'MAXI' ('PROG' 0.
+  (Rmhenm '+' (tic . 'DT' '*' Qohe '/' VTotal ))) ;
+  Rmairn = Rmairn '-' Rmhen ;
+'FINS' ;
+'SI' TBT . 'TH2' ;
+  Rmh2n = 'MAXI' ('PROG' 0.
+  (Rmh2nm '+' (tic . 'DT' '*' Qoh2 '/' VTotal ))) ;
+  Rmairn = Rmairn '-' Rmh2n ;
+'FINS' ;
+'SI' TBT . 'TN2' ;
+  Rmn2n= 'MAXI' ('PROG' 0.
+  (Rmn2nm '+' (tic . 'DT' '*' Qon2 '/' VTotal ))) ;
+  Rmairn = Rmairn '-' Rmn2n ;
+'FINS' ;
+'SI' TBT . 'TO2' ;
+  Rmo2n= 'MAXI' ('PROG' 0.
+  (Rmo2nm '+' (tic . 'DT' '*' Qoo2 '/' VTotal ))) ;
+  Rmairn = Rmairn '-' Rmo2n ;
+'FINS' ;
+'SI' TBT . 'TCO' ;
+  Rmcon= 'MAXI' ('PROG' 0.
+  (Rmconm '+' (tic . 'DT' '*' Qoco '/' VTotal ))) ;
+  Rmairn = Rmairn '-' Rmcon ;
+'FINS' ;
+'SI' TBT . 'TCO2';
+  Rmco2n = 'MAXI' ('PROG' 0.
+  (Rmco2nm '+' (tic . 'DT' '*' Qoco2 '/' VTotal ))) ;
+  Rmairn = Rmairn '-' Rmco2n ;
+'FINS' ;
+'SI' (Rmairn '<' 0.0) ;
+  'MESS' 'Pb avec la masse d air 0D : 11.3 : Rmairn=' ' ' Rmairn ;
+'FINS' ;
+*>>11.3 Calcul par bilan 0D des densités moyennes au temps (n)FIN
+*
+
+*
+*>>12. Appel à la procédure PERSO
+'SI' TBT . 'PERSO' ;
+'SI' (TBT . 'IMPR' '>EG' 2) ;
+mess '  ***********************************';
+mess '  * Execution d une procedure PERSO *';
+mess '  * '(rxt.'PRCPERSO')
+     '       *'  ;
+mess '  ***********************************';
+'FINS' ;
+('TEXT' rxt . 'PRCPERSO') Tps rxt ;
+'SI' (TBT . 'IMPR' '>EG' 2) ;
+mess '  ***********************************';
+mess '  * Fin execution de la procedure   *';
+mess '  * '(rxt.'PRCPERSO')
+     '       *'  ;
+mess '  ***********************************';
+'FINS' ;
+'FINS' ;
+*>>12. Appel à la procédure PERSO  FIN
+*
+
+*
+*
+*>>13. Résolution des EDP
+*
+*
+* Terme source s de l'equation de QDM : divu = s
+tic . 'DSRC' = ((-1.) '*' srcs '/' VTotal)  ;
+*DEBUG
+*tic . 'DSRC' = ((-1.) '*' srcs '/' VTotal)  ;
+*'MESS' 'DSRC  ' tic . 'DSRC' ;
+*DEBUG
+rv  = TBT . 'RV'     ;      
+*DEBUG
+*tic . 'DSN2' = -1. '*' tic . 'DSRC' ;
+*DEBUG
+
+*
+*>>13.1 CLIM injection u.n=uinj
+gjo  matxx = 'KOPS' 'MATRIK' ;
+'SI' TBT . 'TTsortie' ;
+  NBR = 'DIME' rxt . 'Sorties' ;
+  ibr = 'INDE' rxt . 'Sorties' ;
+  'REPE' BBRS NBR ;
+     Briches = rxt . 'Sorties' . (ibr.&BBRS) ;
+     gjo     = gjo 'ET' (Briches . 'gj') ;
+  'FIN' BBRS  ;
+'FINS' ;
+'SI' TBT . 'TTbreche' ;
+**  NBR = 'DIME' rxt . 'Breches' ;
+**  ibr = 'INDE' rxt . 'Breches' ;
+**  'REPE' BBRS NBR  ;
+**     Briches = rxt . 'Breches' . (ibr.&BBRS) ;
+**     gjo = gjo 'ET' (Briches . 'gj') ;
+   gjo = gjo 'ET' (tic . 'Breches' . 'UN') ;
+**  'FIN' BBRS  ;
+'FINS' ;
+*
+* Modèle K-Epsilon EFM1 : K-Epsilon aux E/S 
+*FD
+*WARNING Où le cas K-EPSILON Implicite est-il pris en compte ?
+*FD
+'SI'(('EGA' TBT.'MODTURB' 'KEPSILON') et ('EGA' TBT.'FEF' 'EFM1'));
+  'SI' TBT . 'TTsortie';
+     NBR = 'DIME' rxt . 'Sorties'        ;
+     ibr = 'INDE' rxt . 'Sorties'        ;
+    Repeter BBRS NBR   ;
+     Briches=rxt.'Sorties'.(ibr.&BBRS)   ;
+*    mess ' Sorties CL pour QDM'   (ibr.&BBRS)    ;
+     gjs=Briches.'gj'  ;
+ lcj=extr gjs 'COMP'   ;
+ mdj=gjs 'PSCA' gjs lcj lcj     ;
+ gk=((0.05**2.)*mdj) nomc 'KN'  ;
+ gk=CHAN 'ATTRIBUT' gk 'NATURE' 'DISCRET';
+ ge=((gk**1.5)/(Briches.'Dbreche')) nomc 'EN';
+ gjo= gjo et gk        ;
+ gjo= gjo et ge        ;
+    FIN BBRS  ;
+  FINS       ;
+  Si (TBT.'TTbreche')  ;
+**     NBR=dime rxt.'Breches'     ;
+**     ibr=index (rxt.'Breches')  ;
+**    Repeter BBRS NBR   ;
+**     Briches=rxt.'Breches'.(ibr.&BBRS)   ;
+*    mess ' Breches CL pour QDM'   (ibr.&BBRS)    ;
+**     gjs=Briches.'gj'  ;
+     gjs = tic . 'Breches' . 'UN' ;
+ lcj=extr gjs 'COMP'   ;
+ mdj=gjs 'PSCA' gjs lcj lcj     ;
+ gk=((0.05**2.)*mdj) nomc 'KN'  ;
+ gk=CHAN 'ATTRIBUT' gk 'NATURE' 'DISCRET';
+ ge=((gk**1.5)/(Briches.'Dbreche')) nomc 'EN';
+ gjo= gjo et gk        ;
+ gjo= gjo et ge        ;
+**    FIN BBRS  ;
+  FINS       ;
+
+*---- Modèle K-Epsilon EFM1 -- FIN -------------------------
+'FINS' ;
+
+* Si il y a au moins une brèche ou une sortie
+'SI' (TBT . 'TTbreche' 'OU' TBT . 'TTsortie') ;
+  rv . 'CLIM' = (rv . 'CLIM' '-' rv . 'CLIM') '+' gjo ;
+'FINS' ;
+* Si il y a des PARs
+'SI' TBT . 'TRECOMB' ;
+  Urec0 = tic . 'RECOMB' . 'UN' ;
+  'SI' (TBT . 'TTbreche' 'OU' TBT . 'TTsortie') ;
+    rv . 'CLIM' = rv . 'CLIM' '+' Urec0 ;
+  'SINO' ;
+    rv . 'CLIM' = (rv . 'CLIM' '-' rv . 'CLIM') '+' Urec0 ;
+  'FINS' ;
+'FINS' ;
+*>>13.1 CLIM injection u.n=uinjFIN
+*
+
+'SI' (TBT . 'IMPR' '>EG' 2) ;
+  'MESS' '==> RESOLUTION QDM' ;
+'FINS' ;
+
+*
+*>>13.2 Actualisation de tic . 'NUEFF' et tic . 'MUT'
+*FD
+*WARNING TTbreches et TTsortie non pris en compte pour K-EPSILON
+*FD
+*
+tic . 'NU'  = tic . 'Mu' '/' Rhomnm ;
+tic . 'NUm' = 'SOMT' (GEO . 'Diag' * tic . 'NU') / GEO . 'VTotal' ;
+'SI' TBT . 'FPAROI' ;
+  tic . 'YP' = rxt . 'YP' ;
+'FINS' ;
+'SI' ('EXIS' TBT 'MODTURB') ;
+
+*---- Modèle viscosité tourbillonnaire constante -----------
+  'SI' ('EGA' TBT . 'MODTURB' 'NUTURB') ;
+    tic . 'NUEFF' = tic . 'NU' + rxt . 'NUT' ;
+  'FINS' ;
+*---- Modèle viscosité tourbillonnaire constante  FIN
+
+*---- Modèle de longueur de mélange ------------------------
+  'SI' ('EGA' TBT . 'MODTURB' 'LMEL') ;
+    un  = tic . 'UN' ;
+    P   = PRODT UN $vtf ;
+    lm  = TBT . 'LMEL' ;
+    NUT = lm '*' lm '*' (P**0.5) ;
+* Réalisabilité sur Nut
+    Nu  = tic . 'NU' ;
+    a   = 5000. '*' Nu ;
+    al  = 0.8 ;
+    ala = al '*' a ;
+    b   = ala '*' ((2. '*' (1.-al)) '**' (-1.)) ;
+    ik  = 'MASQ' Nut 'INFERIEUR' ala ;
+    Nut=(ik*Nut)+( (1.-ik)*a*(Nut + b)*(inve (a + Nut + b)));
+    Nutsnu = Nut '*' ('INVE' Nu);
+    'SI' (TBT . 'IMPR' '>EG' 2) ;
+      'MESS' ' Mini Maxi Nut/Nu '
+      ('MINI' Nutsnu) ('MAXI' Nutsnu)    ;
+    'FINS'   ;
+    tic . 'NUEFF' = NUT '+' tic . 'NU'   ;
+  'FINS'      ;
+*---- Modèle de longueur de mélange      FIN
+
+*---- Modèle K-Epsilon Implicite ---------------------------
+  'SI' (('EGA' TBT . 'MODTURB' 'KEPSILON')
+    'ET' ('NON' ('EGA'  TBT . 'FEF' 'EFM1')))     ;
+    cnu = 0.09 ;
+    c1  = 1.44 ;
+    c2  = 1.92 ;
+    sgk = 1.   ;
+    SGE = 1.3  ;
+
+    Dg  = 'DOMA' $vtf 'XXDIAGSI';
+    Lma = ('SOMT' Dg) '**' (1. '/' ('VALE' DIME)) ;
+    Lmi = ('MINI' Dg) '**' (1. '/' ('VALE' DIME)) ;
+    un  = tic . 'UN'   ;
+    P   = PRODT UN $vtf;
+
+    Rrk = TBT . 'Rrk'  ;
+    Rre = TBT . 'Rre'  ;
+    En  = tic . 'EN'   ;
+    Kn  = tic . 'KN'   ;
+* Réalisabilité sur Nut : Nut > 1.e-15
+*Nut=Cnu * Kn * Kn * (inve En)        ;
+    Nut = Lmi '*' Lma '*' (P '**' 0.5)   ;
+    ik  = 'MASQ' Nut 'SUPERIEUR' 1.e-15  ;
+    Nut = (ik*Nut) '+' ((1.-ik)*1.e-15)  ;
+* Nut P < En
+*a= En * (inve P) * 0.133    ;
+*a   = En * ('INVE' P) * 0.133        ;
+*al  = 0.8 ;
+*ala = al*a;
+*b   = ala*((2.*(1.-al))**(-1.))      ;
+*ik  = 'MASQ' Nut 'INFERIEUR' ala     ;
+*Nut=(ik*Nut)+( (1.-ik)*a*(Nut+b)*(inve (a+Nut+b)))     ;
+*Nut = kcht $vtf scal sommet Nut      ;
+    'MESS' 'mini maxi Nut ' ('MINI' Nut) ('MAXI' Nut)      ;
+    Sk  = Nut * P - ((KN**1.5)*(1./Lma)) ;
+    Kn  = 'KOPS' Kn  '|<' 1.e-5 ;
+    EsK = En * ('INVE' Kn)      ;
+    Se  = EsK '*' (Nut * P - (c2*En))    ;
+    tic . 'Se' = Se    ;
+    tic . 'Sk' = Sk    ;
+    tic . 'NUEFF' = NUT + tic . 'NU'     ;
+*
+    cpv matxx = 'KOPS' 'MATRIK' ;
+    'SI' (TBT . 'TTbreche' 'OU' TBT . 'TTsortie') ;
+'MESS' 'K epsilon au revoir' ;
+'ERRE' 5 ;
+      Rrk . 'CLIM' = cpv        ;
+    'FINS'    ;
+    Rrk . 'METHINV' . 'CALPREC' = calprec;
+    EXEC Rrk  ;
+    Kn= tic . 'KN'     ;
+    Kn= 'KOPS' Kn  '|<' 1.e-5   ;
+    tic . 'KN' = Kn    ;
+*
+    cpv matxx = 'KOPS' 'MATRIK' ;
+    'SI' (TBT . 'TTbreche' 'OU' TBT . 'TTsortie') ;
+'MESS' 'K epsilon au revoir' ;
+'ERRE' 5 ;
+      Rre . 'CLIM' = cpv        ;
+    'FINS'    ;
+    Rre . 'METHINV' . 'CALPREC' = calprec;
+    EXEC Rre  ;
+    En=  tic . 'EN'    ;
+    En=  'KOPS' En  '|<' 1.e-15 ;
+    tic . 'EN' = En    ;
+* Réalisabilité sur Nut
+    Nut = cnu * Kn * Kn * ('INVE' En)    ;
+    Nu  = tic . 'NU'   ;
+    a   = 1500. '*' Nu ;
+    al  = 0.8 ;
+    ala = al*a;
+    b   = ala*((2.*(1.-al))**(-1.))      ;
+    tic . 'ala' = ala  ;
+    tic . 'nut' = nut  ;
+    ik  = 'MASQ' Nut 'INFERIEUR' ala     ;
+    Nut = (ik*Nut)+( (1.-ik)*a*(Nut+b)*(inve (a+Nut+b)))   ;
+    Nut = 'KCHT' $vtf 'SCAL' 'SOMMET' Nut;
+    Nutsnu = (1. '/' Nu) '*' Nut;
+    'SI' (TBT . 'IMPR' '>EG' 2) ;
+      'MESS' ' Mini Maxi Nut/Nu '
+      ('MINI' Nutsnu) ('MAXI' Nutsnu)    ;
+    'FINS'    ;
+    tic . 'NUEFF' = NUT + tic . 'NU'     ;
+  'FINS'      ;
+*---- Modèle K-Epsilon ImpliciteFIN
+
+*---- Modèle K-Epsilon EFM1 --------------------------------
+*FD
+*WARNING D'ou vient tic . NUT ?
+*FD
+  'SI' (('EGA' TBT . 'MODTURB' 'KEPSILON') 'ET'
+        ('EGA' TBT . 'FEF' 'EFM1')) ;
+    tic . 'NUEFF' = tic . 'NUT' + tic . 'NU' ;
+  'FINS' ;
+*---- Modèle K-Epsilon EFM1     FIN
+'SINO' ;
+*---- Il n'y a pas de modèle de turbulence -----------------
+  tic . 'NUEFF' = tic . 'NU' ;
+'FINS' ;
+tic . 'MUT' = tic . 'NUEFF' * Rhomnm ;
+*>>13.2 Actualisation de tic . 'NUEFF' et tic . 'MUT'      FIN
+*
+
+*
+*>>13.3 Résolution
+rv . 'METHINV' . 'CALPREC' = calprec ;
+'SI' ('EXIS' rv 'PROJ') ;
+   rv . 'PROJ' . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+RV . 'MRESOP' = VRAI   ;
+RV . 'TCPT'   = rxt . 'TBT' . 'TCPT'   ;
+RV . 'TKPR'   = rxt . 'TBT' . 'TKPR'   ;
+RV . 'TRESOU' = rxt . 'TBT' . 'TRESOU' ;
+RV . 'IMPARA' = rxt . 'TBT' . 'IMPARA' ; 
+*
+* NON TRTOUT = Aucun TKPR à VRAI (tout est séquentiel)
+* alors on résout vitesse-pression en tête
+*DEBUG
+*'MESS' 'DEBUG CLIM en VITESSE' ;
+*'LIST' rv . 'CLIM' ;
+*DEBUG
+'SI' ('NON' TBT . 'TRTOUT')        ;
+  EXEC  rv       ;
+'FINS'  ;
+*DEBUG
+*'LIST' rxt . 'TIC' . 'UN' ;
+*DEBUG
+*
+* Pour le // on concatène dans rv les résolutions à faire en //
+* Puis on résout en // vitesse-pression et TKPR ad'hoc
+'SI' TBT . 'TRTF' ;
+   'MESS' '$$$$ ON RAJOUTE LA TEMPERATURE TF à LA QDM ' ;
+   rtf = rv  ;
+   dtfcl = CLINC RXT rtf (TBT . 'TRTF') 'TF' 'Tj' 'TFNM' ;
+*FD
+* Pourquoi n'a-t-on pas Rtf . 'resmn'
+*FD
+   rtf . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'VAPEUR' 'ET' TBT . 'TRrvap') ;
+   'MESS' '$$$$ ON RAJOUTE LA DENSITE DE VAPEUR à la QDM ' ;
+   Rrvap = rv ;
+   drvpcl = CLINC RXT Rrvap (TBT.'TRrvap') 'RVP' 'Rvapj' 'RVPNM' ;
+*FD
+* Pourquoi n'a-t-on pas Rrvap . 'resmn'
+*FD
+   Rrvap . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'THE' 'ET' TBT . 'TRrhe') ;
+   'MESS' '$$$$ ON RAJOUTE LA RESOLUTION DE LA DENSITE HELIUM' ;
+   Rrhe = rv ;
+   drhecl = CLINC RXT Rrhe (TBT . 'TRrhe') 'RHE' 'Rhej' 'RHEM' ;
+   Rrhe . 'resmn' = tic . 'RHE' NOMC 'RHE' ;
+   Rrhe . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'TH2' 'ET' TBT . 'TRrh2') ;
+   'MESS' '$$$$ ON RAJOUTE LA RESOLUTION DE LA DENSITE HYDROGENE' ;
+   Rrh2 = rv ;
+   drh2cl = CLINC RXT Rrh2 (TBT . 'TRrh2') 'RH2' 'Rh2j' 'RH2M' ;
+   Rrh2 . 'resmn'      = tic . 'RH2' NOMC 'RH2' ;
+   Rrh2 . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'TO2' 'ET' TBT . 'TRro2') ;
+   'MESS' '$$$$ ON RAJOUTE LA RESOLUTION DE LA DENSITE OXYGENE' ;
+   Rro2 = rv ;
+   dro2cl = CLINC RXT Rro2 (TBT . 'TRro2') 'RO2' 'Ro2j' 'RO2M' ;
+   Rro2 . 'resmn' = tic . 'RO2' NOMC 'RO2' ;
+   Rro2 . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'TN2' 'ET' TBT . 'TRrn2') ;
+   'MESS' '$$$$ ON RAJOUTE LA RESOLUTION DE LA DENSITE AZOTE' ;
+   Rrn2 = rv ;
+   drn2cl = CLINC RXT Rrn2 (TBT . 'TRrn2') 'RN2' 'Rn2j' 'RN2M' ;
+   Rrn2 . 'resmn' = tic . 'RN2' NOMC 'RN2' ;
+   Rrn2 . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'TCO2' 'ET' TBT . 'TRrco2') ;
+   'MESS' '$$$$ ON RAJOUTE LA RESOLUTION DE LA DENSITE DIOX DE CARBONE';
+   Rrco2 = rv ;
+   drco2cl = CLINC RXT Rrco2 (TBT . 'TRrco2') 'RCO2' 'Rco2j' 'RCO2M' ;
+   Rrco2 . 'resmn' = tic . 'RCO2' NOMC 'RCO2' ;
+   Rrco2 . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+'SI' (TBT . 'TCO' 'ET' TBT . 'TRrco') ;
+   'MESS' '$$$$ ON RAJOUTE LA RESOLUTION DE LA DENSITE MONO DE CARBONE';
+   Rrco = rv ;
+   drcocl = CLINC RXT Rrco (TBT . 'TRrco') 'RCO' 'Rcoj' 'RCOM' ;
+   Rrco . 'resmn' = tic . 'RCO' NOMC 'RCO' ;
+   Rrco . 'METHINV' . 'CALPREC' = calprec ;
+'FINS' ;
+
+'SI' TBT . 'TRTOUT' ;
+  EXEC rv ;
+'FINS' ;
+*
+* Résolution séquentielle des champs scalaires restant
+* (ajout de la CLIM dans CLINC avant l'appel à EXEC)
+*FD
+* Les densités sont bornées par 1D-10 et MaxRHO dans CORMASSE
+* On le faisait 2 fois avant : ici et dans CORMASSE !
+*FD
+'SI' (TBT . 'VAPEUR' 'ET' ('NON' TBT . 'TRrvap')) ;
+  Rrvap = TBT . 'Rrvap' ;
+  drvpcl = CLINC RXT Rrvap (TBT . 'TRrvap') 'RVP' 'Rvapj' 'RVPNM' ;
+*FD
+* Pourquoi n'a-t-on pas Rrvap . 'resmn' = tic . 'Rvp' NOMC 'RVP' ; ?
+*FD
+  Rrvap . 'METHINV' . 'CALPREC' = calprec  ;
+  EXEC  Rrvap   ;
+'FINS';
+'SI' (TBT . 'THE' 'ET' ('NON' TBT . 'TRrhe')) ;
+  Rrhe = TBT . 'Rrhe' ;
+  drhecl = CLINC RXT Rrhe (TBT . 'TRrhe') 'RHE' 'Rhej' 'RHEM' ;
+  Rrhe . 'resmn' = tic . 'RHE' NOMC 'RHE' ;
+  Rrhe . 'METHINV' . 'CALPREC' = calprec ;
+  EXEC  Rrhe ;
+'FINS' ;
+'SI' (TBT . 'TH2' 'ET' ('NON' TBT . 'TRrh2')) ;
+  Rrh2 = TBT . 'Rrh2' ;
+  drh2cl = CLINC RXT Rrh2 (TBT . 'TRrh2') 'RH2' 'Rh2j' 'RH2M' ;
+  Rrh2 . 'resmn' = tic.'RH2' NOMC 'RH2' ;
+  Rrh2 . 'METHINV' . 'CALPREC' = calprec ; 
+  EXEC  Rrh2 ;
+'FINS' ;
+'SI' (TBT . 'TO2' 'ET' ('NON'  TBT . 'TRro2')) ;
+  Rro2 = TBT . 'Rro2' ;
+  dro2cl = CLINC RXT Rro2 (TBT . 'TRro2') 'RO2' 'Ro2j' 'RO2M' ;
+  Rro2 . 'resmn' = tic . 'RO2' NOMC 'RO2' ;
+  Rro2 . 'METHINV' . 'CALPREC' = calprec ;
+  EXEC  Rro2 ;
+'FINS' ;
+'SI' (TBT . 'TN2' 'ET' ('NON' TBT . 'TRrn2')) ;
+  Rrn2 = TBT . 'Rrn2' ;
+  drn2cl = CLINC RXT Rrn2 (TBT . 'TRrn2') 'RN2' 'Rn2j' 'RN2M' ;
+  Rrn2 . 'resmn' = tic . 'RN2' NOMC 'RN2' ;
+  Rrn2 . 'METHINV' . 'CALPREC' = calprec ;
+  EXEC  Rrn2 ;
+'FINS' ;
+'SI' (TBT . 'TCO2' 'ET' ('NON' TBT . 'TRrco2')) ;
+  Rrco2 = TBT . 'Rrco2' ;
+  drco2cl = CLINC RXT Rrco2 (TBT . 'TRrco2') 'RCO2' 'Rco2j' 'RCO2M' ;
+  Rrco2 . 'resmn' = tic . 'RCO2' NOMC 'RCO2' ;
+  Rrco2 . 'METHINV' . 'CALPREC' = calprec ;
+  EXEC  Rrco2 ;
+'FINS' ;
+'SI' (TBT . 'TCO' 'ET' ('NON' TBT . 'TRrco')) ;
+  Rrco = TBT . 'Rrco' ;
+  drcocl = CLINC RXT Rrco (TBT . 'TRrco') 'RCO' 'Rcoj' 'RCOM' ;
+  Rrco . 'resmn' = tic . 'RCO' NOMC 'RCO' ;
+  Rrco . 'METHINV' . 'CALPREC' = calprec   ;
+  EXEC Rrco ;
+'FINS' ;
+*
+* Résolution séquentielle de la température
+* (ajout de la CLIM dans CLINC avant l'appel à EXEC)
+'SI' ('NON' TBT . 'TRTF') ;     
+  'MESS' '$$$$ RESOLUTION SEQUENTIELLE DE LA TEMPERATURE DU FLUIDE' ;
+  rtf = TBT . 'RTF' ;
+  dtfcl = CLINC RXT rtf (TBT . 'TRTF') 'TF' 'Tj' 'TFNM' ;
+  rtf . 'METHINV' . 'CALPREC' = calprec ;
+  EXEC rtf ;
+'FINS' ;
+*
+* Résolution séquentielle de la Tparoi découplée du fluide
+* (le flux tic . 'FHP1' est calculé dans CONDENS)
+'SI' TBT . 'THERMP' ;
+  'SI' ('NON' TBT . 'THERCO') ;        
+    rtp = TBT . 'RTP' ;
+    'SI' (TBT . 'IMPR' '>EG' 2) ;
+      'MESS' '==> RESOLUTION rtp ';
+    'FINS'     ;
+    rtp . 'METHINV' . 'CALPREC' = calprec  ;
+    EXEC rtp ;    
+  'FINS' ;
+  Tp = tic . 'TP' ;
+'FINS' ;
+*
+*>>13.3 Résolution       FIN
+*
+*
+
+*
+*>>13.4 Bornage de TF(n)
+*
+* Calcul de Tfmi, minimum de la condition initiale
+* et des conditions aux limites 
+Tfmi   = 'PROG' rxt . 'TF0'   ;
+CHrtf1 = rtf . 'CLIM';
+MArtf1 = 'EXTR' CHrtf1 'MAILLAGE'      ;
+*FD
+* C'est quoi ce test charabia MArtf1=0 ?
+*FD
+'SI' ('NEG' MArtf1 0);
+   Tfmi = Tfmi 'ET' ('PROG' ('MINI' rtf . 'CLIM'))       ;
+'FINS'     ;
+'SI' TBT.'ASPER '    ;
+   Tfmi = Tfmi 'ET' ('PROG' Tdinj)     ;
+'FINS'     ;
+'SI' TBT.'THERMP'    ;
+   Tfmi = Tfmi 'ET' ('PROG' ('MINI' tic . 'TP'));
+'FINS'     ;
+'SI' TBT . 'TTIMP'   ;
+   NBTIMP = 'DIME' rxt . 'TIMP'        ;
+   itimp  = 'INDE' rxt . 'TIMP'        ;
+   tfmii  = 'PROG'   ;
+   'REPE' BBTIMP NBTIMP       ;
+      Btimp = rxt . 'TIMP' . (itimp . &BBTIMP)  ;
+      tfmii = tfmii 'ET' ('PROG' tic . (Btimp . 'TBP1')) ;
+   'FIN' BBTIMP      ;
+   Tfmi = Tfmi 'ET' ('PROG' ('MINI' tfmii))     ;
+'FINS'     ;
+'SI' TBT.'TECHANP'   ;
+   Tfmi = Tfmi 'ET' ('PROG' ('MINI' tic . 'TBP0'))  ;
+'FINS'     ;
+Tfmi = 'MINI' Tfmi   ;
+*
+* Borne inférieure de la température Tf(n) par Tfmi
+Tfn = 'KOPS' tic . 'TF'  '|<' Tfmi     ;
+*FD
+* On n'a pas de raison d'imposer la positivité sur Tf (en C)
+* Tfn = 'KOPS' Tfn  '|<' ('MAXI' ('PROG' tfmi 0.))     ;
+*FD
+tic . 'TF' = Tfn     ;
+Tkn        = Tfn '+' 273.15   ;
+*>>13.4 Bornage de TF(n)      FIN
+*
+
+*
+*>>13.5 Aspersion
+'SI' TBT.'ASPER '    ;
+*** RVN ***   Velocita gocce
+   rvn       =  TBT.'RVN'     ;
+   rvn.'CLIM'  = (rvn.'CLIM' '-' rvn.'CLIM') '+' vnj     ;
+    rvn.'METHINV'.'CALPREC' = calprec  ;
+    EXEC  rvn        ;
+
+*** RXD ***   Frazione volume fase dispersa
+   rxd       =  TBT.'RXD'     ;
+   rxd.'CLIM'  = (rxd.'CLIM' '-' rxd.'CLIM') '+' xdj     ;
+    rxd.'METHINV'.'CALPREC' = calprec  ;
+    EXEC  rxd        ;
+   tic.'XD'  =  'KOPS' (tic.'XD') '|<' 1.e-10   ;
+
+*** RTD ***   Temperature fase dispersa
+   rtd       =  TBT.'RTD'     ;
+   rtd.'CLIM'  = (rtd.'CLIM' '-' rtd.'CLIM') '+' tdj     ;
+    rtd.'METHINV'.'CALPREC' = calprec  ;
+    EXEC  rtd        ;
+
+*** RDD ***   Diametro fase dispersa
+   rdd       =  TBT.'RDD'     ;
+   rdd.'CLIM'  = (rdd.'CLIM' '-' rdd.'CLIM') '+' ddj     ;
+    rdd.'METHINV'.'CALPREC' = calprec  ;
+    EXEC  rdd        ;
+   tic.'DD'  =  'KOPS' (tic.'DD') '|<' 1.e-10   ;
+
+'FINS'     ;
+*>>13.5 Aspersion    FIN
+*
+'MESS' 'xxxxxx FIN des EDP '  ;
+*
+*
+*>>13. Résolution des EDP     FIN
+*
+*
+
+*
+*>>14. Contraintes bilans de masse 0D
+drclair = 0. ;
+'SI' TBT . 'VAPEUR' ;
+  drclvp = drclvp '+' (('SOMT' (Diag '*' drvpcl)) '/' Vtotal) ;
+  drclair = drclair '+' drclvp ;
+  'SI' corlim ;
+    Rmvgn2 = Rmvgn ;
+  'SINO' ;
+    Rmvgn2 = Rmvgn '+' drclvp ;
+  'FINS' ;
+*  Rmvn  = Rmvgn '-' Rmbronm ;
+  MV0D = Rmvgn2 '*' Vtotal ;
+  dRhov Rvp MVMD = CORMASSE $vtf tic . 'RVP' MV0D MaxRho ;
+  tic . 'RVP'    = Rvp ;
+  tic . 'ROVP'   = tic . 'RVP' ;
+  tic . 'Mdrvap' = tic . 'Mdrvap' 'ET' (dRhov '*' Vtotal) ;
+'SINO' ;
+  tic . 'RVP' = Rvp ;
+'FINS' ;
+'SI' TBT . 'THE' ;
+  drclhe = drclhe '+' (('SOMT' (Diag '*' drhecl)) '/' Vtotal) ; 
+  drclair = drclair '+' drclhe ;
+  'SI' corlim ;
+    Rmhen2 = Rmhen ;
+  'SINO' ;
+    Rmhen2 = Rmhen '+' drclhe ;
+  'FINS' ;
+  MHE0D = Rmhen2 '*' Vtotal ;
+  dRhohe Rhe MHEMD = CORMASSE $vtf tic . 'RHE' MHE0D MaxRho ;
+  tic . 'RHE'   = Rhe ;
+  tic . 'Mdrhe' = tic . 'Mdrhe' 'ET' (dRhohe '*' Vtotal) ;
+'FINS' ;
+'SI' TBT . 'TH2' ;
+  drclh2 = drclh2 '+' (('SOMT' (Diag '*' drh2cl)) '/' Vtotal) ; 
+  drclair = drclair '+' drclh2 ;
+  'SI' corlim ;
+    Rmh2n2 = Rmh2n ;
+  'SINO' ;
+    Rmh2n2 = Rmh2n '+' drclh2 ;
+  'FINS' ;
+  MH20D = Rmh2n2 '*' Vtotal ;
+  dRhoh2 Rh2 MH2MD = CORMASSE $vtf tic . 'RH2' MH20D MaxRho ;
+  tic . 'RH2'   = Rh2 ;
+  tic . 'Mdrh2' = tic . 'Mdrh2' 'ET' (dRhoh2 '*' Vtotal) ;
+'FINS' ;
+'SI' TBT . 'TO2' ;
+  drclo2 = drclo2 '+' (('SOMT' (Diag '*' dro2cl)) '/' Vtotal) ; 
+  drclair = drclair '+' drclo2 ;
+  'SI' corlim ;
+    Rmo2n2 = Rmo2n ;
+  'SINO' ;
+    Rmo2n2 = Rmo2n '+' drclo2 ;
+  'FINS' ;
+  MO20D = Rmo2n2 '*' Vtotal ;
+  dRhoo2 Ro2 MO2MD = CORMASSE $vtf tic . 'RO2' MO20D MaxRho  ;
+  tic . 'RO2'   = Ro2 ;
+  tic . 'Mdro2' = tic . 'Mdro2' 'ET' (dRhoo2 '*' Vtotal) ;
+'FINS' ;
+'SI' TBT . 'TN2' ;
+  drcln2 = drcln2 '+' (('SOMT' (Diag '*' drn2cl)) '/' Vtotal) ;
+  drclair = drclair '+' drcln2 ;
+  'SI' corlim ;
+    Rmn2n2 = Rmn2n ;
+  'SINO' ;
+    Rmn2n2 = Rmn2n '+' drcln2 ;
+  'FINS' ;
+  MN20D = Rmn2n2 '*' Vtotal ;
+  dRhon2 Rn2 MN2MD = CORMASSE $vtf tic . 'RN2' MN20D MaxRho ;
+  tic . 'RN2'   = Rn2 ;
+  tic . 'Mdrn2' = tic . 'Mdrn2'  'ET' (dRhon2 '*' Vtotal) ;
+'FINS' ;
+'SI' TBT . 'TCO' ;
+  drclco = drclco '+' (('SOMT' (Diag '*' drcocl)) '/' Vtotal) ;
+  drclair = drclair '+' drclco ;  
+  'SI' corlim ;
+    Rmcon2 = Rmcon ;
+  'SINO' ;
+    Rmcon2 = Rmcon '+' drclco ;
+  'FINS' ;
+  MCO0D = Rmcon2 '*' Vtotal ;
+  dRhoco Rco MCOMD = CORMASSE $vtf tic . 'RCO' MCO0D MaxRho ;
+  tic . 'RCO'   = Rco ;
+  tic . 'Mdrco' = tic . 'Mdrco' 'ET' (dRhoco '*' Vtotal) ;
+'FINS' ;
+'SI' TBT . 'TCO2' ;
+  drclco2 = drclco2 '+' (('SOMT' (Diag '*' drco2cl)) '/' Vtotal) ; 
+  drclair = drclair '+' drclco2 ;  
+  'SI' corlim ;
+    Rmco2n2 = Rmco2n ;
+  'SINO' ;
+    Rmco2n2 = Rmco2n '+' drclco2 ;
+  'FINS' ;
+  MCO20D = Rmco2n2 '*' Vtotal ;
+  dRhoco2 Rco2 MCO2MD = CORMASSE $vtf tic . 'RCO2' MCO20D MaxRho ;
+  tic . 'RCO2'   = Rco2 ;
+  tic . 'Mdrco2' = tic . 'Mdrco2' 'ET' (dRhoco2 '*' Vtotal) ;
+'FINS' ;
+*>>14. Contraintes bilans de masse 0D FIN
+*
+
+*
+*>>15. Calcul de la PRESSION P(n) et de la densité Rho(n)
+  irtf = 'INVE' (rgpnm '*' Tkn) ;
+  Ptmn = (Rhomn '*' Vtotal) '/' ('SOMT' (Diag '*' irtf)) ;
+*
+* Condensation en masse à Tf=cst
+  'SI' TBT . 'CONDMAS' ;
+*
+* Densité de vapeur avant la séparation de phase sans brouillard initial
+    Rho_b   = 0. '*' Rvp ;
+    Rho_v   = Rvp '+' Rho_b ;
+*
+* Pressions de vapeur, à saturation et totale (locale)
+*    P_v   = Rvp '*' tbt . 'Rgvap' '*' Tkn ;
+    P_v   = 'VARI' 'PVAP' Rvp Tkn ;
+    P_vs  = 'VARI' 'PSATT' Tkn ;
+    P_tot = 'KCHT' $vtf 'SCAL' 'SOMMET' Ptmn ;
+*
+* Titre thermodynamique (locale)
+*    H_v     = 'VARI' 'HVS' P_v   Tkn ;
+*    H_vs    = 'VARI' 'HVS' P_vs  Tkn ;
+*    H_l     = 'VARI' 'HLS' P_tot Tkn ;
+*    xth     = (H_v '-' H_l) '/' (H_vs '-' H_l) ;
+
+    Rho_vs  = 'VARI' 'ROVAP' P_vs ;
+    Rho_min = Rho_v '+' Rho_vs '-' ('ABS' (Rho_v '-' Rho_vs)) '/' 2. ;
+    xth     = Rho_min '/' Rho_v ;
+    alpha   = 1. ;
+*    txt1 = 'CHAI' 'Titre vapeur au temps t=' tps ;
+*    'TRAC' vtf ('CONT' vtf) xth 'TITR' txt1 'NCLK' ;
+    xth     = 'BORN' xth 'COMPRIS' 0. 1. ;
+*    'TRAC' vtf ('CONT' vtf) xth ;
+*     mm1 = 'MINI' xth ; mm2 = 'MAXI' xth ; 'MESS' 'xth mini maxi' ' ' mm1 ' ' mm2;
+*
+* Séparation de phase avec relaxation (sur-saturation locale)
+    Rho_b   = 0. * (1. '-' alpha) '*' (1. '-' xth) '*' Rho_v ;
+    Rho_l   = alpha '*' (1. '-' xth) '*' Rho_v ;
+    Rho_v   = Rho_v '-' Rho_l ;
+*
+* Masse condensée (globale), correction de pression et d'énergie 0D associée
+    M_v   = 'SOMT' (Diag '*' Rho_v) ;
+    M_b   = 'SOMT' (Diag '*' Rho_b) ;
+*
+    M_l   = 'SOMT' (Diag '*' Rho_l) ;
+    DP_cm = M_l '/' ('SOMT' (Diag '*' irtf)) ;
+    DE_cm = M_l '/' (Gamnm '-' 1.) ;
+    Ptmn = Ptmn '-' DP_cm ;
+    Remn = Remn '-' DE_cm ;
+*FD
+* ROVP est appelé à disparaitre car le brouillard n'a rien à faire dans
+* RVP ou alors RVP sert à transporter la pluie et le brouillard mais
+* comment séparer ensuite pour avoir la pluie à l'instant d'avant ?
+*FD
+*
+* Sauvegarde 0D au temps (n)
+    Mliqn   = M_l ;
+    Mbron   = M_b ;
+    Mcondmn = Mcondmnm '+' M_l ;
+    Rhomn   = Rhomn '+' (Mbronm '-' (M_l '+' M_b) '/' Vtotal) ;
+    Rmvn    = M_v '/' Vtotal ;
+    Rmliqn  = M_l '/' Vtotal ;
+    Rmbron  = M_b '/' Vtotal ;
+    Rmvgn   = Rmvn '+' Rmbron ;
+    tic . 'Rliqm'  = tic . 'Rliqm' 'ET' ('PROG' Rmliqn) ;
+    tic . 'Rbrom'  = tic . 'Rbrom' 'ET' ('PROG' Rmbron) ;
+    Qcmn    = M_l '/' tic . 'DT' ;
+    tic . 'Qcm'    = tic . 'Qcm'    'ET' ('PROG' Qcmn)      ;
+*
+* Sauvegarde CFD
+    Rvp = Rho_v ;
+    tic . 'RBRO' = Rho_b ;
+    tic . 'RVP'  = Rho_v '+' Rho_b ;
+    tic . 'ROVP' = Rho_v ;
+*
+    'MESS' 'zz VERIF ==> Pt=' Ptmn ' ' ' RETSAT Qcm=' Qcmn ;
+  'SINO' ;
+    tic . 'Qcm'    = tic . 'Qcm'    'ET' ('PROG' 0.)      ;
+    'MESS' 'zz VERIF ==> Pt=' Ptmn ;
+  'FINS'   ;
+*
+* Incrément de pression et densité au temp (n) 
+Pta  = (Gamnm '-' 1.) '*' Remn ;
+DPDT = (Pta '-' Ptmnm) '/' tic . 'DT' ;
+Rhon = Ptmn '*' irtf ;
+*
+* Sauvegarde
+tic . 'RHO'    = Rhon ;
+tic . 'PT'     = tic . 'PT'   'ET' ('PROG' Ptmn) ;
+tic . 'dPdt'   = tic . 'dPdt' 'ET' ('PROG' DPDT) ;
+tic . 'Mcondm' = tic . 'Mcondm' 'ET' ('PROG' Mcondmn) ;
+*>>15. Calcul de la PRESSION P(n) et de la densité Rhot(n)       FIN
+*
+
+*
+*>>16. Contrainte sur la densité après condensation en masse
+Rhon   = 'KCHT' $vtf 'SCAL' 'SOMMET' Rhon      ;
+Rhomnt = 'SOMT' (Diag '*' Rhon)       ;
+dRho   = ((Rhomn '*' VTotal) '-' Rhomnt)  '/' Vtotal    ;
+Rhon   = 'KCHT' $vtf 'SCAL' 'SOMMET' (Rhon '+' dRho)    ;
+tic . 'drho' = tic . 'drho' 'ET' ('PROG' dRho) ;
+tic . 'RHO'  = Rhon ;
+*DEBUG
+*'MESS' 'DEBUG drho RHO 16.' ;
+*'LIST' tic . 'drho' ;
+*'LIST' tic . 'RHO' ;
+*DEBUG
+*>>16. Contrainte sur la densité après condensation en masse     FIN
+*
+
+*
+*>>17. Contrainte sur la densité de l'air
+*FD
+* On se fout du transport de l'air
+*FD
+*'SI' TBT . 'TAIR'   ;
+*  Rair = tic . 'RAIR'        ;
+*'SINO'    ;
+*  Rair = Rhon - Rvp - Rhe - Rh2 - Ro2 - Rn2 - Rco2 - Rco;
+*  tic . 'RAIR' = Rair        ;
+*'FINS'    ;
+*FD
+* Pourquoi Mdrair n'est-il pas nul ? On a pourtant corrigé Rhon,
+* la vapeur et chaque incondensable !
+*FD
+Rair = Rhon - Rvp - Rhe - Rh2 - Ro2 - Rn2 - Rco2 - Rco   ;
+tic . 'RAIR' = Rair  ;
+mRairn = 'MINI' rair ;
+'SI' (mRairn '<' 0.0) ;
+  'MESS' 'Pb avec la densite d air 0D : 17 : mini(Rair)=' ' ' mRairn ;
+'FINS' ;
+tic . 'RAIRPB' = Rair ;
+*DEBUG
+*'MESS' 'DEBUG Rair 17.' ;
+*'LIST' Rair ;
+*'LIST' tic . 'RAIR' ;
+*'MESS' 'Rmairn :' rmairn ' ' 'MAIR0D :' (Rmairn '*' Vtotal) ;
+*VOLi   = 'DOMA' $vtf 'XXDIAGSI' ;
+*VTotal = 'SOMT' VOLi ;
+*Rair = 'KOPS' Rair '|<' 1.e-10 ;
+*Rair = 'KOPS' Rair '>|' MaxRho ;
+*MiCFD  = 'SOMT' (VOLi '*' Rair) ;
+*'MESS' 'MICFD :' micfd ;
+*'LIST' rair ;
+*DEBUG
+'SI' corlim ;
+  Rmairn2 = Rmairn ;
+'SINO' ;
+  Rmairn2 = Rmairn '-' drclair ;
+'FINS' ;
+'SI' (Rmairn '<' 0.0) ;
+  'MESS' 'Pb avec la masse d air 0D : 17 : Rmairn=' ' ' Rmairn ;
+'FINS' ;
+*Rmairn2 = Rmairn ;
+MAIR0D = Rmairn2 '*' Vtotal    ;
+*dRhoair Rdumy MAIRMD = CORMASSE $vtf tic . 'RAIR' MAIR0D MaxRho   ;
+dRhoair Rair MAIRMD = CORMASSE $vtf tic . 'RAIR' MAIR0D MaxRho ;
+tic . 'RAIR'   = Rair ;
+*dRhoair Rair2 MAIRMD = CORMASSE $vtf Rair MAIR0D MaxRho  ;
+*tic . 'RAIR'   = Rair2        ;
+*Rair = Rair2 ; 
+tic . 'Mdrair' = tic . 'Mdrair' 'ET' (dRhoair '*' Vtotal) ;
+*DEBUG
+*'LIST' Rair ;
+*'MESS' 'MAIRMD :' MAIRMD ' ' 'Mdrair :' (dRhoair '*' Vtotal) ;
+*DEBUG
+*>>17. Contrainte sur la densité de l'air       FIN
+*
+
+*
+*>>18. Contrainte 0D sur Tf / Remn = Remnm +dt*drh/V
+*FD
+* WARNING Cv n'est pas actualise
+* WARNING On ne considere pas le brouillard
+*FD
+Emnt  = Cvmnm '*' ('SOMT' (Diag '*' Rhon '*' Tkn) )   ;
+'SI' TBT . 'CORTEMP'      ;
+  dE    = (Remn '*' Vtotal) '-' Emnt        ;
+  IndE  = Rhon '*' Cvmnm '*' Tkn '*' Diag '/' Emnt    ;
+  dE    = IndE '*' dE     ;
+  dTf   = ('INVE' (Diag '*' Rhon)) '*' (dE '/' Cvmnm) ;
+  dTf   = 'KCHT' $vtf 'SCAL' 'SOMMET' dTf   ;
+dE    = 'SOMT' ( Diag '*' dE  ) '/' VTotal  ;     
+'SINO'  ;
+  dTf = 'KCHT' $vtf 'SCAL' 'SOMMET' 0.      ;
+dE    = 0.       ;
+'FINS'  ;
+Tfn = 'KCHT' $vtf 'SCAL' 'SOMMET' (Tfn '+' dTf)      ;
+Tfn = 'KOPS' Tfn '|<' Tfmi;
+Tkn = Tfn '+' 273.15      ;
+tic . 'TF'   = Tfn        ;
+tic . 'MdTf' = tic.'MdTf' 'ET' ('PROG' ('MAXI' dTf)) ;
+tic . 'mdTf' = tic.'mdTf' 'ET' ('PROG' ('MINI' dTf)) ;
+Remnt = Cvmnm '*' ('SOMT' (Diag '*' Rhon '*' Tkn) ) '/' Vtotal ;        
+dTf   = dE '/' Cvmnm '/' ('SOMT'(Diag '*' Rhon))      ;
+*>>18. Contrainte 0D sur Tf      FIN
+*
+*DEBUG
+*'LIST' xth ;
+*'LIST' TKN ;
+*DEBUG
+
+
+*
+*>>19. Conservation energie dans le mur
+*FD
+* WARNING A vérifier
+*FD
+'SI' (TBT . 'THERMP' 'ET' ('NON' TBT . 'TPAROIS'))       ;
+  Diagp1   = 'DOMA' $vtp 'VOLUME'      ;
+  Vtotalp1 = 'SOMT' Diagp1    ;
+  tp01     = 'NOEL' $vtp Tp   ;
+  Emurm    = ('SOMT' (tic . 'ROCP' '*' Diagp1 '*'
+  (tp01 '+' 273.15 ) ) ) '/' Vtotalp1  ;
+  tic . 'TP' = Tp    ;
+'FINS'     ;
+'SI' TBT . 'TPAROIS' ;
+   NPAR = 'DIME' rxt . 'PAROIS'        ;
+   ipr  = 'INDE' rxt . 'PAROIS'        ;
+   ROCP = 0.;
+   'REPE' BPRS NPAR  ;
+     Parois = rxt . 'PAROIS' . (ipr.&BPRS)      ;
+     Diagpi = GEO . (ipr . &BPRS) . 'Diagp'     ;
+     CROCP  = 'CHAI' 'ROCP' &BPRS      ;
+     Rocpi  = tic . CROCP     ;
+     ROCP   = ROCP '+' (Rocpi '*' Diagpi)       ;
+   'FIN' BPRS        ;
+   Diagp   = GEO . 'Diagp'    ;
+   ROCP    = ROCP '*' ('INVE' Diagp)   ;
+   Vtotalp = 'SOMT' Diagp     ;
+   Emurm = ( 'SOMT' (ROCP '*' Diagp '*' (tp '+' 273.15 )))
+   '/' Vtotalp       ;
+   tic . 'TP' = Tp   ;
+'FINS'     ;
+*>>19. Conservation energie dans le murFIN
+*
+
+*
+*>>20. Température moyenne gaz et paroi
+Tkmn = (Remn '*' Vtotal)
+    '/' ('SOMT' (Diag '*' Rhon * Cvmnm))        ;
+Tfmn = Tkmn - 273.15 ;
+Tfmn = 'MAXI' ('PROG' Tfmn Tfmi)       ;
+tic . 'Tfm' = tic . 'Tfm' 'ET' ('PROG' Tfmn)    ;
+*
+'SI' TBT . 'THERMP'  ;
+  Tpm= 'SOMT' (GEO . 'Diagp' '*' Tp)
+     '/' GEO . 'VTotalp'      ;
+  tic . 'Tpm' = tic . 'Tpm' 'ET' ('PROG' Tpm)   ;
+'FINS'     ;
+*>>20. Température moyenne gaz et paroiFIN
+*
+
+
+*>>21. Actualisation des proprietes physiques
+*
+*>>21.1 Cp (Tfm) et mu(Tkm)
+*DEBUG
+*'MESS' 'Energie moyenne :' remn ;
+*'MESS' 'Temp moyenne :' tkmn ' ' tfmn ;
+*DEBUG
+Cpvap = TBT . 'Cpvap'        ;
+Cph2 Cphe Cpo2 Cpn2 Cpco2 Cpco Cpair = CALCP Tfmn       ;
+Muh2 Muhe Muo2 Mun2 Muco2 Muco Muvap Muair = CALMU Tkmn ;
+*>>21.1 Cp (Tfm) et mu(Tkm)  FIN
+*
+*
+*>>21.2 Mise à jour des fractions massiques Yi(n)
+*FD
+* Rhon a été calculé et corrigé pour avoir la masse 0D.
+* Inutile donc d'en remettre une couche.
+*FD
+Rhont = Rair + Rvp + Rhe + Rh2 + Ro2 + Rn2 + Rco + Rco2 ;
+tic . 'Rhomn' = tic . 'Rhomn' 'ET' ('PROG' Rhomn) ; 
+tic . 'Remn'  = tic . 'Remn'  'ET' ('PROG' Remn) ; 
+Yair = 'KCHT' $vtf 'SCAL' 'SOMMET' 1. ;
+'SI' TBT . 'VAPEUR' ;
+  Yvap = 'KOPS' Rvp '/' Rhont ;
+  Yair = Yair '-' Yvap ;
+  tic . 'YVAP' = Yvap ;
+  tic . 'Rhomv'  = tic . 'Rhomv'  'ET' ('PROG' Rmvn) ;
+  tic . 'Rhomvg' = tic . 'Rhomvg' 'ET' ('PROG' Rmvgn) ;
+'FINS' ;
+'SI' TBT . 'THE' ;
+  Yhe  = 'KOPS' Rhe '/' Rhont ;
+  Yair = Yair '-' Yhe ;
+  tic . 'YHE' = Yhe ;
+  tic . 'Rhomhe' = tic . 'Rhomhe' 'ET' ('PROG' Rmhen) ;
+'FINS' ;
+'SI' TBT . 'TH2' ;
+  Yh2  = 'KOPS' Rh2 '/' Rhont ;
+  Yair = Yair '-' Yh2 ;
+  tic . 'YH2' = Yh2 ;
+  tic . 'Rhomh2' = tic . 'Rhomh2' 'ET' ('PROG' Rmh2n) ;
+'FINS' ;
+'SI' TBT . 'TO2' ;
+  Yo2  = 'KOPS' Ro2 '/' Rhont ;
+  Yair = Yair '-' Yo2 ;
+  tic . 'YO2' = Yo2 ;
+  tic . 'Rhomo2' = tic . 'Rhomo2' 'ET' ('PROG' Rmo2n) ;
+'FINS' ;
+'SI' TBT . 'TN2' ;
+  Yn2  = 'KOPS' Rn2 '/' Rhont ;
+  Yair = Yair '-' Yn2 ;
+  tic . 'YN2' = Yn2 ;
+  tic . 'Rhomn2' = tic . 'Rhomn2' 'ET' ('PROG' Rmn2n) ;
+'FINS' ;
+'SI' TBT . 'TCO2' ;
+  Yco2 = 'KOPS' Rco2 '/' Rhont ;
+  Yair = Yair '-' Yco2 ;
+  tic . 'YCO2' = Yco2 ;
+  tic . 'Rhomco2' = tic . 'Rhomco2' 'ET' ('PROG' Rmco2n) ;
+'FINS' ;
+'SI' TBT . 'TCO' ;
+  Yco  = 'KOPS' Rco '/' Rhont ;
+  Yair = Yair '-' Yco ;
+  tic . 'YCO' = Yco ;
+  tic . 'Rhomco' = tic . 'Rhomco' 'ET' ('PROG' Rmcon) ;
+'FINS' ;
+tic . 'YAIR' = Yair ;
+tic . 'Rhomair' = tic . 'Rhomair' 'ET' ('PROG' Rmairn) ;
+*>>21.2 Mise à jour des fractions massiques Yi(n)      FIN
+*
+*
+*>>21.3 Mise à jour des propriétés gaz (loi de mélange)
+*
+* Calcul de la constante des gaz du mélange Rgp
+Rgpn = (Rgvap '*' Yvap) '+' (Rgair '*' Yair)
+   '+' (Rghe  '*' Yhe ) '+' (Rgh2  '*' Yh2 )
+   '+' (Rgo2  '*' Yo2 ) '+' (Rgn2  '*' Yn2 )
+   '+' (Rgco  '*' Yco ) '+' (Rgco2 '*' Yco2) ;
+Rgpn = 'KCHT' $vtf 'SCAL' 'SOMMET' Rgpn ;
+*
+* Calcul du Cp du mélange
+Cp   = (Cpvap '*' Yvap) '+' (Cpair '*' Yair)
+   '+' (Cphe  '*' Yhe ) '+' (Cph2  '*' Yh2 )
+   '+' (Cpo2  '*' Yo2 ) '+' (Cpn2  '*' Yn2 )
+   '+' (Cpco  '*' Yco ) '+' (Cpco2 '*' Yco2) ;
+Cp   = 'KCHT' $vtf 'SCAL' 'SOMMET' Cp ;
+*
+* Calcul de la viscosité du mélange Mu
+Mu   = (Muvap '*' Yvap) '+' (Muair '*' Yair)
+   '+' (Muhe  '*' Yhe ) '+' (Muh2  '*' Yh2 )
+   '+' (Muo2  '*' Yo2 ) '+' (Mun2  '*' Yn2 )
+   '+' (Muco  '*' Yco ) '+' (Muco2 '*' Yco2) ;
+Mu   = 'KCHT' $vtf 'SCAL' 'SOMMET' Mu ;
+*
+* Calcul des moyennes de Rg, Cp, Cv et Gamma
+Rgpmn = 'SOMT' (Diag '*' Rgpn) '/' VTotal ;
+Cpmn  = 'SOMT' (Diag '*' Cp) '/' VTotal ;
+Cvmn  = Cpmn '-' Rgpmn ;
+Gamn  = Cpmn '/' Cvmn ;
+*
+tic . 'Mu'   = Mu ;
+tic . 'Rgp'  = Rgpn ;
+tic . 'Rgpm' = tic.'Rgpm' 'ET' ('PROG' Rgpmn) ;
+tic . 'Gamm' = tic.'Gamm' 'ET' ('PROG' Gamn)  ;
+tic . 'Cpm'  = tic.'Cpm'  'ET' ('PROG' Cpmn)  ;
+tic . 'Cvm'  = tic.'Cvm'  'ET' ('PROG' Cvmn)  ;
+*>>21.3 Mise à jour des propriétés gaz        FIN
+*
+*>>21. Actualisation des proprietes physiques FIN
+*
+
+*
+*>>22. Calcul du terme source de l'equation energie
+stf = DPDT '/' (Cpmn '*' Rhomn) ;
+tic.'STF' = stf ;
+*>>22. Calcul du terme source de l'equation energie FIN
+*
+*
+*>>23. Calcul de l'energie convective
+*FD
+* WARNING : Cette énergie sert à calculer la puissance perdue pour la
+* correction de l'énergie au pas de temps suivant. Mais c'est faux car
+* suivant THERCO on ne fait pas la même chose puisque le 'FLUX' n'est pas
+* le même !
+*FD
+Econvw = 0.0        ;
+Econvi = 0.0        ;
+Econv0 = 0.0        ;
+'SI' (TBT . 'THERMP' 'ET' TBT . 'TPAROIF')     ;
+  Tp   = tic . 'TP' ;
+  Tfpw = 'REDU' tic . 'TF' GEO . 'paroif'      ;
+  Tbpw = 'REDU' tic . 'TP' GEO . 'paroif'      ;
+  'SI' tbt . 'THERCO'        ;
+    Hconv = 'KCHT' GEO . '$paroif' 'SCAL' 'SOMMET' tic . 'KHW'   ;
+  'SINO'   ;
+    Hconv = 'KCHT' GEO . '$paroif' 'SCAL' 'CENTRE' tic . 'KHW'   ;
+    Hconv = 'ELNO' GEO . '$paroif' Hconv       ;
+  'FINS'   ;
+  Econvw = 'SOMT' (GEO.'Diagpf' '*' (Hconv '*' (Tfpw '-' Tbpw))) ;
+'FINS'    ;
+'SI' TBT . 'TTIMP'  ;
+  NBTIMP = 'DIME' rxt . 'TIMP'        ;
+  itimp  = 'INDE' rxt . 'TIMP'        ;
+  'REPE' BBTIMP NBTIMP       ;
+     Btimp  = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+     Tfp1   = 'REDU' Tfn (Btimp.'mtpi')        ;
+     Tbp1   = tic . (Btimp . 'TBP1')  ;
+     CKH1   = Btimp . 'KH1'  ;
+     Hconv  = 'KCHT' Btimp . '$mtpi' 'SCAL' 'CENTRE' tic . CKH1  ;
+     Hconv  = 'ELNO' Btimp . '$mtpi'   Hconv   ;
+     Econvi = Econvi
+     '+' ('SOMT' (Btimp . 'Diagif' * (Hconv * (Tfp1 - Tbp1))))   ;
+  'FIN' BBTIMP      ;
+'FINS'    ;
+'SI' TBT . 'TECHANP';
+  Tfp0      = 'REDU' Tfn (GEO . 'mtp0')        ;
+  Tbp0      = tic . 'TBP0'   ;
+  Hconv     = 'KCHT' GEO . '$mtp0' 'SCAL' 'CENTRE' tic . 'KH0'   ;
+  Hconv     = 'ELNO' GEO . '$mtp0' Hconv       ;
+  Econv0    = 'SOMT' (GEO.'Diag0f' * (Hconv * (Tfp0 - Tbp0)))    ;
+'FINS'    ;
+Econvn = Econvw '+' Econvi '+' Econv0  ;
+tic . 'Econv' = tic . 'Econv' 'ET' ('PROG' Econvn)       ;
+*>>23. Calcul de l'energie convective FIN
+*
+
+*
+*>>24. Bilan Aspersion
+Easp = 0.0       ;
+Hasp = 0.0       ;
+Qasp = 0.0       ;
+'SI' TBT . 'ASPER '       ;
+  Td      = tic . 'TD'    ;
+  Hgas    = tic . 'HGAS'  ;
+  Diagvtf = 'DOMA' $vtf 'XXDIAGSI' ;
+  Easp    = ('SOMT' (Diagvtf '*' (Hgas * (Td - Tfn))))
+ '*' Rhomnm '*' Cpmnm     ;
+  srvp    = tic . 'SRVP'  ;
+  Qasp    = 'SOMT' (srvp '*' Volvtf)        ;
+  Tfe     = 'NOEL' $vtf tic . 'TFNM'        ;
+  Hasp    = 'SOMT' ((srvp * (tfe + 273.15) * Volvtf) * Cpvap) ;
+*****modif 2005 (température goutte max et min)
+  Td  = tic . 'TD'        ;
+  maTd= 'MAXI' Td;
+  tic . 'Tdma' = tic . 'Tdma' 'ET' ('PROG' maTd)     ;
+  miTd= 'MINI' Td;
+  tic . 'Tdmi' = tic . 'Tdmi' 'ET'  ('PROG'  miTd)   ;
+'FINS' ;
+tic . 'Easpe' = tic . 'Easpe' 'ET' ('PROG'  Easp)    ;
+tic . 'Haspe' = tic . 'Haspe' 'ET' ('PROG'  Hasp)    ;
+tic . 'Qaspe' = tic . 'Qaspe' 'ET' ('PROG'  Qasp)    ;
+*>>24. Bilan Aspersion    FIN
+*
+
+*
+*>>25. Prediction de la condensation pour le pas suivant
+* Qc = Qcw    + Qci   + Qc1   + Qc2   + QC3   + Qc0     
+*      paroif   $mtpi   $mtp1   $mtp2   $mtp3   $mtp0     
+*      TTIMP   TIMP?   TIMP2   TIMP3   ????    
+Qc    = 0. ;
+Econd = 0. ;
+Hcond = 0. ;        
+*
+*>>25.1 Condensation en paroi thermique      
+'SI' (TBT . 'VAPEUR' 'ET' TBT . 'TPAROIF') ;
+  KHcu = rxt . 'ECHAN' ;
+  Qcw Fcondw Econdw Hcondw KKC ROVI FHP  HT
+  = CONDENS rxt (GEO . '$paroif') 'TP' 'TF' 'RVP' KHcu ;
+  tic . 'KKCW'  = KKC ;
+  tic . 'ROVIW' = ROVI ;
+  tic . 'FHPW'  = FHP ;
+  'SI' tbt . 'THERCO' ;
+     tic . 'KHW' = HT ;
+  'SINO' ;
+     tic . 'KHW' = 'NOEL' GEO . '$paroif' HT ;
+  'FINS' ;
+  tic.'Fcondw'=Fcondw ;
+*'MESS' 'Calcul des flux condenses '  Qcw 'kg/s';
+  Qc    = Qc '+' Qcw ;        
+  Econd = Econd '+' Econdw ;
+  Hcond = Hcond '+' Hcondw ;
+'SINO' ;
+  Qcw    = 0. ;
+  Econdw = 0. ;
+  Hcondw = 0. ;
+'FINS' ;
+*>>25.1 Condensation en paroi thermiqueFIN
+*
+*
+*>>25.2 Condensation en paroi à température imposée i
+'SI' (TBT . 'VAPEUR' 'ET' TBT . 'TTIMP') ;
+  NBTIMP = 'DIME' rxt . 'TIMP' ;
+  itimp  = 'INDE' rxt . 'TIMP' ;
+  'REPE' BBTIMP NBTIMP ;
+     Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+     tic . (Btimp . 'TPI1') =
+     'KCHT' (Btimp . '$mtpi') 'SCAL' 'SOMMET' tic . (Btimp . 'TBP1') ;
+     KHcu  = Btimp . 'ECHAN' ;
+     CTPI1 = Btimp . 'TPI1' ;
+     Qc1 Fcond1 Econd1 Hcond1 KKC ROVI FHP HT
+     = CONDENS rxt (Btimp . '$mtpi') CTPI1 'TF' 'RVP' KHcu ;
+     CKKC1= Btimp . 'KKC1' ;
+     CROVI1        = Btimp . 'ROVI1' ;
+     CFHP1= Btimp . 'FHP1' ;
+     CKH1 = Btimp . 'KH1' ;
+     CFcond1       = Btimp . 'Fcond1' ;
+     tic . CKKC1   = KKC ;
+     tic . CROVI1  = ROVI ;
+     tic . CFHP1   = FHP ;
+     tic . CKH1    = 'NOEL' Btimp . '$mtpi' HT ;
+     tic . CFcond1 = Fcond1 ;
+     Qc   = Qc '+' Qc1 ;
+     Econd= Econd '+' Econd1 ;
+     Hcond= Hcond '+' Hcond1 ;
+     CMcond1       = 'CHAI' 'Mcond1' &BBTIMP ;
+     Mcond1        = Qc1 '*' tic . 'DT' ;
+     McondT1       = 'EXTR' (tic . CMcond1) ndl ;
+     McondT1       = McondT1 '+' Mcond1 ;
+     tic . CMcond1 = tic . CMcond1 'ET' ('PROG' McondT1) ;
+     CQc1 = Btimp . 'Qc1' ;
+     tic . CQc1    = tic . CQc1 'ET' ('PROG' Qc1) ;
+  'FIN' BBTIMP  ;
+'FINS' ;
+*>>25.2 Condensation en paroi à température imposée i    FIN
+*
+*
+*
+*>>25.5 Condensation en paroi à flux imposé
+'SI' (TBT . 'VAPEUR' 'ET' TBT . 'TECHANP') ;
+  tic . 'TPI0' =
+  'KCHT' (GEO . '$mtp0') 'SCAL' 'SOMMET' (tic . 'TBP0') ;
+  KHcu = rxt . 'ECHANP' . 'ECHAN' ;
+  Qc0 Fcond0 Econd0 Hcond0 KKC ROVI FHP HT
+  = CONDENS rxt (GEO . '$mtp0') 'TPI0' 'TF' 'RVP' KHcu ;
+  tic . 'KKC0'   = KKC ;
+  tic . 'ROVI0'  = ROVI ;
+  tic . 'FHP0'   = FHP ;
+  tic . 'KH0'    = 'NOEL' GEO . '$mtp0' HT ;
+  tic . 'Fcond0' = Fcond0  ;
+  Qc    = Qc '+' Qc0 ;
+  Econd = Econd '+' Econd0 ;
+  Hcond = Hcond '+' Hcond0 ;
+'SINO' ;
+  Qc0    = 0. ;
+  Econd0 = 0. ;
+  Hcond0 = 0. ;
+'FINS' ;
+*>>25.5 Condensation en paroi à flux imposé     FIN
+*
+*>>25. Prediction de la condensation pour le pas suivant FIN
+*
+*
+*>>26. Aspersion
+'SI' TBT . 'ASPER ' ;
+   asparam rxt  ;
+'FINS' ;
+*>>26. Aspersion    FIN
+*
+
+*
+*>>27. Avancement en temps
+*FD
+*WARNING Confusion entre stockage et avancée en temps.
+*WARNING Les deux fonctions devraient être séparées. On devrait avoir
+*WARNING un basculement : xxxnm = xxxn
+*WARNING un stockage    : tic . xxx = tic . xxx et (prog xxn)
+*WARNING -> avant la boucle en temps, xxxnm = initialisation 
+*FD
+
+* Calcul densité drho/rho pour le terme de flotabilite
+*FD
+*WARNING Tordre le coup à l'ambiguité entre rho et rhot
+*FD
+*Rhop = (-1.) '*' (Rhomn '-' Rho) '*' (Rho **(-1.0))     ;
+Rhop = (-1.) '*' (Rhomn '-' Rhont) '*' (Rhont **(-1.0)) ;
+Rhop = 'KCHT' $vtf 'SCAL' 'SOMMET' Rhop ;
+*DEBUG
+*'MESS' ' rhop' ;
+*'LIST' rhop ;
+*DEBUG
+rmc  = 'NOEL' $vtf Rhop ;
+tic . 'Rhop' = Rhop  ;
+'SI' DIM3D ;
+  rogx        = 'KCHT' $vtf 'SCAL' 'CENTRE' 0.0 ;
+  rogy        = 'KCHT' $vtf 'SCAL' 'CENTRE' 0.0 ;
+  rogz        = 'KCHT' $vtf 'SCAL' 'CENTRE' (-9.81 '*' rmc) ;
+  rogx        = 'NOMC' 'UX' rogx 'NATU' 'DISCRET' ;
+  rogy        = 'NOMC' 'UY' rogy 'NATU' 'DISCRET' ;
+  rogz        = 'NOMC' 'UZ' rogz 'NATU' 'DISCRET' ;
+  tic . 'ROG' = 'KCHT' $vtf 'VECT' 'CENTRE' (rogx 'ET' rogy 'ET' rogz) ;
+'SINO'        ;
+  rogx        = 'KCHT' $vtf 'SCAL' 'CENTRE' 0.0  ;
+  rogy        = 'KCHT' $vtf 'SCAL' 'CENTRE' (-9.81 '*' rmc) ;
+  rogx        = 'NOMC' 'UX' rogx 'NATU' 'DISCRET' ;
+  rogy        = 'NOMC' 'UY' rogy 'NATU' 'DISCRET' ;
+  tic . 'ROG' =kcht $vtf 'VECT' 'CENTRE' (rogx 'ET' rogy) ;
+'FINS' ;
+*
+* Vitesse max
+un   = tic . 'UN' ;
+lcu  = 'EXTR' un 'COMP' ;
+modu = (un lcu 'PSCA' un lcu) '**' 0.5  ;
+mmu  = 'MAXI' modu ;
+tic . 'LMAXU' = tic . 'LMAXU' 'ET' ('PROG' mmu) ;
+*
+* Bilan masse / condensation
+'MESS' ' Debit condensation Fin pas de temps courant  Qc=' Qc ; 
+Qcn = Qc ;
+tic . 'Qc' = tic . 'Qc' 'ET' ('PROG' Qc)    ;        
+
+Minj   = (Qeau '+' Qlj) '*' tic . 'DT' ;
+MinjT  = MinjT '+' Minj ;
+Mcond  = Qc '*' tic . 'DT' ;
+McondT = McondT '+' Mcond '+' Mliqn ;
+Mrest  = (Qeau  '-' Qc '+' Qasp) '*' tic . 'DT' '-' Mliqn ;
+MrestT = MrestT '+' Mrest ;
+tic . 'Minj'  = tic . 'Minj'  'ET' ('PROG' MinjT)  ;
+tic . 'Mcond' = tic . 'Mcond' 'ET' ('PROG' McondT) ;
+tic . 'Mrest' = tic . 'Mrest' 'ET' ('PROG' MrestT) ;
+
+'SI' TBT . 'VAPEUR'   ;
+*FD
+*WARNING Il manque la structure Parois + TECHANP qui est en commentaire ?
+*FD
+  'SI' TBT . 'TPAROIF';
+    Mcondw= Qcw '*' tic . 'DT' ;        
+    McondTw        = McondTw '+' Mcondw ;
+    tic . 'Mcondw' = tic . 'Mcondw' 'ET' ('PROG' McondTw) ;
+    tic . 'Qcw'    = tic . 'Qcw' 'ET' ('PROG' Qcw)        ;        
+  'FINS'    ;
+  'SI' TBT . 'TECHANP';
+    Mcond0      = Qc0 '*' tic.'DT'      ;        
+*McondT0        = McondT0 '+' Mcond0        ;
+*tic . 'Mcond0' = tic . 'Mcond0' 'ET' ('PROG' McondT0)        ;
+    tic . 'Qc0' = tic . 'Qc0' 'ET' ('PROG' Qc0)  ;        
+  'FINS'    ;
+'FINS'     ;
+
+Econdn = Econd ;
+tic . 'Econd' = tic . 'Econd' 'ET' ('PROG' Econd)  ;
+* tic . 'Econdw' = tic . 'Econdw' 'ET' ('PROG' Econdw) ;
+* tic . 'Econd1' = tic . 'Econd1' 'ET' ('PROG' Econd1) ;
+* tic . 'Econd2' = tic . 'Econd2' 'ET' ('PROG' Econd2) ;
+* tic . 'Econd3' = tic . 'Econd3' 'ET' ('PROG' Econd3) ;
+Hcondn = Hcond ;
+tic . 'Hcond' = tic . 'Hcond' 'ET' ('PROG' Hcond) ;
+* tic . 'Hcondw' = tic . 'Hcondw' 'ET' ('PROG' Hcondw) ;
+* tic . 'Hcond1' = tic . 'Hcond1' 'ET' ('PROG' Hcond1) ;
+* tic . 'Hcond2' = tic . 'Hcond2' 'ET' ('PROG' Hcond2) ;
+* tic . 'Hcond3' = tic . 'Hcond3' 'ET' ('PROG' Hcond3) ;
+
+*
+*>> Affichage
+'SI' (TBT . 'IMPR' '>EG' 2) ;
+  'MESS' '************* BILAN au temps' ' ' Tps ' ' '->' ' '
+     &bcltps ' ' 'DT=' ' ' tic . 'DT' ' ' '*******' ;
+*
+  'SI' TBT . 'TTbreche' ;
+  NBR = 'DIME' rxt . 'Breches' ;
+  ibr = 'INDE' rxt . 'Breches' ;
+  'REPE' BBRS NBR     ;
+  Briches = rxt . 'Breches' . (ibr . &BBRS)    ;
+  nnbri = 'DIME' Briches . 'Qj'       ;
+  Qj  = 'EXTR' Briches . 'Qj'  nnbri ;
+  Ksi = 'EXTR' Briches . 'Ksi' nnbri ;
+  guj = 'EXTR' Briches . 'guj' nnbri ;
+  Hj  = 'EXTR' Briches . 'Hj' nnbri ;
+  Ej  = 'EXTR' Briches . 'Ej' nnbri ;
+  'MESS' '____________________________________________________________';
+  'MESS' '- Data pour la Breche --------' ' ' (ibr . &BBRS) ;
+  'MESS' 'Debit                  (kg/s)' ' ' Qj ;
+  'MESS' 'Vitesse                 (m/s)' ' ' guj ;
+  'MESS' 'Densite               (kg/m3)' ' ' Briches . 'Roj' ;
+  'MESS' 'Temperature              (oC)' ' ' Briches . 'Tj'  ;
+  'MESS' 'Enthalpie              (J/kg)' ' ' Hj ;
+  'MESS' 'Energie                (J/kg)' ' ' Ej ;
+  'MESS' 'R/W                  (J/kg/K)' ' ' Briches . 'Rgj' ;
+  'SI' TBT . 'VAPEUR' ;
+  Ksi = 'EXTR' Briches . 'Ksi' nnbri ;
+  'MESS' 'Ksi (taux de vapeur injectee)' ' ' Ksi ;
+  'FINS'  ;
+  'MESS' '____________________________________________________________';
+  'FIN' BBRS ;
+  'FINS' ;
+  'MESS' 'Pression corrigee        (Pa)' ' ' Ptmn ;
+  'MESS' '____________________________________________________________';
+  'MESS' '  ' ;
+  
+  'SI' TBT . 'VAPEUR'   ;
+  'MESS' '____________________________________________________________';
+  'MESS' '- Bilan sur la vapeur --------------------------------------';
+  'MESS' 'Condensation en paroi  (kg/s)' ' ' Qc    ;        
+  'MESS' 'Condensation en masse  (kg/s)' ' '
+         (Mliqn '/' tic . 'DT') ;
+  'MESS' 'Masse vapeur injectee    (kg)' ' ' Minj
+         ' ' '(cumul)' ' ' MinjT ;
+  'MESS' 'Masse vapeur restante    (kg)' ' ' Mrest 
+         ' ' '(cumul)' ' ' MrestT ;
+  'MESS' 'Masse condensee en paroi (kg)' ' ' Mcond
+         ' ' '(cumul)' ' ' McondT ;
+  'SI' TBT.'TPAROIF'  ;
+  'MESS' 'dont paroi thermique     (kg)' ' ' Mcondw
+         ' ' '(cumul)' ' ' McondTw ;
+  'FINS' ;
+*FD
+*WARNING Nouvelles structures TTIMP non affichées
+*FD
+  'SI' TBT . 'TTIMP' ;
+    NBTIMP = 'DIME' rxt . 'TIMP' ;
+    itimp  = 'INDE' rxt . 'TIMP' ;
+    'REPE' BBTIMP NBTIMP ;
+      Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+      ndl1  = ndl '+' 1 ;
+      CMcondi = 'CHAI' 'Mcond1' &BBTIMP ;
+      McondT1 = 'EXTR' (tic . CMcondi) ndl1 ;
+      McondT0 = 'EXTR' (tic . CMcondi) ndl  ;
+  'MESS' 'dont paroi a T impose    (kg)' ' ' (McondT1 '-' McondT0)
+         ' ' '(cumul)' ' ' McondT1 ' (' (itimp . &bbtimp) ')' ;
+    'FIN' BBTIMP ;
+  'FINS' ;
+  'MESS' ' ' ;
+  'MESS' 'Puissance condensation    (W)' ' ' (QC '*' Lv) ;
+  'MESS' 'Energie extraite par cond.(J)' ' ' Econd;
+  'MESS' '____________________________________________________________';
+  'MESS' '  ' ;
+  'FINS' ;
+
+  'MESS' '____________________________________________________________';
+  'MESS' '- Grandeurs Moyennes ---------------------------------------';
+  'MESS' 'Pression                       (Pa)' ' ' Ptmn  ;
+  'MESS' 'Temperature gaz                (oC)' ' ' Tfmn  ;
+  'MESS' 'Densite gaz                 (kg/m3)' ' ' Rhomn ;
+  'SI' TBT . 'VAPEUR' ;
+  'MESS' 'Vapeur                      (kg/m3)' ' ' Rmvn ;
+  'FINS'        ;
+  'SI' TBT . 'THE' ;
+  'MESS' 'Helium                      (kg/m3)' ' ' Rmhen ;
+  'FINS'        ;
+  'SI' TBT . 'TH2' ;
+  'MESS' 'Hydrogene                   (kg/m3)' ' ' Rmh2n ;
+  'FINS'        ;
+  'SI' TBT . 'TO2' ;
+  'MESS' 'Oxygene                     (kg/m3)' ' ' Rmo2n ;
+  'FINS'        ;
+  'SI' TBT . 'TN2' ;
+  'MESS' 'Azote                       (kg/m3)' ' ' Rmn2n ;
+  'FINS'        ;
+  'SI' TBT . 'TCO' ;
+  'MESS' 'CO                          (kg/m3)' ' ' Rmcon ;
+  'FINS'        ;
+  'SI' TBT . 'TCO2' ;
+  'MESS' 'CO2                         (kg/m3)' ' ' Rmco2n ;
+  'FINS' ;
+  'MESS' 'Air                         (kg/m3)' ' ' Rmairn ;
+  'MESS' 'Energie extraite par convection (J)' ' ' Econvn;
+  
+  'SI' TBT . 'TPAROIF' ;
+  'MESS' ' Temperature des murs          (oC)' ' ' Tpm ;
+    'SI' ('EGA' ('TYPE' tic.'KHW') 'FLOTTANT') ;
+      KHWm = tic . 'KHW' ;
+    'SINO' ;
+      'SI' tbt . 'THERCO' ;
+        KHW1 = tic . 'KHW' ;
+      'SINO' ;
+        KHW1 = 'ELNO' GEO . '$paroif' tic . 'KHW' ;
+      'FINS' ;
+      KHWm = 'SOMT' (GEO . 'Diagpf' '*' KHW1) '/' GEO . 'Sparoif' ;
+    'FINS' ;
+    'MESS' 'Coeff. echange convectif   (W/m2/K)' ' ' KHWm ;
+  'FINS' ;
+  
+  'SI' TBT . 'TTIMP'      ;
+    NBTIMP = 'DIME' rxt . 'TIMP'   ;
+    itimp  = 'INDE' rxt . 'TIMP'   ;
+    'REPE' BBTIMP NBTIMP  ;
+      Btimp = rxt . 'TIMP' . (itimp . &BBTIMP)       ;
+      'MESS'
+      'Tparoi' ' ' (itimp . &BBTIMP) ' ' '(oC)' tic . (Btimp . 'TBP1') ;
+      'SI' TBT . 'VAPEUR' ;
+        CKH1 = Btimp . 'KH1'       ;
+        KH1  = 'ELNO' Btimp . '$mtpi' (tic . CKH1)   ;
+        KH1m = 'SOMT' (Btimp . 'Diagif' '*' KH1) '/' Btimp . 'Smtpi'   ;
+      'SINO'    ;
+        KH1m = tic . CKH1 ;
+      'FINS'    ;
+      'MESS' 'Coeff. echange convectif   (W/m2/K)' ' ' KH1m ;
+    'FIN' BBTIMP ;
+  'FINS'        ;
+  'MESS' 'Cp                         (J/kg/K)' ' ' Cpmn  ;
+  'MESS' 'Cv                         (J/kg/K)' ' ' Cvmn  ;
+  'MESS' 'Gamma                           (-)' ' ' Gamn  ;
+  'MESS' 'Rgaz                (R/W en J/kg/K)' ' ' Rgpmn ;
+  'SI' ('EGA' ('TYPE' Cpvap) 'FLOTTANT')    ;
+  'MESS' 'Cp vap                     (J/kg/K)' ' ' Cpvap ;
+  'SINO';
+  'MESS' 'Cp vap min/max             (J/kg/K)' ' '
+     ('MINI' Cpvap) ' ' ('MAXI' Cpvap) ;
+  'FINS';
+  'MESS' '____________________________________________________________';
+  'MESS' '  '    ;
+  
+  'MESS' '____________________________________________________________';
+  'MESS' '- Corrections de masse et d energie ------------------------';
+  'MESS' 'dM totale (kg)' ' ' (dRho '*' Vtotal) ;
+  'SI' TBT . 'VAPEUR' ;
+  'MESS' 'Vapeur    (kg)' ' ' (dRhov '*' Vtotal) ;
+  'FINS' ; 
+  'SI' TBT . 'THE' ;
+  'MESS' 'Helium    (kg)' ' ' (dRhohe '*' Vtotal) ;
+  'FINS' ;
+  'SI' TBT . 'TH2' ;
+  'MESS' 'Hydrogene (kg)' ' ' (dRhoh2 '*' Vtotal) ;
+  'FINS' ;
+  'SI' TBT . 'TO2' ;
+  'MESS' 'Oxygene   (kg)' ' ' (dRhoo2 '*' Vtotal) ;
+  'FINS' ;
+  'SI' TBT . 'TN2' ;
+  'MESS' 'Azote     (kg)' ' ' (dRhon2 '*' Vtotal) ;
+  'FINS' ;
+  'SI' TBT . 'TCO' ;
+  'MESS' 'CO        (kg)' ' ' (dRhoco '*' Vtotal) ;
+  'FINS' ;
+  'SI' TBT . 'TCO2' ;
+  'MESS' 'CO2       (kg)' ' ' (dRhoco2 '*' Vtotal) ;
+  'FINS' ;
+  'MESS' 'Air       (kg)' ' ' (dRhoair '*' Vtotal) ;
+  'MESS' ' ' ;
+  'MESS' 'dTf        (K)' ' ' dTf ;   
+  'MESS' '____________________________________________________________';
+
+*FD
+* WARNING A mettre ailleurs     
+  M0D = Rhomn '*' Vtotal  ;
+  MMD = Rhomnt   ;
+  E0D = Remn     ;
+  EMD = Remnt    ;
+*FD
+  'MESS' '- Bilans --------- 0D --------- MultiD'
+  ' ' '----- Err.Rel.(%)' ;
+  'MESS' 'Masse totale (kg)' ' ' M0D ' ' MMD ' '
+  (100. '*' (M0D '-' MMD) '/' M0D) ;
+  'SI' (TBT . 'VAPEUR' 'ET' ('NON' ('EGA' MV0D 0.))) ;
+    'MESS' 'Vapeur       (kg)' ' ' MV0D ' ' MVMD ' '
+    (100. '*' (MV0D '-' MVMD) '/' MV0D)     ;
+  'FINS'        ;
+  'SI' (TBT . 'THE' 'ET' ('NON' ('EGA' MHE0D 0.)))   ;
+    'MESS' 'Helium       (kg)' ' ' MHE0D ' ' MHEMD ' '
+    (100. '*' (MHE0D '-' MHEMD) '/' MHE0D)  ;
+  'FINS'        ;
+  'SI' (TBT . 'TH2' 'ET' ('NON' ('EGA' MH20D 0.)))   ;
+    'MESS' 'Hydrogene    (kg)' ' ' MH20D ' ' MH2MD ' '
+    (100. '*' (MH20D '-' MH2MD) '/' MH20D)  ;
+  'FINS'        ;
+  'SI' (TBT . 'TO2' 'ET' ('NON' ('EGA' MO20D 0.)))   ;
+    'MESS' 'Oxygene      (kg)' ' ' MO20D ' ' MO2MD ' '
+    (100. '*' (MO20D '-' MO2MD) '/' MO20D)  ;
+  'FINS'        ;
+  'SI' (TBT . 'TN2' 'ET' ('NON' ('EGA' MN20D 0.)))   ;
+    'MESS' 'Azote        (kg)' ' ' MN20D ' ' MN2MD ' '
+    (100. '*' (MN20D '-' MN2MD) '/' MN20D)  ;
+  'FINS'        ;
+  'SI' (TBT . 'TCO' 'ET' ('NON' ('EGA' MCO0D 0.)))   ;
+    'MESS' 'CO           (kg)' ' ' MCO0D ' ' MCOMD ' '
+    (100. '*' (MCO0D '-' MCOMD) '/' MCO0D)  ;
+  'FINS'        ;
+  'SI' (TBT . 'TCO2' 'ET' ('NON' ('EGA' MCO20D 0.))) ;
+    'MESS' 'CO2          (kg)' ' ' MCO20D ' ' MCO2MD ' '
+    (100. '*' (MCO20D '-' MCO2MD) '/' MCO20D)        ;
+  'FINS'        ;
+***  'SI' (TBT . 'TAIR' 'ET' ('NON' ('EGA' MAIR0D 0.))) ;
+  'SI' ('NON' ('EGA' MAIR0D 0.)) ;
+    'MESS' 'Air          (kg)' ' ' MAIR0D ' ' MAIRMD ' '
+    (100. '*' (MAIR0D '-' MAIRMD) '/' MAIR0D)        ;
+  'FINS'        ;
+  'MESS' ' ' ;
+  'MESS' 'Energie    (J/m3)' ' ' E0D ' ' EMD ' '
+  (100. '*' (E0D '-' EMD) '/' E0D) ;
+  'MESS' '___________________________________________________________' ;
+  
+  'SI' TBT.'THERMP'       ;
+    'MESS' ' Energie Stockee Mur (J) ' Emurn    Emurm
+    (100. '*' (Emurn '-' Emurm) '/' Emurn)  ;
+  'MESS' '___________________________________________________________' ;
+  'FINS'        ;
+'FINS' ;
+*>> Affichage    FIN
+*
+
+*
+*>> Copie des inconnues (n)->(n-1) pour le prochain pas de temps
+tic . 'UNM'   = 'COPI' tic . 'UN'  ;
+tic . 'RHONM' = 'COPI' tic . 'RHO' ;
+*tic . 'RHONM' = Rhon ;
+'SI' TBT . 'VAPEUR' ; tic . 'RVPNM' = Rvp  ; 'FINS' ;
+'SI' TBT . 'THE'    ; tic . 'RHEM'  = Rhe  ; 'FINS' ;
+'SI' TBT . 'TH2'    ; tic . 'RH2M'  = Rh2  ; 'FINS' ;
+'SI' TBT . 'TO2'    ; tic . 'RO2M'  = Ro2  ; 'FINS' ;
+'SI' TBT . 'TN2'    ; tic . 'RN2M'  = Rn2  ; 'FINS' ;
+'SI' TBT . 'TCO'    ; tic . 'RCOM'  = Rco  ; 'FINS' ;
+'SI' TBT . 'TCO2'   ; tic . 'RCO2M' = Rco2 ; 'FINS' ;
+*'SI' TBT . 'TAIR'   ; tic . 'RAIRM' = Rair ; 'FINS' ;
+*                      tic . 'RAIRM' = Rair ;
+tic . 'RAIRM' = 'COPI' tic . 'RAIR' ;
+tic . 'TFNM'  = Tfn ;
+'SI' TBT . 'THERMP' ;
+  tic . 'TPNM' = Tp ;
+'FINS' ;
+'SI' (('EGA' TBT . 'MODTURB' 'KEPSILON')
+'ET' ('EGA' TBT . 'FEF' 'EFM1')) ;
+  tic . 'KNM' = tic . 'KN' ;
+  tic . 'ENM' = tic . 'EN' ;
+'FINS' ;
+'SI' TBT.'ASPER ';
+  tic . 'VNM' = tic .'VN' ;
+  tic . 'XDM' = tic .'XD' ;
+  tic . 'TDM' = tic .'TD' ;
+  tic . 'DDM' = tic .'DD' ;
+'FINS' ;
+*>> Copie des inconnues (n)->(n-1) FIN
+*
+
+*
+*>> Gestion du pas de temps en EFM1
+*
+* On impose une 'CFL' de 0.5
+* Il ne peut pas dépasser le pas de temps de référence
+* Si il varie de plus de 10% on limite l'accroissement
+'SI' ('EGA' TBT . 'FEF' 'EFM1') ;
+  DTDIFU = rv . 'PASDETPS' . 'DTDIFU' ;
+  DTCONV = rv . 'PASDETPS' . 'DTCONV' ;
+  DTEXPL = ('MINI' ('PROG' DTDIFU DTCONV)) * 0.5 ;
+  'MESS' &bcltps ' ' 'dtexpl=' ' ' DTEXPL ' ' DTDIFU ' ' DTCONV ;
+  DTM1   = tic . 'DT' ;
+
+  ect = (DTEXPL '-' tic . 'DT') '/' DTEXPL ;
+  'SI' (ect '>' 0.1) ;
+    tic . 'DT' = (0.3 '*' DTEXPL) '+' (0.7 '*' tic . 'DT');
+  'FINS' ;
+  'SI' (ect '<' 0.1 ) ;
+    tic . 'DT' = DTEXPL ;
+  'FINS' ;
+  
+  'SI' (rxt . 'DT0' < DTEXPL) ;
+    tic . 'DT' = rxt . 'DT0' ;
+  'FINS' ;
+  rv . 'PASDETPS' . 'NUPASDT'  = tic . 'NUPADT' ;
+  rv . 'PASDETPS' . 'DELTAT-1' = DTM1 ;
+  rv . 'PASDETPS' . 'DELTAT'   = 1.e30 ;
+  rv . 'PASDETPS' . 'TPS'      = tic . 'Tps' ;
+'FINS' ;
+*
+*>> Couplage avec CATHARE2 : Echanges P, T et Rho moyens
+'SI' TBT . 'CATHARE2' ;
+  cc   = 'CHAI' 'echo' PTmn ' ' Tfmn ' ' rhomn '  > ' 'CASCAR' ;
+  titi = 'EXTE' cc 'RC'  ;
+'FINS' ;
+*
+*
+*
+'FIN' BCLTPS ;
+*>>    FIN BCLTPS
+*
+*-----------------------------------------------------------
+*----- FIN de la boucle principale sur les pas de temps ----
+*-----------------------------------------------------------
+*
+* Sauvegarde pour reprise
+tic . 'drclvp'  = drclvp  ;
+tic . 'drclhe'  = drclhe  ;
+tic . 'drclh2'  = drclh2  ;
+tic . 'drclo2'  = drclo2  ;
+tic . 'drcln2'  = drcln2  ;
+tic . 'drclco'  = drclco  ;
+tic . 'drclco2' = drclco2 ;
+*
+*
+'SI' ('ET' (TBT . 'DETMAT') ('>' nbit 0)) ;
+
+  RV = TBT . 'RV' ;
+  REPIX RV ;
+*
+* 2022/11/22 : SG
+* Je n'ai pas compris à quoi servent ces lignes car normalement, il n'y
+* a pas de matrices à l'indice 'rvpd'.
+* S'il y en a, il faudra modifier repix.procedur pour les enlever et
+* supprimer les lignes suivantes
+*
+
+  'SI' ('EXIS' TBT . 'RV' 'PROJ') ;
+    rv = TBT . 'RV' ;
+    rv = 'ENLE' rv 'rvpd' ;
+    TBT . 'RV' = rv ;
+  'FINS' ;
+
+  rtf = TBT . 'RTF' ;
+  REPIX rtf ;
+
+  'SI'((TBT . 'THERMP') 'OU' (TBT . 'TPAROIS')) ;
+    rtp = TBT . 'RTP' ;
+    REPIX rtp ;
+  'FINS' ;
+
+  'SI' TBT . 'VAPEUR' ;
+    Rrvap = TBT . 'Rrvap' ;
+    REPIX Rrvap ;
+  'FINS' ;
+
+  'SI' TBT . 'THE' ;
+    Rrhe = TBT . 'Rrhe' ;
+    REPIX Rrhe ;
+  'FINS' ;
+
+  'SI' TBT . 'TH2' ;
+    Rrh2 = TBT . 'Rrh2' ;
+    REPIX Rrh2 ;
+  'FINS' ;
+
+  'SI' TBT . 'TO2' ;
+    Rro2 = TBT . 'Rro2' ;
+    REPIX Rro2 ;
+  'FINS' ;
+
+  'SI' TBT . 'TN2' ;
+    Rrn2 = TBT . 'Rrn2' ;
+    REPIX Rrn2 ;
+  'FINS' ;
+
+  'SI' TBT . 'TCO2' ;
+    Rrco2 = TBT . 'Rrco2' ;
+    REPIX Rrco2 ;
+  'FINS' ;
+
+  'SI' TBT . 'TAIR' ;
+    Rrair = TBT . 'Rrair' ;
+    REPIX Rrair ;
+  'FINS' ;
+
+  'SI' TBT . 'TCO' ;
+    Rrco = TBT . 'Rrco' ;
+    REPIX Rrco ;
+  'FINS' ;
+
+  'SI' TBT . 'ASPER' ;
+    rvn = TBT . 'RVN' ;
+    REPIX rvn ;
+    rxd = TBT . 'RXD' ;
+    REPIX rxd ;
+    rdd = TBT . 'RDD' ;
+    REPIX rdd ;
+    rtd = TBT . 'RTD' ;
+    REPIX rtd ;
+  'FINS' ;
+
+'FINS' ;
+*
+*
+*-----------------------------------------------------------
+* Post-traitement Graphique
+*-----------------------------------------------------------
+*
+*
+* ltps  : Liste des pas de temps servant au tracé
+* ltpsc : Liste du rang des pas de temps de ltps dans la liste des temps calculés 
+'SI' ('EXIS' tic 'LTPSC') ;
+  ltpsc = tic . 'LTPSC' ;
+  ltps  = 'EXTR' (tic . 'LTPS') (tic . 'LTPSC') ;
+'SINO' ;
+  ltps  = tic . 'LTPS' ;
+  ltpsc = 'LECT' 1 'PAS' 1 ('DIME' ltps) ;
+'FINS' ;
+*
+* On trace si il y a quelque chose à tracer
+'SI' (TBT . 'GRAPH' 'ET' ('>EG' ('DIME' ltps) 2)) ;
+*
+ tab1 = 'TABLE' ;
+ tab1 . 'TITRE' = 'TABLE' ;
+ tab1 . 1 = 'MARQ CROI REGU' ;
+ tab1 . 2 = 'MARQ TRIU REGU' ;
+ tab1 . 3 = 'MARQ LOSA REGU' ;
+ tab1 . 4 = 'MARQ CARR REGU' ;
+ tab1 . 5 = 'MARQ ROND REGU' ;
+ tab1 . 6 = 'MARQ TRID REGU' ;
+ tab1 . 7 = 'MARQ TRIL REGU' ;
+ tab1 . 8 = 'MARQ TRIR REGU' ;
+*
+* Initialisation
+ $vtf = GEO . '$vtf' ;
+ mvtf = 'DOMA' $vtf 'MAILLAGE' ;
+*
+ un   = tic . 'UN' ;
+ lcu  = 'EXTR' un 'COMP' ;
+ modu = ('PSCA' un un lcu lcu) ** 0.5 ;
+ mmu  = 'MAXI' modu ;
+ 'MESS' ' MAXI module de U ********* ' mmu ;
+*
+* Recombineur SIEMENS ou HEATER
+'SI' ('EXIS' tbt 'RECOMB') ;
+
+  tab2 = table ;
+  tab2 . 1 = 'MARQ CROI REGU' ;
+  tab2 . 2 = 'MARQ TRIU REGU' ;
+  tab2 . 3 = 'MARQ LOSA REGU' ;
+  tab2 . 4 = 'MARQ CARR REGU' ;
+  tab2 . 5 = 'MARQ ROND REGU' ;
+  tab2 . 6 = 'MARQ TRID REGU' ;
+  tab2 . 7 = 'MARQ TRIL REGU' ;
+  tab2 . 8 = 'MARQ TRIR REGU' ;
+  tab2 . 'TITRE' = 'TABLE' ;
+
+  tab2 = 'COPI' tab1 ;
+  tab2 . 'TITRE' = 'TABLE' ;
+
+  tab3 = table ;
+  tab3 . 1 = 'MARQ CROI REGU' ;
+  tab3 . 2 = 'MARQ TRIU REGU' ;
+  tab3 . 3 = 'MARQ LOSA REGU' ;
+  tab3 . 4 = 'MARQ CARR REGU' ;
+  tab3 . 5 = 'MARQ ROND REGU' ;
+  tab3 . 6 = 'MARQ TRID REGU' ;
+  tab3 . 7 = 'MARQ TRIL REGU' ;
+  tab3 . 8 = 'MARQ TRIR REGU' ;
+  tab3 . 'TITRE' = 'TABLE' ;
+
+  tab3 = 'COPI' tab1 ;
+  tab3 . 'TITRE' = 'TABLE' ;
+
+  Numero = 1 ;
+  tab3 . 'TITRE' . Numero = 'H2O' ;
+  'SI' TBT . 'TH2' ;
+    Numero = Numero '+' 1 ;
+    tab3 . 'TITRE' . Numero = 'H2' ;
+    Numero = Numero '+' 1 ;
+    tab3 . 'TITRE' . Numero = 'O2' ;
+  'FINS' ;
+  'SI' TBT . 'TN2' ;
+    Numero = Numero '+' 1 ;
+    tab3 . 'TITRE' . Numero = 'N2' ;
+  'FINS' ;
+  'SI' TBT . 'TCO' ;
+    Numero = Numero '+' 1 ;
+    tab3 . 'TITRE' . Numero = 'CO' ;
+    Numero = Numero '+' 1 ;
+    tab3 . 'TITRE' . Numero = 'CO2' ;
+  'FINS' ;
+  'SI' TBT . 'THE' ;
+    Numero = Numero '+' 1 ;
+    tab3 . 'TITRE' . Numero = 'HE' ;
+  'FINS' ;
+  Numero = Numero '+' 1 ;
+  tab3 . 'TITRE' . Numero = 'Mixture' ;
+  
+  siemens = faux ;
+  npar  = 'DIME' tbt . 'RECOMB' ;
+  'REPE' blopar npar ;
+  
+    tab1 . 'TITRE' . &blopar = 'MOT' ('CHAI' 'PAR' &blopar) ;
+    tab2 . 'TITRE' . 1 = 'Inlet' ;
+    tab2 . 'TITRE' . 2 = 'Outlet' ;
+    tab2 . 'TITRE' . 3 = 'Plates' ;
+    
+    tpar    = tic . 'RECOMB' . &blopar ; 
+    evTpla  = 'EVOL' 'ORAN' 'MANU' ltps  ('EXTR' tpar . 'Tpla' ltpsc) ;
+    evTin   = 'EVOL' 'CYAN' 'MANU' ltps  ('EXTR' tpar . 'Tin'  ltpsc) ;
+    evTout  = 'EVOL' 'ROUG' 'MANU' ltps  ('EXTR' tpar . 'Tout' ltpsc) ;
+    evUin   = 'EVOL' 'CYAN' 'MANU' ltps  ('EXTR' tpar . 'Uin'  ltpsc) ;
+    evUout  = 'EVOL' 'ROUG' 'MANU' ltps  ('EXTR' tpar . 'Uout' ltpsc) ;
+    evUinb  = 'EVOL' 'CYAN' 'MANU' ltps (('EXTR' tpar . 'Uin'  ltpsc) '+' 1.D-5) ;
+    evUoutb = 'EVOL' 'ROUG' 'MANU' ltps (('EXTR' tpar . 'Uout' ltpsc) '+' 1.D-5) ;
+    evdeb   = 'EVOL' 'ORAN' 'MANU' ltps  ('EXTR' tpar . 'DEB'  ltpsc) ;
+    
+    'SI' ('EGA' &blopar 1) ;
+      fvdeb  = evdeb ;
+      fvTpla = evTpla ;
+      fvTin  = evTin ;
+      fvTout  = evTout ;
+    'SINO' ;
+      fvdeb  = fvdeb  'ET' evdeb ;
+      fvTpla = fvTpla 'ET' evTpla ;
+      fvTin  = fvTin  'ET' evTin ;
+      fvTout = fvTout 'ET' evTout ;
+    'FINS' ;
+    
+    'SI' ('NEG' tbt . 'RECOMB' . &blopar . 'TYPR' 'HEATER') ;
+      siemens = vrai ;
+      evQe   = 'EVOL' 'ORAN' 'MANU' ltps ('EXTR' (tpar . 'DEB' '*' tpar . 'YH2E') ltpsc) ;
+      evQs   = 'EVOL' 'ORAN' 'MANU' ltps ('EXTR' (tpar . 'DEB' '*' tpar . 'YH2S') ltpsc) ;
+      'SI' ('EGA' &blopar 1) ;
+        fvQe   = evQe ;
+        fvQs   = evQs ;
+      'SINO' ;
+        fvQe   = fvQe   'ET' evQe ;
+        fvQs   = fvQs   'ET' evQs ;
+      'FINS' ;
+    'FINS' ;
+*
+* Species mass fraction (-) and densities (kg/m3)
+    NAME = 'CHAI' 'SREC'  'ent' &blopar ; SENTREE = GEO . NAME ;
+    NAME = 'CHAI' 'fgREC' 'ent' &blopar ; FG_ENT  = GEO . NAME ;
+    NAME = 'CHAI' 'SREC'  'sor' &blopar ; SSORTIE = GEO . NAME ;
+    NAME = 'CHAI' 'fgREC' 'sor' &blopar ; FG_SOR  = GEO . NAME ;
+    RO_IN  = (evdeb '/' evUinb)  '*' (FG_ENT '/' SENTREE) ;
+    RO_OUT = (evdeb '/' evUoutb) '*' (FG_SOR '/' SSORTIE) ;
+*
+    evYH2E  = 'EVOL' 'ROUG' 'MANU' ltps ('EXTR' tpar . 'YH2E'  ltpsc) ;
+    evYH2OE = 'EVOL' 'ORAN' 'MANU' ltps ('EXTR' tpar . 'YH2OE' ltpsc) ;
+    evYO2E  = 'EVOL' 'ROSE' 'MANU' ltps ('EXTR' tpar . 'YO2E'  ltpsc) ;
+    evYN2E  = 'EVOL' 'VERT' 'MANU' ltps ('EXTR' tpar . 'YN2E'  ltpsc) ;
+    evYHEE  = 'EVOL' 'OCEA' 'MANU' ltps ('EXTR' tpar . 'YHEE'  ltpsc) ;
+    evYCO2E = 'EVOL' 'LAVA' 'MANU' ltps ('EXTR' tpar . 'YCO2E' ltpsc) ;
+    evYCOE  = 'EVOL' 'BOUT' 'MANU' ltps ('EXTR' tpar . 'YCOE'  ltpsc) ;
+*
+    evYH2S  = 'EVOL' 'ROUG' 'MANU' ltps ('EXTR' tpar . 'YH2S'  ltpsc) ;
+    evYH2OS = 'EVOL' 'ORAN' 'MANU' ltps ('EXTR' tpar . 'YH2OS' ltpsc) ;
+    evYO2S  = 'EVOL' 'ROSE' 'MANU' ltps ('EXTR' tpar . 'YO2S'  ltpsc) ;
+    evYN2S  = 'EVOL' 'VERT' 'MANU' ltps ('EXTR' tpar . 'YN2S'  ltpsc) ;
+    evYHES  = 'EVOL' 'OCEA' 'MANU' ltps ('EXTR' tpar . 'YHES'  ltpsc) ;
+    evYCO2S = 'EVOL' 'LAVA' 'MANU' ltps ('EXTR' tpar . 'YCO2S' ltpsc) ;
+    evYCOS  = 'EVOL' 'BOUT' 'MANU' ltps ('EXTR' tpar . 'YCOS'  ltpsc) ;
+*
+    RH2E  = RO_IN '*' evYH2E  ;
+    RH2OE = RO_IN '*' evYH2OE ;
+    RO2E  = RO_IN '*' evYO2E ;
+    RN2E  = RO_IN '*' evYN2E ;
+    RHEE  = RO_IN '*' evYHEE  ;
+    RCO2E = RO_IN '*' evYCO2E ;
+    RCOE  = RO_IN '*' evYCOE  ;
+*
+    RH2S  = RO_OUT '*' evYH2S  ;
+    RH2OS = RO_OUT '*' evYH2OS ;
+    RO2S  = RO_OUT '*' evYO2S ;
+    RN2S  = RO_OUT '*' evYN2S ;
+    RHES  = RO_OUT '*' evYHES  ;
+    RCO2S = RO_OUT '*' evYCO2S ;
+    RCOS  = RO_OUT '*' evYCOS  ;
+*
+    evYE = evYH2OE ;
+    evYS = evYH2OS ;
+    evRE = RH2OE ;
+    evRS = RH2OS ;
+    'SI' TBT . 'TH2' ;
+      evYE = evYE 'ET' evYH2E 'ET' evYO2E ;
+      evYS = evYS 'ET' evYH2S 'ET' evYO2S ;
+      evRE = evRE 'ET' RH2E 'ET' RO2E ;
+      evRS = evRS 'ET' RH2S 'ET' RO2S ;
+    'FINS' ;
+    'SI' TBT . 'TN2' ;
+      evYE = evYE 'ET' evYN2E ;
+      evYS = evYS 'ET' evYN2S ;
+      evRE = evRE 'ET' RN2E ;
+      evRS = evRS 'ET' RN2S ;
+    'FINS' ;
+    'SI' TBT . 'TCO' ;
+      evYE = evYE 'ET' evYCOE 'ET' evYCO2E ;
+      evYS = evYS 'ET' evYCOS 'ET' evYCO2S ;
+      evRE = evRE 'ET' RCOE 'ET' RCO2E ;
+      evRS = evRS 'ET' RCOS 'ET' RCO2S ;
+    'FINS' ;
+    'SI' TBT . 'THE' ;
+      evYE = evYE 'ET' evYHEE ;
+      evYS = evYS 'ET' evYHES ;
+      evRE = evRE 'ET' RHEE ;
+      evRS = evRS 'ET' RHES ;
+    'FINS' ;
+    evRE = evRE 'ET' (RO_IN  'COUL' 'DEFA') ;
+    evRS = evRS 'ET' (RO_OUT 'COUL' 'DEFA') ;
+*
+* Single PAR graphics
+    TIT1 = 'MOT' ('CHAI' 'PAR' &blopar '- Mean temperatures') ;
+    'DESS' (evTin 'ET' evTout 'ET' evTpla) 'MIMA' 'TITR' TIT1
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' ' C' 'LEGE' tab2 ;
+    
+    TIT1 = 'MOT' ('CHAI' 'PAR' &blopar '- Mean velocities') ;
+    'DESS' (evUin 'ET' evUout) 'MIMA' 'TITR' TIT1
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'm/s' 'LEGE' tab2 ;
+    
+    TIT1 = 'MOT' ('CHAI' 'PAR' &blopar '- Inlet mass fraction') ;
+    'DESS' evYE  'MIMA' 'TITR' TIT1
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' '--' 'LEGE' tab3 ;
+          
+    TIT1 = 'MOT' ('CHAI' 'PAR' &blopar '- Outlet mass fraction') ;
+    'DESS' evYS  'MIMA' 'TITR' TIT1
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' '--' 'LEGE' tab3 ;
+
+    TIT1 = 'MOT' ('CHAI' 'PAR' &blopar '- Inlet densities') ;
+    'DESS' evRE  'MIMA' 'TITR' TIT1
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/m3' 'LEGE' tab3 ;
+          
+    TIT1 = 'MOT' ('CHAI' 'PAR' &blopar '- Outlet densities') ;
+    'DESS' evRS  'MIMA' 'TITR' TIT1
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/m3' 'LEGE' tab3 ; 
+    
+  'FIN' blopar ;
+*
+* Global PAR graphics
+
+  'DESS' fvdeb 'MIMA' 'TITR' 'PAR - Mass flow rate' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab1 ;
+
+  'SI' siemens ;
+    'DESS' fvQe 'MIMA' 'TITR' 'PAR - H2 inlet mass flow rate' 
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab1 ;
+    
+    'DESS' fvQs 'MIMA' 'TITR' 'PAR - H2 outlet mass flow rate' 
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab1 ;
+    
+    'DESS' (fvQs '-' fvQe) 'MIMA' 'TITR' 'PAR - H2 consumption mass flow rate' 
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab1 ;
+  'FINS' ;
+
+  'SI' ('NEG' npar 1) ;
+    'DESS' fvTpla 'MIMA' 'TITR' 'PAR - Plate Temperature' 
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' ' C' 'LEGE' tab1 ;
+
+    'DESS' fvTin 'MIMA' 'TITR' 'PAR - Inlet Temperature' 
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' ' C' 'LEGE' tab1 ;
+  
+    'DESS' fvTout 'MIMA' 'TITR' 'PAR - Outlet Temperature' 
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' ' C' 'LEGE' tab1 ;
+  'FINS' ;
+  
+'FINS' ;
+* PAR - FIN
+*
+
+'SI' TBT . 'ASPER ' ;
+  lqQas = tic . 'Qaspe' ;
+  evQas = 'EVOL' 'JAUN' 'MANU'
+  't(s)' ltps 'kg/s' ('EXTR' lqQas ltpsc) ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'Qaspe' ; 
+  'DESS' evqas 'MIMA' 'TITR' 'Aspsion mass flow rate'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab1 ;
+'FINS' ;
+
+**************************************************************
+**************************************************************
+* Taux d'injection de la vapeur
+'SI' TBT . 'VAPEUR' ;
+
+ tab1 . 'TITRE' . 1 = 'MOT' 'Tinj ' ;
+ tab1 . 'TITRE' . 2 = 'MOT' 'Tinj2' ;
+ tab1 . 'TITRE' . 3 = 'MOT' 'Tinj3' ;
+
+ tab1 .'TITRE' . 1 = 'MOT' 'Ksi ' ;
+ tab1 .'TITRE' . 2 = 'MOT' 'Ksi2' ;
+ tab1 .'TITRE' . 3 = 'MOT' 'Ksi3' ;
+
+*.............................................................
+
+* Trace des Debits liquide vapeur et total aux breches
+
+ tab1 . 1 = 'MARQ CROI REGU' ;
+ tab1 . 2 = 'MARQ CROI REGU TIRM' ;
+ tab1 . 3 = 'MARQ CROI REGU TIRC' ;
+ tab1 . 4 = 'MARQ TRIA REGU' ;
+ tab1 . 5 = 'MARQ TRIA REGU TIRM' ;
+ tab1 . 6 = 'MARQ TRIA REGU TIRC' ;
+ tab1 . 7 = 'MARQ LOSA REGU' ;
+ tab1 . 8 = 'MARQ LOSA REGU TIRM' ;
+ tab1 . 9 = 'MARQ LOSA REGU TIRC' ;
+
+ tab1 . 'TITRE'. 1 = 'MOT' 'Qjtot' ;
+ tab1 . 'TITRE'. 2 = 'MOT' 'Qlj ' ;
+ tab1 . 'TITRE'. 3 = 'MOT' 'Qj ';
+
+ tab1 . 1 = 'MARQ CROI REGU' ;
+ tab1 . 2 = 'MARQ CARR REGU' ;
+ tab1 . 3 = 'MARQ LOSA REGU' ;
+ 
+*.............................................................
+
+'FINS';
+*
+*
+* Débit de condensation : Total, bilan et détails
+*
+*
+'SI' TBT . 'VAPEUR' ;
+  tab2 = table ;
+  tab2 . 1 = 'MARQ CROI REGU' ;
+  tab2 . 2 = 'MARQ TRIU REGU' ;
+  tab2 . 3 = 'MARQ LOSA REGU' ;
+  tab2 . 4 = 'MARQ CARR REGU' ;
+  tab2 . 5 = 'MARQ ROND REGU' ;
+  tab2 . 6 = 'MARQ TRID REGU' ;
+  tab2 . 7 = 'MARQ TRIL REGU' ;
+  tab2 . 8 = 'MARQ TRIR REGU' ;
+  tab2 . 'TITRE' = 'TABLE' ;
+* Wall condensation (total)
+  Numero = 1 ;
+  evsrcv = 'EVOL' 'VERT' 'MANU'
+  't(s)' ltps 'kg/s' ('EXTR' tic . 'Qc' ltpsc) ;
+  evtq   = evsrcv ;
+  tab2 . 'TITRE' . Numero = 'MOT' 'Qcond' ;
+  evqc1  = evsrcv ;
+* Wall condensation (paroi thermique)
+  'SI' ('EXIS' tic 'Qcw') ;
+    Numero = Numero + 1 ;
+    evqcw  = 'EVOL' 'TURQ' 'MANU'
+    't(s)' ltps 'kg/s' ('EXTR' tic . 'Qcw' ltpsc) ;
+    evtq = evtq 'ET' evqcw ;
+    tab2 . 'TITRE' . Numero = 'MOT' 'Qcw' ;
+    evqc1  = evqc1 '-' evqcw ;
+  'FINS' ;
+* Wall Condensation (paroi imposée par l'utilisateur (ECHANP))
+  'SI' ('EXIS' tic 'Qc0') ;
+    Numero = Numero + 1 ;
+    evqc0  = 'EVOL' 'TURQ' 'MANU'
+    't(s)' ltps 'kg/s' ('EXTR' tic . 'Qc0' ltpsc) ;
+    evtq = evtq 'ET'  evqc0 ;
+    tab2 . 'TITRE' .  Numero = 'MOT' 'Qc0' ;
+    evqc1  = evqc1 '-' evqc0 ;
+  'FINS' ;
+* Wall Condensation (poroi à température imposée)
+  'SI' TBT . 'TTIMP' ;
+    Numero = Numero + 1 ;
+    evqc1  = evqc1 'COUL' 'TURQ' ;
+    evtq   = evtq 'ET'  evqc1 ;
+    tab2 . 'TITRE' .  Numero = 'MOT' 'Qc1' ;
+  'FINS' ;
+* Bulk condensation
+  'SI' ('EXIS' tic 'Qcm') ;
+    Numero = Numero + 1 ;
+    evqcm = 'EVOL' 'CYAN' 'MANU'
+    't(s)' ltps 'kg/s' ('EXTR' tic . 'Qcm' ltpsc) ;
+    evtq = evtq 'ET' evqcm ;
+    tab2 . 'TITRE' . Numero = 'MOT' 'Qcm' ;
+  'FINS' ;
+
+  'DESS' evtq 'MIMA' 'TITR' 'Steam mass condensation distribution'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab2 ;
+'FINS' ;
+*
+* Cas des Températures imposées nouvelle méthode
+'SI' TBT . 'VAPEUR' ;
+  'SI' TBT . 'TTIMP' ;
+    NBTIMP = 'DIME' rxt . 'TIMP' ;
+    itimp  = 'INDE' rxt . 'TIMP' ;
+    Numero = 1 ;
+    evtq   = evqc1 ; 
+    tab2 . 'TITRE' . Numero = 'MOT' 'Qc1' ;
+    'REPE' BBTIMP NBTIMP ;
+      Btimp  = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+      CQc1   = Btimp . 'Qc1' ;
+      Numero = Numero + 1 ;
+      evqci  = 'EVOL' 'CYAN' 'MANU'
+      't(s)' ltps 'kg/s' ('EXTR' tic . CQc1 ltpsc) ;
+      evtq   = evtq 'ET' evqci ;
+      tab2 . 'TITRE' . Numero = 'MOT' ('CHAI' itimp . &BBTIMP) ;
+    'FIN' BBTIMP ;
+    'DESS' evtq 'MIMA' 'TITR' 'Steam wall condensation (TIMP)'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/s' 'LEGE' tab2 ;
+  'FINS' ;
+'FINS' ;
+*
+*
+* Eléments pour le bilan d'énergie
+*
+*
+'SI' TBT . 'VAPEUR' ;
+  lqEcd = tic . 'Econd' ;
+  evEcd = 'EVOL' 'VERT' 'MANU' 't(s)' ltps 'J' ('EXTR' lqEcd ltpsc);
+  tab1 . 'TITRE'. 1 = 'MOT' 'Latent HT' ;
+  'DESS' evEcd 'MIMA' 'TITR' 'Latent heat transfer'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'J' 'LEGE' tab1 ;
+
+  lqEcv = tic . 'Econv' ;
+  evEcv = 'EVOL' 'CYAN' 'MANU' 't(s)' ltps 'J' ('EXTR' lqEcv ltpsc);
+  tab1 . 'TITRE'. 1 = 'MOT' 'Sensible HT' ;
+  'DESS' evEcv 'MIMA' 'TITR' 'Sensible heat transfer' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'J' 'LEGE' tab1 ;
+
+  tab1 . 'TITRE' . 1 = 'MOT' 'Latent' ;
+  tab1 . 'TITRE' . 2 = 'MOT' 'Sensible' ;
+
+  'DESS' (evEcd 'ET' evEcv) 'MIMA' 'TITR' 'Heat transfer' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'J' 'LEGE' tab1 ;
+'FINS' ;
+*
+*
+* Eléments pour le bilan de masse en vapeur
+*
+*
+ evMinjv = 'EVOL' 'CYAN' 'MANU'
+ 't(s)' ltps 'kg' ('EXTR' tic . 'Minj'  ltpsc)  ;
+ evMcond = 'EVOL' 'VERT' 'MANU'
+ 't(s)' ltps 'kg' ('EXTR' tic . 'Mcond' ltpsc) ;
+ evMrest = 'EVOL' 'ROUG' 'MANU'
+ 't(s)' ltps 'kg' ('EXTR' tic . 'Mrest' ltpsc) ;
+
+'SI' TBT . 'VAPEUR' ;
+  evMcondm = 'EVOL' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mcondm' ltpsc) ;
+'SINO' ;
+  evMcondm = 0 . '*' evMinjv ;
+'FINS' ;  
+
+tab1 . 'TITRE'. 1 = 'MOT' 'M_inj  ' ;
+tab1 . 'TITRE'. 2 = 'MOT' 'M_cond ' ;
+tab1 . 'TITRE'. 3 = 'MOT' 'M_rest ' ;
+tab1 . 'TITRE'. 4 = 'MOT' 'M_condm' ;
+
+'DESS' (evMinjv 'ET' evMcond 'ET' evMrest 'ET' evMcondm) 'MIMA'
+ 'TITR' 'Steam mass balance (kg)'
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+*
+*
+* Masse et correction 0D pour chaque constituant
+* (+ ensemble des constituants : Masses, corrrections 0D et densités)
+*
+*
+tab1 = table ;
+tab1 . 1 = 'MARQ CROI REGU' ;
+tab1 . 2 = 'MARQ TRIU REGU' ;
+tab1 . 3 = 'MARQ LOSA REGU' ;
+tab1 . 4 = 'MARQ CARR REGU' ;
+tab1 . 5 = 'MARQ ROND REGU' ;
+tab1 . 6 = 'MARQ TRID REGU' ;
+tab1 . 7 = 'MARQ TRIL REGU' ;
+tab1 . 8 = 'MARQ TRIR REGU' ;
+tab1 . 'TITRE' = 'TABLE' ;
+
+tab2 = table ;
+tab2 . 1 = 'MARQ CROI REGU' ;
+tab2 . 2 = 'MARQ TRIU REGU' ;
+tab2 . 3 = 'MARQ LOSA REGU' ;
+tab2 . 4 = 'MARQ CARR REGU' ;
+tab2 . 5 = 'MARQ ROND REGU' ;
+tab2 . 6 = 'MARQ TRID REGU' ;
+tab2 . 7 = 'MARQ TRIL REGU' ;
+tab2 . 8 = 'MARQ TRIR REGU' ;
+tab2 . 'TITRE' = 'TABLE' ;
+
+tab3 = table ;
+tab3 . 1 = 'MARQ CROI REGU' ;
+tab3 . 2 = 'MARQ TRIU REGU' ;
+tab3 . 3 = 'MARQ LOSA REGU' ;
+tab3 . 4 = 'MARQ CARR REGU' ;
+tab3 . 5 = 'MARQ ROND REGU' ;
+tab3 . 6 = 'MARQ TRID REGU' ;
+tab3 . 7 = 'MARQ TRIL REGU' ;
+tab3 . 8 = 'MARQ TRIR REGU' ;
+tab3 . 'TITRE' = 'TABLE' ;
+
+tab4 = table ;
+tab4 . 1 = 'MARQ CROI REGU' ;
+tab4 . 2 = 'MARQ TRIU REGU' ;
+tab4 . 3 = 'MARQ LOSA REGU' ;
+tab4 . 4 = 'MARQ CARR REGU' ;
+tab4 . 5 = 'MARQ ROND REGU' ;
+tab4 . 6 = 'MARQ TRID REGU' ;
+tab4 . 7 = 'MARQ TRIL REGU' ;
+tab4 . 8 = 'MARQ TRIR REGU' ;
+tab4 . 'TITRE' = 'TABLE' ;
+
+ ID = 1 ;
+ tab1 . 'TITRE' . 1  = 'MOT' 'M (kg)' ;
+ tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+ tab3 . 'TITRE' . ID = 'MOT' 'Rho' ;
+ evM = 'EVOL' 'MANU'
+ 't(s)' ltps 'kg' (('EXTR' tic . 'Rhomn' ltpsc) '*' Vtotal) ;
+ 'DESS' evM 'MIMA' 'TITR' 'Mixture mass'
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+ tab1 . 'TITRE' . 1  = 'MOT' 'dM (kg)' ;
+ tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+ evdM = 'EVOL' 'MANU'
+ 't(s)' ltps 'kg' (('EXTR' tic . 'drho' ltpsc) '*' Vtotal) ;
+ 'DESS' evdM 'MIMA' 'TITR' 'Mixture mass correction' 
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+ allM = evM   ;
+ alldM = evdM ;
+
+ ID = ID '+' 1 ;
+ tab1 . 'TITRE' . 1 = 'MOT' 'M_air (kg)' ;
+ tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+ tab3 . 'TITRE' . ID = 'MOT' 'Rho_air' ;
+ evMair = 'EVOL' 'TURQ' 'MANU'
+ 't(s)' ltps 'kg' (('EXTR' tic .'Rhomair' ltpsc) '*' Vtotal) ;
+ 'DESS' evMair 'MIMA' 'TITR' 'Air mass' 
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+ tab1 . 'TITRE' . 1 = 'MOT' 'dM_air' ;
+ tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+ evdMair = 'EVOL' 'TURQ' 'MANU'
+ 't(s)' ltps 'kg' ('EXTR' tic . 'Mdrair' ltpsc) ;
+ 'DESS' evdMair 'MIMA' 'TITR' 'Air mass correction' 
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+ allM  = allM 'ET' evMair ;
+ alldM = alldM 'ET' evdMair ;
+
+'SI' TBT . 'THE' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'M_he (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_he' ;
+  evMhe = 'EVOL' 'ROUG' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomhe' ltpsc) '*' Vtotal) ;
+  'DESS' evMhe 'MIMA' 'TITR' 'He mass' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_he' ;
+  tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  evdMhe = 'EVOL' 'ROUG' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdrhe' ltpsc) ;
+  'DESS' evdMhe 'MIMA' 'TITR' 'He mass correction' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMhe ;
+  alldM = alldM 'ET' evdMhe ;
+'FINS' ;
+
+'SI' TBT . 'TH2' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'M_h2 (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_h2' ;
+  evMh2 = 'EVOL' 'ROUG' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomh2' ltpsc) '*' Vtotal) ;
+  'DESS' evMh2 'MIMA' 'TITR' 'H2 mass'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_h2' ;
+  tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  evdMh2 = 'EVOL' 'ROUG' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdrh2' ltpsc) ;
+  'DESS' evdMh2 'MIMA' 'TITR' 'H2 mass correction' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMh2 ;
+  alldM = alldM 'ET' evdMh2 ;
+'FINS' ;
+
+'SI' TBT . 'TO2' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'M_o2 (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_o2' ;
+  evMo2 = 'EVOL' 'CYAN' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomo2' ltpsc) '*' Vtotal) ;
+  'DESS' evMo2 'MIMA' 'TITR' 'O2 mass'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_o2' ;
+  tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  evdMo2 = 'EVOL' 'CYAN' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdro2' ltpsc) ;
+  'DESS' evdMo2 'MIMA' 'TITR' 'O2 mass correction'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMo2 ;
+  alldM = alldM 'ET' evdMo2 ;
+'FINS' ;
+
+'SI' TBT . 'TN2' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'M_n2 (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_n2' ;
+  evMn2 = 'EVOL' 'CYAN' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomn2' ltpsc) '*' Vtotal) ;
+  'DESS' evMn2 'MIMA' 'TITR' 'N2 mass'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;  
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_n2' ;
+  tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  evdMn2 = 'EVOL' 'CYAN' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdrn2' ltpsc) ;
+  'DESS' evdMn2 'MIMA' 'TITR' 'N2 mass correction'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMn2 ;
+  alldM = alldM 'ET' evdMn2 ;
+'FINS' ;
+
+'SI' TBT . 'TCO' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'M_co (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_co' ;
+  evMco = 'EVOL' 'ORAN' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomco' ltpsc) '*' Vtotal) ;
+  'DESS' evMco 'MIMA' 'TITR' 'CO mass'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_co' ;
+  tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  evdMco = 'EVOL' 'ORAN' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdrco' ltpsc) ;
+  'DESS' evdMco 'MIMA' 'TITR' 'CO mass correction' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMco ;
+  alldM = alldM 'ET' evdMco ;
+'FINS' ;
+
+'SI' TBT . 'TCO2' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'M_co2 (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_co2' ;
+  evMco2 = 'EVOL' 'ROSE' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomco2' ltpsc) '*' Vtotal) ;
+  'DESS' evMco2 'MIMA' 'TITR' 'CO2 mass' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_co2' ;
+  tab4 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  evdMco2 = 'EVOL' 'ROSE' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdrco2' ltpsc) ;
+  'DESS' evdMco2 'MIMA' 'TITR' 'CO2 mass correction'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMco2 ;
+  alldM = alldM 'ET' evdMco2 ;
+'FINS' ;
+
+'SI' TBT . 'VAPEUR' ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 1  = 'MOT' 'M_vap (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 1 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_vap' ;
+  evMv  = 'EVOL' 'VERT' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic .'Rhomv' ltpsc) '*' Vtotal) ;
+  ID = ID '+' 1 ;
+  tab1 . 'TITRE' . 2  = 'MOT' 'M_vg (kg)' ;
+  tab2 . 'TITRE' . ID = tab1 . 'TITRE' . 2 ;
+  tab3 . 'TITRE' . ID = 'MOT' 'Rho_vg' ;
+  evMvg = 'EVOL' 'BOUT' 'MANU'
+  't(s)' ltps 'kg' (('EXTR' tic . 'Rhomvg' ltpsc) '*' Vtotal) ;
+  'DESS' (evMv 'ET' evMvg) 'MIMA' 'TITR' 'Steam mass' 
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  tab1 . 'TITRE' . 1 = 'MOT' 'dM_vap' ;
+  tab4 . 'TITRE' . (ID-1) = tab1 . 'TITRE' . 1 ;
+  evdMv = 'EVOL' 'VERT' 'MANU'
+  't(s)' ltps 'kg' ('EXTR' tic . 'Mdrvap' ltpsc) ;
+  'DESS' evdMv 'MIMA' 'TITR' 'Steam mass correction'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab1 ;
+  allM  = allM 'ET' evMv 'ET' evMvg ;
+  alldM = alldM 'ET' evdMv ;
+'FINS' ;
+
+'DESS' allM 'MIMA' 'TITR' 'Mass' 
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab2 ;
+'DESS' (allM '/' Vtotal) 'MIMA' 'TITR' 'Densities'
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg/m3' 'LEGE' tab3 ;
+'DESS' alldM 'MIMA' 'TITR' 'Mass corrections' 
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'kg' 'LEGE' tab4 ;
+*
+* Pressure
+ evPT = 'EVOL' 'CYAN' 'MANU'
+ 't(s)' ltps 'Pa' ('EXTR' tic . 'PT' ltpsc) ;
+ tab1 . 'TITRE' . 1 = 'MOT' 'Ptot' ;
+'DESS' evPT 'MIMA' 'TITR' 'Mean pressure'
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'Pa' 'LEGE' tab1 ;
+*
+* Temperature (fluide, parois et correction)
+ evtpf = 'EVOL' 'ROUG' 'MANU'
+ 't(s)' ltps 'oC ' ('EXTR' tic . 'Tfm' ltpsc) ;
+ tab1 . 'TITRE' . 1 = 'MOT' 'Tfm' ;
+*
+ evtpf1 = 'EVOL' 'CYAN' 'MANU'
+ 't(s)' ltps 'oC' ('EXTR' tic . 'MdTf' ltpsc) ;
+ tab1 . 'TITRE' . 2 = 'MOT' 'Maxi dTf' ;
+ evtpf  = evtpf 'ET' evtpf1 ;
+*
+ evtpf2 = 'EVOL' 'ROSE' 'MANU'
+ 't(s)' ltps 'oC' ('EXTR' tic . 'mdTf' ltpsc) ;
+ tab1 . 'TITRE' . 3 = 'MOT' 'Mini dTf' ;
+ evtpf  = evtpf 'ET' evtpf2 ;
+*
+ ID = 3 ;
+*FD
+* Tpm est complètement faux dans le cas multicouche donc on oublie
+* A faire : Tracer la température de paroi pour TPAROIF
+*FD
+*'SI' TBT . 'THERMP' ;
+*  ID = ID + 1 ;
+*  evTfp = 'EVOL' 'VERT' 'MANU'
+*  't(s)' ltps 'oC ' ('EXTR' tic . 'Tpm' ltpsc) ;
+*  tab1 . 'TITRE' . ID = 'MOT' 'Tfp oC' ;
+*  evtpf = evtpf 'ET' evTfp ;
+*'FINS' ;
+'SI' TBT . 'TTIMP' ;
+  NBTIMP = 'DIME' (rxt . 'TIMP') ;
+  itimp  = 'INDE' (rxt . 'TIMP') ;
+  'REPE' BBTIMP NBTIMP ;
+    Btimp = rxt . 'TIMP' . (itimp . &BBTIMP) ;
+    ID = ID + 1 ;
+    uu = 'CHAI'  itimp . &BBTIMP ;
+    tab1 . 'TITRE' . ID = 'MOT' uu ;
+    evTfpc1 = 'EVOL' 'TURQ' 'MANU'
+    't(s)' ltps 'oC ' ('EXTR' Btimp . 'Ltbpi' ltpsc) ;
+    evtpf = evtpf 'ET' evTfpc1 ;
+  'FIN' BBTIMP ;
+'FINS' ;
+
+'DESS' evtpf 'MIMA'
+ 'TITR' 'Mean temperature (fluid and TIMP)'
+ 'GRIL' 'POIN' 'GRIS' 'TITX' 't(s)' 'TITY' 'oC' 'LEGE' tab1 ;
+*
+'FINS' ;
+*
+* Post-traitement Graphique     FIN
+'FINPROC' ;
+ 
+ 
+ 
+ 
+ 
+ 

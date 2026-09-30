@@ -1,0 +1,57 @@
+C TSTD3D    SOURCE    FD218221  24/02/07    21:15:29     11834          
+      subroutine TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     # precision3d,log_reduc,reduc)
+      
+c     test refermeture excessive lors de l coulement et calcul du coeff
+c     de reduction de retour radial
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      integer ncr
+      logical actif(ncr),actif_prec(ncr)
+      real*8 fcr(ncr),eplr3(3),deplr3(3),precision3d
+      logical log_reduc
+      real*8 reduc,aux
+
+      log_reduc=.false.
+      reduc=1.d0
+      do i=1,3
+        if(actif(i)) then   
+            if((eplr3(i)+deplr3(i)).lt.0.d0) then
+                log_reduc=.true.
+                aux=-eplr3(i)/deplr3(i)
+                if(aux.ne.aux)then
+                  print*,'Pb dans testref3d, reduc = NaN, mis a zero'
+                  print*,i,eplr3(i),deplr3(i)
+                  aux=0.d0
+                end if  
+c                print*,'tstd3d reduc(',i,')=',aux
+                if(aux.le.precision3d) then
+C                  print*,'pb dans tstd3d'
+C                  print*,'reduc',reduc
+                   reduc=0.d0
+c                  on desactive le critere pour la prochaine iteration
+                   actif(i)=.false.
+                   fcr(i)=0.d0                   
+C                  print*,'direction',i
+C                  print*,'eplr3(i)',eplr3(i)
+C                  print*,'deplr3(i)',deplr3(i)
+C                  read*
+                else
+                   reduc=min(reduc,aux)
+                end if
+            end if
+        end if
+      end do
+c      if(log_reduc)then
+c          print*,'testref3d reduc',reduc
+c      end if
+        
+      return
+      end
+        
+        
+ 
+ 
+ 

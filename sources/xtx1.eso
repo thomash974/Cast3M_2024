@@ -1,0 +1,37 @@
+C XTX1      SOURCE    CB215821  20/11/25    13:43:33     10792          
+      SUBROUTINE XTX1(ICH1,XRET)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C=======================================================================
+C   APPELE PAR XTX: CALCULE LA NORME XT.X DU CHPOINT ICH1
+C                 EN ELIMINANT LES TERMES EN LX OU EN FLX
+C                   RESULTAT MIS DANS XTX
+C=======================================================================
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+      XRET=0.D0
+      MCHPOI=ICH1
+      SEGACT MCHPOI
+      NSOUPO=IPCHP(/1)
+      DO 1 ISOU=1,NSOUPO
+        MSOUPO=IPCHP(ISOU)
+        SEGACT MSOUPO
+        MPOVAL=IPOVAL
+        SEGACT MPOVAL
+        N=VPOCHA(/1)
+        NC=VPOCHA(/2)
+        DO 2 IC=1,NC
+        IF(NOCOMP(IC).EQ.'LX  ') GOTO 2
+        IF(NOCOMP(IC).EQ.'FLX ') GOTO 2
+          DO 5 I2=1,N
+            XRET=XRET + (VPOCHA(I2,IC)**2)
+ 5        CONTINUE
+ 2      CONTINUE
+ 1    CONTINUE
+      END
+
+ 
+ 
+ 

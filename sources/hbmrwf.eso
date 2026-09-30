@@ -1,0 +1,72 @@
+C HBMRWF    SOURCE    BP208322  20/09/18    21:16:51     10718          
+
+       SUBROUTINE HBMRWF(NT,NDDL,OMEG,Q1,AiDi,Di,LAMBD,VCTCS,Rw)
+       
+*=======================================================================   
+* Rajoute la derivee des efforts de couplage fluidelastique: 
+* R,w = R,w - dFf/dw
+*     = R,w - Zwf*X
+*=======================================================================        
+
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+       INTEGER NHBM,NT,NDDL,H
+       REAL*8 Rw(NT),Q1(NT),VCTCS(7),LAMBD(NDDL),AiDi(2),Di(2),bi(2)
+       REAL*8 OMEG,V,cf0,mf0,dmfej,cfei,cii,dniR,dniI
+       
+*-----------------------------------------------------------------------
+* 0. Recuperation des coefficients
+       V = VCTCS(4)
+*     Coefficient de couplage: mf0dV = -(rho_f/2)*(dCLdy)*V^2             
+       mf0  = -VCTCS(1)*VCTCS(7)*(V**2)
+*     Coefficient d'amortissement: cf0 = (rho_f/2)*(DIAM)*(CD)*V  
+       cf0  = VCTCS(1)*VCTCS(5)*VCTCS(6)*V    
+       DO I = 1,2
+        bi(I) = Di(I)*V/VCTCS(5)
+       ENDDO
+       NHBM = (NT/NDDL - 1)/2
+       
+*-----------------------------------------------------------------------
+* 1. Terme d'amortissement ajoute     
+*  1.1 Composante statique: nulle
+*  1.2 Boucle sur les harmoniques 
+       DO J=2,2*NHBM,2
+         dmfej = (J/2)*cf0
+        DO I=1,NDDL   
+*         Cos         
+          Rw(NDDL*(1+(J-2))+I) = Rw(NDDL*(1+(J-2))+I)
+     &                         + dmfej*LAMBD(I)*Q1(NDDL*(1+(J-1))+I)
+*         Sin     
+          Rw(NDDL*(1+(J-1))+I) = Rw(NDDL*(1+(J-1))+I)
+     &                         - dmfej*LAMBD(I)*Q1(NDDL*(1+(J-2))+I)                    
+        ENDDO              
+       ENDDO
+       
+*-----------------------------------------------------------------------
+** 2. Effet memoire 
+** Boucle sur le nombre de termes 
+        DO JJ = 1,2       
+           cfei = mf0*AiDi(JJ)*V/VCTCS(5)
+*   2.1 Composante statique: nulle          
+*   2.2 Boucle sur les harmoniques
+          DO H = 2,2*NHBM,2
+           cii = 1./((bi(JJ))**2+((H/2)*OMEG)**2)
+           dniR = -2.D0*bi(JJ)*OMEG*((H/2)*cii)**2
+           dniI = 2.D0*((H/2)**3)*(OMEG*cii)**2 -cii*(H/2)
+**         Boucle sur les DDL
+           DO K = 1,NDDL
+*          Cos
+           Rw(NDDL*(1+(H-2))+K) = Rw(NDDL*(1+(H-2))+K)  
+     &     + LAMBD(K)*cfei*(  dniR*Q1(NDDL*(1+(H-2))+K)              
+     &                      + dniI*Q1(NDDL*(1+(H-1))+K) ) 
+*          Sin
+           Rw(NDDL*(1+(H-1))+K) = Rw(NDDL*(1+(H-1))+K) 
+     &     + LAMBD(K)*cfei*(  dniR*Q1(NDDL*(1+(H-1))+K)             
+     &                      - dniI*Q1(NDDL*(1+(H-2))+K) )                   
+           ENDDO
+          ENDDO
+         ENDDO 
+         
+        END         
+ 
+ 

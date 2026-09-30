@@ -1,0 +1,33 @@
+C MAMU31    SOURCE    PV        20/02/22    21:15:10     10531          
+      subroutine mamu31(long,val11     ,val1,lpl,pt)
+      implicit real*8 (a-h,o-z)
+      real*8 val11(*),val1(*)
+      real*8 pt(36)
+           id2=lpl
+           id3=lpl+lpl+1
+           pt1=pt(1)
+           pt4=pt(2)
+           pt7=pt(3)
+           do 110 i=1,long
+              xval1=val1(i)
+              xval11=val11(i)
+              xval2=val1(i+id2)
+              xval3=val1(i+id3)
+              pt1=pt1+xval1*xval11
+              pt4=pt4+xval2*xval11
+              pt7=pt7+xval3*xval11
+ 110       continue
+           pt(1)=pt1
+           pt(2)=pt4
+           pt(3)=pt7
+
+
+
+           end
+
+ 
+ 
+ 
+ 
+ 
+ 

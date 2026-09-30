@@ -1,0 +1,83 @@
+C FATIG     SOURCE    KICH      22/09/22    21:15:02     11465          
+      SUBROUTINE FATIG
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C==================================
+C     CH2 = FATI TAB1 CH1 MOT1 ;
+C===================================
+      PARAMETER (NCLE=7,NOPT=2)
+
+-INC PPARAM
+-INC CCREEL
+-INC CCOPTIO
+-INC SMCHARG
+      LOGICAL L0,L1
+      CHARACTER*4 CLE(NCLE),OPTSEU(NOPT)
+      DATA CLE/'TOUS','DVKP','PAPA','SINE','CROS','DC','VMIS'/
+      DATA OPTSEU/'SEUI','TOUS'/
+      DATA zc/-2.d-1/
+
+      CALL LIROBJ('MMODEL  ',IPMODE,1,irt1)
+      CALL ACTOBJ('MMODEL  ',IPMODE,1)
+      IF (IERR.NE.0) RETURN
+      IF (IRt1.EQ.0) GOTO 100
+
+      CALL LIROBJ('CHARGEME',ICHAR,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IF(IRETOU.EQ.0) GO TO 100
+* caracteristiques critere
+      CALL LIROBJ('MCHAML  ',IP1,0,IRETOU)
+          if (ierr.ne.0) return
+      CALL LIRREE(XRE1,0,iret)
+       if(iret.eq.0) xre1 = 0.D0
+      CALL LIRREE(XRE2,0,iret)
+       if(iret.eq.0) xre2 = 0.D0
+       
+
+          CALL LIRMOT(CLE,NCLE,ICLE,0)
+          if(icle.eq.0) icle = 1
+          if (ierr.ne.0) return
+        IF (icle.ge.2.or.icle.le.6) THEN
+          CALL LIRMOT(OPTSEU,NOPT,IOP1,0)
+          if(iop1.eq.1) then
+            CALL LIRMOT(OPTSEU,NOPT,IOP2,0)
+            if (iop2.eq.0) then
+              CALL LIRREE(zecrit,1,iret)
+              if (iret.eq.0) then
+                return
+              endif
+            elseif (iop2.eq.2) then
+               zecrit = XPETIT
+            endif
+          else
+            zecrit = zc
+          endif
+        ENDIF
+          if (ierr.ne.0) return
+
+       MCHARG = ichar
+       segact mcharg
+       if (kcharg(/1).ne.1) then
+        call erreur(512)
+        return
+       endif
+      icharg = kcharg(1) 
+      segact icharg
+        ittemp = ichpo1
+        itcont = ichpo2
+*      write(6,*)'sr',ierr,ITCONT,ITTEMP,IPMODE,IP1,xre1,xre2,ICLE
+
+      call FATIG2(ITCONT,ITTEMP,IPMODE,IPZZZ,IP1,xre1,xre2,ICLE,NCLE,
+     &CLE,zecrit,ICHOUT)
+      if(ierr.ne.0) return
+
+            CALL ECROBJ( 'MCHAML  ',ICHOUT )
+ 100  CONTINUE
+
+      RETURN
+      END
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,884 @@
+C CHOLE     SOURCE    PV090527  24/01/15    21:15:03     10699          
+*
+      subroutine chole(mmatrx,prec,istab,nbnnma,nligra,xmatri)
+*
+* octobre 2022 version unifie chole chomod: normal et condensation superelement
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C  TANT QUE OOOVAL(1,4) NE MARCHE PAS SUR CRAY
+      PARAMETER (LPCRAY=10000)
+      INTEGER OOOVAL,OOOLEN
+      dimension ittime(4)
+
+      POINTEUR LILIGN.MILIGN
+C
+C  ****  MISE SOUS FORME A=Lt D L  DE LA MATRICE MMATRX
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMMATRI
+-INC SMRIGID
+
+-INC CCASSIS
+-INC CCHOLE
+      SEGMENT KIVPO(IIMAX)
+      SEGMENT KIVLO(IIMAX)
+      segment immt(nblig)
+      segment ireser(nvstrm)
+      external chole3i
+      SAVE IPASV
+      DATA IPASV/0/
+*  ngmpet dit si on tient en memoire (false) ou si on deborde (true)
+      logical ngmpet
+C     character*8 zen
+C     equivalence (zen,izen)
+      logical lsgdes,pasfait,ngdyn
+      ireser=0
+      nbres=0
+      matric=xmatri
+      maitre=0
+      nelrig=1
+      nligrp=nligra
+      nligrd=nligra
+      if (xmatri.ne.0) then
+       segini xmatri
+      endif
+      nbnnmc=nbnnma
+      matric=xmatri
+
+
+
+10000 continue
+      pasfait=.true.
+      lsgdes=.false.
+*  faire attention a respecter l'ordre des segdes par la suite
+      call ooomru(1)
+      if (istab.ne.0.and.istab.ne.1) call erreur(5)
+      condmax=0.d0
+      condmin=xgrand
+      ngmpet=.false.
+      ngdyn=.true.
+      call timespv(ittime,oothrd)
+      kcour=(ittime(1)+ittime(2))/10
+      kcouri=kcour
+      kcour=0
+      nbopit=0
+
+      iposm=0
+C     zen='CPU'//char(0)
+C     le=4
+      nvaor=0
+      nbthro=nbthrs
+      ithrd=0
+      if (nbthro.gt.1) then
+       ithrd=1
+       call threadii
+       call oooprl(1)
+      endif
+      nbthr=nbthro
+      do ith=1,nbthr
+       nbop(ith)=0
+      enddo
+      stmult=1d-5
+
+C  nouvelle methode de gestion de l'espace memoire necessitee par la parallelisation
+C  memoire vive totale
+      MACTIT=OOOVAL(1,1)
+**    write(6,*) ' mactit igrand ',mactit,igrand
+C  un bloc de memoire fera au plus macti/2
+      call intpdo(inpdo)
+      nvstrm=mactit/10
+      MMATRI=MMATRX
+      SEGACT,MMATRI*MOD
+      PRCHLV=PREC
+      MILIGN=IILIGN
+
+      SEGACT,MILIGN*MOD
+      INO=ILIGN(/1)
+      MDIAG=IDIAG
+      SEGACT,MDIAG*MOD
+      NBLIG=INO
+      segini immt
+      precc=prec
+      INC=DIAG(/1)
+      if (matric.eq.0) nbnnmc=inc+1
+      nvstrm=max(inc*inpdo,nvstrm)
+**      write(6,*) ' nvstrm ',nvstrm
+      INCC=INC
+      MIMIK=IIMIK
+      MINCPO=IINCPO
+      SEGACT,MINCPO,MIMIK
+      IPLUMI=IMIK(/2)*2 +4
+      IL2=0
+      IIMAX=IJMAX+IPLUMI
+      SEGINI KIVPO,KIVLO
+      INEG=0
+      NBLAG=0
+      NENSLX=0
+      NVSTOC=0
+      NVSTOR=0
+      diagmax=XPETIT/XZPREC
+      diagmin=xgrand
+      do i=1,diag(/1)
+       if (ittr(i).eq.0) diagmax=max(diagmax,abs(diag(i)))
+       if (ittr(i).eq.0.and.abs(diag(i)).gt.xpetit/xzprec)
+     >   diagmin=min(diagmin,abs(diag(i)))
+      enddo
+      if (diagmax.le.xpetit/xzprec) then
+         do i=1,diag(/1)
+           diagmax=max(diagmax,abs(diag(i)))
+           if (abs(diag(i)).gt.xpetit/xzprec)
+     >       diagmin=min(diagmin,abs(diag(i)))
+         enddo
+      endif
+      diagmin=min(diagmin,diagmax)
+***    write (6,*) ' chole diagmin diagmax ',diagmin,diagmax,diag(/1)
+
+
+C
+C
+C
+C  **** DEBUT DE LA TRIANGULARISATION. ON PREND NOEUD A NOEUD,
+C  **** DECOMPACTAGE PUIS TRAVAIL SUR LES LIGNES DU NOEUDS
+C
+C  ****  LA LONGUEUR DE LA PLUS GRANDE LIGNE EST DONNEE PAR IMAX
+C
+C SP  indicateurs pour impression message "stabilisation RESO..."
+      isr=0
+      isrl=0
+
+  1   CONTINUE
+      IVALMA=IJMAX+IPLUMI
+      IL1=IL2+1
+      IMIN=IL1
+*  reserver de la place ou mettre les lignes superieures dans le cas debordement
+      if (ngmpet) then
+        if (ireser.eq.0) segini ireser
+      endif
+      DO 2 I=IL1,INO
+      ngdyn=.true.
+**    imasq=0
+      LIGN=0  
+
+      LLIGN=    ILIGN(I)
+      SEGACT /ERR=32/LLIGN
+      goto 31
+  32  continue
+**       write(6,*) ' segact llign erreur',i,il1,lsgdes
+      if (.not.lsgdes) then
+**         write(6,*) ' lsgdes 1 '
+        lsgdes=.true.
+*****   ngmpet=.true.
+**      write(6,*) 'desactivation-1 ',1,il1-1
+        do it=il1-1,1,-1
+         lign=ilign(it)
+         segdes lign
+        enddo
+      else
+        goto 3
+      endif
+      SEGACT /ERR=3/LLIGN
+  31  continue
+      NA=  IMMMM(/1)
+*     write (6,*) ' chole ligne noeud inconnues ',i,ipno(i),na
+      NBPAR=NA+1
+      NVALL=  NJMAX
+      LMASQ=NVALL/MASDIM+2
+      SEGINI /ERR=33/ LIGN
+      goto 34
+  33  continue
+**     write(6,*) ' segini lign erreur',il1
+      if (.not.lsgdes) then
+**        write(6,*) ' lsgdes 2 '
+        lsgdes=.true.
+*****   ngmpet=.true.
+**      write(6,*) 'desactivation-2 ',1,il1-1
+        do it=il1-1,1,-1
+         lign=ilign(it)
+         segdes lign
+        enddo
+      else
+        goto 3
+      endif
+      SEGINI /ERR=3/ LIGN
+**     write(6,*) 'deuxieme essai lign ok'
+  34  continue
+C  recuperer la longueur du segment
+      lglig=na*(nvall/na)**1.333333333333333333
+      NVSTOC=NVSTOC + NVALL
+      IVALMA=IVALMA + NVALL
+
+
+      nvaor = nvaor + xxva(/1)
+C
+C  ****  DECOMPACTAGE
+C
+      IPA=1
+      DO 121 JPA=1,NA
+            IVPO(JPA)=IPA
+        KPA =   IPPO(JPA+1)-  IPPO(JPA)
+        IPP =   IPPO(JPA)
+            IPPVV(JPA)=IPA-1
+        LPA  =   LDEB(JPA)
+        LPA1 = LPA-IPA
+
+        DO 122 MPA=1,KPA
+          LL   =   LINC(MPA+IPP)
+          IPLA = LL -LPA1
+           xxv=xxva(mpa+ipp)
+           if (abs(xxv).gt.xpetit) then
+              VAL(IPLA)=  XXV
+              IMASQ(IPLA/MASDIM+1)=1
+              if (ipla-ipa+1.ge.1) IMASQ((IPLA-ipa+1)/MASDIM+1)=1
+           endif
+122     CONTINUE
+
+        IPA=IPA+  IMMMM(JPA)-LPA + 1
+Cpv         IMMM(JPA)=   IPNO(LPA)
+        IMMM(JPA)=LPA
+        IF(IMIN  .GT.   IPNO(LPA )) IMIN  =    IPNO(LPA)
+
+
+
+121   CONTINUE
+
+* indexation de imasq
+        ipln=lmasq/na
+        iplp=lmasq/na
+        do 123 ipl=lmasq/na,1,-1
+          if (imasq(ipl).gt.0) then
+            imasq(ipl)=iplp*masdim
+            ipln=ipl-1
+          else
+            imasq(ipl)=-ipln*masdim
+            iplp=ipl-1
+          endif
+ 123    continue
+**      write (6,*) ' imasq ',lmasq/na
+**      write (6,*) (imasq(ipl),ipl=1,lmasq/na)
+
+
+
+
+
+
+
+
+C*** **** ****
+
+
+
+
+
+
+
+
+
+
+
+      if (na.gt.0) then
+          IPREL=  IMMMM(1)
+          IDERL=  IMMMM(NA)
+          lcara(2,i)=iprel
+          lcara(3,i)=iderl
+      endif
+          IPPVV(NA+1)=IPA-1
+
+
+
+
+
+      SEGSUP LLIGN
+         ILIGN(I)=LIGN
+
+
+C*    write (6,*) 'longueur ligne ',nvall
+C nb de ligne multiple du nb de threads
+C blocage ligne lecture-ecriture pour minimiser le cache
+C on note si on est au minimum de lignes
+      nbthro=min(nbthrs,lglig/1200+1)
+      if (i+1-il1.ge.nbthro.and.(.not.ngmpet)) then
+       nbthro=min(nbthrs,i+1-il1)
+       ngdyn=.true.
+        if(i+1-il1.eq.nbthrs) ngdyn=.false.
+         il2=i
+**       write(6,*) ' nbthro il1 il2 ',nbthro,il1,il2
+
+
+         GOTO 4
+      endif
+
+
+    2 CONTINUE
+      IL2=INO
+      GO TO 4
+    3 IL2=I-1
+**      write(6,*) 'desactivation-4 ',llign
+      segdes llign
+      if (               lign.ne.0) segsup lign
+    4 CONTINUE
+      nbthro=min(nbthrs,nbthro)
+      nbthr=nbthro
+      if(ireser.ne.0) segsup ireser
+C
+      IF(IL2.GE.IL1) GO TO 40
+C
+C ****  APPEL AUX ERREURS  MESSAGE PAS ASSEZ DE PLACE MEMOIRE
+C
+C      ITYP=48
+      CALL ERREUR(48)
+        call ooodmp(0)
+      if (ithrd.eq.1) then
+       call threadis
+       call oooprl(0)
+      endif
+      call ooomru(0)
+      RETURN
+   40 CONTINUE
+      IM=INC
+
+
+
+      DO 352 IH=IL2 ,IL1,-1
+      LIGN=   ILIGN(IH  )
+      IL=INC
+      DO 354 JH=1,    IMMM(/1)
+      IM=MIN(IM,    IMMM(JH))
+      IL=MIN(IL,    IMMM(JH))
+ 354  CONTINUE
+      IML=IL
+      lcara(1,ih)=iml
+      immt(ih)=ipno(im)
+  352 CONTINUE
+C  353 CONTINUE
+      LIGN=ILIGN(IL1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      IL11=    IPREL
+
+
+C
+C  ****  BOUCLE  *5*  TRAVAILLE SUR LE NOEUD I QUI EST EN LECTURE
+C
+C    >      il1,il2
+      lig1=   ilign(imin)
+      ipos=0
+      iper=imin
+      ider=imin-1
+      iderac=imin-1
+
+      IL1i=il1
+      DO 5 I=IMIN ,IL2
+
+      LIG1=   ILIGN(I)
+
+      IF(I.LT.IL1)  GO TO 7
+C____________
+C
+C  ******* LE NOEUD I EST EN MEMOIRE IL EST TRIANGULE JUSQU'A
+C  ******* IPREL  IL FAUT CONTINUER TOUTE LES LIGNES PUIS CALCULER
+C  ******* LE TERME DIAGONAL
+C
+      LIGN=LIG1
+      DO 156 KHG=1,IMMM(/1)
+
+      II=IPREL-1+KHG
+      IMMM(KHG)=0
+      NN=IPPVV(KHG+1)
+
+      NNM1=IPPVV(KHG)
+
+      N=NN-NNM1
+      DIAG(II)=VAL(NN)
+       if (n.eq.1) then
+        if(ii-nbnnmc.gt.0) then
+         re(ii-nbnnmc,ii-nbnnmc,1)=val(nn)
+         goto 41
+        else
+         goto 8
+        endif
+       endif
+
+
+      NMI=N-II
+*  attention subtile difference noeud maitre et non maitre
+      if (ii-nbnnmc.le.0) then
+       IDEP=MAX(IL11,2-NMI)
+      else
+       IDEP=MAX(IL11,1-NMI)
+      endif
+      KIDEP=IDEP+NMI
+      KI1=N-1
+      KQ=-NMI
+      VAL(NN)=VAL(NN)+
+     > CHOLE1(ILIGN,IPREL,imasq(1),VAL(1+IPPVV(KHG)),DIAG(1-NMI),
+     > IPNO(1-NMI),IPPVV(1),KHG,IVPO(1),KIDEP,KI1,KQ,1+IPPVV(KHG),
+     > PREC,nbop(1))
+       imasq(nn/masdim+1)=1
+       imasq(n/masdim+1)=1
+       if(ii-nbnnmc.gt.0) then
+         re(ii-nbnnmc,ii-nbnnmc,1)=val(nn)
+         goto 41
+       endif
+   8  CONTINUE
+      diagref=max(abs(diag(ii)),diagmin)
+      diagcmp=diagref*5d-12
+      IF(   ITTR(II).EQ.0.AND.
+     & ABS(     VAL(NN)).GT.diagcmp)  GO TO 12
+      IF(   ITTR(II).NE.0.AND.
+     & ABS(     VAL(NN)).GT.diagcmp)  GO TO 12
+**      write(6,*) ' ittr val diagcmp ',ittr(ii),val(nn),diagcmp
+C  il faut mettre une valeur plus grande sur les LX car on a un probleme de conditionnement
+C  sur le calcul des reactions en cas de 2 relations presque identique
+C
+C  **** ON VIENT DE DETECTER UN MODE D'ENSEMBLE
+C  **** ON AJOUTE A LA STRUCTURE UN RESSORT EGAL A CELUI QUI EXISTAIT
+C  **** AU PREALABLE SUR CETTE INCONNUE.
+C
+*     write (6,*) ' chole mode d ensemble ittr ligne ',
+*    >      ittr(ii),ii,diag(ii),val(nn),diagref
+C  on garde le signe car il fau un moins sur les ML
+       vmaxi=diagref
+       do ipv=1+ippvv(khg),nn
+        vmaxi=max(vmaxi,abs(val(ipv)))
+       enddo
+      if(   ittr(ii).NE.0) then
+       VAL(NN)=val(nn)-1.30D0*diagref
+       NENSLX=NENSLX+1
+      else
+       val(nn)=vmaxi
+      endif
+      NENS=NENS+1
+           IMMM(KHG)=NENS
+   12 CONTINUE
+
+
+*  stabilisation
+      IF (ISTAB.NE.0) THEN
+*  elimination des Nan
+       if (.not.(abs(val(nn)).lt.xgrand*xzprec).and.pasfait) then
+         pasfait=.false.
+         val(nn)=xgrand*xzprec
+         write (6,*) 'Nan dans chole ligne',ii
+       endif
+*
+       diagcmp=abs(diagmin)*1d-5+xpetit/xzprec
+       if (val(nn).lt.-diagmax*1d-3.and.ittr(ii).eq.0) then
+        val(nn)=abs(val(nn))
+***     val(nn)=diagmax*1d-3
+        if (immm(khg).eq.0) NENS=NENS+1
+        IMMM(KHG)=NENS
+       elseif (val(nn).le.diagcmp.and.ittr(ii).eq.0 ) then
+        if (isr.eq.0.or.iimpi.gt.0)
+     &     write (6,*) ' stabilisation RESO ',ii,val(nn),diag(ii)
+        isr=isr+1
+        val(nn)=max(diagcmp,-val(nn))
+        if (immm(khg).eq.0) NENS=NENS+1
+        IMMM(KHG)=NENS
+       else
+        if (ittr(ii).eq.0) diagmin=min(diagmin,abs(val(nn)))
+       endif
+       if (val(nn).ge.abs(diag(ii))*stmult.and.ittr(ii).ne.0) then
+        if (isrl.eq.0.or.iimpi.gt.0)
+     &     write (6,*) ' stabilisation RESO lagrange ',ii,val(nn)
+        isrl=isrl+1
+        val(nn)=-abs(diag(ii))*stmult
+        if (immm(khg).eq.0) then
+           NENS=NENS+1
+           NENSLX=NENSLX+1
+        endif
+        IMMM(KHG)=NENS
+       endif
+      ENDIF
+
+
+
+
+
+      DIAG(II)=     VAL(NN)
+      IF(abs(DIAG(II)).gt.xpetit)  GO TO 41
+      DIAG(II)=diagmax
+      if (ittr(ii).ne.0) diag(ii)=-diagmax
+      VAL(NN)=DIAG(II)
+      GO TO 41
+C
+C  ****  ENVOI ERREUR MATRICE SINGUIERE
+C
+C      ITYP=49
+      INTERR(1)=I
+      CALL ERREUR(49)
+      if (ithrd.eq.1) then
+        call threadis
+       call oooprl(0)
+      endif
+      call ooomru(0)
+      RETURN
+C
+C  ****  ON COMPTE LE NOMBRE DE TERMES DIAGONAUX NEGATIFS
+C        ET LE NOMBRE DE MULTIPLICATEUR DE LAGRANGE
+C
+   41 IF(DIAG(II).LT.0.D0)  INEG=INEG+1
+      IF(   ITTR(II).NE.0) NBLAG=NBLAG+1
+
+      if (ii.le.nbnnmc) condmin=min(condmin,abs(diag(ii)))
+      condmax=max(condmax,abs(diag(ii)))
+      if (ii.le.nbnnmc) diag(ii)=1.d0/diag(ii)
+  156 CONTINUE
+      NA=IMMM(/1)
+C
+C  RECOMPACTAGE DE LIGN (DEJA ENTIEREMENT TRAITEE)
+C
+*       write(6,*) 'chole ligne lpl',i,na,ippvv(2)-ippvv(1)
+      if (na.gt.0)
+     >CALL COMPAC(     VAL(1),NBPAR,KIVPO(1),KIVLO(1),
+     #    NVALL,     IPPVV(1),IZROSF,NA,PREC,imasq(1),iprel,iderl)
+      lmasq=0
+C on recree lign car la compacter en place emiette la memoire
+       lig1=lign
+       segini /err=1431/ lig1
+       goto 1432
+ 1431  continue
+       write(6,*) ' segini echoue'
+ 1432  continue
+      nbres=max(nbres,nvall)
+*  deplacement fait ici maintenant, avec unrolling
+      do 300 nbp=1,nbpar-1
+       kdif =kivpo(nbp)-kivlo(nbp)
+       do     iv=kivlo(nbp),kivlo(nbp+1)-4,4
+          lig1.val(iv)=val(iv+kdif )
+          lig1.val(iv+1)=val(iv+1+kdif )
+          lig1.val(iv+2)=val(iv+2+kdif )
+          lig1.val(iv+3)=val(iv+3+kdif )
+       enddo
+       do     iv1=iv,kivlo(nbp+1)-1
+          lig1.val(iv1)=val(iv1+kdif )
+       enddo
+ 300  continue
+*      do it=1,nvall
+*       lig1.val(it)=val(it)
+*      enddo
+       do it=1,na
+        lig1.immm(it)=immm(it)
+        lig1.ippvv(it)=ippvv(it)
+       enddo
+        lig1.ippvv(na+1)=ippvv(na+1)
+        lig1.iml=iml
+        lig1.iprel=iprel
+        lig1.iderl=iderl
+        lig1.iml=iml
+        lcara(2,i)=lig1.iprel
+        lcara(3,i)=lig1.iderl
+        lcara(1,i)=lig1.iml
+       if (lign.ne.lig1) then
+        segsup lign
+        lign=lig1
+       else
+        segadj lign
+       endif
+          ilign(i)=lign
+      NVSTOR=NVSTOR+NVALL
+      nvstrm=max(nvstrm,nvall*inpdo)
+      DO 143 LHG=1,NBPAR
+            IVPO(2*LHG-1)=KIVPO(LHG)
+            IVPO(2*LHG)  =KIVLO(LHG)
+ 143  CONTINUE
+C   Si la ligne est petite, il n'y a rien a gagner a paralleliser
+
+      if (i.gt.1) then
+       lig1=ilign(i-1)
+**      if(lsgdes) write(6,*) 'desactivation-5 ',i
+       if (lsgdes)  segdes lig1
+       iderac=min(iderac,i-2)
+      endif
+
+C
+C  ****  ON TRIANGULARISE LES AUTRES LIGNES
+C
+      il1=il1+1
+      if (il1.gt.il2) goto 5
+      LIG1=ILIGN(I)
+      lign=ilign(il1)
+      IL11=IPREL
+      goto 7
+C  72  continue
+  71  continue
+*  passage en superlent
+      if (ider.lt.il1-1.and..not.ngmpet) then
+**      write(6,*) 'ngmpet true ',iper,ider,il1,il2
+        ngmpet=.true.
+**      do ipv=1,iper-1
+**        lig2=ilign(ipv)
+**       call oooeta(lig2,ieta,imod)
+**         if (ieta.eq.1) write(6,*) 'ligne active ',ipv,iper
+**      enddo
+      endif
+      if (iper.gt.ider) then
+        call erreur(48)
+        write(6,*) ' 1 chole iper ider i il1 il2 ',
+     >         iper,ider,i,il1,il2
+        do ipv=1,ino
+         lig2=ilign(ipv)
+         call oooeta(lig2,ieta,imod)
+         if (ipv.lt.il1.or.ipv.gt.il2) then
+           if (ieta.eq.1) write(6,*) 'ligne active ',ipv
+         endif
+        enddo
+        call ooodmp(0)
+      if (ithrd.eq.1) then
+       call threadis
+       call oooprl(0)
+      endif
+      call ooomru(0)
+        return
+      endif
+
+C      soit parce qu'on a fini, soit parce qu'on manque de memoire
+C      il faut executer les lignes activees puis les desactiver
+C      lancer les chole3 et attendre qu'ils soient finis
+      if (ipos.ne.0) then
+**      write (6,*) ' lancement thread ',iper,ider,il1,il2
+        if (iper.gt.ider) then
+          write (6,*) ' erreur interne chole '
+          call erreur(5)
+        endif
+        nbthr=min(nbthr,il2-il1+1)
+**      write(6,*) 'nbthr ',nbthr,il2-il1+1
+         LILIGN=MILIGN
+*  blocage pour rester dans le cache secondaire
+        ipers=iper
+        iders=ider
+        ipas=1500
+        if(nbthr.eq.1) ipas=igrand
+*       do 400 iper=ipers,iders,ipas
+ 401    continue
+        ider=min(iders,iper+ipas-1)
+          do ith=1,nbthr-1
+            call threadid(ith,chole3i)
+          enddo
+          call chole3i(nbthr)
+          do ith=nbthr-1,1,-1
+            call threadif(ith)
+          enddo
+        iper=iper+ipas
+        ipas=ipas/2
+        ipas=max(ipas,750)
+        if (iper.le.iders) goto 401
+ 400    continue
+        iper=ipers
+        ider=iders
+      endif
+
+C  test ctrlC
+      if (ierr.ne.0) goto 9999
+      iposm=max(iposm,ipos)
+      ipos=0
+      iderf=ider-1
+      if (ider.ne.il1-1) iderf=ider
+      if (lsgdes) then
+**      write(6,*) 'desactivation 7 iper iderf',iper,iderf
+      do il=iderf,iper,-1
+        lign=ilign(il)
+        segdes lign
+C       write (6,*) ' desactivation ligne ',il
+      enddo
+      endif
+       iderac=min(iderac,iper-1)
+      iper=ider+1
+C     write (6,*) ' iper ider il1 ',iper,ider,il1
+      if (iper.ne.il1) goto 7
+
+      goto 5
+    7 CONTINUE
+
+      if (lsgdes) SEGACT/err=71/LIG1
+      ipos=ipos+1
+      ider=i
+      if (i.gt.iderac) iderac=i
+      if (i.eq.il1-1)   goto 71
+    5 CONTINUE
+**    write (6,*) ' il1 il2 apres 5 ',il1,il2
+      if (lsgdes) then
+**      write(6,*) 'desactivation 8 il1 il2',il1,il2
+      DO I=min(il1,il2),max(il1,il2)
+        LIGN=   ILIGN(I)
+        if(lign.ne.0) SEGDES,LIGN
+      enddo
+      endif
+      nbopt=0
+      do ith=1,nbthro
+       nbopt=nbopt+nbop(ith)
+       nbop(ith)=0
+      enddo
+      nbopin=nbopt
+      nbopit=nbopit+nbopin
+      call timespv(ittime,oothrd)
+      kcour=(ittime(1)+ittime(2))/10
+
+
+
+
+
+      iderac=min(iderac,il1-1)
+      if (ireser.ne.0) segsup ireser
+      IF(IL2.LT.INO)  GO TO 1
+C  ON MET A JOUR LE NOMBRE DE TERMES DIAGONAUX NEGATIF
+C   ON ENLEVE LE NOMBRE DE MULTIPLICATEUR DE LAGRANGE
+C       INEG=INEG-NBLAG
+C     on ne compte pas 2 fois les multiplicateurs qui vont etre
+C     elimines lors de la resolution car mode d'ensemble
+      INEG=INEG-(NBLAG-NENSLX)
+      if (iimpi.ne.0.and.NENSLX.gt.0) WRITE(IOIMP,4820) NENSLX
+ 4820 FORMAT(I12,' MODES D ENSEMBLE PORTANT SUR DES MULTIPLICATEURS',
+     1' DE LAGRANGE DETECTES')
+
+      IF (IIMPI.EQ.1) WRITE(IOIMP,4821) NVSTOC
+ 4821 FORMAT( ' NOMBRE DE VALEURS  DANS LE PROFIL',I12)
+      IF (IIMPI.EQ.1) WRITE(IOIMP,4822) NVSTOR
+ 4822 FORMAT( ' NOMBRE DE VALEURS STOCKEES DANS LE PROFIL',I12)
+      IF (IIMPI.EQ.1) WRITE(IOIMP,4825) Nbopit/1000000
+ 4825 FORMAT( ' NOMBRE DE GIGA OPERATIONS FMA',I40)
+      IF (IIMPI.EQ.1) WRITE(IOIMP,4823) NVaor
+ 4823 FORMAT( ' NOMBRE DE VALEURS initiales',I9)
+C     IF (IIMPI.EQ.1) WRITE(IOIMP,4824) nbopit/1d6/(kcour-kcouri)
+C 4824 FORMAT( ' Performance en Gigaflops ',F8.1)
+      INTERR(1)=NVSTOR
+      reaerr(1)=nvstor/inc**(4.D0/3.D0)
+      reaerr(2)=2.D0*nbopit/1.D6/max(1,(kcour-kcouri))
+      reaerr(3)=condmax/condmin
+      IF (IPASV.EQ.0.or.reaerr(3).gt.1.D23) CALL ERREUR(-278)
+      IPASV=1
+      call ooomru(0)
+      if(lsgdes) then
+        do ipv=1,ino
+          lign=ilign(ipv)
+          segdes lign
+        enddo
+      endif
+      SEGDES,MINCPO
+      SEGDES,MIMIK
+      SEGDES,MMATRI
+      SEGDES,MILIGN
+      MMATRX=MMATRI
+      SEGSUP KIVPO,KIVLO
+      segsup immt
+C     write (6,*) ' chole ipos max ',iposm
+ 9999 continue
+      if (ithrd.eq.1) then
+        call threadis
+       call oooprl(0)
+      endif
+      if(iimpi.ne.0)  write (6,*) 
+     >      ' chole condmin condmax ',condmin,condmax,diag(/1)
+      SEGDES,MDIAG
+**    write(6,*) 'kseq kpar',xkseq,xkpar
+
+
+      RETURN
+      END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

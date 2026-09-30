@@ -1,0 +1,264 @@
+C ETG       SOURCE    CB215821  23/02/02    21:15:04     11576          
+      SUBROUTINE ETG
+
+      implicit integer (i-n)
+      implicit real*8(a-h,o-z)
+
+      external long
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMTABLE
+-INC SMLOBJE
+-INC CCNOYAU
+-INC CCASSIS
+-INC CCPRECO
+
+      LOGICAL        LOGR1,LOGR2
+      REAL*8         XVALRE,XVALR2
+      CHARACTER*(8)  TYOBJE,CHA8,CHACRE
+      CHARACTER*(LOCHAI) CHARRE
+
+C     Objets geres par les TABLES 'ESCLAVE'
+      PARAMETER(NBOK=12)
+      CHARACTER*(8)  OBJOK(NBOK)
+      DATA OBJOK /'CHPOINT ','RIGIDITE','LOGIQUE ','MCHAML  ','MMODEL',
+     >            'MAILLAGE','MATRIK  ','FLOTTANT','EVOLUTIO','ENTIER',
+     <            'MOT','CHARGEME'/
+
+C     MACRO a synchroniser avec le DATA OBJOK pour test rapide d'entiers
+      MACRO,(CHPOINT ,RIGIDITE,LOGIQUE ,MCHAML  ,MMODEL,
+     >       MAILLAGE,MATRIK  ,FLOTTANT,EVOLUTIO,ENTIER,
+     >       MOT,CHARGEME)
+
+C     Objets geres par les LISTOBJ
+      PARAMETER(NBOK2=9)
+      CHARACTER*(8)  OBJOK2(NBOK2)
+      DATA OBJOK2/'CHPOINT ','RIGIDITE','MCHAML  ','MMODEL','MAILLAGE',
+     $            'MATRIK  ','EVOLUTIO','ENTIER  ','CHARGEME'/
+
+C     SID : SEGMENT CONTENANT LES INFORMATIONS POUR LA FUSION DES OBJETS
+      SEGMENT SID
+C       NBFUS  : NOMBRE D'OBJETS A FUSIONNER
+C       IPOINT : POINTEURS A FUSIONNER ou ENTIERS A FUSIONNER (cas particuler MAXI / MINI)
+C       BVAL   : LOGIQUES SUR LESQUELS ON FAIT UN ET/OU LOGIQUE
+C       XVAL   : REELS A FUSIONNER (cas particuler MAXI / MINI)
+C       CVAL   : MOTS  A FUSIONNER (cas particuler MAXI / MINI)
+C       CHATYP : MOT DONNANT LE TYPE   D'OBJETS A FUSIONNER
+        INTEGER         IPOINT(NBFUS)
+        LOGICAL         BVAL  (NBFUS)
+        REAL*8          XVAL  (NBFUS)
+        CHARACTER*(IC1) CVAL  (NBFUS)
+        CHARACTER*8     CHATYP,CREATE
+      ENDSEGMENT
+
+      LOGR1 = .FALSE.
+      LOGR2 = .FALSE.
+      XVALRE= 0.
+      XVALR2= 0.
+
+
+CC     Lecture du premier objet
+CC     ------------------------
+      CALL MESLIR(-225)
+      CALL QUETYP(TYOBJE,0,IRETOU)
+      IF(IRETOU.EQ.0) THEN
+CC       Cet opérateur a encore besoin d'un opérande.
+         CALL ERREUR (533)
+         RETURN
+      ENDIF
+      CALL LIROBJ(TYOBJE,IP1,1,IRETOU)
+
+      IF(TYOBJE.EQ.'TABLE   ') THEN
+         MTABLE = IP1
+         CALL ACCTAB(MTABLE,'MOT',0,0.D0    ,'SOUSTYPE',.TRUE.,0,
+     >        'MOT',IENT1,XVALRE, TYOBJE ,LOGR1 ,ID1)
+         IF (TYOBJE.NE.'ESCLAVE') THEN
+CC          Donnez une TABLE de sous-type %m1:8
+            MOTERR ='ESCLAVE'
+            CALL ERREUR(-173)
+CC          Le sous-type de la table est incorrect
+            CALL ERREUR(648)
+            RETURN
+         ENDIF
+
+         SEGACT,MTABLE
+         ML=MLOTAB
+
+C       RECHERCHE DU CREATEUR
+         CALL ACCTAB(MTABLE,'MOT     ',IND ,0.D0  ,'CREATEUR',.TRUE.,0
+     $        ,'MOT     ',IENT1,XVALR2,CHACRE  ,LOGR2 ,ID2)
+         IF (IERR.NE.0) RETURN
+         NBENT = 0
+         IND   = 1
+         TYOBJE=' '
+         CALL ACCTAB(MTABLE,'ENTIER',IND  ,0.D0   ,' ',.TRUE.,0 ,
+     &        TYOBJE ,IENT1,XVALRE ,CHARRE,LOGR1 ,ID1 )
+         IF (IERR.NE.0) RETURN
+C       Verification que ETG traite bien ce type d'objet
+         CALL PLAMO8(OBJOK,NBOK,IPLAC,TYOBJE)
+C       DIMENSIONNEMENT DU SEGMENT SID A (ML - 2) a cause des indices 'SOUSTYPE' et 'CREATEUR'
+         NBFUS = ML - 2
+         IF(IPLAC .EQ. MOT)THEN
+            IC1 = LONG(CHARRE)
+         ELSE
+            IC1 = 0
+         ENDIF
+         SEGINI,SID
+         SID.CREATE=CHACRE
+
+         IF(IPLAC .EQ. MMODEL)THEN
+C         Verification si le MMODEL partitionne est deja dans le CCPRECO (resultat instantanné)
+            DO IIMOD = 1, NMOPAR
+               IF (PESCLA(IIMOD) .EQ. 0) THEN
+C             On sort
+                  GOTO 1
+               ELSEIF (MTABLE .EQ. PESCLA(IIMOD)) THEN
+                  imodel = PARMOD(IIMOD)
+                  CALL ACTOBJ('MMODEL',imodel,1)
+                  CALL ECROBJ('MMODEL',imodel)
+                  SEGSUP,SID
+                  SEGDES,MTABLE
+                  RETURN
+               ENDIF
+            ENDDO
+         ENDIF
+ 1       CONTINUE
+
+         IF (IPLAC .GT. 0) THEN
+C         REMPLISSAGE DU SEGMENT SID POUR LA FUSION PAR TOURNOI
+            NBENT            = NBENT + 1
+            IF(IPLAC .EQ. ENTIER)THEN
+               SID.IPOINT(NBENT)= IENT1
+            ELSE
+               SID.IPOINT(NBENT)= ID1
+            ENDIF
+            SID.BVAL  (NBENT)= LOGR1
+            SID.XVAL  (NBENT)= XVALRE
+            IF(IPLAC .EQ. MOT)THEN
+               SID.CVAL(NBENT)= CHARRE
+            ENDIF
+            SID.CHATYP       = TYOBJE
+            CHA8             = TYOBJE
+
+            IF (NBFUS .GE. 2) THEN
+               DO I=2,NBFUS
+                  IND = I
+                  CALL ACCTAB(MTABLE,'ENTIER  ',IND,0.D0,' ',.TRUE.,0,
+     &                 TYOBJE,IENT2,XVALRE,CHARRE,LOGR2,ID2)
+                  IF (IERR.NE.0) RETURN
+                  IF (TYOBJE .NE. CHA8) THEN
+C                   ERREUR SI LES TYPES SONT DIFFERENTS ENTRE 2 INDICES DE LA TABLE ESCLAVE
+                    MOTERR       = CHA8
+                    MOTERR(9:16) = TYOBJE
+                    CALL ERREUR(1045)
+                    SEGSUP,SID
+                    RETURN
+                  ENDIF
+
+C                 REMPLISSAGE DU SEGMENT SID POUR LA FUSION PAR TOURNOI
+                  NBENT=NBENT + 1
+                  IF(IPLAC .EQ. ENTIER)THEN
+                     SID.IPOINT(NBENT)= IENT2
+                  ELSE
+                     SID.IPOINT(NBENT)= ID2
+                  ENDIF
+                  SID.BVAL  (NBENT)= LOGR2
+                  SID.XVAL  (NBENT)= XVALRE
+                  IF(IPLAC .EQ. MOT)THEN
+                     IF(LONG(CHARRE) .GT. IC1)THEN
+                        IC1 = LONG(CHARRE)
+                        SEGADJ,SID
+                     ENDIF
+                     SID.CVAL(NBENT)= CHARRE
+                  ENDIF
+               ENDDO
+            ENDIF
+
+C           LANCEMENT DE LA FUSION DES OBJETS
+C           WRITE(IOIMP,*)'FUSION ENCLENCHEE DANS ETG    : ',CHA8
+            ID = SID
+            CALL FUNOBJ(ID,ID1,XVALRE,LOGR1)
+            IF(IERR .NE. 0) RETURN
+
+         ELSE
+C           Type d'objet non traite par ETG
+            MOTERR = TYOBJE
+            CALL ERREUR(1046)
+            RETURN
+         ENDIF
+
+      ELSEIF(TYOBJE.EQ.'LISTOBJE') THEN
+         MLOBJE = IP1
+         SEGACT,MLOBJE
+         ML     = LISOBJ(/1)
+         CHACRE = ' '
+         TYOBJE = ' '
+         TYOBJE = TYPOBJ
+
+C        Verification que ETG traite bien ce type d'objet
+         CALL PLAMO8(OBJOK2,NBOK2,IPLAC2,TYOBJE)
+
+C        On trouve IPLAC dans OBJOK pour le "CASE, IPLAC"
+         CALL PLAMO8(OBJOK ,NBOK ,IPLAC ,TYOBJE)
+
+         NBFUS = ML
+         SEGINI,SID
+         SID.CREATE= CHACRE
+         SID.CHATYP= TYOBJE
+         IF (IPLAC2 .GT. 0) THEN
+C         REMPLISSAGE DU SEGMENT SID POUR LA FUSION PAR TOURNOI
+            DO I=1,ML
+               SID.IPOINT(I)=LISOBJ(I)
+            ENDDO
+C           LANCEMENT DE LA FUSION DES OBJETS
+C           WRITE(IOIMP,*)'FUSION ENCLENCHEE DANS ETG    : ',TYOBJE
+            ID = SID
+            CALL FUNOBJ(ID,ID1,XVALRE,LOGR1)
+            IF(IERR .NE. 0) RETURN
+
+         ELSE
+            MOTERR = TYOBJE
+            CALL ERREUR(1046)
+            RETURN
+         ENDIF
+
+      ELSE
+        CALL REFUS
+        RETURN
+      ENDIF
+
+C     Ecriture du resultat dans la pile
+C     write(ioimp,*) 'iplac,tyobje=',iplac,tyobje
+      CASE, IPLAC
+          WHEN, LOGIQUE
+            CALL ECRLOG(LOGR1)
+          WHEN, MOT
+            CALL ACTOBJ('LISTMOTS',ID1,1)
+            CALL ECROBJ('LISTMOTS',ID1)
+          WHEN, ENTIER
+C           Il manque la gestion de MAXI et MINI pour ce cas la !
+            CALL ACTOBJ('LISTENTI',ID1,1)
+            CALL ECROBJ('LISTENTI',ID1)
+          WHEN, FLOTTANT
+            IF(ID1 .EQ. 0)THEN
+              CALL ECRREE(XVALRE)
+            ELSE
+              CALL ACTOBJ('LISTREEL',ID1,1)
+              CALL ECROBJ('LISTREEL',ID1)
+            ENDIF
+          WHENOTHERS
+C           Cas des POINTEURS sur des OBJETS
+            CALL ACTOBJ(TYOBJE,ID1,1)
+            CALL ECROBJ(TYOBJE,ID1)
+      ENDCASE
+
+      SEGSUP,SID
+      IF(TYOBJE.EQ.'TABLE   ') THEN
+         SEGDES,MTABLE
+      ELSEIF(TYOBJE.EQ.'LISTOBJE') THEN
+         SEGDES,MLOBJE
+      ENDIF
+      RETURN
+      END
+ 

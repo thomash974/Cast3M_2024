@@ -1,0 +1,26 @@
+C THED3D    SOURCE    PV090527  23/01/27    21:16:04     11574          
+      subroutine thed3d(t,t0,t1,m,p,f)
+
+c     reduction des parametres par effet thermique pour endo3d 
+c     (A.Sellier 2021/04/26)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n) 
+      
+      real*8 t,t0,t1,m,p,f
+      
+      if(m.ne.0.) then
+        if((t.ge.t0).and.(t1.gt.t0)) then
+            t7 = ((t - t0) / (t1 - t0)) ** m
+            t8 = exp(-t7)
+            f = p + t8 * (0.1D1 - p)
+        else
+            f=1.d0
+        end if
+      else
+        f=1.d0
+      end if
+
+      return
+      end      
+      
+ 

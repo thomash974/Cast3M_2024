@@ -1,0 +1,15 @@
+C FFAXCI    SOURCE    MB234859  21/11/22    21:15:07     11194          
+      SUBROUTINE FFAXCi(ith) 
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C
+C     Subroutine qui realise l’interface en parallele
+      COMMON/FAFORM/IPARAL
+C
+      IDONNEES = IPARAL
+      CALL FFAXCA(ith,IDONNEES)
+C
+      RETURN
+      END
+ 

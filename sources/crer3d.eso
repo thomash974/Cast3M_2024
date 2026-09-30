@@ -1,0 +1,798 @@
+C CRER3D    SOURCE    FD218221  24/02/07    21:15:08     11834          
+       SUBROUTINE CRER3D(NBRINC,NTYPC,NINC,NDIMG,RTP,RTI,DELTA,
+     # BETA,COHE,FRAC,GCH,bwPw,bgpg,SEFFR,SEFFI,SEFFO,EPSTR,EPSTI,
+     # EPSTO,EPSLR,V33,V33T,V33S,V33ST,EPSTG,EPSPLG,SEFFG,FTHG,
+     # NTMAX,FT,ACTIFT,DPFTDS,DGFTDS,LNUMCRT,NBRACT,PLASTT,Log_RTG,
+     # NCMAX,FC,ACTIFC,DPFCDS,DGFCDS,LNUMCRC,NBRACC,PLASTC,RFP,RFI,
+     # NLMAX,FL,ACTIFL,DPFLDS,DGFLDS,LNUMCRL,NBRACL,PLASTL,Log_RLG,
+     # STOTR,STOTG,RESG,PLAST,RTG,RTLG,RFG,RFLG,reduc_resg,
+     # PRECISION3D,ERR1,AFFICHE)
+     
+     
+c      evaluation des criteres pour incl3d
+c      la liste des citeres actif en traction (LNUMCRT ) et en compression (LNUMCRC)
+c      est definie dans la repere generalise LNUMCRT(1) est le critere le plus
+c      actif de traction-refermeture de valeur REST=FT(LNUMCRT(1)), 
+
+c      il en est de même pour :
+c      - les criteres de cisaillement aux interfaces des phase  et dans la matrice
+c      - les critere de cisaillement, NUMCR est le numero de la phase plastifiee
+c      si cette phase et la matrice elle peut inclure des interfaces dans sont
+c      ecoulement
+
+c      l ordre de rangement des criteres est le suivant (base generalisee des ecoulements)
+c      idir=(iphase-1)*3+(itypt-1)*3+jdir 
+c      avec idirg direction generalisee
+c      iphase numero de la phanse 0 à ninc
+c      ityp position zone d interet (1 inclusion 3,4,5 points d interet sur l interface)
+c      jdir un des 3 direction principale des contraintes macroscopiques
+
+
+c      (A.Sellier 2022/02/21)
+c      maj 2022/02/22 ! pour le fun que des 2 ;)
+c      maj 2022/27/02 amelioration par triage des criteres et traitement par groupes
+c      maj 2022/03/30 criteres en forces thermodynamiques generalisees
+c      2022/06/02 simplification pour version20I
+c      2022/06/16 ecoulement par methode du gradient generalise
+c      2023/06/26 correction methode gradient generalisee
+
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+
+c      ********variables externes ***************************************      
+       integer NBRINC,NINC,IETAP,NTYPC
+       logical AFFICHE
+c      fractions volumiques des phases      
+       real*8 FRAC(0:NBRINC)
+c      indicateur de diffusion produits chimiques dans fissure
+       real*8 GCH(0:NBRINC)       
+c      contraintes totales au sens poro mecanique     
+       real*8 SEFFR(-1:NBRINC,6,0:1)
+       real*8 SEFFI(-1:NBRINC,6,0:1)
+       real*8 SEFFO(-1:NBRINC,6,0:1)
+c      contrainte hydrique
+       real*8 SEW(0:NBRINC,0:1) 
+c      resistance a la traction
+       real*8 RTP(-1:NBRINC) 
+c      resistance a la refermeture      
+       real*8 RTI(-1:NBRINC) 
+c      resistance a la refermeture de la phase
+       real*8 RFP(-1:NBRINC)
+c      resistance a la refermeture  de l interface      
+       real*8 RFI(-1:NBRINC) 
+c      proprite pour Drucker Pragger
+       real*8 DELTA(0:NBRINC),BETA(0:NBRINC),COHE(0:NBRINC)           
+c      deformations plastiques de traction      
+       real*8 EPSTR(-1:NBRINC,6,0:1)
+       real*8 EPSLR(-1:NBRINC,6,0:1)      
+       real*8 EPSTI(-1:NBRINC,6,0:1)      
+       real*8 EPSTO(-1:NBRINC,6,0:1)
+       real*8 EPSRH(-1:NBRINC,6,0:1)
+  
+c      erreur
+       integer err1       
+c      precision
+       real*8 precision3d
+c      logique critere ACTIFT
+       logical PLAST        
+c      matrice de passage vers la base du critere le plus actif
+       real*8 V33(3,3),V33T(3,3),V33D(3,3),V33DT(3,3)
+       real*8 V33S(3,3),V33ST(3,3) 
+c      donnes poro-mechaniques (eau, gel, dechrage)      
+       real*8 bwPw(0:NBRINC),bgpg(0:NBRINC)
+c      residu global pour la convergence
+       real*8 RESG  
+
+c      variables pour les decollement d interface en contrainte totale
+       integer NLMAX
+       real*8 FL(NLMAX)
+       logical ACTIFL(NLMAX)
+       real*8 DPFLDS(NLMAX,NDIMG),DGFLDS(NLMAX,NDIMG)
+       integer LNUMCRL(NLMAX),NBRACL
+       logical Log_RLG(NLMAX)
+       logical PLASTL
+       real*8 STOTR(-1:NBRINC,6,0:1)
+       real*8 EPSLG(NDIMG),STOTG(NDIMG)
+     
+     
+
+c      Variables internes definies dans l espace generalise
+      
+   
+c      dimension de l espace generalise  
+       integer NDIMG,NTMAX,NCMAX  
+c      Res vecteur des residus des criteres
+       real*8 Rest
+c      indicateur de plasticite elementaire      
+       logical PLASTT,PLASTC,Log_RTG(NTMAX)
+c      contrainte en base generalisees et force thermo associee aux epsa
+       real*8 SEFFG(NDIMG),FTHG(NDIMG)
+c      deformation plastique de traction generalisee
+       real*8 EPSTG(NDIMG),EPSPLG(NDIMG)       
+c      derivee du critere par rapport à la contrainte
+       real*8 DPFTDS(NTMAX,NDIMG),DPFCDS(NCMAX,NDIMG)  
+c      derivee du critere par rapport à la contrainte
+       real*8 DGFTDS(NTMAX,NDIMG),DGFCDS(NCMAX,NDIMG)    
+c      resistances en base generalisee
+       real*8 RTG(NDIMG),RTLG(NDIMG),RFG(NDIMG),RFLG(NDIMG)   
+c      image des resistances dans la base des forces thermodynamiques
+       real*8 FTRAC(NDIMG)
+c      activite des criteres      
+       logical ACTIFT(NTMAX),ACTIFC(NCMAX)
+c      table du critere de rankine et dp  
+       real*8 FT(NTMAX),FC(NCMAX)
+c      numeror critre retenu pour les tensions refermeture      
+       integer LNUMCRT(NTMAX),LNUMCRC(NCMAX)     
+c      nombre de criteres actif, numero d ordre du dernier traitement 
+       integer NBRACT
+c      nombre de criteres actif cisaillement, numero d ordre du dernier traitement 
+       integer NBRACC
+c      coeff de viscosite sur l annulation des residus
+       real*8 reduc_res       
+ 
+c      pour DGFTDS, 1er indice = oredre, second indice = direction generalisee       
+    
+c     ********* variables locales **************************************
+
+      real*8 x6(6),x3(3),x33(3,3)
+      real*8 x06(6),x03(3),x16(6)
+      real*8 vnorm,fmaxc,fmaxg,fmaxt,fminc,fming,fmint
+      integer iphase,idir,idebut,jdir,idirg
+
+      logical affiche_local
+
+      real*8 press,y3(3),dilatance,frottement,cohesion,press_lim,taulim
+      real*8 taueq,resc_lim,xpetit      
+      integer posi,icr,ityp
+      integer nbracc_i,ipt_i,icr_i,inc,idebut_inc
+      logical cond_i
+      real*8 SEFF3(3),FTH3(3),DPFCDS3(3),DGFCDS3(3),FC1,som
+      logical ACTIFC1
+
+c     il faut plastifier tous les pts d interface pour en 
+c     plastifier un si cond_i estvrai
+      cond_i=.false.
+      
+c     option d affichage local      
+      affiche_local=affiche 
+c      affiche_local=.true.
+      if(affiche_local) then
+        print*,'On est dans crer3d'
+      end if
+
+c     evaluation des criteres fin de pas
+      posi=1     
+      
+c     ******************************************************************      
+c     recherche des criteres actifs en traction 
+c     ******************************************************************
+
+c      lors de l evalauation en 0 il ne faut pas effacer 
+c      les directions ni la liste des criteres actifs   
+  
+c      ------1er passage sans connaitre le critere le plus actif--------
+
+c      variable de controle
+       err1=0
+c      petite valeur pour comparaison des criteres
+       xpetit=0.d0      
+      
+c     ------debut de la recherche d activite des criteres--------------- 
+     
+      
+       PLAST=.false.
+       PLASTT=.false.
+c      initialisation des indicateur directionnels en base generalisee
+       if(affiche_local) then
+         print*,'Dans crer3d on initialise les indicateur de Trac'
+       end if
+c      sur toutes les directions generalisee potentiellement actives
+ 
+       do idir=1,NDIMG
+         FTHG(idir)=0.d0
+         SEFFG(idir)=0.d0
+         STOTG(idir)=0.d0
+       end do
+       
+
+c     ------- Base d evaluation des criteres ---------------------------
+
+
+c       les retours se font en base principale des contraintes 
+c       effectives moyennes
+        iphase=-1
+        posi=1            
+        do idir=1,6
+            x6(idir)=SEFFR(iphase,idir,posi)
+        end do      
+        call x6x33(x6,x33)    
+        call b3_v33(x33,x3,V33S)
+        call traps1(V33ST,V33S,3)
+        do i=1,3
+            do j=1,3
+                V33(i,j)=v33S(i,j)
+                V33T(i,j)=V33ST(i,j) 
+            end do
+        end do
+
+           
+c     ----passage dans la base des contraintes generalisee -------------
+
+c     ----pour les composantes moyennes des phases ---------------------
+
+      do iphase=0,NINC
+        if(affiche_local) then
+            print*,'Dans crer3d traction radiale phase:', iphase
+        end if
+c       (ie des deformation elastiques)     
+        if(iphase.eq.0) then
+            idebut=9*NINC        
+        else
+            idebut=9*(iphase-1)
+        end if
+c       recup contraintes totales et changement de base
+        do idir=1,6
+            x6(idir)=SEFFR(iphase,idir,posi)
+        end do
+c       projection sur base de l increment de charge       
+        call prjc3d(x6,v33,v33t,x3,x16,.false.)
+        do idir=1,3
+            SEFFG(idebut+idir)=x3(idir)
+        end do
+c       passage de la deformation plastique en base principales
+        do idir=1,6
+            x06(idir)=EPSTR(iphase,idir,posi)
+        end do                
+        call prjc3d(x06,v33,v33t,x03,x16,.false.)
+        do idir=1,3
+            EPSTG(idebut+idir)=x03(idir)
+        end do
+      end do
+
+c     ---- composantes d interface radiale ----------------------------- 
+
+      do iphase=1,NINC
+        if(affiche_local) then
+            print*,'Criter1inc3d traction radiale interface :',iphase     
+        end if       
+c       position dans vecteur des contraintes     
+        idebut=9*(iphase-1)+3
+c       recup contraintes totales et changement de base
+        do idir=1,6
+            x6(idir)=SEFFI(iphase,idir,posi)
+        end do
+c       projection sur base de l increment de charge        
+        call prjc3d(x6,v33,v33t,x3,x16,.false.)
+        do idir=1,3
+            SEFFG(idebut+idir)=x3(idir)
+        end do
+c       passage de la deformation plastique en base principales
+        do idir=1,6
+            x06(idir)=EPSTI(iphase,idir,posi)
+        end do                
+        call prjc3d(x06,v33,v33t,x03,x16,.false.)
+        do idir=1,3
+            EPSTG(idebut+idir)=x03(idir)
+        end do       
+      end do
+
+c     ---- composantes de contrainte totale  dans l inclusion ---------- 
+
+      do iphase=1,NINC
+        if(affiche_local) then
+            print*,'Criter1inc3d traction radiale interface :',iphase     
+        end if       
+c       position dans vecteur des contraintes     
+        idebut=9*(iphase-1)
+c       recup contraintes totales et changement de base
+        do idir=1,6
+            x6(idir)=STOTR(iphase,idir,posi)
+        end do
+c       projection sur base de l increment de charge        
+        call prjc3d(x6,v33,v33t,x3,x16,.false.)
+        do idir=1,3
+            STOTG(idebut+idir)=x3(idir)
+        end do
+c       passage de la deformation plastique en base principales
+        do idir=1,6
+            x06(idir)=EPSLR(iphase,idir,posi)
+        end do                
+        call prjc3d(x06,v33,v33t,x03,x16,.false.)
+        do idir=1,3
+            EPSLG(idebut+idir)=x03(idir)
+        end do       
+      end do
+      
+c     ---- composantes orthoradiales dans les interfaces ---------------
+
+      do iphase=1,NINC      
+        if(affiche_local) then
+            print*,'Criter1inc3d traction orthoradiale phase:',iphase
+        end if        
+c       position dans vecteur des contraintes     
+        idebut=9*(iphase-1)+6
+c       recup contrainte totale et digonalisation
+        do idir=1,6
+            x6(idir)=SEFFO(iphase,idir,posi)
+        end do      
+c       projection sur base de l increment de charge         
+        call prjc3d(x6,v33,v33t,x3,x16,.false.)
+        do idir=1,3
+            SEFFG(idebut+idir)=x3(idir)
+        end do
+c       passage de la deformation plastique en base principales
+        do idir=1,6
+            x06(idir)=EPSTO(iphase,idir,posi)
+        end do                
+        call prjc3d(x06,v33,v33t,x03,x16,.false.)
+        do idir=1,3
+            EPSTG(idebut+idir)=x03(idir)
+        end do 
+      end do
+
+    
+c***********************************************************************       
+c     Forces thermodynamique 
+c***********************************************************************
+
+      call ftnc3d(NBRINC,NINC,NDIMG,SEFFG,FRAC,GCH,
+     # bwPw,bgPg,FTHG,AFFICHE_local,ERR1)
+
+            
+c***********************************************************************
+c     criteres de traction diffuse
+c***********************************************************************
+
+       do idir=1,NTMAX
+         Log_RTG(idir)=.false.
+         ACTIFT(idir)=.false. 
+         FT(idir)=0.d0
+         do jdir=1,NDIMG
+            DPFTDS(idir,jdir)=0.d0
+            DGFTDS(idir,jdir)=0.d0
+         end do            
+       end do
+
+      do iphase=0,ninc
+        if(iphase.eq.0) then        
+            idebut=9*ninc
+            do icr=idebut+1,idebut+3
+                idir=icr            
+                RTG(idir)=RTP(0)
+                RFG(idir)=RFP(0)
+c               a l interieur des phases on a FTH=SEFF
+                call RanKinc3d(NDIMG,NTMAX,icr,idir,
+     #          SEFFG,EPSTG,RTG,RFG,SEFFG,FT,DPFTDS,DGFTDS,ACTIFT,
+     #          Log_RTG,precision3d,affiche,err1)                
+            end do 
+        else
+c           boucle sur les positions des zones d interet            
+            do ityp=1,3
+                idebut=(iphase-1)*9+(ityp-1)*3
+                do idir=idebut+1,idebut+3
+                    icr=idir
+                    if (ityp.eq.1) then
+c                       ityp=1 radial ds la phase    
+                        RTG(idir)=RTP(iphase)
+                        RFG(idir)=RFP(iphase)
+c                       a l interieur des phases on a FTH=SEFF
+                        call RanKinc3d(NDIMG,NTMAX,icr,idir,
+     #                  SEFFG,EPSTG,RTG,RFG,SEFFG,FT,DPFTDS,DGFTDS,
+     #                  ACTIFT,Log_RTG,precision3d,affiche,err1)
+                    else
+c                       ityp=2 radial dans l interface cote matrice (non actif)                  
+c                       ityp=3 ortho radial ds la matrice (activable)                   
+                        RTG(idir)=RTP(0)
+                        RFG(idir)=RFP(0)
+                        if(ityp.eq.3) then
+c                         on evalue le critere orthoradial                          
+                          call RanKinc3d(NDIMG,NTMAX,icr,idir,
+     #                    SEFFG,EPSTG,RTG,RFG,SEFFG,FT,DPFTDS,DGFTDS,
+     #                    ACTIFT,Log_RTG,precision3d,affiche,err1)
+                        else
+c                         le critere radial de traction cote matrice estvrai
+c                         desactive au profit du critere de decollement 
+c                         qui est traite dans les citere d'interface localise (eps pl l)
+                          ACTIFT(icr)=.false.
+                          FT(icr)=0.d0
+                          DPFTDS(icr,idir)=0.d0
+                          DGFTDS(icr,idir)=0.d0
+                        end if
+                    end if
+                end do
+            end do
+        end if
+      end do
+             
+        
+c     activite de la plasticite de traction diffuse
+      PLASTT=.false.
+      do icr=1,NTMAX 
+        PLASTT=PLASTT.or.ACTIFT(icr)
+      end do     
+
+    
+c     selection des criteres de traction diffuse    
+      if(PLASTT) then  
+      
+c       triage des criteres du plus grand au plus petit ds LNUMCRT 
+        call ordr3d(NTMAX,LNUMCRT,FT,affiche_local,ACTIFT,NBRACT)
+                          
+c       affichage des resultats de l analyse des criteres actifs         
+        if((NBRACT.ne.0).and.(affiche_local)) then
+             print*,'Dans crer3d TRACTION EFFECTIVE PHASES'
+             write(*,'(A9,I2,1X,/)')
+     #       'NBRACT=',NBRACT
+              do icr=1,NTMAX
+                 write(*,'(A10,I2,1X,5(A7,E10.3,1X),A5,1X,L1)')
+     #           'Direction:',LNUMCRT(icr),
+     #           'DGFTDS=',DGFTDS(LNUMCRT(icr),LNUMCRT(icr)),
+     #           'DPFTDS=',DPFTDS(LNUMCRT(icr),LNUMCRT(icr)),
+     #           'FT=',FT(LNUMCRT(icr)),
+     #           'FTHG=',FTHG(LNUMCRT(icr)),
+     #           'SEFFG=',SEFFG(LNUMCRT(icr)),
+     #           'Activ:',ACTIFT(LNUMCRT(icr))
+              end do
+c             read*
+        end if 
+       
+       else
+
+          NBRACT=0
+
+       end if
+     
+c***********************************************************************
+c     criteres de traction par decollement  localise aux interfaces 
+c***********************************************************************
+c      goto 10
+      do idir=1,NLMAX
+         Log_RLG(idir)=.false.
+         ACTIFL(idir)=.false. 
+         do jdir=1,NDIMG
+             DPFLDS(idir,jdir)=0.d0
+             DGFLDS(idir,jdir)=0.d0
+         end do             
+         FL(idir)=0.d0
+      end do
+
+      do iphase=1,ninc 
+c         print*,'critere interface phase',iphase 
+         idebut=(iphase-1)*9
+         do idirg=idebut+1,idebut+3
+c             print*,'direction',idirg
+             icr=idirg
+             RTLG(idirg)=RTI(iphase)
+             RFLG(idirg)=RFI(iphase)
+c            aux interfaces FTH=STOTG
+            call RanKinc3d(NDIMG,NLMAX,icr,idirg,
+     #      STOTG,EPSLG,RTLG,RFLG,STOTG,FL,DPFLDS,DGFLDS,ACTIFL,
+     #      Log_RLG,precision3d,affiche,err1)
+         end do
+      end do
+                    
+c     activite de la plasticite d interface localisee 
+      PLASTL=.false.
+      do icr=1,NLMAX 
+        PLASTL=PLASTL.or.ACTIFL(icr)
+      end do     
+    
+c     selection des criteres a traiter      
+      if(PLASTL) then  
+      
+c       triage des criteres du plus grand au plus petit ds LNUMCRT 
+        call ordr3d(NLMAX,LNUMCRL,FL,affiche_local,ACTIFL,NBRACL)
+                  
+        
+c       affichage des resultats de l analyse des criteres actifs         
+        if((NBRACL.ne.0).and.(affiche_local)) then
+             print*,'Dans crer3d TRACTION TOTALE INTERFACES'
+             write(*,'(A9,I2,1X,/)')
+     #       'NBRACL=',NBRACL
+              do icr=1,NLMAX
+                 write(*,'(A10,I2,1X,5(A7,E10.3,1X),A5,1X,L1)')
+     #           'Direction:',LNUMCRL(icr),
+     #           'DGFTDS=',DGFLDS(LNUMCRL(icr),LNUMCRL(icr)),
+     #           'DPFTDS=',DPFLDS(LNUMCRL(icr),LNUMCRL(icr)),
+     #           'FT=',FL(LNUMCRL(icr)),
+     #           'FTHG=',FTHG(LNUMCRL(icr)),
+     #           'STOTG=',STOTG(LNUMCRL(icr)),
+     #           'Activ:',ACTIFL(LNUMCRL(icr))
+              end do
+c             read*
+        end if 
+   
+       else
+ 
+         NBRACL=0
+        
+       end if
+
+           
+c***********************************************************************
+c     criteres de cisaillement 
+c***********************************************************************
+
+c     ---- initialisations 
+     
+c       lors de l evalauation en 0 il ne faut pas effacer 
+c       les directions, ni la liste des criteres actifs 
+    
+10      PLASTC=.false.
+        TAUEQ=0.d0
+        PRESS=0.d0
+        NBRACC=0
+c       direction pour le critere le plus actif en cisaillement
+        do icr=1,NCMAX
+            FC(icr)=0.d0
+            ACTIFC(icr)=.false.        
+            do idir=1,NDIMG
+                DGFCDS(icr,idir)=0.d0
+                DPFCDS(icr,idir)=0.d0                
+            end do 
+        end do  
+         
+c     ---- desactivation possible de DP --------------------------------
+
+      if((NBRACT.gt.0).or.(NBRACL.gt.0)) then
+c       on n examine pas les cisaillement tant que des 
+c       tractions sont actifs      
+        goto 40
+      end if
+    
+c     ------------------------------------------------------------------ 
+     
+      if(affiche_local) then
+            print*,'Dans crer3d on demarre le cisaillement'
+      end if 
+c     boucle sur les phases 
+       
+      do iphase=0,ninc
+        
+c       affectation d un numero au critere
+        if(iphase.eq.0) then
+        
+c           -- matrice  en cisaillement --------------------------------
+   
+            IDEBUT=9*ninc
+c           type de critere (1 dans la phase, 2 dans l interface)
+            ityp=1            
+c           numero du critere            
+            icr=ntypc*ninc+ityp
+            
+c          recuperation des contraintes         
+            do idir=1,3
+                SEFF3(idir)=SEFFG(IDEBUT+IDIR)
+                FTH3(idir)=FTHG(IDEBUT+IDIR)
+            end do
+c           initialisation de l activite du critere et de sa valeur            
+            actifc1=.false.
+            FC1=0.d0
+c           calcul du critere de cisaillement                
+            call dpin3d(NBRINC,NCMAX,NDIMG,IPHASE,
+     #      BETA,DELTA,COHE,RTP,SEFF3,FC1,DPFCDS3,DGFCDS3,
+     #      ACTIFC1,FTH3,PRECISION3D,AFFICHE,ERR1)
+c           stockage ds la variables generalisees     
+            if(ACTIFC1) then
+                ACTIFC(icr)=.true.
+                NBRACC=NBRACC+1
+                LNUMCRC(NBRACC)=icr
+                FC(icr)=FC1
+                do idir=1,3
+                    DPFCDS(icr,idebut+idir)=DPFCDS3(idir)
+                    DGFCDS(icr,idebut+idir)=DGFCDS3(idir)                      
+                end do   
+            else
+                ACTIFC(icr)=.false.            
+            end if
+                 
+        else 
+        
+c           ---- inclusion en cisaillement -----------------------------
+
+            IDEBUT=9*(iphase-1)
+c           type de critere (1 dans la phase, 2 dans l interface)
+            ityp=1            
+c           numero du critere            
+            icr=ntypc*(iphase-1)+ityp
+            
+c          recuperation des contraintes         
+            do idir=1,3
+                SEFF3(idir)=SEFFG(IDEBUT+IDIR)
+                FTH3(idir)=FTHG(IDEBUT+IDIR)
+            end do
+c           initialisation de l activite du critere et de sa valeur            
+            actifc1=.false.
+            FC1=0.d0
+c           calcul du critere de cisaillement                
+            call dpin3d(NBRINC,NCMAX,NDIMG,IPHASE,
+     #      BETA,DELTA,COHE,RTP,SEFF3,FC1,DPFCDS3,DGFCDS3,
+     #      ACTIFC1,FTH3,PRECISION3D,AFFICHE,ERR1)
+c           stockage ds la variables generalisees     
+            if(ACTIFC1) then
+                ACTIFC(icr)=.true.
+                NBRACC=NBRACC+1
+                LNUMCRC(NBRACC)=icr
+                FC(icr)=FC1
+                do idir=1,3
+                    DPFCDS(icr,idebut+idir)=DPFCDS3(idir)
+                    DGFCDS(icr,idebut+idir)=DGFCDS3(idir)
+                end do
+            else
+                ACTIFC(icr)=.false.
+            end if
+            
+c           --- interface de l inclusion en cisaillement ---------------            
+       
+c           type de critere (1 dans la phase, 2 dans l interface)
+            ityp=2            
+c           numero du critere            
+            icr=ntypc*(iphase-1)+ityp
+            
+c           recuperation des contraintes au sens thermodynamique         
+            do idir=1,3
+                SEFF3(idir)=
+     #          (SEFFG(IDEBUT+3+IDIR)+2.d0*SEFFG(IDEBUT+6+IDIR))/3.d0
+                FTH3(idir)=
+     #          (FTHG(IDEBUT+3+IDIR)+2.d0*FTHG(IDEBUT+6+IDIR))/3.d0
+            end do
+c           initialisation de l activite du critere et de sa valeur            
+            actifc1=.false.
+            FC1=0.d0
+c           calcul du critere de cisaillement                
+            call dpin3d(NBRINC,NCMAX,NDIMG,IPHASE,
+     #      BETA,DELTA,COHE,RTP,SEFF3,FC1,DPFCDS3,DGFCDS3,
+     #      ACTIFC1,FTH3,PRECISION3D,AFFICHE,ERR1)
+c           stockage ds la variables generalisees     
+            if(ACTIFC1) then
+                do idir=1,3
+                    DPFCDS(icr,idebut+3+idir)=DPFCDS3(idir)/3.d0
+                    DPFCDS(icr,idebut+6+idir)=DPFCDS3(idir)*2.d0/3.d0
+                    DGFCDS(icr,idebut+3+idir)=DGFCDS3(idir)/3.d0
+                    DGFCDS(icr,idebut+6+idir)=DGFCDS3(idir)*2.d0/3.d0
+                end do
+                ACTIFC(icr)=.true.
+                NBRACC=NBRACC+1
+                LNUMCRC(NBRACC)=icr
+                FC(icr)=FC1 
+            else
+                ACTIFC(icr)=.false.               
+            end if
+            
+        end if       
+     
+        if(err1.eq.1) then
+            print*,'Erreur dans le calcul du cisaillement'
+            print*,'dans crer3d'
+            return
+        end if
+             
+      end do
+      
+c     bilan des activites de cisaillement
+      if(NBRACC.ne.0) then      
+         PLASTC=.true.
+      end if      
+
+      if(PLASTC) then
+      
+c       -- triage des criteres du plus grand au plus petit ds LNUMCRC --
+
+        call ordr3d(NCMAX,LNUMCRC,FC,affiche_local,ACTIFC,NBRACC)
+                  
+        
+c       --- affichage des resultats de l analyse des criteres actifs ---
+        
+        if((NBRACC.ne.0).and.(affiche_local)) then
+             print*,'Dans crer3d'
+             write(*,'(A9,I2)') 'NBRACC=',NBRACC      
+             do icr=1,NBRACC
+                 write(*,'(A10,I2,1X,A3,E10.3,1X,A6,1X,L1)')
+     #           'Citere:',LNUMCRC(icr),
+     #           'FC=',FT(LNUMCRC(icr)),
+     #           'Activ:',ACTIFC(LNUMCRC(icr))
+                 do idir=1,NDIMG
+                     write(*,'(A9,I3,1X,2(A7,E10.3,1X))')
+     #               'Direction',idir,
+     #               'DGFCDS=',DGFCDS(LNUMCRC(icr),idir),
+     #               'DPFCDS=',DPFCDS(LNUMCRC(icr),idir)
+                 end do
+             end do
+c            read*
+        end if 
+
+       else
+
+         NBRACC=0
+        
+       end if       
+      
+c     ------- fin zone critere de cisaillement -------------------------
+
+
+c***********************************************************************
+c     bilan de franchissement des criteres
+c***********************************************************************
+
+40    plast=plastt.or.plastc.or.plastl
+
+c     initialisation critere global
+      resg=0.d0 
+
+c     evaluation du critere global
+      if(plast) then
+
+        if(plastt) then
+            do i=1,nbract
+                j=lnumcrt(i)
+                RESG=RESG+FT(j)**2
+            end do
+C             fmaxt=ft(lnumcrt(1))
+C             fmint=ft(lnumcrt(nbract))
+C             coefft=fmint/fmaxt
+C             fmaxg=fmaxt
+C             fming=fmint
+C             coeffg=coefft
+        end if
+
+        if(plastl) then
+            do i=1,nbracl
+                j=lnumcrl(i)
+                RESG=RESG+FL(j)**2
+            end do
+C             fmaxl=fl(lnumcrl(1))
+C             fminl=fl(lnumcrl(nbract))
+C             coeffl=fminl/fmaxl
+C             fmaxg=fmaxl
+C             fming=fminl
+C             coeffg=coeffl
+        end if
+
+        if(plastc) then          
+            do i=1,nbracc
+                j=lnumcrc(i)
+                RESG=RESG+FC(j)**2
+            end do
+C             fmaxc=fc(lnumcrc(1))
+C             fminc=fc(lnumcrc(nbracc))
+C             coeffc=fminc/fmaxc   
+C             fmaxg=fmaxc
+C             fming=fminc 
+C             coeffg=coeffc
+        end if
+
+        RESG=sqrt(RESG)
+
+C         if(plastc.and.plastt) then
+C             coeffg=min(coefft,coeffc)
+
+C         else if(plastc.and.plastl) then
+C             coeffg=min(coeffl,coeffc)
+
+C         else if(plastt.and.plastl) then
+C             coeffg=min(coeffl,coefft)
+
+C         else if(plastt.and.plastl.and.plastc) then
+C             coeffg=min(coeffl,coefft,coeffc)
+C         end if
+
+c        reduc_resg=coeffg
+        reduc_resg=1.d0
+c        print*,'Coefficient de relaxation du residu:',reduc_resg
+      end if        
+            
+      if(affiche_local) then     
+        print*,'Fin de crer3d'
+*       read*
+      end if        
+      
+      return
+      
+      end
+        
+        
+        
+        
+      
+ 
+ 

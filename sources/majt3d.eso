@@ -1,0 +1,51 @@
+C MAJT3D    SOURCE    FD218221  24/02/07    21:15:19     11834          
+        subroutine majt3d(DX3,O333,varf,nvari,vnvari,nstype,
+     #  ndtens,ityp,numt)
+
+c       mise a jour d un tenseur a partir de d increments principaux DX
+c       orientee par O333 a priori non colineaire aux directions initiale
+c       du tenseur X33
+
+
+c       declarations externes
+        implicit integer(i-n)
+        implicit real*8(a-h,o-z)
+
+
+        integer nstype,nvari,ndtens
+        integer vnvari(nstype,2)
+        real*8 varf(nvari)
+        real*8 DX3(3),O333(3,3,3)
+        integer ityp,numt
+
+        real*8 X3(3),X33(3,3),X6(6),V33(3,3)
+        integer nX
+
+c        print*,'dans majt3d debut DX3,O333 ityp',ityp,'numt',numt
+c        print*,'increment',DX3
+c        print*,'orientation',O333
+
+c       recuperation du tenseur initial        
+        call tvar3d(X3,V33,nX,varf,nvari,vnvari,nstype,ndtens,ityp,numt)
+c       ecriture en pseudo vecteur base fixe
+        call x12x6(X3,V33,X6)
+c        print*,'dans majt3d AV maj X6',X6
+c       ajout de l ecoulement par valeurs principales en base fixe
+c        print*,'dans majt3d DX3',DX3
+        call incv3d(X6,DX3,O333)
+c       actualisation des direction principales et valeurs propres
+        call x6x33(X6,X33)
+c        print*,'dans majt3d AP maj X6',X6,'X33',X33
+        call b3_v33(X33,X3,V33)
+c       sauvegarde ds les varf
+        do i=1,3
+            varf(nX+i)=X3(i)
+            do j=1,3
+                 varf(nX+3+(i-1)*3+j)=V33(j,i)
+            end do
+        end do
+c        call x12x6(X3,V33,X6)
+c        print*,'dans majt3d AP maj X6',X6
+c        read*
+        return
+        end 

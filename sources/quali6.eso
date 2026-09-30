@@ -1,0 +1,400 @@
+C QUALI6    SOURCE    GOUNAND   21/04/01    21:15:07     10933          
+      SUBROUTINE QUALI6(MELEMX,IELDEB,IELFIN,IMET,IMOMET,XDENS,KCMETR
+     $     ,KPVIRT,XVTOL,MLREEL,NDQC)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : QUALI6
+C DESCRIPTION : Etant donné un maillage volumique simple MELEMX, 
+C               on construit la qualité de chacun de ses éléments 
+C               dans un listreel MLREEL.
+C               MELEMX est supposé actif.
+C               MLREEL est rendu actif.
+C      
+C     Par rapport à quali2, on utilise xvtol pour mettre
+C     le volume d'un élément à 0 s'il est petit.
+C     Ceci est important car on utilise le signe pour dégrader la
+C     qualité d'un élément (-1)
+C
+C     Par rapport à quali3, MELEME devient un MELEMX, MLREEL est un
+C     segment déjà existant et on introduit les éléments de début et de
+C     fin IELDEB et IELFIN qui servent pour MELEMX ET MLREEL (qui sont
+C     supposés de même dimension cf. trlver.eso.)
+*     Pour MLREEL, comme on ne calcule pas la qualité des éléments
+*     contenant le noeud virtuel, on a NDQC qui dit le nombre de qualité
+*     calculés (IELDEB sert donc pour MELEMX et MLREEL mais IELFIN
+*     uniquement pour MELEMX et NDQC uniquement pour MLREEL).
+C      
+*     Par rapport à quali5, on essaie de simplifier et de regrouper les
+*     cas avec, sans métrique + un peu de ménage
+C     
+C     
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 27/11/2017, version initiale
+C HISTORIQUE : v1, 27/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC CCGEOME
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCOORD
+-INC TMATOP1      
+*-INC SMETRIQ
+      POINTEUR KCMETR.METRIQ
+*-INC SMELEMX
+-INC SMLREEL
+      PARAMETER(NMET=6)
+      DIMENSION XMET(NMET)
+      DIMENSION XMET2(2,2)
+      DIMENSION XMET3(3,3)
+      REAL*8 DXI(3)
+* Statement functions
+*      DISTA(A,B,C,D)=SQRT((A-C)*(A-C)+(B-D)*(B-D))
+*      DISTB(A,B,C,D,E,F)=SQRT((A-D)*(A-D)+(B-E)*(B-E)+(C-F)*(C-F))
+*      DISTA(A,B)=SQRT(A*A+B*B)
+*      DISTB(A,B,C)=SQRT(A*A+B*B+C*C)
+*      DETTRI(A11,A12,A21,A22)=A11*A22-A21*A12
+      DETTET(A11,A12,A13,A21,A22,A23,A31,A32,A33)=
+     &  A11*(A22*A33-A23*A32)
+     &       +A12*(A23*A31-A21*A33)
+     &       +A13*(A21*A32-A22*A31)
+*     
+* Executable statements
+*
+      istneg=0
+      xstmax=-1.*xgrand
+      xstmin=xgrand
+      ISIGN=0
+      NDQC=0
+      IDIMP1=IDIM+1
+*      NBNN=NUMX(/1)
+      NBNN=NNCOU
+*      NBELEM=NUMX(/2)
+*?      JG=PROG(/1)
+* Trop de verif nuit...
+*      IF (NBNN.NE.IDIMP1.OR.JG.NE.NBELEM) THEN
+      IF (NBNN.NE.IDIMP1) THEN
+         CALL ERREUR(5)
+         RETURN
+      ENDIF
+      IF
+     $     (.NOT.(IELDEB.GE.1.AND.IELFIN.GE.IELDEB.AND.NLCOU.GE.IELFIN
+     $     .AND.NUMX(/2).GE.NLCOU))  THEN
+         WRITE(IOIMP,*) 'coucou quali6'
+         write(ioimp,*) 'IELDEB=',IELDEB
+         write(ioimp,*) 'IELFIN=',IELFIN
+         write(ioimp,*) 'NLCOU=',NLCOU
+         write(ioimp,*) 'NUM2=',NUMX(/2)
+         write(ioimp,*) 'MELEMX=',MELEMX
+         CALL ECMELX(MELEMX,0)
+         CALL ERREUR(5)
+         RETURN
+      ENDIF
+*     NARET=(NBNN-1)*NBNN/2
+c$$$      nbnn=2
+c$$$      NARET=(NBNN-1)*(NBNN/2)
+c$$$      WRITE(IOIMP,*) 'NBNN,NARET=',NBNN,NARET
+c$$$      nbnn=3
+c$$$      NARET=(NBNN-1)*(NBNN/2)
+c$$$      WRITE(IOIMP,*) 'NBNN,NARET=',NBNN,NARET
+c$$$      nbnn=4
+c$$$      NARET=(NBNN-1)*(NBNN/2)
+c$$$      WRITE(IOIMP,*) 'NBNN,NARET=',NBNN,NARET
+c$$$      stop 16
+*     2017/08/28 La ligne ci-dessus peut-elle induire des bugs ?
+*       Après test, non mais c'est chaud quand même...      
+      NARET=((NBNN-1)*NBNN)/2
+* Coefficient de normalisation
+      I=IDIM
+      XCOF=DFACT(I)*(SQRT((DBLE(2**I))/(DBLE(I+1))))
+*
+      IF (IMET.EQ.1) XMETD=1.D0/DENSIT
+      IF (IMET.EQ.2) XMETD=1.D0/XDENS
+      IF (IMET.EQ.3) NFMET=1
+      IF (IMET.EQ.4) NFMET=IDIM*(IDIM+1)/2
+      
+*     DO 10 IBELEM=1,NUMX(/2)
+      DO 10 IBELEM=IELDEB,IELFIN
+*     WRITE(IOIMP,*) 'IBELEM=',IBELEM
+*     Calcul de la métrique moyenne et de son déterminant suivant les
+*     cas 
+         if (imet.gt.0) then
+            IF (IMET.GE.1.AND.IMET.LE.3) THEN
+               IF (IMET.EQ.3) THEN
+                  YDENS=0.D0
+                  YDMIN=xgrand
+                  YDMAX=-xgrand
+                  DO I=1,IDIMP1
+                     INO=NUMX(I,IBELEM)
+                     IF (KPVIRT.NE.0) THEN
+                        IF (KPVIRT.EQ.INO) GOTO 10
+                     ENDIF
+*!
+*! MODIF !
+*!
+                     if (imomet.eq.1) then 
+                        YDENS=YDENS+LOG(KCMETR.XIN(1,INO))
+                        YDMIN=MIN(YDMIN,LOG(KCMETR.XIN(1,INO)))
+                        YDMAX=MAX(YDMAX,LOG(KCMETR.XIN(1,INO)))
+                     else
+                        YDENS=YDENS+KCMETR.XIN(1,INO)
+                        YDMIN=MIN(YDMIN,KCMETR.XIN(1,INO))
+                        YDMAX=MAX(YDMAX,KCMETR.XIN(1,INO))
+                     endif
+                  ENDDO
+*!
+*! MODIF !
+*!
+                  if (imomet.eq.1) then
+                     YDENS=EXP(YDENS/IDIMP1)
+                     YDMIN=EXP(YDMIN)
+                     YDMAX=EXP(YDMAX)
+                  else
+                     YDENS=YDENS/IDIMP1
+                  endif
+*                  write(ioimp,*) 'ydens,ydmin,ydmax=',ydens,ydmin,ydmax
+*                  YDENS=YDMIN
+                  if (.false.) then
+*     ydens2=1.D0/SQRT(YDENS)
+                     ydens2=YDENS
+                     xxxx=abs(ydens2-densit)/densit
+                     if (xxxx.gt.xzprec) then
+                        write(ioimp,*) 'ydens2,densit,xxxx=',ydens2
+     $                       ,densit,xxxx
+                        call erreur(5)
+                        return
+                     endif
+                  endif
+*                  XMETD=1.D0/YDENS
+                  XMETD=SQRT(YDENS)
+               ENDIF
+               XDETMD=XMETD**IDIM
+            ELSEIF (IMET.EQ.4) THEN
+               DO J=1,NFMET
+                  XMET(J)=0.D0
+               ENDDO
+               DO I=1,IDIMP1
+                  INO=NUMX(I,IBELEM)
+                  IF (KPVIRT.NE.0) THEN
+                     IF (KPVIRT.EQ.INO) GOTO 10
+                  ENDIF
+                  DO J=1,NFMET
+                     XMET(J)=XMET(J)+KCMETR.XIN(J,INO)
+                  ENDDO
+               ENDDO
+               DO J=1,NFMET
+                  XMET(J)=XMET(J)/IDIMP1
+               ENDDO
+               IF (IDIM.EQ.2) THEN
+                  XMET2(1,1)=XMET(1)
+                  XMET2(2,1)=XMET(2)
+                  XMET2(1,2)=XMET(2)
+                  XMET2(2,2)=XMET(3)
+                  XDETMD=XMET2(1,1)*XMET2(2,2)-XMET2(2,1)*XMET2(1,2)
+                  XDETMD=SQRT(XDETMD)
+               ELSEIF (IDIM.EQ.3) THEN
+                  XMET3(1,1)=XMET(1)
+                  XMET3(2,1)=XMET(2)
+                  XMET3(1,2)=XMET(2)
+                  XMET3(2,2)=XMET(3)
+                  XMET3(3,1)=XMET(4)
+                  XMET3(1,3)=XMET(4)
+                  XMET3(3,2)=XMET(5)
+                  XMET3(2,3)=XMET(5)
+                  XMET3(3,3)=XMET(6)
+                  XDETMD=DETTET(XMET3(1,1),XMET3(1,2),XMET3(1,3),XMET3(2
+     $                 ,1),XMET3(2,2),XMET3(2,3),XMET3(3,1),XMET3(3,2)
+     $                 ,XMET3(3,3))   
+                  XDETMD=SQRT(XDETMD)
+               ELSE
+                  WRITE(IOIMP,*) 'quali6 idim=',IDIM
+                  INTERR(1)=IDIM
+                  CALL ERREUR(709)
+                  RETURN
+               ENDIF
+            ELSE
+               WRITE(IOIMP,*) 'quali6 imet=',IMET
+               CALL ERREUR(5)
+               RETURN
+            ENDIF
+         endif
+* Calcul des volumes
+* Volume d'un triangle
+         IF (IDIM.EQ.2) THEN 
+            I0=NUMX(1,IBELEM)
+            I1=NUMX(2,IBELEM)
+            I2=NUMX(3,IBELEM)
+            IF (KPVIRT.NE.0) THEN
+               IF (KPVIRT.EQ.I0.OR.KPVIRT.EQ.I1.OR.KPVIRT.EQ.I2) 
+     $              goto 10
+            ENDIF
+            IP0=(I0-1)*IDIMP1
+            IP1=(I1-1)*IDIMP1
+            IP2=(I2-1)*IDIMP1
+            X10=XCOOR(IP1+1)-XCOOR(IP0+1)
+            Y10=XCOOR(IP1+2)-XCOOR(IP0+2)
+            X20=XCOOR(IP2+1)-XCOOR(IP0+1)
+            Y20=XCOOR(IP2+2)-XCOOR(IP0+2)
+*     XVOL=ABS(DETTRI(X10,Y10,X20,Y20))/2.D0
+*     XVOL=ABS(X10*Y20-X20*Y10)/2.D0
+            XVOLO=(X10*Y20-X20*Y10)/2.D0
+*     sigvol=sign(1.d0,xvolo)
+*     Volume d'un tétraèdre
+         ELSEIF (IDIM.EQ.3) THEN
+            I0=NUMX(1,IBELEM)
+            I1=NUMX(2,IBELEM)
+            I2=NUMX(3,IBELEM)
+            I3=NUMX(4,IBELEM)
+            IF (KPVIRT.NE.0) THEN
+               IF (KPVIRT.EQ.I0.OR.KPVIRT.EQ.I1.OR.KPVIRT.EQ.I2
+     $              .OR.KPVIRT.EQ.I3) goto 10
+            ENDIF
+            IP0=(I0-1)*IDIMP1
+            IP1=(I1-1)*IDIMP1
+            IP2=(I2-1)*IDIMP1
+            IP3=(I3-1)*IDIMP1
+            X10=XCOOR(IP1+1)-XCOOR(IP0+1)
+            Y10=XCOOR(IP1+2)-XCOOR(IP0+2)
+            Z10=XCOOR(IP1+3)-XCOOR(IP0+3)
+            X20=XCOOR(IP2+1)-XCOOR(IP0+1)
+            Y20=XCOOR(IP2+2)-XCOOR(IP0+2)
+            Z20=XCOOR(IP2+3)-XCOOR(IP0+3)
+            X30=XCOOR(IP3+1)-XCOOR(IP0+1)
+            Y30=XCOOR(IP3+2)-XCOOR(IP0+2)
+            Z30=XCOOR(IP3+3)-XCOOR(IP0+3)
+*     XVOL=ABS(DETTET(X10,X20,X30,Y10,Y20,Y30,Z10,Z20,Z30))
+*     $              /6.D0
+            XVOLO=(DETTET(X10,X20,X30,Y10,Y20,Y30,Z10,Z20,Z30))
+     $           /6.D0
+         ENDIF
+* Déterminant de la métrique
+         if (imet.gt.0) then
+            XVOLO=XVOLO*XDETMD
+         endif            
+         sigvol=sign(1.d0,xvolo+xvtol)
+         if (sigvol.lt.0.d0) then
+            istneg=istneg+1
+            xstmax=max(xstmax,xvolo)
+            xstmin=min(xstmin,xvolo)
+         endif
+         xvol=abs(xvolo)
+*     Calcul des longueurs
+         XLAR=0.D0
+         XLAR2=0.D0
+         IMEXP=IDIM
+            XLAMAX=XPETIT**(1.D0/IMEXP)
+            XLAMIN=XGRAND**(1.D0/IMEXP)
+         DO IBNN=1,NBNN
+            DO JBNN=IBNN+1,NBNN
+               I0=NUMX(IBNN,IBELEM)
+               I1=NUMX(JBNN,IBELEM)
+               IP0=(I0-1)*IDIMP1
+               IP1=(I1-1)*IDIMP1
+               DO IIDIM=1,IDIM
+                  DXI(IIDIM)=XCOOR(IP1+IIDIM)-XCOOR(IP0+IIDIM)
+                  IF (IMET.GE.1.AND.IMET.LE.3) THEN
+*!
+*! MODIF !
+*!
+*!                     DXI(IIDIM)=DXI(IIDIM)*(1.D0/XMETD)
+                     DXI(IIDIM)=DXI(IIDIM)*XMETD
+                  ENDIF
+               ENDDO
+               DXLAR2=0.D0
+               IF (IMET.EQ.4) THEN
+                  IF (IDIM.EQ.2) THEN
+                     DO J=1,IDIM
+                        DO I=1,IDIM
+                           DXLAR2=DXLAR2+XMET2(I,J)*DXI(I)*DXI(J)
+                        ENDDO
+                     ENDDO
+                  ELSEIF (IDIM.EQ.3) THEN
+                     DO J=1,IDIM
+                        DO I=1,IDIM
+                           DXLAR2=DXLAR2+XMET3(I,J)*DXI(I)*DXI(J)
+                        ENDDO
+                     ENDDO
+                  ELSE
+                     WRITE(IOIMP,*) 'quali6 idim=',IDIM
+                     
+                     CALL ERREUR(5)
+                     RETURN
+                  ENDIF
+               ELSE
+                  DO I=1,IDIM
+                     DXLAR2=DXLAR2+DXI(I)*DXI(I)
+                  ENDDO
+               ENDIF
+               DXLAR=SQRT(DXLAR2)
+               XLAR=XLAR+DXLAR
+               XLAR2=XLAR2+DXLAR2
+*               XLAR2=XLAR2+(DXLAR**2)
+               XLAMAX=MAX(XLAMAX,DXLAR)
+               XLAMIN=MIN(XLAMIN,DXLAR)
+            ENDDO
+         ENDDO
+         XLAMOY=XLAR/NARET
+         if (imet.eq.0) then
+            XQUAL=XVOL/(XLAMOY**IDIM)
+            XQUALN=XQUAL*XCOF
+         else            
+            XLAMO2=SQRT(XLAR2*(2.D0/(DBLE(IDIM)*DBLE(IDIM+1))))
+**tst 2017/08/29 XLAMO3 ne marche pas bien            
+**     XLAMO3=SQRT(XLAMAX*XLAMIN)
+            XLAD=XLAMO2**IMEXP
+*            XLAD=XLAMOY**IDIM
+*
+            XLAMAD=XLAMAX**IMEXP
+            XLAMID=XLAMIN**IMEXP
+            XQUAL=XVOL/XLAD
+            XQUALN=XQUAL*XCOF
+*            PROG(IBELEM)=XQUALN
+*     PROG(IBELEM)=MIN(XQUALN,XLAD,1.D0/XLAD)
+*      Je n'aime pas trop ce critère            
+* 2017/08/28            PROG(**)=MIN(XQUALN,XLAD,1.D0/XLAD)
+*     write(ioimp,*) 'xqualn,xqual2=',xqualn,xqual2
+*            write(ioimp,*) 'xlad=',xlad
+*      xqual2=min(XLAD,1.D0/XLAD)
+            xqualn=MIN(XQUALN,XLAD,1.D0/XLAD)
+*            xqualn=MIN(XQUALN,XQUAL2)
+*            write(ioimp,*) 'xqualn,xlamax,xlamin,xlamad,xlamid=',xqualn
+*     $           ,xlamax,xlamin,min(XLAMAD,1.D0/XLAMAD),min(XLAMID,1.D0
+*     $           /XLAMID)
+*            xqual2=min(XLAMAD,1.D0/XLAMAD,XLAMID,1.D0/XLAMID)
+*            xqual2=min(XLAMID,1.D0/XLAMID)
+*            write(ioimp,*) 'xqualn,xqual2=',xqualn,xqual2
+*!
+*! MODIF !
+*!
+*            xqualn=MIN(XQUALN,XLAMAD,1.D0/XLAMAD,XLAMID,1.D0/XLAMID)
+*            xqualn=MIN(XQUALN,XQUAL2)
+         endif
+         if (isign.eq.1) then
+            if (sigvol.lt.0.d0) xqualn=xqualn-1.d0
+         endif
+*     PROG(**)=XQUALN
+* faux            PROG(IBELEM)=XQUALN
+         PROG(IELDEB+NDQC)=XQUALN
+         NDQC=NDQC+1
+ 10   CONTINUE
+
+*      write(ioimp,*) 'quali6 : istneg=',istneg
+*      write(ioimp,*) 'xstmin',xstmin,'xstmax',xstmax
+      
+      RETURN
+*
+* formats      
+*
+  188  FORMAT (2X,12(A6,'=',1PG12.5,2X))
+*     
+* End of subroutine QUALI6
+*
+      END
+
+ 

@@ -1,0 +1,109 @@
+C DADP3D    SOURCE    PV090527  23/01/27    21:15:20     11574          
+      subroutine damdp3d(prec3d,ekdc,epeqpc,epspc6,dcc3,sigfc61,
+     # sigft61,dcdp,ortho)
+c     endo de compresion
+c     A.Sellier 2021/05/05
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      
+      real*8 epspc6(6),dcc3(3),ekdc,epeqpc,sigfc61(6),sigft61(6),dcdp
+      real*8 dcpp
+
+      real*8 epspc33(3,3),epspc3(3),vepspc33(3,3),vepspc33t(3,3)
+      real*8 sigfc6p(6),sigfc6ct(6),dx
+      integer i,j,k,l
+      real*8 trepsdc 
+      real*8 dmaxi
+      logical ortho
+      real*8 dcc,scom
+      
+      dmaxi=1.d0-prec3d   
+C       print*,'Dans DamDP3D'
+C       print*,'ekdc',ekdc
+C       print*,'ortho',ortho
+      
+c***********************************************************************
+c     variation de raideur due aux dilatations transverses
+c     induites par le cisaillement 
+c     ******************************************************************
+      if(ortho) then
+c***********************************************************************      
+c      cas ou l endo de DP est orthotrope      
+c      directions principale de epspc6
+       call x6x33(epspc6,epspc33)       
+       call b3_v33(epspc33,epspc3,vepspc33)
+c      do i=1,3
+c         print*,'endo3d epspc3:',i,epspc3(i)
+c      end do
+c      construction matrice de passage inverse
+       call traps1(vepspc33t,vepspc33,3) 
+c      calcul des endo orthotropes de compression (dcc)      
+       do i=1,3
+          call indce1(i,k,l)
+          trepsdc=max(epspc3(k),0.d0)+max(epspc3(l),0.d0)
+          if(trepsdc.gt.epeqpc) then
+             trepsdc=trepsdc-epeqpc
+             dcc3(i)=min(dmaxi,(trepsdc/(trepsdc+ekdc)))
+          else
+             dcc3(i)=0.d0
+          endif 
+c          print*,'Dans damDP3d endo DP ortho dcc(',i,')=',dcc3(i)      
+       end do      
+c      *****************************************************************
+c      prise en compte endo ortho de DP sur contraintes de compression
+c      *****************************************************************
+       if(max(dcc3(1),dcc3(2),dcc3(3)).gt.0.) then
+c         passage  des contraintes effectives dans la base 
+c         prin des endo dcc actuels
+          call chrep6(sigfc61,vepspc33,.false.,sigfc6p)  
+c         application du tenseur d endommagement aux contraintes 
+c         de tractions
+          do i=1,6
+             if(i.le.3) then
+                 sigfc6ct(i)=sigfc6p(i)*(1.d0-dcc3(i))
+             else
+                 call indce0(i,k,l)
+                 dx=max(dcc3(k),dcc3(l))
+                 sigfc6ct(i)=sigfc6p(i)*(1.d0-dx)
+             end if           
+          end do
+c         retour des contraintes negatives en base fixe
+          call chrep6(sigfc6ct,vepspc33t,.false.,sigfc61)
+       end if
+      else
+c***********************************************************************      
+c      cas ou l endo de compression est isotrope
+c      calcul de la dilatance post pic
+       trepsdc=0.d0
+       do i=1,3
+          trepsdc=trepsdc+epspc6(i)
+       end do
+c      *****************************************************************       
+c      calcul de l endommagement isotrope actuel
+c      *****************************************************************       
+       if(trepsdc.gt.epeqpc) then
+          trepsdc=trepsdc-epeqpc
+          dcc=min(dmaxi,(trepsdc/(trepsdc+ekdc)))
+       else
+          dcc=0.d0
+       endif
+c      condition de croissance de l endommagement de cisaillement
+       dcdp=max(dcdp,dcc)
+c       print*,'Dans dadp3d endo DP iso dcdp=',dcdp       
+c      *****************************************************************
+c      prise en compte endo iso de DP sur contraintes 
+c      *****************************************************************
+       scom=1.d0-dcdp
+       do i=1,6
+          sigfc61(i)=scom*sigfc61(i)
+          sigft61(i)=scom*sigft61(i)          
+       end do       
+      end if
+
+c***********************************************************************      
+      return
+      end      
+      
+       
+ 

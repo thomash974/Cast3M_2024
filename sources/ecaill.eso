@@ -1,0 +1,1281 @@
+C ECAILL    SOURCE    PV090527  23/02/06    21:15:02     11587          
+      subroutine ecaill(i,k,phi,lsa,alpha,l1,ls,Df,nligne,
+     # Rt,F,j)
+
+c peut tourner avec L1(actuel), L1 cos(phi) ou L1 sin(phi)
+      implicit integer (i,j,k,n)
+c      logical laranjeira      
+      
+      implicit real*8 (t,s)
+      real*8 ls,L1,phi,lsa,alpha,df,rt,f
+      
+C       cg4 = ((L1 * sin(phi) + lsa) * sqrt(-0.4D1 * ((L1 * sin(phi) + lsa
+C      # / 0.2D1) * (Df ** 2 * cos(phi) ** 2 / 0.2D1 + L1 * sin(phi) * lsa
+C      # - Df ** 2 / 0.2D1 + lsa ** 2 / 0.2D1) * cos(alpha) ** 2 + Df * (L
+C      #1 * sin(phi) + lsa) * (-sin(phi) * (L1 * sin(phi) + lsa / 0.2D1) *
+C      # sin(alpha) + L1 * sin(phi) * cos(phi) ** 2 - L1 * sin(phi)) * cos
+C      #(alpha) - (L1 * sin(phi) ** 2 * (L1 * sin(phi) + lsa) * sin(alpha)
+C      # + (L1 * sin(phi) + lsa / 0.2D1) ** 2) * lsa) * cos(phi) ** 2 * ls
+C      #a) + 0.2D1 * cos(phi) * ((Df * (L1 * sin(phi) + lsa / 0.2D1) * cos
+C      #(alpha) + L1 * sin(phi) * (L1 * sin(phi) + lsa)) * sin(phi) + sin(
+C      #alpha) * (L1 * sin(phi) + lsa) * (L1 * sin(phi) + lsa / 0.2D1)) * 
+C      #lsa) / ((0.2D1 * (Df * cos(alpha) / 0.2D1 + L1 * sin(phi)) * (L1 *
+C      # sin(phi) + lsa) * sin(phi) + 0.2D1 * sin(alpha) * (L1 ** 2 * sin(
+C      #phi) ** 2 + L1 * sin(phi) * lsa + lsa ** 2 / 0.2D1)) * cos(phi) + 
+C      #sqrt(-0.4D1 * ((L1 * sin(phi) + lsa / 0.2D1) * (Df ** 2 * cos(phi)
+C      # ** 2 / 0.2D1 + L1 * sin(phi) * lsa - Df ** 2 / 0.2D1 + lsa ** 2 /
+C      # 0.2D1) * cos(alpha) ** 2 + Df * (L1 * sin(phi) + lsa) * (-sin(phi
+C      #) * (L1 * sin(phi) + lsa / 0.2D1) * sin(alpha) + L1 * sin(phi) * c
+C      #os(phi) ** 2 - L1 * sin(phi)) * cos(alpha) - (L1 * sin(phi) ** 2 *
+C      # (L1 * sin(phi) + lsa) * sin(alpha) + (L1 * sin(phi) + lsa / 0.2D1
+C      #) ** 2) * lsa) * cos(phi) ** 2 * lsa)) / ((Df * L1 * sin(phi) ** 2
+C      # * cos(alpha) * cos(phi) + Df * cos(alpha) * sin(phi) * cos(phi) *
+C      # lsa + 0.2D1 * L1 * sin(phi) ** 2 * cos(phi) * lsa + 0.2D1 * L1 * 
+C      #sin(phi) * cos(phi) * sin(alpha) * lsa + cos(phi) * sin(alpha) * l
+C      #sa ** 2 + sqrt(Df ** 2 * L1 ** 2 * sin(phi) ** 6 * cos(alpha) ** 2
+C      # + Df ** 2 * L1 ** 2 * sin(phi) ** 4 * cos(alpha) ** 2 * cos(phi) 
+C      #** 2 + 0.2D1 * Df ** 2 * L1 * sin(phi) ** 3 * cos(alpha) ** 2 * co
+C      #s(phi) ** 2 * lsa + Df ** 2 * cos(alpha) ** 2 * sin(phi) ** 2 * co
+C      #s(phi) ** 2 * lsa ** 2 + 0.4D1 * Df * L1 ** 2 * sin(phi) ** 4 * co
+C      #s(alpha) * cos(phi) ** 2 * lsa + 0.4D1 * Df * L1 ** 2 * sin(phi) *
+C      #* 3 * cos(alpha) * cos(phi) ** 2 * sin(alpha) * lsa + 0.4D1 * Df *
+C      # L1 * sin(phi) ** 3 * cos(alpha) * cos(phi) ** 2 * lsa ** 2 + 0.6D
+C      #1 * Df * L1 * sin(phi) ** 2 * cos(alpha) * cos(phi) ** 2 * sin(alp
+C      #ha) * lsa ** 2 + 0.2D1 * Df * cos(alpha) * sin(phi) * cos(phi) ** 
+C      #2 * sin(alpha) * lsa ** 3 - Df ** 2 * L1 ** 2 * sin(phi) ** 4 * co
+C      #s(alpha) ** 2 + 0.4D1 * L1 ** 2 * sin(phi) ** 6 * lsa ** 2 + 0.4D1
+C      # * L1 ** 2 * sin(phi) ** 5 * sin(alpha) * lsa ** 2 + 0.4D1 * L1 **
+C      # 2 * sin(phi) ** 4 * cos(phi) ** 2 * lsa ** 2 + 0.8D1 * L1 ** 2 * 
+C      #sin(phi) ** 3 * cos(phi) ** 2 * sin(alpha) * lsa ** 2 + 0.4D1 * L1
+C      # ** 2 * sin(phi) ** 2 * cos(phi) ** 2 * sin(alpha) ** 2 * lsa ** 2
+C      # + 0.4D1 * L1 * sin(phi) ** 2 * cos(phi) ** 2 * sin(alpha) * lsa *
+C      #* 3 + 0.4D1 * L1 * sin(phi) * cos(phi) ** 2 * sin(alpha) ** 2 * ls
+C      #a ** 3 + cos(phi) ** 2 * sin(alpha) ** 2 * lsa ** 4 - 0.4D1 * L1 *
+C      #* 2 * sin(phi) ** 4 * lsa ** 2 - 0.4D1 * L1 ** 2 * sin(phi) ** 3 *
+C      # sin(alpha) * lsa ** 2)) / sin(phi) ** 3 * Rt / cos(alpha) / 0.2D1
+C      # - cos(phi) * L1 ** 2 * Rt * (-(sin(phi) * sin(alpha) - cos(phi) *
+C      #* 2 / 0.2D1 - cos(alpha) ** 2 / 0.2D1 + 0.1D1) * cos(alpha) * Df *
+C      # sqrt(Df ** 2 * L1 ** 4 * sin(phi) ** 6 * cos(alpha) ** 2 * cos(ph
+C      #i) ** 2 * Rt ** 2) + cos(phi) * (Df ** 2 * (sin(alpha) + sin(phi) 
+C      #/ 0.2D1) * cos(alpha) ** 2 * cos(phi) ** 2 + Df ** 2 * cos(alpha) 
+C      #** 4 * sin(phi) / 0.2D1 + (-Df ** 2 * sin(phi) - sin(alpha) * Df *
+C      #* 2) * cos(alpha) ** 2) * L1 ** 2 * sin(phi) ** 2 * Rt) / (((Df * 
+C      #cos(alpha) / 0.4D1 + L1 * sin(phi) / 0.2D1) * cos(phi) ** 2 + L1 *
+C      # sin(phi) * cos(alpha) ** 2 / 0.2D1 - Df * (sin(phi) * sin(alpha) 
+C      #+ 0.1D1) * cos(alpha) / 0.4D1 - (sin(phi) * sin(alpha) + 0.1D1) * 
+C      #L1 * sin(phi)) * sqrt(Df ** 2 * L1 ** 4 * sin(phi) ** 6 * cos(alph
+C      #a) ** 2 * cos(phi) ** 2 * Rt ** 2) + cos(phi) * L1 ** 2 * sin(phi)
+C      # ** 2 * ((Df ** 2 * (sin(phi) + sin(alpha)) * cos(alpha) ** 2 / 0.
+C      #4D1 + Df * L1 * sin(phi) * (sin(alpha) + sin(phi) / 0.2D1) * cos(a
+C      #lpha)) * cos(phi) ** 2 + sin(phi) ** 2 * Df * L1 * cos(alpha) ** 3
+C      # / 0.2D1 + (-Df ** 2 * sin(phi) / 0.4D1 - sin(alpha) * Df ** 2 / 0
+C      #.4D1) * cos(alpha) ** 2 - Df * (sin(phi) + sin(alpha)) * L1 * sin(
+C      #phi) * cos(alpha)) * Rt) / cos(alpha) / 0.2D1) * F / (0.1D1 - mu *
+C      # sin(phi)) + 0.12D2 * cos(alpha) * Df * sin(phi) ** 3 * L1 ** 2 * 
+C      #(((-sin(phi) * sin(alpha) + cos(phi) ** 2 / 0.2D1 + cos(alpha) ** 
+C      #2 / 0.2D1 - 0.1D1) * sqrt(Df ** 2 * L1 ** 4 * sin(phi) ** 6 * cos(
+C      #alpha) ** 2 * cos(phi) ** 2 * Rt ** 2) + cos(phi) * cos(alpha) * D
+C      #f * L1 ** 2 * sin(phi) ** 2 * ((sin(alpha) + sin(phi) / 0.2D1) * c
+C      #os(phi) ** 2 + sin(phi) * cos(alpha) ** 2 / 0.2D1 - sin(alpha) - s
+C      #in(phi)) * Rt) * (L1 * sin(phi) + lsa) * sqrt(-0.4D1 * ((L1 * sin(
+C      #phi) + lsa / 0.2D1) * (Df ** 2 * cos(phi) ** 2 / 0.2D1 + L1 * sin(
+C      #phi) * lsa - Df ** 2 / 0.2D1 + lsa ** 2 / 0.2D1) * cos(alpha) ** 2
+C      # + Df * (L1 * sin(phi) + lsa) * (-sin(phi) * (L1 * sin(phi) + lsa 
+C      #/ 0.2D1) * sin(alpha) + L1 * sin(phi) * cos(phi) ** 2 - L1 * sin(p
+C      #hi)) * cos(alpha) - (L1 * sin(phi) ** 2 * (L1 * sin(phi) + lsa) * 
+C      #sin(alpha) + (L1 * sin(phi) + lsa / 0.2D1) ** 2) * lsa) * cos(phi)
+C      # ** 2 * lsa) / 0.3D1 + cos(phi) * lsa * (((0.2D1 / 0.3D1 * Df * (s
+C      #in(alpha) + sin(phi) / 0.2D1) * (L1 * sin(phi) + lsa / 0.2D1) * co
+C      #s(alpha) + (L1 * sin(phi) ** 2 / 0.3D1 + sin(alpha) * (L1 * sin(ph
+C      #i) + lsa / 0.6D1)) * (L1 * sin(phi) + lsa)) * cos(phi) ** 2 + Df *
+C      # sin(phi) * (L1 * sin(phi) + lsa / 0.2D1) * cos(alpha) ** 3 / 0.3D
+C      #1 + (L1 * sin(phi) + lsa) * ((0.3D1 * L1 * sin(phi) + lsa) * sin(p
+C      #hi) + sin(alpha) * (L1 * sin(phi) + lsa / 0.2D1)) * cos(alpha) ** 
+C      #2 / 0.3D1 - 0.2D1 / 0.3D1 * (sin(phi) + sin(alpha)) * Df * (L1 * s
+C      #in(phi) + lsa / 0.2D1) * cos(alpha) - 0.4D1 / 0.3D1 * (sin(phi) + 
+C      #sin(alpha)) * (L1 * sin(phi) + lsa) * (L1 * sin(phi) + lsa / 0.4D1
+C      #)) * sqrt(Df ** 2 * L1 ** 4 * sin(phi) ** 6 * cos(alpha) ** 2 * co
+C      #s(phi) ** 2 * Rt ** 2) + cos(phi) * cos(alpha) * Df * ((-Df * (L1 
+C      #* sin(phi) + lsa / 0.2D1) * cos(alpha) / 0.3D1 - L1 * sin(phi) * (
+C      #L1 * sin(phi) + lsa) / 0.3D1) * cos(phi) ** 4 + (-Df * (L1 * sin(p
+C      #hi) + lsa / 0.2D1) * cos(alpha) ** 3 / 0.3D1 - (L1 * sin(phi) + ls
+C      #a) * (L1 * sin(phi) + lsa / 0.3D1) * cos(alpha) ** 2 + 0.2D1 / 0.3
+C      #D1 * Df * (sin(phi) * sin(alpha) + 0.3D1 / 0.2D1) * (L1 * sin(phi)
+C      # + lsa / 0.2D1) * cos(alpha) + (sin(alpha) * (L1 * sin(phi) + lsa 
+C      #/ 0.6D1) * sin(phi) + 0.5D1 / 0.3D1 * L1 * sin(phi) + lsa / 0.3D1)
+C      # * (L1 * sin(phi) + lsa)) * cos(phi) ** 2 + Df * (L1 * sin(phi) + 
+C      #lsa / 0.2D1) * cos(alpha) ** 3 / 0.3D1 + (sin(phi) * (L1 * sin(phi
+C      #) + lsa / 0.2D1) * sin(alpha) + 0.3D1 * L1 * sin(phi) + lsa) * (L1
+C      # * sin(phi) + lsa) * cos(alpha) ** 2 / 0.3D1 - 0.2D1 / 0.3D1 * Df 
+C      #* (sin(phi) * sin(alpha) + 0.1D1) * (L1 * sin(phi) + lsa / 0.2D1) 
+C      #* cos(alpha) - 0.4D1 / 0.3D1 * (L1 * sin(phi) + lsa) * (sin(phi) *
+C      # sin(alpha) + 0.1D1) * (L1 * sin(phi) + lsa / 0.4D1)) * L1 ** 2 * 
+C      #sin(phi) ** 2 * Rt)) / ((((-0.2D1 * Df ** 2 * (sin(phi) + sin(alph
+C      #a)) * (L1 * sin(phi) + lsa) * cos(alpha) ** 2 - 0.8D1 * Df * (L1 *
+C      # sin(phi) ** 2 * (L1 * sin(phi) + 0.2D1 * lsa) / 0.2D1 + (L1 ** 2 
+C      #* sin(phi) ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 / 0.4D1) 
+C      #* sin(alpha)) * cos(alpha) - 0.12D2 * (L1 * sin(phi) ** 2 * (L1 * 
+C      #sin(phi) + 0.2D1 * lsa) / 0.3D1 + sin(alpha) * (L1 ** 2 * sin(phi)
+C      # ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 / 0.3D1)) * L1 * si
+C      #n(phi)) * cos(phi) ** 2 - 0.4D1 * sin(phi) * Df * (L1 ** 2 * sin(p
+C      #hi) ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 / 0.2D1) * cos(a
+C      #lpha) ** 3 + ((-0.12D2 * L1 ** 3 * sin(phi) ** 3 - 0.24D2 * L1 ** 
+C      #2 * sin(phi) ** 2 * lsa + (0.2D1 * Df ** 2 - 0.8D1 * lsa ** 2) * L
+C      #1 * sin(phi) + 0.2D1 * Df ** 2 * lsa) * sin(phi) - 0.4D1 * (L1 * s
+C      #in(phi) + lsa) * sin(alpha) * (L1 ** 2 * sin(phi) ** 2 + L1 * sin(
+C      #phi) * lsa - Df ** 2 / 0.2D1)) * cos(alpha) ** 2 + 0.8D1 * Df * (L
+C      #1 ** 2 * sin(phi) ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 / 
+C      #0.4D1) * (sin(phi) + sin(alpha)) * cos(alpha) + 0.16D2 * (sin(phi)
+C      # + sin(alpha)) * L1 * sin(phi) * (L1 ** 2 * sin(phi) ** 2 + 0.2D1 
+C      #* L1 * sin(phi) * lsa + lsa ** 2 / 0.2D1)) * sqrt(Df ** 2 * L1 ** 
+C      #4 * sin(phi) ** 6 * cos(alpha) ** 2 * cos(phi) ** 2 * Rt ** 2) - 0
+C      #.12D2 * cos(phi) * cos(alpha) * Df * ((-Df ** 2 * (L1 * sin(phi) +
+C      # lsa) * cos(alpha) ** 2 / 0.6D1 - L1 * sin(phi) * Df * (L1 * sin(p
+C      #hi) + 0.2D1 * lsa) * cos(alpha) / 0.3D1 - L1 ** 2 * sin(phi) ** 2 
+C      #* (L1 * sin(phi) + 0.2D1 * lsa) / 0.3D1) * cos(phi) ** 4 + (-Df * 
+C      #(L1 ** 2 * sin(phi) ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 
+C      #/ 0.2D1) * cos(alpha) ** 3 / 0.3D1 + (Df ** 2 * sin(alpha) * (L1 *
+C      # sin(phi) + lsa) * sin(phi) / 0.6D1 - L1 ** 3 * sin(phi) ** 3 - 0.
+C      #2D1 * L1 ** 2 * sin(phi) ** 2 * lsa + (Df ** 2 / 0.3D1 - 0.2D1 / 0
+C      #.3D1 * lsa ** 2) * L1 * sin(phi) + Df ** 2 * lsa / 0.3D1) * cos(al
+C      #pha) ** 2 + 0.2D1 / 0.3D1 * ((L1 ** 2 * sin(phi) ** 2 + 0.2D1 * L1
+C      # * sin(phi) * lsa + lsa ** 2 / 0.4D1) * sin(alpha) * sin(phi) + 0.
+C      #3D1 / 0.2D1 * L1 ** 2 * sin(phi) ** 2 + 0.3D1 * L1 * sin(phi) * ls
+C      #a + lsa ** 2 / 0.4D1) * Df * cos(alpha) + L1 * sin(phi) * (sin(alp
+C      #ha) * (L1 ** 2 * sin(phi) ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa
+C      # ** 2 / 0.3D1) * sin(phi) + 0.10D2 / 0.3D1 * L1 * sin(phi) * lsa +
+C      # 0.2D1 / 0.3D1 * lsa ** 2 + 0.5D1 / 0.3D1 * L1 ** 2 * sin(phi) ** 
+C      #2)) * cos(phi) ** 2 + Df * (L1 ** 2 * sin(phi) ** 2 + 0.2D1 * L1 *
+C      # sin(phi) * lsa + lsa ** 2 / 0.2D1) * cos(alpha) ** 3 / 0.3D1 + ((
+C      #L1 * sin(phi) + lsa) * sin(alpha) * (L1 ** 2 * sin(phi) ** 2 + L1 
+C      #* sin(phi) * lsa - Df ** 2 / 0.2D1) * sin(phi) / 0.3D1 + L1 ** 3 *
+C      # sin(phi) ** 3 + 0.2D1 * L1 ** 2 * sin(phi) ** 2 * lsa + (-Df ** 2
+C      # / 0.6D1 + 0.2D1 / 0.3D1 * lsa ** 2) * L1 * sin(phi) - Df ** 2 * l
+C      #sa / 0.6D1) * cos(alpha) ** 2 - 0.2D1 / 0.3D1 * Df * (L1 ** 2 * si
+C      #n(phi) ** 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 / 0.4D1) * (s
+C      #in(phi) * sin(alpha) + 0.1D1) * cos(alpha) - 0.4D1 / 0.3D1 * (sin(
+C      #phi) * sin(alpha) + 0.1D1) * L1 * sin(phi) * (L1 ** 2 * sin(phi) *
+C      #* 2 + 0.2D1 * L1 * sin(phi) * lsa + lsa ** 2 / 0.2D1)) * L1 ** 2 *
+C      # sin(phi) ** 2 * Rt) * sqrt(-0.4D1 * ((L1 * sin(phi) + lsa / 0.2D1
+C      #) * (Df ** 2 * cos(phi) ** 2 / 0.2D1 + L1 * sin(phi) * lsa - Df **
+C      # 2 / 0.2D1 + lsa ** 2 / 0.2D1) * cos(alpha) ** 2 + Df * (L1 * sin(
+C      #phi) + lsa) * (-sin(phi) * (L1 * sin(phi) + lsa / 0.2D1) * sin(alp
+C      #ha) + L1 * sin(phi) * cos(phi) ** 2 - L1 * sin(phi)) * cos(alpha) 
+C      #- (L1 * sin(phi) ** 2 * (L1 * sin(phi) + lsa) * sin(alpha) + (L1 *
+C      # sin(phi) + lsa / 0.2D1) ** 2) * lsa) * cos(phi) ** 2 * lsa) + 0.3
+C      #2D2 * cos(phi) * (((Df * cos(alpha) / 0.2D1 + L1 * sin(phi)) * (Df
+C      # ** 2 * (L1 ** 2 * sin(phi) ** 2 + 0.4D1 * L1 * sin(phi) * lsa + 0
+C      #.2D1 * lsa ** 2) * cos(alpha) ** 2 / 0.4D1 + 0.2D1 * L1 * sin(phi)
+C      # * Df * lsa * (L1 * sin(phi) + lsa) * cos(alpha) + L1 ** 2 * sin(p
+C      #hi) ** 2 * lsa * (L1 * sin(phi) + lsa)) * cos(phi) ** 4 / 0.4D1 + 
+C      #(Df ** 2 * (L1 ** 3 * sin(phi) ** 3 + 0.8D1 * L1 ** 2 * sin(phi) *
+C      #* 2 * lsa + 0.8D1 * L1 * sin(phi) * lsa ** 2 + 0.2D1 * lsa ** 3) *
+C      # cos(alpha) ** 4 / 0.16D2 + 0.15D2 / 0.8D1 * Df * (-sin(alpha) * D
+C      #f ** 2 * (L1 ** 2 * sin(phi) ** 2 + 0.4D1 * L1 * sin(phi) * lsa + 
+C      #0.2D1 * lsa ** 2) * sin(phi) / 0.60D2 + L1 ** 3 * sin(phi) ** 3 * 
+C      #lsa + (-Df ** 2 / 0.30D2 + 0.7D1 / 0.5D1 * lsa ** 2) * L1 ** 2 * s
+C      #in(phi) ** 2 + (-0.2D1 / 0.15D2 * Df ** 2 * lsa + 0.8D1 / 0.15D2 *
+C      # lsa ** 3) * L1 * sin(phi) - Df ** 2 * lsa ** 2 / 0.15D2 + lsa ** 
+C      #4 / 0.30D2) * cos(alpha) ** 3 + (-sin(alpha) * Df ** 2 * (L1 ** 3 
+C      #* sin(phi) ** 3 + 0.8D1 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.7D1 * 
+C      #L1 * sin(phi) * lsa ** 2 + lsa ** 3) * sin(phi) / 0.8D1 + 0.3D1 / 
+C      #0.2D1 * L1 ** 4 * sin(phi) ** 4 * lsa + (-0.3D1 / 0.16D2 * Df ** 2
+C      # + 0.21D2 / 0.8D1 * lsa ** 2) * L1 ** 3 * sin(phi) ** 3 + (-0.3D1 
+C      #/ 0.2D1 * Df ** 2 * lsa + 0.3D1 / 0.2D1 * lsa ** 3) * L1 ** 2 * si
+C      #n(phi) ** 2 + (-0.5D1 / 0.4D1 * Df ** 2 * lsa ** 2 + lsa ** 4 / 0.
+C      #8D1) * L1 * sin(phi) - Df ** 2 * lsa ** 3 / 0.8D1) * cos(alpha) **
+C      # 2 - 0.15D2 / 0.8D1 * lsa * Df * (L1 * sin(phi) ** 2 * sin(alpha) 
+C      #* (L1 ** 2 * sin(phi) ** 2 + 0.6D1 / 0.5D1 * L1 * sin(phi) * lsa +
+C      # 0.4D1 / 0.15D2 * lsa ** 2) + 0.5D1 / 0.3D1 * L1 ** 3 * sin(phi) *
+C      #* 3 + 0.31D2 / 0.15D2 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.8D1 / 0.
+C      #15D2 * L1 * sin(phi) * lsa ** 2 + lsa ** 3 / 0.30D2) * cos(alpha) 
+C      #- lsa * L1 * sin(phi) * (L1 * sin(phi) ** 2 * sin(alpha) * (L1 ** 
+C      #2 * sin(phi) ** 2 + 0.11D2 / 0.8D1 * L1 * sin(phi) * lsa + lsa ** 
+C      #2 / 0.2D1) + 0.2D1 * L1 ** 3 * sin(phi) ** 3 + 0.25D2 / 0.8D1 * L1
+C      # ** 2 * sin(phi) ** 2 * lsa + 0.3D1 / 0.2D1 * L1 * sin(phi) * lsa 
+C      #** 2 + lsa ** 3 / 0.8D1)) * cos(phi) ** 2 + (L1 ** 4 * sin(phi) **
+C      # 4 * lsa / 0.4D1 + (-Df ** 2 / 0.16D2 + 0.5D1 / 0.8D1 * lsa ** 2) 
+C      #* L1 ** 3 * sin(phi) ** 3 + (-Df ** 2 * lsa / 0.2D1 + lsa ** 3 / 0
+C      #.2D1) * L1 ** 2 * sin(phi) ** 2 + (-Df ** 2 * lsa ** 2 / 0.2D1 + l
+C      #sa ** 4 / 0.8D1) * L1 * sin(phi) - Df ** 2 * lsa ** 3 / 0.8D1) * c
+C      #os(alpha) ** 4 - 0.5D1 / 0.8D1 * Df * ((L1 ** 3 * sin(phi) ** 3 * 
+C      #lsa + (0.8D1 / 0.5D1 * lsa ** 2 - Df ** 2 / 0.20D2) * L1 ** 2 * si
+C      #n(phi) ** 2 + (-Df ** 2 * lsa / 0.5D1 + 0.4D1 / 0.5D1 * lsa ** 3) 
+C      #* L1 * sin(phi) - Df ** 2 * lsa ** 2 / 0.10D2 + lsa ** 4 / 0.10D2)
+C      # * sin(alpha) * sin(phi) + 0.3D1 * L1 ** 3 * sin(phi) ** 3 * lsa +
+C      # (-Df ** 2 / 0.20D2 + 0.21D2 / 0.5D1 * lsa ** 2) * L1 ** 2 * sin(p
+C      #hi) ** 2 + (-Df ** 2 * lsa / 0.5D1 + 0.8D1 / 0.5D1 * lsa ** 3) * L
+C      #1 * sin(phi) - Df ** 2 * lsa ** 2 / 0.10D2 + lsa ** 4 / 0.10D2) * 
+C      #cos(alpha) ** 3 + (-(L1 ** 4 * sin(phi) ** 4 * lsa + (-Df ** 2 / 0
+C      #.8D1 + 0.17D2 / 0.8D1 * lsa ** 2) * L1 ** 3 * sin(phi) ** 3 + (-Df
+C      # ** 2 * lsa + 0.3D1 / 0.2D1 * lsa ** 3) * L1 ** 2 * sin(phi) ** 2 
+C      #+ (-0.7D1 / 0.8D1 * Df ** 2 * lsa ** 2 + lsa ** 4 / 0.4D1) * L1 * 
+C      #sin(phi) - Df ** 2 * lsa ** 3 / 0.8D1) * sin(alpha) * sin(phi) - 0
+C      #.2D1 * L1 ** 4 * sin(phi) ** 4 * lsa + (Df ** 2 / 0.8D1 - 0.31D2 /
+C      # 0.8D1 * lsa ** 2) * L1 ** 3 * sin(phi) ** 3 + (Df ** 2 * lsa - 0.
+C      #5D1 / 0.2D1 * lsa ** 3) * L1 ** 2 * sin(phi) ** 2 + (0.7D1 / 0.8D1
+C      # * Df ** 2 * lsa ** 2 - 0.3D1 / 0.8D1 * lsa ** 4) * L1 * sin(phi) 
+C      #+ Df ** 2 * lsa ** 3 / 0.8D1) * cos(alpha) ** 2 + 0.5D1 / 0.2D1 * 
+C      #lsa * Df * (sin(phi) * sin(alpha) + 0.1D1) * (L1 ** 3 * sin(phi) *
+C      #* 3 + 0.13D2 / 0.10D2 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.2D1 / 0.
+C      #5D1 * L1 * sin(phi) * lsa ** 2 + lsa ** 3 / 0.40D2) * cos(alpha) +
+C      # 0.2D1 * lsa * (sin(phi) * sin(alpha) + 0.1D1) * (L1 ** 3 * sin(ph
+C      #i) ** 3 + 0.7D1 / 0.4D1 * L1 ** 2 * sin(phi) ** 2 * lsa + L1 * sin
+C      #(phi) * lsa ** 2 + lsa ** 3 / 0.8D1) * L1 * sin(phi)) * sqrt(Df **
+C      # 2 * L1 ** 4 * sin(phi) ** 6 * cos(alpha) ** 2 * cos(phi) ** 2 * R
+C      #t ** 2) + cos(phi) * cos(alpha) * Df * ((Df ** 3 * (L1 ** 2 * sin(
+C      #phi) ** 2 + 0.4D1 * L1 * sin(phi) * lsa + 0.2D1 * lsa ** 2) * (sin
+C      #(phi) + sin(alpha)) * cos(alpha) ** 3 / 0.32D2 + Df ** 2 * ((L1 **
+C      # 3 * sin(phi) ** 3 / 0.2D1 + 0.4D1 * L1 ** 2 * sin(phi) ** 2 * lsa
+C      # + 0.3D1 * L1 * sin(phi) * lsa ** 2) * sin(phi) + sin(alpha) * (L1
+C      # ** 3 * sin(phi) ** 3 + 0.8D1 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.
+C      #7D1 * L1 * sin(phi) * lsa ** 2 + lsa ** 3)) * cos(alpha) ** 2 / 0.
+C      #8D1 + 0.15D2 / 0.8D1 * Df * (L1 * sin(phi) ** 2 * (L1 * sin(phi) +
+C      # lsa) / 0.3D1 + sin(alpha) * (L1 ** 2 * sin(phi) ** 2 + 0.6D1 / 0.
+C      #5D1 * L1 * sin(phi) * lsa + 0.4D1 / 0.15D2 * lsa ** 2)) * lsa * L1
+C      # * sin(phi) * cos(alpha) + lsa * (L1 * sin(phi) ** 2 * (L1 * sin(p
+C      #hi) + lsa) / 0.4D1 + sin(alpha) * (L1 ** 2 * sin(phi) ** 2 + 0.11D
+C      #2 / 0.8D1 * L1 * sin(phi) * lsa + lsa ** 2 / 0.2D1)) * L1 ** 2 * s
+C      #in(phi) ** 2) * cos(phi) ** 4 + (sin(phi) * Df ** 2 * (L1 ** 3 * s
+C      #in(phi) ** 3 + 0.8D1 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.8D1 * L1 
+C      #* sin(phi) * lsa ** 2 + 0.2D1 * lsa ** 3) * cos(alpha) ** 4 / 0.16
+C      #D2 + 0.5D1 / 0.8D1 * ((0.3D1 * L1 ** 3 * sin(phi) ** 3 * lsa + (-D
+C      #f ** 2 / 0.10D2 + 0.21D2 / 0.5D1 * lsa ** 2) * L1 ** 2 * sin(phi) 
+C      #** 2 + (-0.2D1 / 0.5D1 * Df ** 2 * lsa + 0.8D1 / 0.5D1 * lsa ** 3)
+C      # * L1 * sin(phi) - Df ** 2 * lsa ** 2 / 0.5D1 + lsa ** 4 / 0.10D2)
+C      # * sin(phi) + (L1 ** 3 * sin(phi) ** 3 * lsa + (-Df ** 2 / 0.10D2 
+C      #+ 0.8D1 / 0.5D1 * lsa ** 2) * L1 ** 2 * sin(phi) ** 2 + (-0.2D1 / 
+C      #0.5D1 * Df ** 2 * lsa + 0.4D1 / 0.5D1 * lsa ** 3) * L1 * sin(phi) 
+C      #- Df ** 2 * lsa ** 2 / 0.5D1 + lsa ** 4 / 0.10D2) * sin(alpha)) * 
+C      #Df * cos(alpha) ** 3 + ((0.3D1 / 0.2D1 * L1 ** 4 * sin(phi) ** 4 *
+C      # lsa + (-0.3D1 / 0.16D2 * Df ** 2 + 0.21D2 / 0.8D1 * lsa ** 2) * L
+C      #1 ** 3 * sin(phi) ** 3 + (-0.3D1 / 0.2D1 * Df ** 2 * lsa + 0.3D1 /
+C      # 0.2D1 * lsa ** 3) * L1 ** 2 * sin(phi) ** 2 + (-0.5D1 / 0.4D1 * D
+C      #f ** 2 * lsa ** 2 + lsa ** 4 / 0.8D1) * L1 * sin(phi) - Df ** 2 * 
+C      #lsa ** 3 / 0.8D1) * sin(phi) + sin(alpha) * (L1 ** 4 * sin(phi) **
+C      # 4 * lsa + (-Df ** 2 / 0.4D1 + 0.17D2 / 0.8D1 * lsa ** 2) * L1 ** 
+C      #3 * sin(phi) ** 3 + (-0.2D1 * Df ** 2 * lsa + 0.3D1 / 0.2D1 * lsa 
+C      #** 3) * L1 ** 2 * sin(phi) ** 2 + (-0.7D1 / 0.4D1 * Df ** 2 * lsa 
+C      #** 2 + lsa ** 4 / 0.4D1) * L1 * sin(phi) - Df ** 2 * lsa ** 3 / 0.
+C      #4D1)) * cos(alpha) ** 2 - 0.35D2 / 0.8D1 * Df * lsa * ((0.5D1 / 0.
+C      #7D1 * L1 ** 3 * sin(phi) ** 3 + 0.31D2 / 0.35D2 * L1 ** 2 * sin(ph
+C      #i) ** 2 * lsa + 0.8D1 / 0.35D2 * L1 * sin(phi) * lsa ** 2 + lsa **
+C      # 3 / 0.70D2) * sin(phi) + sin(alpha) * (L1 ** 3 * sin(phi) ** 3 + 
+C      #0.44D2 / 0.35D2 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.12D2 / 0.35D2 
+C      #* L1 * sin(phi) * lsa ** 2 + lsa ** 3 / 0.70D2)) * cos(alpha) - 0.
+C      #3D1 * ((0.2D1 / 0.3D1 * L1 ** 3 * sin(phi) ** 3 + 0.25D2 / 0.24D2 
+C      #* L1 ** 2 * sin(phi) ** 2 * lsa + L1 * sin(phi) * lsa ** 2 / 0.2D1
+C      # + lsa ** 3 / 0.24D2) * sin(phi) + sin(alpha) * (L1 ** 3 * sin(phi
+C      #) ** 3 + 0.13D2 / 0.8D1 * L1 ** 2 * sin(phi) ** 2 * lsa + 0.5D1 / 
+C      #0.6D1 * L1 * sin(phi) * lsa ** 2 + lsa ** 3 / 0.12D2)) * lsa * L1 
+C      #* sin(phi)) * cos(phi) ** 2 + (L1 ** 4 * sin(phi) ** 4 * lsa + (-D
+C      #f ** 2 / 0.4D1 + 0.5D1 / 0.2D1 * lsa ** 2) * L1 ** 3 * sin(phi) **
+C      # 3 + (-0.2D1 * Df ** 2 * lsa + 0.2D1 * lsa ** 3) * L1 ** 2 * sin(p
+C      #hi) ** 2 + (lsa ** 4 / 0.2D1 - 0.2D1 * Df ** 2 * lsa ** 2) * L1 * 
+C      #sin(phi) - Df ** 2 * lsa ** 3 / 0.2D1) * sin(phi) * cos(alpha) ** 
+C      #4 / 0.4D1 - 0.5D1 / 0.8D1 * Df * ((0.3D1 * L1 ** 3 * sin(phi) ** 3
+C      # * lsa + (-Df ** 2 / 0.20D2 + 0.21D2 / 0.5D1 * lsa ** 2) * L1 ** 2
+C      # * sin(phi) ** 2 + (-Df ** 2 * lsa / 0.5D1 + 0.8D1 / 0.5D1 * lsa *
+C      #* 3) * L1 * sin(phi) - Df ** 2 * lsa ** 2 / 0.10D2 + lsa ** 4 / 0.
+C      #10D2) * sin(phi) + (L1 ** 3 * sin(phi) ** 3 * lsa + (0.8D1 / 0.5D1
+C      # * lsa ** 2 - Df ** 2 / 0.20D2) * L1 ** 2 * sin(phi) ** 2 + (-Df *
+C      #* 2 * lsa / 0.5D1 + 0.4D1 / 0.5D1 * lsa ** 3) * L1 * sin(phi) - Df
+C      # ** 2 * lsa ** 2 / 0.10D2 + lsa ** 4 / 0.10D2) * sin(alpha)) * cos
+C      #(alpha) ** 3 + ((-0.2D1 * L1 ** 4 * sin(phi) ** 4 * lsa + (Df ** 2
+C      # / 0.8D1 - 0.31D2 / 0.8D1 * lsa ** 2) * L1 ** 3 * sin(phi) ** 3 + 
+C      #(Df ** 2 * lsa - 0.5D1 / 0.2D1 * lsa ** 3) * L1 ** 2 * sin(phi) **
+C      # 2 + (0.7D1 / 0.8D1 * Df ** 2 * lsa ** 2 - 0.3D1 / 0.8D1 * lsa ** 
+C      #4) * L1 * sin(phi) + Df ** 2 * lsa ** 3 / 0.8D1) * sin(phi) - (L1 
+C      #** 4 * sin(phi) ** 4 * lsa + (-Df ** 2 / 0.8D1 + 0.17D2 / 0.8D1 * 
+C      #lsa ** 2) * L1 ** 3 * sin(phi) ** 3 + (-Df ** 2 * lsa + 0.3D1 / 0.
+C      #2D1 * lsa ** 3) * L1 ** 2 * sin(phi) ** 2 + (-0.7D1 / 0.8D1 * Df *
+C      #* 2 * lsa ** 2 + lsa ** 4 / 0.4D1) * L1 * sin(phi) - Df ** 2 * lsa
+C      # ** 3 / 0.8D1) * sin(alpha)) * cos(alpha) ** 2 + 0.5D1 / 0.2D1 * l
+C      #sa * Df * (L1 ** 3 * sin(phi) ** 3 + 0.13D2 / 0.10D2 * L1 ** 2 * s
+C      #in(phi) ** 2 * lsa + 0.2D1 / 0.5D1 * L1 * sin(phi) * lsa ** 2 + ls
+C      #a ** 3 / 0.40D2) * (sin(phi) + sin(alpha)) * cos(alpha) + 0.2D1 * 
+C      #(sin(phi) + sin(alpha)) * lsa * (L1 ** 3 * sin(phi) ** 3 + 0.7D1 /
+C      # 0.4D1 * L1 ** 2 * sin(phi) ** 2 * lsa + L1 * sin(phi) * lsa ** 2 
+C      #+ lsa ** 3 / 0.8D1) * L1 * sin(phi)) * L1 ** 2 * sin(phi) ** 2 * R
+C      #t))
+
+
+c L1 sin phi
+C       t2 = sin(phi)
+C       t3 = t2 * L1
+C       t4 = t3 + lsa
+C       t6 = t3 + lsa / 0.2D1
+C       t7 = Df ** 2
+C       t8 = cos(phi)
+C       t9 = t8 ** 2
+C       t12 = lsa * t3
+C       t13 = t7 / 0.2D1
+C       t14 = lsa ** 2
+C       t15 = t14 / 0.2D1
+C       t18 = cos(alpha)
+C       t19 = t18 ** 2
+C       t23 = sin(alpha)
+C       t24 = t23 * t6 * t2
+C       t29 = t2 ** 2
+C       t30 = t29 * L1
+C       t31 = t23 * t4
+C       t33 = t6 ** 2
+C       t40 = sqrt(-0.4D1 * lsa * t9 * (t19 * (t9 * t7 / 0.2D1 + t12 - t13
+C      # + t15) * t6 + t18 * (t9 * t3 - t24 - t3) * t4 * Df - lsa * (t31 *
+C      # t30 + t33)))
+C       t42 = t6 * Df
+C       t45 = t18 * t42 + t4 * t3
+C       t53 = t18 * Df
+C       t55 = t53 / 0.2D1 + t3
+C       t58 = L1 ** 2
+C       t59 = t29 * t58
+C       t67 = Df * L1
+C       t74 = lsa * t8
+C       t77 = t23 * t8
+C       t82 = t58 * t7
+C       t83 = t29 ** 2
+C       t84 = t29 * t83
+C       t87 = t19 * t83
+C       t91 = t2 * t29
+C       t93 = t9 * t19
+C       t101 = t58 * Df
+C       t103 = t9 * t18
+C       t117 = t14 * t23
+C       t122 = t23 * t9
+C       t123 = lsa * t14
+C       t124 = t123 * t122
+C       t135 = t83 * t58
+C       t139 = t91 * t58
+C       t143 = t23 ** 2
+C       t144 = t143 * t9
+C       t153 = t14 ** 2
+C       t159 = t19 * t84 * t82 + t9 * t87 * t82 + 0.2D1 * lsa * t93 * t91 
+C      #* L1 * t7 + t14 * t9 * t29 * t19 * t7 + 0.4D1 * lsa * t103 * t83 *
+C      # t101 + 0.4D1 * lsa * t23 * t103 * t91 * t101 + 0.4D1 * t14 * t103
+C      # * t91 * t67 + 0.6D1 * t117 * t103 * t29 * t67 + 0.2D1 * t124 * t2
+C      # * t53 - t87 * t82 + 0.4D1 * t14 * t84 * t58 + 0.4D1 * t117 * t2 *
+C      # t83 * t58 + 0.4D1 * t14 * t9 * t135 + 0.8D1 * t14 * t122 * t139 +
+C      # 0.4D1 * t14 * t144 * t59 + 0.4D1 * t124 * t30 + 0.4D1 * t123 * t1
+C      #44 * t3 + t153 * t144 - 0.4D1 * t14 * t135 - 0.4D1 * t117 * t139
+C       t160 = sqrt(t159)
+C       t164 = 0.1D1 / t18
+C       t167 = t58 * t8
+C       t169 = t23 * t2
+C       t172 = t169 - t9 / 0.2D1 - t19 / 0.2D1 + 0.1D1
+C       t174 = t58 ** 2
+C       t177 = Rt ** 2
+C       t180 = sqrt(t177 * t93 * t84 * t174 * t7)
+C       t184 = t23 + t2 / 0.2D1
+C       t187 = t19 ** 2
+C       t191 = t2 * t7
+C       t192 = t7 * t23
+C       t193 = -t191 - t192
+C       t206 = t169 + 0.1D1
+C       t207 = t206 * Df
+C       t210 = L1 * t206
+C       t214 = t2 + t23
+C       t215 = t214 * t7
+C       t224 = t18 * t19
+C       t229 = t214 * Df
+C       t230 = t18 * t3
+C       t252 = Df * t18 * t8
+C       t265 = t18 * t6
+C       t271 = (t3 + lsa / 0.6D1) * t23
+C       t276 = t2 * Df
+C       t280 = 0.3D1 * t3
+C       t292 = t3 + lsa / 0.4D1
+C       t297 = t9 ** 2
+C       t300 = t224 * t42 / 0.3D1
+C       t301 = lsa / 0.3D1
+C       t326 = Rt * t29
+C       t337 = t3 + 0.2D1 * lsa
+C       t338 = t337 * t30
+C       t340 = 0.2D1 * t12
+C       t341 = t14 / 0.4D1
+C       t342 = t59 + t340 + t341
+C       t343 = t23 * t342
+C       t351 = (t59 + t340 + t14 / 0.3D1) * t23
+C       t358 = t59 + t340 + t15
+C       t362 = L1 * t58
+C       t363 = t91 * t362
+C       t365 = lsa * t59
+C       t372 = lsa * t7
+C       t373 = 0.2D1 * t372
+C       t376 = t59 + t12 - t13
+C       t381 = t342 * Df
+C       t386 = t358 * t2
+C       t404 = t224 * t358 * Df / 0.3D1
+C       t408 = 0.2D1 * t365
+C       t410 = 0.2D1 / 0.3D1 * t14
+C       t455 = t59 + 0.4D1 * t12 + 0.2D1 * t14
+C       t460 = t4 * lsa
+C       t469 = 0.8D1 * t365
+C       t470 = t14 * t3
+C       t473 = t363 + t469 + 0.8D1 * t470 + 0.2D1 * t123
+C       t480 = lsa * t363
+C       t491 = t14 * t7
+C       t499 = t363 + t469 + 0.7D1 * t470 + t123
+C       t504 = lsa * t83 * t174
+C       t505 = 0.3D1 / 0.2D1 * t504
+C       t510 = t91 * t362 * (-0.3D1 / 0.16D2 * t7 + 0.21D2 / 0.8D1 * t14)
+C       t511 = -t372 + t123
+C       t513 = 0.3D1 / 0.2D1 * t29 * t58 * t511
+C       t515 = t153 / 0.8D1
+C       t518 = t2 * L1 * (-0.5D1 / 0.4D1 * t491 + t515)
+C       t519 = t123 * t7
+C       t520 = t519 / 0.8D1
+C       t523 = lsa * Df
+C       t527 = (t59 + 0.6D1 / 0.5D1 * t12 + 0.4D1 / 0.15D2 * t14) * t23
+C       t540 = (t59 + 0.11D2 / 0.8D1 * t12 + t15) * t23
+C       t545 = t123 / 0.8D1
+C       t565 = 0.8D1 / 0.5D1 * t14
+C       t566 = t7 / 0.20D2
+C       t570 = t372 / 0.5D1
+C       t571 = 0.4D1 / 0.5D1 * t123
+C       t575 = t491 / 0.10D2
+C       t576 = t153 / 0.10D2
+C       t578 = t23 * (t480 + t29 * t58 * (t565 - t566) + t2 * L1 * (-t570 
+C      #+ t571) - t575 + t576)
+C       t580 = 0.3D1 * t480
+C       t581 = 0.21D2 / 0.5D1 * t14
+C       t584 = t29 * t58 * (-t566 + t581)
+C       t585 = 0.8D1 / 0.5D1 * t123
+C       t588 = t2 * L1 * (-t570 + t585)
+C       t593 = t7 / 0.8D1
+C       t594 = 0.17D2 / 0.8D1 * t14
+C       t598 = 0.3D1 / 0.2D1 * t123
+C       t602 = 0.7D1 / 0.8D1 * t491
+C       t603 = t153 / 0.4D1
+C       t608 = t23 * (t504 + t91 * t362 * (-t593 + t594) + t29 * t58 * (-t
+C      #372 + t598) + t2 * L1 * (-t602 + t603) - t520)
+C       t610 = 0.2D1 * t504
+C       t614 = t91 * t362 * (t593 - 0.31D2 / 0.8D1 * t14)
+C       t618 = t29 * t58 * (t372 - 0.5D1 / 0.2D1 * t123)
+C       t622 = t2 * L1 * (t602 - 0.3D1 / 0.8D1 * t153)
+C       t628 = t363 + 0.13D2 / 0.10D2 * t365 + 0.2D1 / 0.5D1 * t470 + t123
+C      # / 0.40D2
+C       t637 = t2 * L1 * (t363 + 0.7D1 / 0.4D1 * t365 + t470 + t545)
+C       t657 = t4 * t30
+C       t673 = t7 / 0.10D2
+C       t677 = 0.2D1 / 0.5D1 * t372
+C       t681 = t491 / 0.5D1
+C       t698 = t7 / 0.4D1
+C       t717 = t123 / 0.70D2
+C       t790 = 0.2D1 / (-t2 * mu + 0.1D1) * F / (t164 * Rt / t91 * (lsa * 
+C      #t8 * t2 * t53 + t8 * t18 * t29 * t67 + 0.2D1 * lsa * t77 * t3 + t1
+C      #4 * t77 + 0.2D1 * t74 * t30 + t160) - t164 / (t180 * (t9 * (t53 / 
+C      #0.4D1 + t3 / 0.2D1) + t19 * t3 / 0.2D1 - t18 * t207 / 0.4D1 - t2 *
+C      # t210) + Rt * (t9 * (t19 * t215 / 0.4D1 + t18 * t184 * t2 * t67) +
+C      # t224 * L1 * Df * t29 / 0.2D1 + t19 * t193 / 0.4D1 - t230 * t229) 
+C      #* t29 * t167) * (-t180 * Df * t18 * t172 + Rt * t59 * (t93 * t184 
+C      #* t7 + t2 * t187 * t7 / 0.2D1 + t19 * t193) * t8) * Rt * t167) / (
+C      #0.2D1 * t8 * (t2 * t4 * t55 + (t59 + t12 + t15) * t23) + t40) * (t
+C      #40 * t4 + 0.2D1 * lsa * (t2 * t45 + t6 * t31) * t8) + 0.12D2 / (t4
+C      #0 * (t180 * (t9 * (-0.2D1 * t19 * t4 * t215 - 0.8D1 * t18 * (t338 
+C      #/ 0.2D1 + t343) * Df - 0.12D2 * t2 * L1 * (t338 / 0.3D1 + t351)) -
+C      # 0.4D1 * t224 * t358 * t276 + t19 * (t2 * (-0.12D2 * t363 - 0.24D2
+C      # * t365 + t2 * L1 * (0.2D1 * t7 - 0.8D1 * t14) + t373) - 0.4D1 * t
+C      #376 * t31) + 0.8D1 * t18 * t214 * t381 + 0.16D2 * t386 * L1 * t214
+C      #) - 0.12D2 * t326 * t58 * (t297 * (-t19 * t4 * t7 / 0.6D1 - t18 * 
+C      #t337 * Df * t3 / 0.3D1 - t337 * t59 / 0.3D1) + t9 * (-t404 + t19 *
+C      # (t2 * t4 * t192 / 0.6D1 - t363 - t408 + t2 * L1 * (t7 / 0.3D1 - t
+C      #410) + t372 / 0.3D1) + 0.2D1 / 0.3D1 * t18 * Df * (t2 * t343 + 0.3
+C      #D1 / 0.2D1 * t59 + 0.3D1 * t12 + t341) + (t2 * t351 + 0.10D2 / 0.3
+C      #D1 * t12 + t410 + 0.5D1 / 0.3D1 * t59) * t3) + t404 + t19 * (t2 * 
+C      #t376 * t31 / 0.3D1 + t363 + t408 + t2 * L1 * (-t7 / 0.6D1 + t410) 
+C      #- t372 / 0.6D1) - 0.2D1 / 0.3D1 * t18 * t206 * t381 - 0.4D1 / 0.3D
+C      #1 * t386 * t210) * t252) + 0.32D2 * (t180 * (t297 * (t19 * t455 * 
+C      #t7 / 0.4D1 + 0.2D1 * t18 * t460 * Df * t3 + t460 * t59) * t55 / 0.
+C      #4D1 + t9 * (t187 * t473 * t7 / 0.16D2 + 0.15D2 / 0.8D1 * t224 * (-
+C      #t2 * t455 * t192 / 0.60D2 + t480 + t29 * t58 * (-t7 / 0.30D2 + 0.7
+C      #D1 / 0.5D1 * t14) + t2 * L1 * (-0.2D1 / 0.15D2 * t372 + 0.8D1 / 0.
+C      #15D2 * t123) - t491 / 0.15D2 + t153 / 0.30D2) * Df + t19 * (-t2 * 
+C      #t499 * t192 / 0.8D1 + t505 + t510 + t513 + t518 - t520) - 0.15D2 /
+C      # 0.8D1 * t18 * (t527 * t30 + 0.5D1 / 0.3D1 * t363 + 0.31D2 / 0.15D
+C      #2 * t365 + 0.8D1 / 0.15D2 * t470 + t123 / 0.30D2) * t523 - (t540 *
+C      # t30 + 0.2D1 * t363 + 0.25D2 / 0.8D1 * t365 + 0.3D1 / 0.2D1 * t470
+C      # + t545) * t2 * lsa * L1) + t187 * (t504 / 0.4D1 + t91 * t362 * (-
+C      #t7 / 0.16D2 + 0.5D1 / 0.8D1 * t14) + t29 * t58 * t511 / 0.2D1 + t2
+C      # * L1 * (-t491 / 0.2D1 + t515) - t520) - 0.5D1 / 0.8D1 * t224 * (t
+C      #2 * t578 - t575 + t576 + t580 + t584 + t588) * Df + t19 * (-t2 * t
+C      #608 + t520 - t610 + t614 + t618 + t622) + 0.5D1 / 0.2D1 * t18 * t6
+C      #28 * t206 * t523 + 0.2D1 * t637 * t206 * lsa) + t326 * t58 * (t297
+C      # * (t224 * t214 * t455 * Df * t7 / 0.32D2 + t19 * (t2 * (t363 / 0.
+C      #2D1 + 0.4D1 * t365 + 0.3D1 * t470) + t499 * t23) * t7 / 0.8D1 + 0.
+C      #15D2 / 0.8D1 * t230 * lsa * (t657 / 0.3D1 + t527) * Df + t59 * (t6
+C      #57 / 0.4D1 + t540) * lsa) + t9 * (t187 * t473 * t191 / 0.16D2 + 0.
+C      #5D1 / 0.8D1 * t224 * Df * (t2 * (t580 + t29 * t58 * (-t673 + t581)
+C      # + t2 * L1 * (-t677 + t585) - t681 + t576) + t23 * (t480 + t29 * t
+C      #58 * (-t673 + t565) + t2 * L1 * (-t677 + t571) - t681 + t576)) + t
+C      #19 * (t2 * (t505 + t510 + t513 + t518 - t520) + (t504 + t91 * t362
+C      # * (-t698 + t594) + t29 * t58 * (-t373 + t598) + t2 * L1 * (-0.7D1
+C      # / 0.4D1 * t491 + t603) - t519 / 0.4D1) * t23) - 0.35D2 / 0.8D1 * 
+C      #t18 * (t2 * (0.5D1 / 0.7D1 * t363 + 0.31D2 / 0.35D2 * t365 + 0.8D1
+C      # / 0.35D2 * t470 + t717) + (t363 + 0.44D2 / 0.35D2 * t365 + 0.12D2
+C      # / 0.35D2 * t470 + t717) * t23) * t523 - 0.3D1 * t3 * lsa * (t2 * 
+C      #(0.2D1 / 0.3D1 * t363 + 0.25D2 / 0.24D2 * t365 + t470 / 0.2D1 + t1
+C      #23 / 0.24D2) + (t363 + 0.13D2 / 0.8D1 * t365 + 0.5D1 / 0.6D1 * t47
+C      #0 + t123 / 0.12D2) * t23)) + t187 * t2 * (t504 + t91 * t362 * (-t6
+C      #98 + 0.5D1 / 0.2D1 * t14) + 0.2D1 * t29 * t58 * t511 + t2 * L1 * (
+C      #t153 / 0.2D1 - 0.2D1 * t491) - t519 / 0.2D1) / 0.4D1 - 0.5D1 / 0.8
+C      #D1 * t224 * (t2 * (t580 + t584 + t588 - t575 + t576) + t578) * Df 
+C      #+ t19 * (t2 * (-t610 + t614 + t618 + t622 + t520) - t608) + 0.5D1 
+C      #/ 0.2D1 * t18 * t214 * t628 * t523 + 0.2D1 * t637 * lsa * t214) * 
+C      #t252) * t8) * (t40 * t4 * (-t180 * t172 + Rt * (t9 * t184 + t19 * 
+C      #t2 / 0.2D1 - t23 - t2) * t59 * t252) / 0.3D1 + (t180 * (t9 * (0.2D
+C      #1 / 0.3D1 * t265 * t184 * Df + t4 * (t30 / 0.3D1 + t271)) + t224 *
+C      # t6 * t276 / 0.3D1 + t19 * (t2 * (t280 + lsa) + t6 * t23) * t4 / 0
+C      #.3D1 - 0.2D1 / 0.3D1 * t265 * t229 - 0.4D1 / 0.3D1 * t292 * t4 * t
+C      #214) + t326 * t58 * (-t297 * t45 / 0.3D1 + t9 * (-t300 - t19 * (t3
+C      # + t301) * t4 + 0.2D1 / 0.3D1 * t265 * (t169 + 0.3D1 / 0.2D1) * Df
+C      # + t4 * (t2 * t271 + 0.5D1 / 0.3D1 * t3 + t301)) + t300 + t19 * t4
+C      # * (t24 + t280 + lsa) / 0.3D1 - 0.2D1 / 0.3D1 * t265 * t207 - 0.4D
+C      #1 / 0.3D1 * t292 * t206 * t4) * t252) * t74) * t58 * t91 * t53
+
+
+c L1 cos phi
+
+C       t2 = cos(phi)
+C       t3 = t2 * L1
+C       t4 = t3 + lsa
+C       t6 = t3 + lsa / 0.2D1
+C       t7 = Df ** 2
+C       t8 = t2 ** 2
+C       t11 = lsa * t3
+C       t12 = t7 / 0.2D1
+C       t13 = lsa ** 2
+C       t14 = t13 / 0.2D1
+C       t17 = cos(alpha)
+C       t18 = t17 ** 2
+C       t21 = sin(phi)
+C       t23 = sin(alpha)
+C       t24 = t23 * t6 * t21
+C       t25 = t2 * t8
+C       t26 = t25 * L1
+C       t30 = t4 * t21
+C       t33 = t6 ** 2
+C       t40 = sqrt(-0.4D1 * lsa * t8 * (t18 * (t8 * t7 / 0.2D1 + t11 - t12
+C      # + t14) * t6 + t17 * (-t24 + t26 - t3) * t4 * Df - lsa * (t23 * t3
+C      #0 * t3 + t33)))
+C       t42 = t6 * Df
+C       t45 = t17 * t42 + t4 * t3
+C       t47 = t4 * t23
+C       t54 = t17 * Df
+C       t56 = t54 / 0.2D1 + t3
+C       t59 = L1 ** 2
+C       t60 = t8 * t59
+C       t68 = Df * L1
+C       t75 = t8 * L1
+C       t79 = lsa * t23
+C       t84 = t59 * t7
+C       t85 = t21 ** 2
+C       t86 = t85 ** 2
+C       t90 = t8 ** 2
+C       t96 = t85 * t18
+C       t105 = t90 * t59 * Df
+C       t106 = t85 * t17
+C       t110 = t21 * t17
+C       t114 = t25 * t68
+C       t122 = t21 * t54
+C       t123 = t23 * t8
+C       t124 = lsa * t13
+C       t128 = t18 * t8
+C       t135 = t21 * t85
+C       t140 = t90 * t59
+C       t141 = t13 * t85
+C       t144 = t23 * t21
+C       t145 = t13 * t144
+C       t148 = t23 ** 2
+C       t159 = t13 ** 2
+C       t165 = t8 * t18 * t86 * t84 + t85 * t18 * t90 * t84 + 0.2D1 * lsa 
+C      #* t96 * t25 * L1 * t7 + t13 * t8 * t85 * t18 * t7 + 0.4D1 * lsa * 
+C      #t106 * t105 + 0.4D1 * t79 * t110 * t105 + 0.4D1 * t13 * t106 * t11
+C      #4 + 0.6D1 * t13 * t23 * t110 * t114 + 0.2D1 * t124 * t123 * t122 -
+C      # t85 * t128 * t84 + 0.4D1 * t13 * t8 * t86 * t59 + 0.4D1 * t13 * t
+C      #123 * t135 * t59 + 0.4D1 * t141 * t140 + 0.8D1 * t145 * t140 + 0.4
+C      #D1 * t13 * t148 * t140 + 0.4D1 * t124 * t144 * t26 + 0.4D1 * t124 
+C      #* t148 * t26 + t159 * t148 * t8 - 0.4D1 * t141 * t60 - 0.4D1 * t14
+C      #5 * t60
+C       t166 = sqrt(t165)
+C       t170 = 0.1D1 / t17
+C       t173 = t59 * t25
+C       t177 = t144 - t8 / 0.2D1 - t18 / 0.2D1 + 0.1D1
+C       t179 = t59 ** 2
+C       t183 = Rt ** 2
+C       t186 = sqrt(t183 * t96 * t8 * t90 * t179 * t7)
+C       t190 = t23 + t21 / 0.2D1
+C       t193 = t18 ** 2
+C       t197 = t21 * t7
+C       t198 = t7 * t23
+C       t199 = -t197 - t198
+C       t212 = t144 + 0.1D1
+C       t213 = t212 * Df
+C       t216 = L1 * t212
+C       t220 = t21 + t23
+C       t221 = t220 * t7
+C       t229 = Df * t21
+C       t230 = t17 * t18
+C       t235 = t220 * Df
+C       t236 = t17 * t3
+C       t258 = Df * t17 * t25
+C       t272 = t17 * t6
+C       t279 = (t3 + lsa / 0.6D1) * t23
+C       t287 = 0.3D1 * t3
+C       t299 = t3 + lsa / 0.4D1
+C       t306 = t230 * t42 / 0.3D1
+C       t307 = lsa / 0.3D1
+C       t341 = t3 + 0.2D1 * lsa
+C       t343 = t21 * t341 * t3
+C       t345 = 0.2D1 * t11
+C       t346 = t13 / 0.4D1
+C       t347 = t60 + t345 + t346
+C       t348 = t23 * t347
+C       t356 = (t60 + t345 + t13 / 0.3D1) * t23
+C       t363 = t60 + t345 + t14
+C       t367 = L1 * t59
+C       t368 = t25 * t367
+C       t370 = lsa * t60
+C       t377 = lsa * t7
+C       t378 = 0.2D1 * t377
+C       t381 = t60 + t11 - t12
+C       t386 = t347 * Df
+C       t391 = t363 * t2
+C       t409 = t230 * t363 * Df / 0.3D1
+C       t412 = 0.2D1 * t370
+C       t414 = 0.2D1 / 0.3D1 * t13
+C       t459 = t60 + 0.4D1 * t11 + 0.2D1 * t13
+C       t464 = t4 * lsa
+C       t473 = 0.8D1 * t370
+C       t474 = t13 * t3
+C       t477 = t368 + t473 + 0.8D1 * t474 + 0.2D1 * t124
+C       t484 = lsa * t368
+C       t495 = t13 * t7
+C       t503 = t368 + t473 + 0.7D1 * t474 + t124
+C       t508 = lsa * t90 * t179
+C       t509 = 0.3D1 / 0.2D1 * t508
+C       t514 = t25 * t367 * (-0.3D1 / 0.16D2 * t7 + 0.21D2 / 0.8D1 * t13)
+C       t515 = -t377 + t124
+C       t517 = 0.3D1 / 0.2D1 * t8 * t59 * t515
+C       t519 = t159 / 0.8D1
+C       t522 = t2 * L1 * (-0.5D1 / 0.4D1 * t495 + t519)
+C       t523 = t124 * t7
+C       t524 = t523 / 0.8D1
+C       t527 = lsa * Df
+C       t531 = (t60 + 0.6D1 / 0.5D1 * t11 + 0.4D1 / 0.15D2 * t13) * t23
+C       t545 = (t60 + 0.11D2 / 0.8D1 * t11 + t14) * t23
+C       t551 = t124 / 0.8D1
+C       t571 = 0.8D1 / 0.5D1 * t13
+C       t572 = t7 / 0.20D2
+C       t576 = t377 / 0.5D1
+C       t577 = 0.4D1 / 0.5D1 * t124
+C       t581 = t495 / 0.10D2
+C       t582 = t159 / 0.10D2
+C       t584 = t23 * (t484 + t8 * t59 * (t571 - t572) + t2 * L1 * (-t576 +
+C      # t577) - t581 + t582)
+C       t586 = 0.3D1 * t484
+C       t587 = 0.21D2 / 0.5D1 * t13
+C       t590 = t8 * t59 * (-t572 + t587)
+C       t591 = 0.8D1 / 0.5D1 * t124
+C       t594 = t2 * L1 * (-t576 + t591)
+C       t599 = t7 / 0.8D1
+C       t600 = 0.17D2 / 0.8D1 * t13
+C       t604 = 0.3D1 / 0.2D1 * t124
+C       t608 = 0.7D1 / 0.8D1 * t495
+C       t609 = t159 / 0.4D1
+C       t614 = t23 * (t508 + t25 * t367 * (-t599 + t600) + t8 * t59 * (-t3
+C      #77 + t604) + t2 * L1 * (-t608 + t609) - t524)
+C       t616 = 0.2D1 * t508
+C       t620 = t25 * t367 * (t599 - 0.31D2 / 0.8D1 * t13)
+C       t624 = t8 * t59 * (t377 - 0.5D1 / 0.2D1 * t124)
+C       t628 = t2 * L1 * (t608 - 0.3D1 / 0.8D1 * t159)
+C       t634 = t368 + 0.13D2 / 0.10D2 * t370 + 0.2D1 / 0.5D1 * t474 + t124
+C      # / 0.40D2
+C       t643 = t2 * L1 * (t368 + 0.7D1 / 0.4D1 * t370 + t474 + t551)
+C       t663 = t30 * t3
+C       t679 = t7 / 0.10D2
+C       t683 = 0.2D1 / 0.5D1 * t377
+C       t687 = t495 / 0.5D1
+C       t704 = t7 / 0.4D1
+C       t723 = t124 / 0.70D2
+C       t797 = 0.2D1 / (-t21 * mu + 0.1D1) * F / (t170 * Rt / t135 * (lsa 
+C      #* t2 * t21 * t54 + t21 * t17 * t8 * t68 + 0.2D1 * lsa * t21 * t75 
+C      #+ t13 * t23 * t2 + 0.2D1 * t79 * t75 + t166) - 0.1D1 / t85 * t170 
+C      #/ (t186 * (t8 * (t54 / 0.4D1 + t3 / 0.2D1) + t18 * t3 / 0.2D1 - t1
+C      #7 * t213 / 0.4D1 - t2 * t216) + Rt * (t8 * (t18 * t221 / 0.4D1 + t
+C      #17 * t190 * t2 * t68) + t230 * t3 * t229 / 0.2D1 + t18 * t199 / 0.
+C      #4D1 - t236 * t235) * t173) * (-t186 * Df * t17 * t177 + Rt * t59 *
+C      # (t128 * t190 * t7 + t21 * t193 * t7 / 0.2D1 + t18 * t199) * t25) 
+C      #* Rt * t173) / (0.2D1 * t2 * (t21 * t4 * t56 + (t60 + t11 + t14) *
+C      # t23) + t40) * (t40 * t4 + 0.2D1 * lsa * (t21 * t45 + t6 * t47) * 
+C      #t2) + 0.12D2 / (t40 * (t186 * (t8 * (-0.2D1 * t18 * t4 * t221 - 0.
+C      #8D1 * t17 * (t343 / 0.2D1 + t348) * Df - 0.12D2 * t2 * L1 * (t343 
+C      #/ 0.3D1 + t356)) - 0.4D1 * t230 * t363 * t229 + t18 * (t21 * (-0.1
+C      #2D2 * t368 - 0.24D2 * t370 + t2 * L1 * (0.2D1 * t7 - 0.8D1 * t13) 
+C      #+ t378) - 0.4D1 * t381 * t47) + 0.8D1 * t17 * t220 * t386 + 0.16D2
+C      # * t391 * L1 * t220) - 0.12D2 * Rt * t59 * (t90 * (-t18 * t4 * t7 
+C      #/ 0.6D1 - t17 * t341 * Df * t3 / 0.3D1 - t341 * t60 / 0.3D1) + t8 
+C      #* (-t409 + t18 * (t30 * t198 / 0.6D1 - t368 - t412 + t2 * L1 * (t7
+C      # / 0.3D1 - t414) + t377 / 0.3D1) + 0.2D1 / 0.3D1 * t17 * Df * (t21
+C      # * t348 + 0.3D1 / 0.2D1 * t60 + 0.3D1 * t11 + t346) + (t21 * t356 
+C      #+ 0.10D2 / 0.3D1 * t11 + t414 + 0.5D1 / 0.3D1 * t60) * t3) + t409 
+C      #+ t18 * (t21 * t381 * t47 / 0.3D1 + t368 + t412 + t2 * L1 * (-t7 /
+C      # 0.6D1 + t414) - t377 / 0.6D1) - 0.2D1 / 0.3D1 * t17 * t212 * t386
+C      # - 0.4D1 / 0.3D1 * t391 * t216) * t258) + 0.32D2 * (t186 * (t90 * 
+C      #(t18 * t459 * t7 / 0.4D1 + 0.2D1 * t17 * t464 * Df * t3 + t464 * t
+C      #60) * t56 / 0.4D1 + t8 * (t193 * t477 * t7 / 0.16D2 + 0.15D2 / 0.8
+C      #D1 * t230 * (-t21 * t459 * t198 / 0.60D2 + t484 + t8 * t59 * (-t7 
+C      #/ 0.30D2 + 0.7D1 / 0.5D1 * t13) + t2 * L1 * (-0.2D1 / 0.15D2 * t37
+C      #7 + 0.8D1 / 0.15D2 * t124) - t495 / 0.15D2 + t159 / 0.30D2) * Df +
+C      # t18 * (-t21 * t503 * t198 / 0.8D1 + t509 + t514 + t517 + t522 - t
+C      #524) - 0.15D2 / 0.8D1 * t17 * (t21 * t531 * t3 + 0.5D1 / 0.3D1 * t
+C      #368 + 0.31D2 / 0.15D2 * t370 + 0.8D1 / 0.15D2 * t474 + t124 / 0.30
+C      #D2) * t527 - (t21 * t545 * t3 + 0.2D1 * t368 + 0.25D2 / 0.8D1 * t3
+C      #70 + 0.3D1 / 0.2D1 * t474 + t551) * t2 * lsa * L1) + t193 * (t508 
+C      #/ 0.4D1 + t25 * t367 * (-t7 / 0.16D2 + 0.5D1 / 0.8D1 * t13) + t8 *
+C      # t59 * t515 / 0.2D1 + t2 * L1 * (-t495 / 0.2D1 + t519) - t524) - 0
+C      #.5D1 / 0.8D1 * t230 * (t21 * t584 - t581 + t582 + t586 + t590 + t5
+C      #94) * Df + t18 * (-t21 * t614 + t524 - t616 + t620 + t624 + t628) 
+C      #+ 0.5D1 / 0.2D1 * t17 * t634 * t212 * t527 + 0.2D1 * t643 * t212 *
+C      # lsa) + Rt * t59 * (t90 * (t230 * t220 * t459 * Df * t7 / 0.32D2 +
+C      # t18 * (t21 * (t368 / 0.2D1 + 0.4D1 * t370 + 0.3D1 * t474) + t503 
+C      #* t23) * t7 / 0.8D1 + 0.15D2 / 0.8D1 * t236 * lsa * (t663 / 0.3D1 
+C      #+ t531) * Df + t60 * (t663 / 0.4D1 + t545) * lsa) + t8 * (t193 * t
+C      #477 * t197 / 0.16D2 + 0.5D1 / 0.8D1 * t230 * Df * (t21 * (t586 + t
+C      #8 * t59 * (-t679 + t587) + t2 * L1 * (-t683 + t591) - t687 + t582)
+C      # + t23 * (t484 + t8 * t59 * (-t679 + t571) + t2 * L1 * (-t683 + t5
+C      #77) - t687 + t582)) + t18 * (t21 * (t509 + t514 + t517 + t522 - t5
+C      #24) + (t508 + t25 * t367 * (-t704 + t600) + t8 * t59 * (-t378 + t6
+C      #04) + t2 * L1 * (-0.7D1 / 0.4D1 * t495 + t609) - t523 / 0.4D1) * t
+C      #23) - 0.35D2 / 0.8D1 * t17 * (t21 * (0.5D1 / 0.7D1 * t368 + 0.31D2
+C      # / 0.35D2 * t370 + 0.8D1 / 0.35D2 * t474 + t723) + (t368 + 0.44D2 
+C      #/ 0.35D2 * t370 + 0.12D2 / 0.35D2 * t474 + t723) * t23) * t527 - 0
+C      #.3D1 * t3 * lsa * (t21 * (0.2D1 / 0.3D1 * t368 + 0.25D2 / 0.24D2 *
+C      # t370 + t474 / 0.2D1 + t124 / 0.24D2) + (t368 + 0.13D2 / 0.8D1 * t
+C      #370 + 0.5D1 / 0.6D1 * t474 + t124 / 0.12D2) * t23)) + t193 * t21 *
+C      # (t508 + t25 * t367 * (-t704 + 0.5D1 / 0.2D1 * t13) + 0.2D1 * t8 *
+C      # t59 * t515 + t2 * L1 * (t159 / 0.2D1 - 0.2D1 * t495) - t523 / 0.2
+C      #D1) / 0.4D1 - 0.5D1 / 0.8D1 * t230 * (t21 * (t586 + t590 + t594 - 
+C      #t581 + t582) + t584) * Df + t18 * (t21 * (-t616 + t620 + t624 + t6
+C      #28 + t524) - t614) + 0.5D1 / 0.2D1 * t17 * t220 * t634 * t527 + 0.
+C      #2D1 * t643 * lsa * t220) * t258) * t2) * (t40 * t4 * (-t186 * t177
+C      # + Rt * (t8 * t190 + t18 * t21 / 0.2D1 - t23 - t21) * t59 * t258) 
+C      #/ 0.3D1 + (t186 * (t8 * (0.2D1 / 0.3D1 * t272 * t190 * Df + t4 * (
+C      #t21 * t3 / 0.3D1 + t279)) + t230 * t6 * t229 / 0.3D1 + t18 * (t21 
+C      #* (t287 + lsa) + t6 * t23) * t4 / 0.3D1 - 0.2D1 / 0.3D1 * t272 * t
+C      #235 - 0.4D1 / 0.3D1 * t299 * t4 * t220) + Rt * t59 * (-t90 * t45 /
+C      # 0.3D1 + t8 * (-t306 - t18 * (t3 + t307) * t4 + 0.2D1 / 0.3D1 * t2
+C      #72 * (t144 + 0.3D1 / 0.2D1) * Df + t4 * (t21 * t279 + 0.5D1 / 0.3D
+C      #1 * t3 + t307)) + t306 + t18 * t4 * (t24 + t287 + lsa) / 0.3D1 - 0
+C      #.2D1 / 0.3D1 * t272 * t213 - 0.4D1 / 0.3D1 * t299 * t212 * t4) * t
+C      #258) * lsa * t2) * t60 * t122
+   
+
+c L1
+
+C       t2 = L1 + lsa
+C       t3 = Df ** 2
+C       t4 = cos(phi)
+C       t5 = t4 ** 2
+C       t8 = L1 * lsa
+C       t9 = t3 / 0.2D1
+C       t10 = lsa ** 2
+C       t11 = t10 / 0.2D1
+C       t14 = L1 + lsa / 0.2D1
+C       t16 = cos(alpha)
+C       t17 = t16 ** 2
+C       t19 = sin(phi)
+C       t20 = t19 * t14
+C       t21 = sin(alpha)
+C       t22 = t20 * t21
+C       t26 = Df * t16
+C       t28 = L1 * t19
+C       t29 = t2 * t21
+C       t31 = t14 ** 2
+C       t38 = sqrt(-0.4D1 * lsa * ((t3 * t5 / 0.2D1 + t8 - t9 + t11) * t14
+C      # * t17 + (L1 * t5 - L1 - t22) * t2 * t26 - (t28 * t29 + t31) * lsa
+C      #) * t5)
+C       t40 = Df * t14
+C       t42 = L1 * t2
+C       t43 = t40 * t16 + t42
+C       t52 = t26 / 0.2D1 + L1
+C       t55 = L1 ** 2
+C       t56 = t55 + t8 + t11
+C       t64 = Df * L1
+C       t71 = L1 * t21
+C       t76 = t19 * lsa
+C       t81 = t3 * t55
+C       t82 = t17 * t5
+C       t83 = t19 ** 2
+C       t86 = t83 ** 2
+C       t91 = t5 * t83
+C       t92 = t91 * lsa
+C       t96 = t91 * t10
+C       t98 = Df * t55
+C       t100 = t16 * t5
+C       t108 = t19 * t10
+C       t117 = t5 * t19
+C       t118 = lsa * t10
+C       t119 = t117 * t118
+C       t124 = t21 ** 2
+C       t129 = t55 * t21
+C       t151 = t10 ** 2
+C       t158 = 0.2D1 * Df * t21 * t16 * t119 + 0.4D1 * L1 * t124 * t5 * t1
+C      #18 + 0.2D1 * t3 * L1 * t17 * t92 + 0.4D1 * t55 * t124 * t5 * t10 +
+C      # 0.4D1 * t129 * t19 * t83 * t10 + 0.4D1 * t55 * t5 * t83 * t10 + 0
+C      #.6D1 * t64 * t21 * t100 * t108 + 0.4D1 * t98 * t21 * t100 * t76 + 
+C      #0.8D1 * t129 * t117 * t10 - 0.4D1 * t55 * t83 * t10 + 0.4D1 * t55 
+C      #* t86 * t10 + t124 * t5 * t151 + 0.4D1 * t64 * t16 * t96 + 0.4D1 *
+C      # t98 * t16 * t92 + t3 * t17 * t96 - t81 * t17 * t83 + t81 * t17 * 
+C      #t86 + t81 * t82 * t83 - 0.4D1 * t129 * t108 + 0.4D1 * t71 * t119
+C       t159 = sqrt(t158)
+C       t161 = 0.1D1 / t83
+C       t163 = 0.1D1 / t16
+C       t166 = t55 * Rt
+C       t168 = t21 * t19
+C       t171 = t168 - t5 / 0.2D1 - t17 / 0.2D1 + 0.1D1
+C       t173 = t55 ** 2
+C       t176 = Rt ** 2
+C       t179 = sqrt(t3 * t173 * t17 * t91 * t176)
+C       t183 = t21 + t19 / 0.2D1
+C       t186 = t17 ** 2
+C       t191 = t21 * t3
+C       t192 = -t3 * t19 - t191
+C       t205 = t168 + 0.1D1
+C       t209 = t205 * L1
+C       t212 = t21 + t19
+C       t213 = t3 * t212
+C       t221 = t16 * t17
+C       t243 = t55 * t16
+C       t246 = t243 * Rt
+C       t264 = t21 * (L1 + lsa / 0.6D1)
+C       t272 = 0.3D1 * L1
+C       t285 = L1 + lsa / 0.4D1
+C       t292 = t5 ** 2
+C       t295 = t40 * t221 / 0.3D1
+C       t296 = lsa / 0.3D1
+C       t297 = L1 + t296
+C       t298 = t2 * t297
+C       t338 = 0.4D1 / 0.3D1 * t8
+C       t339 = t10 / 0.6D1
+C       t341 = (t55 + t338 + t339) * t21
+C       t342 = t55 / 0.6D1
+C       t349 = L1 * (L1 + 0.2D1 * lsa)
+C       t352 = 0.2D1 * t8
+C       t355 = t21 * (t55 + t352 + t10 / 0.3D1)
+C       t362 = t55 / 0.3D1
+C       t367 = L1 * t55
+C       t369 = t55 * lsa
+C       t375 = t3 * lsa
+C       t376 = 0.2D1 * t375
+C       t380 = (t55 + t8 - t9) * t2
+C       t385 = 0.3D1 * t55
+C       t386 = 0.4D1 * t8
+C       t396 = t55 + t352 + t11
+C       t401 = Df * t2
+C       t410 = t2 * t19
+C       t413 = 0.2D1 * t369
+C       t414 = 0.2D1 / 0.3D1 * t10
+C       t423 = t129 / 0.3D1
+C       t442 = t3 / 0.6D1
+C       t462 = 0.2D1 * t10
+C       t463 = t55 + t386 + t462
+C       t485 = t367 * lsa
+C       t486 = 0.6D1 * t485
+C       t494 = t3 * t10
+C       t496 = t151 / 0.6D1
+C       t501 = L1 * t10
+C       t505 = (t367 + 0.9D1 / 0.2D1 * t369 + 0.7D1 / 0.2D1 * t501 + t118 
+C      #/ 0.2D1) * t21
+C       t506 = t55 * t2
+C       t507 = t506 / 0.4D1
+C       t513 = t81 * t29 / 0.3D1
+C       t514 = t173 * lsa
+C       t515 = 0.4D1 * t514
+C       t518 = (-t3 + 0.7D1 * t10) * t367
+C       t520 = 0.4D1 * t118
+C       t522 = (-0.9D1 / 0.2D1 * t375 + t520) * t55
+C       t526 = (-0.10D2 / 0.3D1 * t494 + t151 / 0.3D1) * L1
+C       t527 = t3 * t118
+C       t528 = t527 / 0.3D1
+C       t535 = (t367 + 0.6D1 * t369 + 0.37D2 / 0.6D1 * t501 + 0.4D1 / 0.3D
+C      #1 * t118) * t21
+C       t536 = t506 / 0.3D1
+C       t540 = t55 * t10
+C       t544 = 0.5D1 / 0.3D1 * t173
+C       t545 = 0.10D2 * t485
+C       t546 = 0.32D2 / 0.3D1 * t540
+C       t547 = L1 * t118
+C       t548 = 0.8D1 / 0.3D1 * t547
+C       t553 = t55 + 0.11D2 / 0.8D1 * t8 + t11
+C       t559 = t118 / 0.8D1
+C       t573 = (t485 + (-t9 + t462) * t55 + (-t376 + t118) * L1 - t494) * 
+C      #t14
+C       t577 = t3 / 0.4D1
+C       t578 = 0.17D2 / 0.2D1 * t10
+C       t579 = -t577 + t578
+C       t581 = -t375 + t520
+C       t583 = t494 / 0.2D1
+C       t584 = t151 / 0.2D1
+C       t587 = 0.3D1 * t173
+C       t588 = 0.3D1 * t485
+C       t594 = 0.18D2 * t485
+C       t595 = 0.22D2 * t10
+C       t596 = -t577 + t595
+C       t598 = 0.8D1 * t118
+C       t599 = -t375 + t598
+C       t605 = 0.8D1 / 0.3D1 * t514
+C       t606 = 0.2D1 / 0.3D1 * t3
+C       t607 = 0.17D2 / 0.3D1 * t10
+C       t610 = 0.3D1 * t375
+C       t613 = 0.7D1 / 0.3D1 * t494
+C       t614 = 0.2D1 / 0.3D1 * t151
+C       t618 = (-t605 + (t606 - t607) * t367 + (t610 - t520) * t55 + (t613
+C      # - t614) * L1 + t528) * t21
+C       t619 = t81 * t2
+C       t620 = t619 / 0.3D1
+C       t623 = 0.16D2 / 0.3D1 * t514
+C       t626 = (t606 - 0.31D2 / 0.3D1 * t10) * t367
+C       t629 = (t610 - 0.20D2 / 0.3D1 * t118) * t55
+C       t631 = (t613 - t151) * L1
+C       t634 = 0.27D2 / 0.4D1 * t540
+C       t635 = 0.2D1 * t547
+C       t636 = t151 / 0.8D1
+C       t637 = t173 + t486 + t634 + t635 + t636
+C       t639 = t55 * t31
+C       t642 = t639 * t21
+C       t649 = (t367 + 0.7D1 / 0.4D1 * t369 + t501 + t559) * L1
+C       ls = (t2 * t38 + 0.2D1 * lsa * (t29 * t14 + t43 * t19) * t4) / ((0
+C      #.2D1 * t2 * t52 * t19 + 0.2D1 * t21 * t56) * t4 + t38) / ((t26 * t
+C      #4 * t19 * lsa + t64 * t16 * t4 * t19 + 0.2D1 * L1 * t4 * t76 + 0.2
+C      #D1 * t71 * t4 * lsa + t21 * t4 * t10 + t159) * t161 * Rt * t163 / 
+C      #0.2D1 - t166 * t4 * (-t16 * t171 * Df * t179 + t166 * (t3 * t183 *
+C      # t82 + t3 * t186 * t19 / 0.2D1 + t192 * t17) * t4) * t161 * t163 /
+C      # (((t26 / 0.4D1 + L1 / 0.2D1) * t5 + L1 * t17 / 0.2D1 - Df * t205 
+C      #* t16 / 0.4D1 - t209) * t179 + t166 * t4 * ((t213 * t17 / 0.4D1 + 
+C      #t64 * t183 * t16) * t5 + Df * t19 * L1 * t221 / 0.2D1 + t192 * t17
+C      # / 0.4D1 - Df * t212 * L1 * t16)) / 0.2D1) * F + 0.12D2 * t243 * D
+C      #f * ((-t171 * t179 + t246 * t4 * Df * (t183 * t5 + t19 * t17 / 0.2
+C      #D1 - t21 - t19)) * t2 * t38 / 0.3D1 + (((0.2D1 / 0.3D1 * t14 * t18
+C      #3 * t26 + (t28 / 0.3D1 + t264) * t2) * t5 + t20 * Df * t221 / 0.3D
+C      #1 + ((t272 + lsa) * t19 + t21 * t14) * t2 * t17 / 0.3D1 - 0.2D1 / 
+C      #0.3D1 * t212 * t14 * t26 - 0.4D1 / 0.3D1 * t212 * t2 * t285) * t17
+C      #9 + t243 * (-t43 * t292 / 0.3D1 + (-t295 - t298 * t17 + 0.2D1 / 0.
+C      #3D1 * (t168 + 0.3D1 / 0.2D1) * t14 * t26 + t2 * (t264 * t19 + 0.5D
+C      #1 / 0.3D1 * L1 + t296)) * t5 + t295 + t2 * (t22 + t272 + lsa) * t1
+C      #7 / 0.3D1 - 0.2D1 / 0.3D1 * t205 * t14 * t26 - 0.4D1 / 0.3D1 * t20
+C      #5 * t2 * t285) * Rt * t4 * Df) * t4 * lsa) / ((((-0.2D1 * t213 * t
+C      #2 * t17 - 0.12D2 * (L1 * (L1 + 0.4D1 / 0.3D1 * lsa) * t19 / 0.2D1 
+C      #+ t341 - t342) * Df * t16 - 0.12D2 * L1 * (t349 * t19 / 0.3D1 + t3
+C      #55)) * t5 - 0.6D1 * Df * (t298 * t19 - t362) * t221 + ((-0.12D2 * 
+C      #t367 - 0.24D2 * t369 + (0.2D1 * t3 - 0.8D1 * t10) * L1 + t376) * t
+C      #19 - 0.4D1 * t380 * t21) * t17 - 0.4D1 * ((t129 - t385 - t386 - t1
+C      #1) * t19 + (-t385 - t386 - t11) * t21 + t55) * Df * t16 + 0.16D2 *
+C      # L1 * t212 * t396) * t179 - 0.12D2 * t246 * (-(t401 * t16 + t349) 
+C      #* t52 * t292 / 0.3D1 + (-t401 * t297 * t221 / 0.2D1 + (t191 * t410
+C      # / 0.6D1 - t367 - t413 + (-t414 + t3 / 0.3D1) * L1 + t375 / 0.3D1)
+C      # * t17 + ((t341 - t342) * t19 - t423 + t352 + 0.3D1 / 0.2D1 * t55 
+C      #+ t339) * Df * t16 + L1 * (t355 * t19 + 0.5D1 / 0.3D1 * t55 + 0.10
+C      #D2 / 0.3D1 * t8 + t414)) * t5 - Df * (t55 * t19 - t10 - t385 - t38
+C      #6) * t221 / 0.6D1 + (t380 * t168 / 0.3D1 + t367 + t413 + (-t442 + 
+C      #t414) * L1 - t375 / 0.6D1) * t17 - ((t341 - t362) * t19 - t423 + t
+C      #55 + t338 + t339) * Df * t16 - 0.4D1 / 0.3D1 * t209 * t396) * t4 *
+C      # Df) * t38 + 0.12D2 * t4 * ((t52 * (t3 * t463 * t17 / 0.2D1 + t64 
+C      #* (L1 + 0.4D1 * lsa) * t2 * t16 + 0.2D1 * t369 * t2) * t292 / 0.3D
+C      #1 + (t14 * t3 * t463 * t186 / 0.3D1 + (-t191 * t463 * t19 / 0.12D2
+C      # + t173 + t486 + (0.22D2 / 0.3D1 * t10 - t442) * t55 + (-0.2D1 / 0
+C      #.3D1 * t375 + 0.8D1 / 0.3D1 * t118) * L1 - t494 / 0.3D1 + t496) * 
+C      #Df * t221 + (-0.2D1 / 0.3D1 * (t505 - t507) * t3 * t19 + t513 + t5
+C      #15 + t518 + t522 + t526 - t528) * t17 - (L1 * (t535 - t536) * t19 
+C      #+ (-t173 - t485 - t540 / 0.6D1) * t21 + t544 + t545 + t546 + t548 
+C      #+ t496) * Df * t16 - 0.8D1 / 0.3D1 * L1 * (t71 * t553 * t19 + 0.2D
+C      #1 * t367 + 0.25D2 / 0.8D1 * t369 + 0.3D1 / 0.2D1 * t501 + t559) * 
+C      #lsa) * t5 + (t81 * t410 / 0.6D1 + 0.2D1 / 0.3D1 * t573) * t186 - (
+C      #((t581 * L1 + t579 * t55 + t173 + t486 - t583 + t584) * t21 - t587
+C      # - t588 - t540) * t19 + (-t173 - t485 - t540 / 0.2D1) * t21 + t587
+C      # + t594 + t596 * t55 + t599 * L1 - t583 + t584) * Df * t221 / 0.3D
+C      #1 + ((t618 - t620) * t19 - t513 - t623 + t626 + t629 + t631 + t528
+C      #) * t17 + 0.4D1 / 0.3D1 * Df * ((t637 * t21 - t639) * t19 - t642 +
+C      # t173 + t486 + t634 + t635 + t636) * t16 + 0.16D2 / 0.3D1 * t649 *
+C      # t205 * lsa) * t179 + t246 * t4 * ((Df * t3 * t463 * t212 * t221 /
+C      # 0.12D2 + 0.2D1 / 0.3D1 * t3 * (L1 * (t55 + 0.9D1 / 0.2D1 * t8 + 0
+C      #.3D1 * t10) * t19 / 0.2D1 + t505 - t507) * t17 + L1 * (L1 * (L1 + 
+C      #0.5D1 * lsa) * t410 / 0.3D1 + t535 - t536) * t26 + 0.8D1 / 0.3D1 *
+C      # t369 * (t42 * t19 / 0.4D1 + t21 * t553)) * t292 + ((t14 * t463 * 
+C      #t19 - t506 / 0.2D1) * t3 * t186 / 0.3D1 + ((t587 + t594 + (-t9 + t
+C      #595) * t55 + (-t376 + t598) * L1 - t494 + t584) * t19 + (t173 + t4
+C      #86 + (-t9 + t578) * t55 + (-t376 + t520) * L1 - t494 + t584) * t21
+C      # - t587 - t588 - t540) * Df * t221 / 0.3D1 + ((t513 + t515 + t518 
+C      #+ t522 + t526 - t528) * t19 + (t605 + (-0.4D1 / 0.3D1 * t3 + t607)
+C      # * t367 + (-0.6D1 * t375 + t520) * t55 + (-0.14D2 / 0.3D1 * t494 +
+C      # t614) * L1 - 0.2D1 / 0.3D1 * t527) * t21 + t619 / 0.2D1) * t17 + 
+C      #((t55 * (t55 + t8 + t339) * t21 - t544 - t545 - t546 - t548 - t496
+C      #) * t19 + (-0.7D1 / 0.3D1 * t173 - 0.14D2 * t485 - 0.91D2 / 0.6D1 
+C      #* t540 - 0.4D1 * t547 - t496) * t21 + 0.5D1 / 0.3D1 * t55 * (t55 +
+C      # t8 + t10 / 0.5D1)) * Df * t16 - 0.8D1 * L1 * ((0.2D1 / 0.3D1 * t3
+C      #67 + 0.25D2 / 0.24D2 * t369 + t501 / 0.2D1 + t118 / 0.24D2) * t19 
+C      #+ t21 * (t367 + 0.13D2 / 0.8D1 * t369 + 0.5D1 / 0.6D1 * t501 + t11
+C      #8 / 0.12D2)) * lsa) * t5 + (0.2D1 / 0.3D1 * t573 * t19 + t619 / 0.
+C      #6D1) * t186 + ((t55 * t56 * t21 - t599 * L1 - t596 * t55 + t583 - 
+C      #t584 - t587 - t594) * t19 + (-t581 * L1 - t579 * t55 - t173 - t486
+C      # + t583 - t584) * t21 + t587 + t588 + t540) * Df * t221 / 0.3D1 + 
+C      #((-t513 - t623 + t626 + t629 + t631 + t528) * t19 + t618 - t620) *
+C      # t17 - 0.4D1 / 0.3D1 * ((t642 - t173 - t486 - t634 - t635 - t636) 
+C      #* t19 - t637 * t21 + t639) * Df * t16 + 0.16D2 / 0.3D1 * t649 * t2
+C      #12 * lsa) * Df))
+
+      if(phi.ne.0.) then
+
+      t2 = L1+lsa
+      t3 = cos(phi)
+      t4 = t3**2
+      t6 = Df**2
+      t9 = L1*lsa
+      t10 = t6/2
+      t11 = lsa**2
+      t12 = t11/2
+      t15 = L1+lsa/2
+      t17 = cos(alpha)
+      t18 = t17**2
+      t20 = t2*Df
+      t21 = sin(phi)
+      t23 = sin(alpha)
+      t24 = t23*t15*t21
+      t25 = t4*L1
+      t29 = t21*L1
+      t30 = t23*t2
+      t32 = t15**2
+      t38 = sqrt(-4*(t18*t15*(t4*t6/2+t9-t10+t12)+t17*(-t24+t25-L1)*t20-
+     #(t30*t29+t32)*lsa)*t4*lsa)
+      t40 = t3*lsa
+      t41 = t15*Df
+      t43 = t2*L1
+      t44 = t17*t41+t43
+      t51 = t17*Df
+      t53 = t51/2+L1
+      t56 = L1**2
+      t57 = t56+t9+t12
+      t64 = Df*L1
+      t68 = t21*Df
+      t69 = t17*t3
+      t75 = lsa*t23
+      t80 = t56*t6
+      t81 = t21**2
+      t82 = t81**2
+      t90 = t18*t4
+      t97 = t56*Df
+      t99 = t17*t4
+      t112 = t11*t23
+      t118 = lsa*t11
+      t131 = t81*t56
+      t135 = t56*t21
+      t136 = t23*t4
+      t141 = t23**2
+      t152 = t11**2
+      t158 = 2*lsa*t90*t81*L1*t6+2*t118*t23*t17*t4*t68+4*lsa*t99*t81*t97
+     #+4*t11*t141*t4*t56+t11*t90*t81*t6+4*t11*t99*t81*t64+4*t112*t21*t81
+     #*t56+6*t112*t99*t21*t64+t18*t4*t81*t80+4*t75*t99*t21*t97+4*t11*t4*
+     #t131+8*t11*t136*t135+4*t11*t82*t56+4*t118*t136*t29+4*t118*t141*t25
+     #+t152*t141*t4-t18*t81*t80+t18*t82*t80-4*t11*t131-4*t112*t135
+      t159 = sqrt(t158)
+      t161 = 1/t81
+      t163 = 1/t17
+      t166 = t23*t21
+      t169 = t166-t4/2-t18/2+1
+      t171 = t56**2
+      t174 = Rt**2
+      t177 = sqrt(t174*t90*t81*t171*t6)
+      t181 = t23+t21/2
+      t184 = t21*t6
+      t185 = t18**2
+      t188 = t23*t6
+      t189 = -t184-t188
+      t193 = t56*t3
+      t205 = t166+1
+      t206 = t205*Df
+      t212 = t21+t23
+      t217 = t17*L1
+      t221 = t17*t18
+      t226 = t212*Df
+      t259 = (L1+lsa/6)*t23
+      t267 = 3*L1
+      t275 = t17*t15
+      t279 = L1+lsa/4
+      t285 = Df*Rt
+      t287 = t4**2
+      t290 = t221*t41/3
+      t291 = lsa/3
+      t293 = t2*(L1+t291)
+      t331 = 4.D0/3.D0*t9
+      t332 = t11/6
+      t334 = t23*(t56+t331+t332)
+      t335 = t56/6
+      t342 = L1*(L1+2*lsa)
+      t345 = 2*t9
+      t348 = (t56+t345+t11/3)*t23
+      t355 = t56/3
+      t360 = L1*t56
+      t362 = lsa*t56
+      t368 = lsa*t6
+      t369 = 2*t368
+      t373 = t23*(t56+t9-t10)
+      t378 = t56*t23
+      t379 = 3*t56
+      t380 = 4*t9
+      t389 = t212*L1
+      t390 = t345+t56+t12
+      t395 = t3*t285
+      t404 = t21*t2
+      t407 = 2*t362
+      t408 = 2.D0/3.D0*t11
+      t417 = t378/3
+      t435 = t6/6
+      t456 = 2*t11
+      t457 = t56+t380+t456
+      t472 = t15*t457
+      t479 = lsa*t360
+      t480 = 6*t479
+      t488 = t11*t6
+      t490 = t152/6
+      t495 = t11*L1
+      t499 = t23*(t360+9.D0/2.D0*t362+7.D0/2.D0*t495+t118/2)
+      t500 = t56*t2
+      t501 = t500/4
+      t507 = t30*t80/3
+      t508 = lsa*t171
+      t509 = 4*t508
+      t512 = t360*(-t6+7*t11)
+      t514 = 4*t118
+      t516 = t56*(-9.D0/2.D0*t368+t514)
+      t520 = L1*(-10.D0/3.D0*t488+t152/3)
+      t521 = t118*t6
+      t522 = t521/3
+      t529 = t23*(t360+6*t362+37.D0/6.D0*t495+4.D0/3.D0*t118)
+      t530 = t500/3
+      t534 = t11*t56
+      t538 = 5.D0/3.D0*t171
+      t539 = 10*t479
+      t540 = 32.D0/3.D0*t534
+      t541 = t118*L1
+      t542 = 8.D0/3.D0*t541
+      t548 = t56+11.D0/8.D0*t9+t12
+      t554 = t118/8
+      t567 = (t479+t56*(-t10+t456)+L1*(-t369+t118)-t488)*t15
+      t571 = t6/4
+      t572 = 17.D0/2.D0*t11
+      t573 = -t571+t572
+      t575 = -t368+t514
+      t577 = t488/2
+      t578 = t152/2
+      t581 = 3*t171
+      t582 = 3*t479
+      t588 = 18*t479
+      t589 = 22*t11
+      t590 = -t571+t589
+      t592 = 8*t118
+      t593 = -t368+t592
+      t599 = 8.D0/3.D0*t508
+      t600 = 2.D0/3.D0*t6
+      t601 = 17.D0/3.D0*t11
+      t604 = 3*t368
+      t607 = 2.D0/3.D0*t152
+      t608 = 7.D0/3.D0*t488
+      t612 = t23*(-t599+t360*(t600-t601)+t56*(t604-t514)+L1*(-t607+t608)
+     #+t522)
+      t613 = t2*t80
+      t614 = t613/3
+      t617 = 16.D0/3.D0*t508
+      t620 = t360*(-31.D0/3.D0*t11+t600)
+      t623 = t56*(t604-20.D0/3.D0*t118)
+      t625 = L1*(t608-t152)
+      t628 = 27.D0/4.D0*t534
+      t629 = 2*t541
+      t630 = t152/8
+      t631 = t171+t480+t628+t629+t630
+      t633 = t32*t56
+      t636 = t23*t633
+      t642 = t360+7.D0/4.D0*t362+t495+t554
+      s1 = 2*F/(t163*Rt*t161*(t17*t3*t21*t64+2*t75*t3*L1+lsa*t69*t68+t11
+     #*t23*t3+2*t40*t29+t159)-1/(t177*(t4*(L1/2+t51/4)+t18*L1/2-t17*t206
+     #/4-L1*t205)+t193*(t4*(t18*t212*t6/4+t217*Df*t181)+t221*L1*t68/2+t1
+     #8*t189/4-t217*t226)*Rt)*t163*t161*t56*t3*Rt*(-t177*t17*Df*t169+t19
+     #3*Rt*(t90*t181*t6+t185*t184/2+t18*t189)))/(2*t3*(t21*t2*t53+t57*t2
+     #3)+t38)*(t38*t2+2*(t15*t30+t21*t44)*t40)
+      s4 = 12
+      s8 = t38
+      s10 = t177*(t4*(-2*t18*t212*t2*t6-12*t17*(t21*(L1+4.D0/3.D0*lsa)*L
+     #1/2+t334-t335)*Df-12*L1*(t21*t342/3+t348))-6*t221*(t21*t293-t355)*
+     #Df+t18*(t21*(-12*t360-24*t362+L1*(2*t6-8*t11)+t369)-4*t2*t373)-4*t
+     #17*(t21*(t378-t379-t380-t12)+t23*(-t379-t380-t12)+t56)*Df+16*t390*
+     #t389)
+      s11 = -12*t56*(-t287*t53*(t17*t20+t342)/3+t4*(-t221*Df*t293/2+t18*
+     #(t404*t188/6-t360-t407+L1*(-t408+t6/3)+t368/3)+t17*Df*(t21*(t334-t
+     #335)-t417+3.D0/2.D0*t56+t345+t332)+L1*(t21*t348+5.D0/3.D0*t56+10.D
+     #0/3.D0*t9+t408))-t221*(t135-t379-t380-t11)*Df/6+t18*(t404*t373/3+t
+     #360+t407+L1*(-t435+t408)-t368/6)-t17*Df*(t21*(t334-t355)-t417+t56+
+     #t331+t332)-4.D0/3.D0*t205*t390*L1)*t17*t395
+      s9 = s10+s11
+      s7 = s8*s9
+      s9 = 12
+      s13 = t177
+      s15 = t287*(t18*t457*t6/2+t17*t2*(L1+4*lsa)*t64+2*t2*t362)*t53/3+t
+     #4*(t185*t6*t472/3+t221*(-t21*t457*t188/12+t171+t480+t56*(-t435+22.
+     #D0/3.D0*t11)+L1*(-2.D0/3.D0*t368+8.D0/3.D0*t118)-t488/3+t490)*Df+t
+     #18*(-2.D0/3.D0*t21*(t499-t501)*t6+t507+t509+t512+t516+t520-t522)-t
+     #17*Df*(t21*(t529-t530)*L1+t23*(-t171-t479-t534/6)+t538+t539+t540+t
+     #542+t490)-8.D0/3.D0*(t21*t548*t23*L1+2*t360+25.D0/8.D0*t362+3.D0/2
+     #.D0*t495+t554)*t9)+t185*(t404*t80/6+2.D0/3.D0*t567)
+      s14 = s15-t221*(t21*(t23*(L1*t575+t56*t573+t171+t480-t577+t578)-t5
+     #81-t582-t534)+t23*(-t171-t479-t534/2)+t581+t588+t56*t590+L1*t593-t
+     #577+t578)*Df/3+t18*(t21*(t612-t614)-t507-t617+t620+t623+t625+t522)
+     #+4.D0/3.D0*t17*Df*(t21*(t23*t631-t633)-t636+t171+t480+t628+t629+t6
+     #30)+16.D0/3.D0*t642*t205*t9
+      s12 = s13*s14
+      s15 = t56
+      s18 = t287*(t221*t212*t457*Df*t6/12+2.D0/3.D0*t18*(t21*(t56+9.D0/2
+     #.D0*t9+3*t11)*L1/2+t499-t501)*t6+t217*Df*(t404*L1*(L1+5*lsa)/3+t52
+     #9-t530)+8.D0/3.D0*(t21*t43/4+t548*t23)*t362)
+      s19 = t4*(t185*(t21*t472-t500/2)*t6/3+t221*(t21*(t581+t588+t56*(-t
+     #10+t589)+L1*(-t369+t592)-t488+t578)+t23*(t171+t480+t56*(-t10+t572)
+     #+L1*(-t369+t514)-t488+t578)-t581-t582-t534)*Df/3+t18*(t21*(t507+t5
+     #09+t512+t516+t520-t522)+t23*(t599+t360*(-4.D0/3.D0*t6+t601)+t56*(-
+     #6*t368+t514)+L1*(-14.D0/3.D0*t488+t607)-2.D0/3.D0*t521)+t613/2)+t1
+     #7*(t21*(t23*(t56+t9+t332)*t56-t538-t539-t540-t542-t490)+t23*(-7.D0
+     #/3.D0*t171-14*t479-91.D0/6.D0*t534-4*t541-t490)+5.D0/3.D0*t56*(t56
+     #+t9+t11/5))*Df-8*L1*lsa*(t21*(2.D0/3.D0*t360+25.D0/24.D0*t362+t495
+     #/2+t118/24)+t23*(t360+13.D0/8.D0*t362+5.D0/6.D0*t495+t118/12)))+t1
+     #85*(2.D0/3.D0*t21*t567+t613/6)
+      s17 = s18+s19
+      s16 = s17+t221*Df*(t21*(t23*t56*t57-L1*t593-t56*t590+t577-t578-t58
+     #1-t588)+t23*(-L1*t575-t56*t573-t171-t480+t577-t578)+t581+t582+t534
+     #)/3+t18*(t21*(-t507-t617+t620+t623+t625+t522)+t612-t614)-4.D0/3.D0
+     #*t17*(t21*(t636-t171-t480-t628-t629-t630)-t23*t631+t633)*Df+16.D0/
+     #3.D0*t642*lsa*t389
+      s14 = s15*s16
+      s15 = t17*t395
+      s13 = s14*s15
+      s11 = s12+s13
+      s12 = t3
+      s10 = s11*s12
+      s8 = s9*s10
+      s6 = s7+s8
+      s5 = 1/s6
+      s3 = s4*s5
+      s4 = t56*(t38*t2*(-t177*t169+t56*t69*Df*(t4*t181+t18*t21/2-t23-t21
+     #)*Rt)/3+t3*lsa*(t177*(t4*(2.D0/3.D0*t17*t181*t41+t2*(t29/3+t259))+
+     #t221*t15*t68/3+t18*t2*(t21*(t267+lsa)+t15*t23)/3-2.D0/3.D0*t275*t2
+     #26-4.D0/3.D0*t2*t279*t212)+(-t287*t44/3+t4*(-t290-t18*t293+2.D0/3.
+     #D0*t275*(t166+3.D0/2.D0)*Df+t2*(t21*t259+5.D0/3.D0*L1+t291))+t290+
+     #t18*t2*(t24+t267+lsa)/3-2.D0/3.D0*t275*t206-4.D0/3.D0*t2*t279*t205
+     #)*t193*t17*t285))*t51
+      s2 = s3*s4
+      ls = s1+s2
+      
+      else
+        ls=0.d0
+      end if
+      if(ls.le.0.d0) then
+        ls=0.d0
+      end if
+       
+      return
+      end 

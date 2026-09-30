@@ -1,0 +1,14 @@
+C TTE10A    SOURCE    OF166741  23/12/04    21:15:21     11800          
+C
+C ===>  SOUS-PROGRAMME  TTE10A  PLUS UTILISE    <===
+C ===>  SUBROUTINE              NO LONGER USED  <===
+C
+      SUBROUTINE TTE10A
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      RETURN
+      END
+
+ 

@@ -1,0 +1,51 @@
+C CHILEC    SOURCE    OF166741  23/10/16    21:15:04     11754          
+      SUBROUTINE CHILEC(LBDD,MLIDEN,LXMX,IDSCHI,IOCHI1,IOCHI2)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMLENTI
+      POINTEUR MLIDEN.MLENTI,MLXMX.MLENTI
+      SEGMENT IDSCHI
+           REAL*8 GK(NYDIM),AA(NYDIM,NXDIM),FF(NZDIM,NPDIM)
+           INTEGER IDX(NXDIM),IDY(NYDIM),IDZ(NZDIM),IDP(NPDIM),NN(6)
+           INTEGER IDECY(NYDIM),IONZ(NXDIM)
+           CHARACTER*32 NAME(NXDIM),NAMESP(NYDIM)
+      ENDSEGMENT
+
+      SEGACT MLIDEN
+
+      NXDIM=MLIDEN.LECT(/1)
+      NYDIM=200
+      NZDIM=0
+      NPDIM=0
+      SEGINI IDSCHI
+      CALL RSETI(IDX,MLIDEN.LECT,NXDIM)
+c*dbg      write(ioimp,*) 'On va lire IOCHI1,IOCHI2',LBDD,IOCHI1,IOCHI2
+      IF(LBDD.EQ.0)THEN
+            CALL CHINP(IDSCHI,LXMX,IOCHI1,IOCHI2)
+      ELSEIF(LBDD.EQ.1)THEN
+            CALL CHINPS(IDSCHI,LXMX,IOCHI1,IOCHI2)
+      ENDIF
+      NYDIM=IDY(/1)
+      NPDIM=IDP(/1)
+
+c      write(ioimp,*) 'CHILEC : Fin lecture IOCHI1,IOCHI2'
+c      WRITE(ioimp,*)(NAME(I),I=1,NXDIM)
+c      WRITE(ioimp,*)'IDX',(IDX(I),I=1,NXDIM)
+c      WRITE(ioimp,*)'IDY',(IDY(I),I=1,NYDIM)
+c      write(ioimp,*)'chilec IDP',(idp(i),i=1,npdim)
+c      WRITE(ioimp,*)'GK',(GK(I),I=1,NYDIM)
+c      WRITE(ioimp,110)((AA(I,J),I=1,NYDIM),J=1,NXDIM)
+c      WRITE(ioimp,*)' NN ',( NN(i),I=1,6)
+c  110 FORMAT( 2X ,'AA',(10(1PE10.3)))
+
+      SEGDES MLIDEN
+
+c      RETURN
+      END
+
+ 

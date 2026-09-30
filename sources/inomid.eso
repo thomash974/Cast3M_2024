@@ -1,0 +1,718 @@
+C INOMID    SOURCE    JK148537  23/11/20    21:15:06     11790          
+*
+*  iqmod est un pointeur sur un segment imodel de l'objet modele, il est
+*  suppose actif
+*
+*  A)  ITYP= '        '
+*     creation des segments de noms de composantes des MCHAML
+*     CREES PAR LE MODELE ELEMENTAIRE
+*     Rn entree l_vari,l_mato, l_matf et l_paex sont des listmots pour 
+*     les variables internes, materiaux, parametreis externes s'ils 
+*     ont ete definis (<= 0 sinon).
+*     Ces arguments ne doivent absolument pas a etre modifies ici !
+*   attention : une modele de mecanique ne peut creer de composantes thermiques
+*  ou phases metallurgiques !
+*  fortement inspire de comou2
+*
+*  B) ITYP different de '        '  on renvoie dans iret le nomid associe.
+*
+      SUBROUTINE INOMID(iqmod,ityp,iret,l_vari,l_mato,l_matf,l_paex)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMMODEL
+      pointeur nomid1.nomid
+-INC SMLMOTS
+
+      character*(*) ityp
+
+      parameter(ninc=13,ntyp=19)
+      logical dcmate,d_mc
+      character*8 nomtyp(ntyp)
+      CHARACTER*4 lesinc(ninc),lesdua(ninc)
+      CHARACTER*5 FMT1
+
+      EXTERNAL LONG
+
+      DATA lesinc/'UX','UY','UZ','RX','RY','RZ','UR','UT','RT',
+     &            'LX','P','ALFA','BETA'/
+      DATA lesdua/'FX','FY','FZ','MX','MY','MZ','FR','FT','MT',
+     &            'FLX','FP','FALF','FBET'/
+       data nomtyp/ 'DEPLACEM', 'FORCES  ', 'GRADIENT', 'CONTRAIN',
+     &              'DEFORMAT', 'MATERIAU', 'CARACTER', 'TEMPERAT',
+     &              'PRINCIPA', 'VARINTER', 'GRAFLEXI', 'VINMETAL',
+     &              'DEFINELA', 'PARAMEXT', 'VIDE    ', 'SCAL    ',
+     &              'TEMP    ', 'MAHO    ', 'MAHT    ' /
+
+C modele metallurgie ajoute par T.L. en mai 2018
+C Donnees pour la metallurgie :
+      parameter(NBMET=2)
+      CHARACTER*4 TYPMET(NBMET),LEBLON(3),KOISTI(2)
+      DATA TYPMET/'LEBL', 'KOIS'/
+      DATA LEBLON/'PEQ ', 'TAU ', 'F   '/
+      DATA KOISTI/'MS  ', 'KM  '/
+
+* on suppose le sous-modele (imodel) est actif
+      imodel = iqmod
+
+* Petit test normalement inutile :
+      if (imodel.lnomid(/1).ne.ntyp) then
+        write(ioimp,*) 'INOMID : Incoherence lnomid(/1) et ntyp'
+        call erreur(5)
+        return
+      endif
+
+      iret = 0
+* -------------------
+* CAS PARTICULIER B :
+* -------------------
+C On sort le NOMID demande et on ne le cree pas
+      if (ityp.NE.'        ') then
+        do ideb = 1, ntyp
+          if (ityp.eq.nomtyp(ideb)) then
+            iret = imodel.lnomid(ideb)
+            goto 100
+          endif
+        enddo
+        call erreur(5)
+ 100    continue
+        return
+      endif
+
+* ---------------
+* CAS GENERAL A :
+* ---------------
+*  On passe en *mod pour remplir imodel.lnomid(.)
+      segact,imodel*mod
+
+* Recopie locale des arguments d'entrees :
+      luvari = l_vari
+      lumato = l_mato
+      lumatf = l_matf
+      lupaex = l_paex
+
+      NFOR=formod(/2)
+      CALL PLACE(formod,NFOR,IMECA,'MECANIQUE       ')
+      CALL PLACE(formod,NFOR,IPORE,'POREUX          ')
+      CALL PLACE(formod,NFOR,ITHHY,'THERMOHYDRIQUE  ')
+      CALL PLACE(formod,NFOR,ITHER,'THERMIQUE       ')
+      CALL PLACE(formod,NFOR,IMAGN,'MAGNETODYNAMIQUE')
+      CALL PLACE(formod,NFOR,IELEC,'ELECTROSTATIQUE ')
+      CALL PLACE(formod,NFOR,IDIFF,'DIFFUSION       ')
+      CALL PLACE(formod,NFOR,ILIAI,'LIAISON         ')
+      CALL PLACE(formod,NFOR,ICONT,'CONTACT         ')
+      CALL PLACE(formod,NFOR,ICHGM,'CHARGEMENT      ')
+      CALL PLACE(formod,NFOR,IMETA,'METALLURGIE     ')
+      CALL PLACE(formod,NFOR,ICHPH,'CHANGEMENT_PHASE')
+      CALL PLACE(formod,NFOR,INAST,'NAVIER_STOKES   ')
+      CALL PLACE(formod,NFOR,IMELA,'MELANGE         ')
+      CALL PLACE(formod,NFOR,ICNTR,'CONTRAINTE      ')
+        
+      d_mc = .false.
+      if (imela.gt.0) then 
+        d_mc = CMATEE.EQ.'PARALLELE' .OR. CMATEE.EQ.'SERIE'
+      endif
+
+      dcmate = .false.
+      nimcom = 0
+      do im = 1,matmod(/2)
+        if (matmod(im).eq.'IMPEDANCE') then
+          dcmate = .true.
+          if (luvari.gt.0) then
+            mlmot5 = luvari
+            luvari = 0
+            mlmot6 = lumato
+            lumato = 0
+            segact mlmot5,mlmot6
+            nimcom = mlmot5.mots(/2)
+            nbrobl = nimcom
+            nbrfac = nimcom
+            segini nomid,nomid1
+            do inim = 1,nimcom
+              CALL PLACE(lesinc,ninc,IMOT,mlmot5.mots(inim))
+              if (imot.eq.0) call erreur(26)
+              lesobl(inim) = mlmot5.mots(inim)
+              nomid1.lesobl(inim) = lesdua(imot)
+              CALL PLACE(lesinc,ninc,IMOT,mlmot6.mots(inim))
+              if (imot.eq.0) call erreur(26)
+              lesfac(inim) = mlmot6.mots(inim)
+              nomid1.lesfac(inim) = lesdua(imot)
+            enddo
+          endif
+        endif
+      enddo
+
+* Cas particulier d'un modele de CHANGEMENT_PHASE :
+*     write(6,*)'inomidichph',ichph,(MATMOD(1)(1:10) .EQ.'PARFAIT   ')
+      IF (ICHPH .GT. 0) THEN
+        IF    (MATMOD(1)(1:10) .EQ. 'PARFAIT   ')THEN
+          DO im=1,LNOMID(/1)
+              IF    (im .EQ. 1 )THEN
+C               COMPOSANTES PRIMALES
+                NBROBL=1
+                NBRFAC=0
+                SEGINI,NOMID
+                MLMOT1=IMODEL.IVAMOD(1)
+                NOMID.LESOBL(1)=MLMOT1.MOTS(1)
+              ELSEIF(im .EQ. 2 )THEN
+C               COMPOSANTES DUALES
+                NBROBL=1
+                NBRFAC=0
+                SEGINI,NOMID
+                MLMOT1=IMODEL.IVAMOD(1)
+                NOMID.LESOBL(1)=MLMOT1.MOTS(2)
+              ELSEIF(im .EQ. 6 )THEN
+C               COMPOSANTES MATERIAU
+                NBROBL=2
+                NBRFAC=0
+                SEGINI,NOMID
+                NOMID.LESOBL(1)='PRIM'
+                NOMID.LESOBL(2)='DUAL'
+              ELSEIF(im .EQ. 10)THEN
+C               COMPOSANTES VARINTER
+                NBROBL=1
+                NBRFAC=0
+                SEGINI,NOMID
+                NOMID.LESOBL(1)='PPHA'
+              ELSE
+C               NOMID vide
+                NBROBL=0
+                NBRFAC=0
+c                SEGINI,NOMID
+                nomid = 0
+              ENDIF
+              LNOMID(im)=NOMID
+          ENDDO
+
+        ELSEIF(MATMOD(1)(1:10) .EQ. 'SOLUBILITE')THEN
+            DO im=1,LNOMID(/1)
+              IF    (im .EQ. 1 )THEN
+C               COMPOSANTES PRIMALES
+                NBROBL=2
+                NBRFAC=0
+                SEGINI,NOMID
+                MLMOT1=IMODEL.IVAMOD(1)
+                NOMID.LESOBL(1)=MLMOT1.MOTS(1)
+                NOMID.LESOBL(2)=MLMOT1.MOTS(2)
+              ELSEIF(im .EQ. 2 )THEN
+C               COMPOSANTES DUALES
+                NBROBL=2
+                NBRFAC=0
+                SEGINI,NOMID
+                MLMOT1=IMODEL.IVAMOD(1)
+                NOMID.LESOBL(1)=MLMOT1.MOTS(3)
+                NOMID.LESOBL(2)=MLMOT1.MOTS(4)
+              ELSEIF(im .EQ. 6 )THEN
+C               COMPOSANTES MATERIAU
+                NBROBL=1
+                NBRFAC=0
+                SEGINI,NOMID
+                NOMID.LESOBL(1)='SOLU'
+              ELSE
+C               NOMID vide
+                NBROBL=0
+                NBRFAC=0
+                SEGINI,NOMID
+              ENDIF
+              LNOMID(im)=NOMID
+            ENDDO
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+
+        RETURN
+      ENDIF
+
+* Cas general :
+      MELE=nefmod
+
+C  Formulation GENERALE
+      MFR3=nummfr(mele)
+
+C  Determination de la Formulation Specifique MFR2
+      MFR2=MFR3
+     
+      if (formod(1).eq.'LIAISON') MFR2= infele(13)
+      do im=1,matmod(/2)
+        if (matmod(im).eq.'MODAL' .or. matmod(im).eq.'STATIQUE'
+     &    .or.matmod(im).eq.'IMPEDANCE')  MFR2= infele(13)
+      enddo
+
+      IF (ITHHY.EQ.1) MFR2=65
+      IF (IELEC.EQ.1) MFR2=71
+
+      IF (IDIFF.EQ.1) THEN
+        IF (MFR3.EQ.1) THEN
+C         Cas MASSIF
+          MFR2=73
+        ELSEIF (MFR3.EQ.3  .OR. MFR3.EQ.5  .OR. MFR3.EQ.9 .OR.
+     &          MFR3.EQ.27 .OR. MFR3.EQ.75 .OR. MFR3.EQ.79) THEN
+C        Cas COQUES, BARRES, JOI1, TUY2, TUY3
+          MFR2=MFR3
+        ELSE
+          CALL ERREUR(21)
+          RETURN
+        ENDIF
+      ENDIF
+*
+*       Modele CHARGEMENT PRESSION, dans certains cas, il est necessaire
+*       de definir les noms des composantes CARACTERISTIQUES, d'ou les
+*       distinctions ci-apres
+      IF (ICHGM.GT.0) THEN
+        IF (IFOUR.EQ.-2) THEN
+          MFR2 = MFR3
+        ELSE
+          IF (MFR3.EQ.1) THEN
+            MFR2 = 72
+          ELSEIF (MFR3.EQ.3 .OR. MFR3.EQ.7 .OR.
+     &            MFR3.EQ.9 .OR. MFR3.EQ.13) THEN
+            MFR2 = 74
+          ELSEIF (MFR3.EQ.5) THEN
+            MFR2 = MFR3
+          ELSE
+            CALL ERREUR(21)
+            RETURN
+          ENDIF
+        ENDIF
+      ENDIF
+*
+      npint3=0
+      if(infmod(/1).gt.0) npint3=infmod(1)
+*      write(6,*) ' inomid formod', (formod(im),im=1,nfor)
+*      write(6,*) 'inomidmeleMFR2 ',mele,mfr2,dcmate,imela
+c      write(6,*) 'inomid', imeta,luvari,lumato,lumatf,lupaex
+
+      DO ino = 1, ntyp
+
+        mocomp=0
+*         write(6,*) 'inomino',ino
+
+*       AIGUILLAGE SUIVANT MOT CLE
+        GOTO (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19) ino
+        GOTO 120
+
+C       Composantes PRIMALES (DEPLACEMENT en MECANIQUE, etc...)
+   1    if (dcmate.and.nimcom.gt.0) then
+         nobl = nimcom*2
+         nfac = 0
+         mocomp=nomid
+        else
+          if(icont.eq.0) then
+           CALL IDPRIM(IMODEL,MFR2,MOCOMP,NOBL,NFAC)
+           NOMID=MOCOMP
+          endif
+        endif
+c         write(6,*) ' modepl  MFR2 ', mocomp,MFR2,nobl,nomid.lesobl(1)
+        GOTO 120
+
+C       Composantes DUALES (FORCES en MECANIQUE, etc...)
+   2    if (dcmate.and.nimcom.gt.0) then
+         nobl = nimcom*2
+         nfac = 0
+         mocomp=nomid1
+        elseif(icont.eq.0) then
+         CALL IDDUAL(IMODEL,MFR2,MOCOMP,NOBL,NFAC)
+        endif
+        GOTO 120
+
+C       Composantes GRADIENTS des grandeurs PRIMALES
+   3    if(ither.gt.0) then
+          IF (MFR2.EQ.1) THEN
+            MDM=29
+          ELSE IF (MFR2.EQ.3  .OR. MFR2.EQ.5 .OR. MFR2.EQ.9) THEN
+C           Formulation THERMIQUE COQUE
+            MDM=39
+          ELSE IF (MFR2.EQ.79 .OR. MFR2.EQ.27) THEN
+C           Formulation THERMIQUE TUY2, TUY3, BARR
+            MDM=40
+          ENDIF
+
+        ELSEIF(IDIFF.GT.0)then
+          IF (MFR2.EQ.73) THEN
+C           Formulation DIFFUSION MASSIF
+            MDM=73
+          ELSE IF (MFR2.EQ.3  .OR. MFR2.EQ.5 .OR. MFR2.EQ.9) THEN
+C           Formulation DIFFUSION COQUE
+            MDM=74
+          ELSE IF (MFR2.EQ.79 .OR. MFR2.EQ.27) THEN
+C           Formulation DIFFUSION TUY2, TUY3, BARR
+            MDM=76
+          ENDIF
+
+        ELSEIF(IMAGN.GT.0)then
+            MDM=69
+
+        ELSE
+          MDM=MFR2
+        ENDIF
+
+        IF( IMETA .GT. 0) THEN
+          NBRFAC=0
+          NBROBL=0
+          SEGINI NOMID
+          MOCOMP=NOMID
+        ENDIF
+
+        IF( icont.eq.0 .AND. ICHGM.EQ.0 .AND. IMETA.EQ.0) THEN
+C         Remarque CB215821 :
+C         Il vaudrait mieux envoyer IMODEL a IDGRAD parce que ca fait faire
+C         toute une gymnastique inutile avec MDM alors que tout est dans IMODEL...
+          CALL IDGRAD(MDM,IFOUR,MOCOMP,NOBL,NFAC)
+        ENDIF
+
+        IF (IDIFF.GT.0) THEN
+          nomid = mocomp
+          segact,nomid*MOD
+          j = LONG(TYMODE(1))
+          DO i = 1,lesobl(/2)
+            lesobl(i)(j+1:j+2) = lesobl(i)(1:2)
+            lesobl(i)(1:j)     = TYMODE(1)(1:j)
+          ENDDO
+        ENDIF
+        
+        if (nobl.eq.0.and.nfac.eq.0) then
+          nomid = mocomp
+          segsup nomid
+          mocomp = 0
+        endif
+*           write(6,*) ' mograd  mfr ' , mocomp,mdm
+        GOTO 120
+
+C       Composantes CONTRAINTES
+   4    continue
+        if (imeca.gt.0 .or. iliai.gt.0 .or. inast.gt.0 .or. 
+     &      ipore.gt.0 .or. idiff.gt.0 .or. ielec.gt.0 .or.
+     &      ichgm.gt.0) then
+          CALL IDCONT(IMODEL,IFOUR,MOCOMP,NOBL,NFAC)
+        endif
+*           write(6,*) ' mocont ' , mocomp
+        if (dcmate.and.nimcom.gt.0) then
+          nbrobl = nimcom
+          nbrfac = nfac
+          nomid = mocomp
+          segadj nomid
+        endif
+        GOTO 120
+
+C       Composantes DEFORMATION
+   5    continue
+        if (imeca.gt.0 .or. iliai.gt.0 .or. inast.gt.0 .or. 
+     &      ipore.gt.0 .or. idiff.gt.0 .or. ielec.gt.0 ) then
+          CALL IDDEFO(IMODEL,IFOUR,MOCOMP,NOBL,NFAC)
+        endif
+*        write(6,*) ' modefo ',mocomp
+        if (dcmate.and.nimcom.gt.0) then
+          nbrobl = nimcom
+          nbrfac = nfac
+          nomid = mocomp
+          segadj nomid
+        endif
+        GOTO 120
+
+C       Composantes MATERIAU
+   6    IF (lumato.le.0) THEN
+          CALL IDMATR(MFR2,IMODEL,MOCOMP,NOBL,NFAC)
+          NOMID=MOCOMP
+c          write(6,*) 'nobl',nobl,(lesobl(jj),jj=1,nobl)
+c          write(6,*) 'nfac',nfac,(lesfac(jj),jj=1,nfac)
+        ELSE
+C         Cas de la metallurgie
+          if( IMETA .gt. 0 ) then
+            mlmot5 = lumato
+            lumato = 0
+            segact mlmot5
+            nimcom = mlmot5.mots(/2)
+C             On a au plus (Nb_modele*3) vars internes materiaux obl
+            nbrobl = nimcom*3
+            nbrfac = 0
+            segini nomid
+            i_obl = 0
+            if(nimcom .GE. 1 .AND. nimcom .LT. 10 )then
+              FMT1 = '(I1)'
+            else
+              INTERR(1)=nimcom
+              INTERR(2)=10
+              CALL ERREUR(1076)
+              RETURN
+            endif
+            do inim = 1,nimcom
+              CALL PLACE(TYPMET,NBMET,IMOT,mlmot5.mots(inim))
+                  i_obl = i_obl + 1
+              if (IMOT.eq.0) then
+                MOTERR(1:4)=mlmot5.mots(inim)
+                CALL erreur(1082)
+                RETURN
+              else if( imot .eq. 1) then
+C                 la formulation est LEBLOND
+                LESOBL(i_obl)   = LEBLON(1)
+                WRITE(LESOBL(i_obl  )(4:4), fmt=FMT1) inim
+                LESOBL(i_obl+1) = LEBLON(2)
+                WRITE(LESOBL(i_obl+1)(4:4), fmt=FMT1) inim
+                LESOBL(i_obl+2) = LEBLON(3)
+                WRITE(LESOBL(i_obl+2)(2:2), fmt=FMT1) inim
+                i_obl = i_obl + 2
+              else if( imot .eq. 2) then
+C                 la formulation est KOISTINEN
+                LESOBL(i_obl)   = KOISTI(1)
+                WRITE(LESOBL(i_obl  )(3:3), fmt=FMT1) inim
+                LESOBL(i_obl+1) = KOISTI(2)
+                WRITE(LESOBL(i_obl+1)(3:3), fmt=FMT1) inim
+                i_obl = i_obl + 1
+              endif
+            enddo
+C             on ajuste la taille du tableau LESOBL(nbrobl)
+            nbrobl = i_obl
+            segadj nomid
+            segact,nomid*NOMOD
+            mocomp=nomid
+          else if( IMETA .eq. 0 ) then
+            mlmots=lumato
+            segact MLMOTS
+            nbrobl=mots(/2)
+            nbrfac=0
+            IF (lumatf.GT.0) THEN
+              mlmot1=lumatf
+              segact mlmot1
+              nbrfac=mlmot1.mots(/2)
+            ENDIF
+            SEGINI,nomid
+            DO im=1,nbrobl
+              lesobl(im)=mots(im)
+            enddo
+            if(lumatf.gt.0) then
+              do im=1,nbrfac
+                lesfac(im)=mlmot1.mots(im)
+              enddo
+            endif
+            mocomp=nomid
+          endif
+
+        ENDIF
+*        write(6,*) ' momatr ',mocomp
+
+C== FORMULATION HHO == Ajout de composantes specifiques ================
+        CALL HHOIDC(imodel,mocomp)
+C== FORMULATION HHO ====================================================
+
+        GOTO 120
+
+C       Composantes CARACTERISTIQUES GEOMETRIQUES
+   7    CONTINUE
+
+        if(icont.eq.0.AND.(ICHGM.EQ.0.OR.(ICHGM.EQ.1.AND.MFR2.EQ.5)))
+     &   then
+* exception impedance
+          CALL IDCARA(IMODEL,MFR2,MOCOMP,NOBL,NFAC)
+          if (nobl.gt.0.or.nfac.gt.0) then
+          else
+            nomid = mocomp
+            segsup nomid
+            mocomp = 0
+          endif
+        endif
+*        write(6,*) ' mocara ',mocomp,nobl,nfac
+        GOTO 120
+
+C       Composante TEMPERATURE
+   8    mocomp=0
+        if(ither.eq.0 .AND. icont.eq.0 .AND. ICHGM.EQ.0 .AND.
+     &     IDIFF.EQ.0 .AND. icntr.eq.0) THEN
+          CALL IDTEMP(MFR2,IFOUR,npint3,MOCOMP,NOBL,NFAC)
+        endif
+*        write(6,*) ' motemp ',mocomp
+        GOTO 120
+
+C       Composantes des contraintes PRINCIPALES
+   9    continue
+c        if (d_mc) then
+        if(imeca.gt.0.or.iliai.gt.0.or.inast.gt.0.or.ipore.gt.0) then
+          CALL IDPRIN(MFR2,IFOUR,MOCOMP,NOBL,NFAC)
+        else if( IMETA .GT. 0 .OR. ITHER .GT. 0) then
+c          NOMID = IMODEL.LNOMID(3)
+          NBRFAC=0
+          NBROBL=0
+          SEGINI NOMID
+          MOCOMP=NOMID
+        else
+        endif
+*        write(6,*) ' moprin ',mocomp
+        GOTO 120
+
+C       Composantes des VARIABLES INTERNES
+  10    CONTINUE
+        if ( imeca.gt.0 .or. iliai.gt.0 .or. inast.gt.0 .or.
+     &       ipore.gt.0 .or. idiff.gt.0 ) then
+            CALL IDVARI(MFR2,IMODEL,MOCOMP,NOBL,NFAC)
+        endif
+        if (luvari.ne.0) then
+          mlmots=luvari
+          segact MLMOTS
+          nomid= mocomp
+          if (nomid.GT.0) then
+            segact nomid*mod
+            ndej=lesobl(/2)
+            if(ndej.eq.1) ndej=0
+            nbrobl=mots(/2)+ndej
+            nbrfac=0
+            ista=ndej+1
+            segadj nomid
+            iau=1
+            do im=ista,nbrobl
+              lesobl(im)=mots(iau)
+              iau=iau+1
+            enddo
+          else
+            nbrobl=mots(/2)
+            nbrfac=0
+            segini nomid
+            do im=1,nbrobl
+              lesobl(im)=mots(im)
+            enddo
+          endif
+          mocomp=nomid
+        endif
+c        write(6,*) ' movari ', mocomp
+c        nomid = mocomp
+c        write(6,*) (lesobl(jj),jj=1,lesobl(/2))
+        GOTO 120
+*
+C       Composantes des GRADIENTS de FLEXION
+  11    continue
+        if (imeca.gt.0) then
+          CALL IDGRAF(MFR2,IFOUR,MOCOMP,NOBL,NFAC)
+          if (nobl.gt.0.or.nfac.gt.0) then
+          else
+            nomid = mocomp
+            segsup nomid
+            mocomp = 0
+          endif
+        endif
+*          write(6,*) ' movari ', mocomp
+        GOTO 120
+
+C       Composantes des DES PHASES en formulation MELANGE
+  12    continue
+c  if(icont.eq.0.AND.ICHGM.EQ.0)
+        if (imela.gt.0) then 
+          CALL IDPHAS(MFR2,IMODEL,MOCOMP,NOBL,NFAC)
+c         write(6,*) 'inomidmophas ', mocomp,nobl,nfac,imela
+        endif
+        GOTO 120
+
+C       Composantes des DEFORMATIONS INELASTIQUES
+  13    continue
+        if(imeca.gt.0.or.iliai.gt.0.or.inast.gt.0.or.ipore.gt.0) then
+          CALL IDDEIN(IMODEL,IFOUR,MOCOMP,NOBL,NFAC)
+        endif
+*          write(6,*) ' modein ', mocomp
+        GOTO 120
+
+C       Composantes des PARAMETRES EXTERNES (LISTMOTS)
+  14    continue
+        IF (LUPAEX.GT.0) THEN
+          mlmots=lupaex
+          segact MLMOTS
+          nbrobl=mots(/2)
+          nbrfac=0
+          segini nomid
+          do im=1,nbrobl
+            lesobl(im)=mots(im)
+          enddo
+          mocomp=nomid
+*         write(6,*)'  mopaex ',nomid
+        ENDIF
+        GOTO 120
+*
+C       15 a 19 : Pour les besoins de 'COMP' (SUBROUTINE comou2)
+C       Composantes VIDE
+  15    continue
+        if (imeca.gt.0.or.iliai.gt.0) then
+          NBROBL=0
+          NBRFAC=0
+          SEGINI NOMID
+          MOCOMP=NOMID
+        else if(inast.gt.0) then
+          NBROBL = 3
+          NBRFAC = 0
+          SEGINI NOMID
+          LESOBL(1) = 'FLX1'
+          LESOBL(2) = 'FLX2'
+          LESOBL(3) = 'FLX3'
+          MOCOMP = NOMID
+        endif
+        GOTO 120
+
+C       Composantes 'SCAL'
+  16    continue
+        if (imeca.gt.0.or.iliai.gt.0.or.ipore.gt.0) then
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          LESOBL(1)='SCAL'
+          MOCOMP=NOMID
+        else if(inast.gt.0) then
+          NBROBL = 3
+          NBRFAC = 0
+          SEGINI NOMID
+          LESOBL(1) = 'LX1'
+          LESOBL(2) = 'LX2'
+          LESOBL(3) = 'LX3'
+          MOCOMP = NOMID
+        endif
+        GOTO 120
+
+C       Composantes 'TEMP'
+  17    continue
+        if (icntr.eq.0) then
+        NBROBL=1
+        NBRFAC=0
+        SEGINI NOMID
+        LESOBL(1)='TEMP'
+        MOCOMP=NOMID
+        endif
+        GOTO 120
+
+C       Composantes 'MAHO'
+  18    continue
+        if(imeca.gt.0.and.imatee.le.3) then
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          LESOBL(1)='MAHO'
+          MOCOMP=NOMID
+        endif
+        GOTO 120
+
+C       Composantes 'MAHT'
+  19    continue
+        if(imeca.gt.0.and.imatee.le.3) then
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          LESOBL(1)='MAHT'
+          MOCOMP=NOMID
+        endif
+        GOTO 120
+
+  120   CONTINUE
+        nomid = mocomp
+        IF (nomid.GT.0) SEGACT,nomid*NOMOD
+        imodel.lnomid(ino) = mocomp
+
+C Fin du DO ino=1,ntyp
+      ENDDO
+
+C Retour en *nomod effectue dans modeli
+C      segact,imodel*nomod
+
+c      RETURN
+      END
+
+ 
+ 
+ 
+ 

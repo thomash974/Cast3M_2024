@@ -1,0 +1,23 @@
+C MONAST    SOURCE    JK148537  23/02/21    21:15:04     11603          
+      SUBROUTINE MONAST(MOMODL,NMOD)
+*----------------------------------------------------------------------
+*     -  CAS DE LA FORMULATION 'NAVIER_STOKES'
+*    DEFINITION DES NOMS DES MATERIAUX
+*----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+*
+      CHARACTER*16 MOMODL(*)
+*
+*     Noms des materiaux
+*
+      NMOD=3
+      MOMODL(1)='NEWTONIEN'
+      MOMODL(2)='BINGHAM'
+      MOMODL(3)='VISCOPLASTIQUE'
+      RETURN
+      END
+
+ 

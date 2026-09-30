@@ -1,0 +1,53 @@
+C DTCHAZ    SOURCE    OF166741  23/07/05    21:15:04     11701          
+
+*-----------------------------------------------------------------------
+*     DESTRUCTION D'UN CHAMP PAR ELEMENT ( MCHAML )
+*-----------------------------------------------------------------------
+      SUBROUTINE DTCHAZ(IRET,ktrace,msorse)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC SMCHAML
+
+      character*(*) msorse
+
+      MCHELM=IRET
+      SEGACT MCHELM
+      DO IA=1,IMACHE(/1)
+        MCHAML=ICHAML(IA)
+        SEGACT MCHAML
+        DO IB=1,IELVAL(/1)
+          MELVAL=IELVAL(IB)
+          if (melval.eq.ktrace) then
+            ktrace=-ktrace
+            msorse='MELVAL'
+          endif
+** Les MELVALs ne sont plus systematiquement dupliques.
+***        SEGSUP MELVAL
+        ENDDO
+        if (mchaml.eq.ktrace) then
+          ktrace=-ktrace
+          msorse='MCHAML'
+        endif
+        n2 = 0
+        SEGadj MCHAML
+***     SEGSUP MCHAML
+      ENDDO
+      if (mchelm.eq.ktrace) then
+        ktrace=-ktrace
+        msorse='MCHELM'
+      endif
+      n1 = 0
+      n3 = 0
+      l1 = 0
+      SEGadj MCHELM
+***   SEGSUP MCHELM
+
+      IRET=0
+
+C      RETURN
+      END
+
+ 

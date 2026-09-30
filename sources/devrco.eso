@@ -1,0 +1,86 @@
+C DEVRCO    SOURCE    BP208322  20/09/18    21:15:42     10718          
+      SUBROUTINE DEVRCO(Q1,Q2,NA1,XPTB,NPLB,XPHILB,NSB,NPLSB,NA2,IDIMB,
+     &                  IBASB,IPLSB,INMSB,IORSB,IND,IAROTA)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE : algorithme de Fu - de Vogelaere               *
+*     ________________________________________________               *
+*                                                                    *
+*     Recombinaison des deplacements aux points de choc.             *
+*                                                                    *
+*     Param}tres:                                                    *
+*                                                                    *
+* e   Q1      Tableau des deplacements generalises.                  *
+* e   NA1     Nombre total d'inconnues en base A.                    *
+* es  XPTB    Tableau des deplacements des points sur base B.        *
+*new:                 et de la vitesse                               *
+* e   NPLB    Nombre total de points intervenant dans les liaisons.  *
+* e   XPHILB  Tableau des vecteurs propres aux points de liaisons.   *
+* e   NSB     Nombre de sous base.                                   *
+* e   NPLSB   Nombre total de points intervenant dans les liaisons   *
+*             dans une sous base.                                    *
+* e   NA2     Nombre total d'inconnues dans une sous base.           *
+* e   IDIMB   Nombre total de ddl retenus.                           *
+* e   IBASB   Indique dans quelle sous base appartient le point de   *
+*             liaison.                                               *
+* e   INMSB   Indique le nombre d'inconnues de la sous base.         *
+* e   IORSB   Donne l'indice du premier mode dans l'ensemble des     *
+*             modes.                                                 *
+* e   IPLSB   Dans une sous base, indique la position du point de    *
+*             liaison.                                               *
+* e   IND     Indice du pas.                                         *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+      INTEGER IBASB(*),INMSB(*),IORSB(*),IPLSB(*),IAROTA(*)
+      REAL*8  XPHILB(NSB,NPLSB,NA2,*),Q1(NA1,*),Q2(NA1,*),XPTB(NPLB,2,*)
+*
+c     boucle sur les points de la liaison
+      DO 10 IP = 1,NPLB
+         ISB  = IBASB(IP)
+         NA3  = INMSB(ISB)
+         INA1 = IORSB(ISB) - 1
+         IPLB = IPLSB(IP)
+         IROT = IAROTA(ISB)
+cbp      sortie de la boucle des calculs de cos et sin
+         IF (IROT.NE.0) THEN
+           XANGLE=Q1(IROT,IND)
+           VITROT=Q2(IROT,IND)
+           XCOS  =COS(XANGLE)
+           XSIN  =SIN(XANGLE)
+           XCOS1 =XCOS - 1.
+         ENDIF
+c        boucle sur les ddls
+         DO 20 ID = 1,IDIMB
+            XRET = 0.D0
+            XRETV= 0.D0
+c           boucle sur les modes
+            DO 30 IN = 1,NA3
+               INN = INA1 + IN
+               XRET = XRET + XPHILB(ISB,IPLB,IN,ID) * Q1(INN,IND)
+               XRETV= XRETV+ XPHILB(ISB,IPLB,IN,ID) * Q2(INN,IND)
+ 30         CONTINUE
+*           Prise en compte des effets de rotation pour les corps rigides
+            IF (IROT.NE.0) THEN
+cbp                XANGLE=Q1(IROT,IND)
+*               Déplacements dus à la rotation
+cbp                XRET =XRET + XPHILB(ISB,IPLB,NA3+1,ID)* (COS(XANGLE)-1)
+cbp                XRET =XRET + XPHILB(ISB,IPLB,NA3+2,ID)* SIN(XANGLE)
+                XRET =XRET + XPHILB(ISB,IPLB,NA3+1,ID)*XCOS1
+                XRET =XRET + XPHILB(ISB,IPLB,NA3+2,ID)*XSIN
+                XRETV=XRETV+VITROT*(XCOS*XPHILB(ISB,IPLB,NA3+2,ID)
+     &                             -XSIN*XPHILB(ISB,IPLB,NA3+1,ID))
+            ENDIF
+            XPTB(IP,1,ID) = XRET
+            XPTB(IP,2,ID) = XRETV
+ 20      CONTINUE
+ 10   CONTINUE
+*
+      END
+
+
+ 
+ 
+ 

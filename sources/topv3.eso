@@ -1,0 +1,474 @@
+C TOPV3     SOURCE    GOUNAND   21/04/06    21:15:34     10940          
+* On préférerait KEXTO à la place de TRAVK mais KEXTO n'est pas autoporteur.
+*ijob      SUBROUTINE TOPV3(TRAVK,KELEM,IJOB,TRAVL,ICBES
+*kelemx      SUBROUTINE TOPV3(TRAVK,KELEM,IAJNO,TRAVL,INCMA,ISTMA,
+      SUBROUTINE TOPV3(TRAVK,KELEMX,IAJNO,TRAVL,INCMA,ISTMA,
+     $     JNASCM,ICBES,IPOPL2,iveri,impr) 
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPV3
+C DESCRIPTION :
+*
+*     Génération des topologies candidates (stockage dans LMCANS indexé
+*     par LIDXCA) Issue de topv2_nettoie_final.eso 
+*      
+C     
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 09/11/2017, version initiale
+C HISTORIQUE : v1, 09/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+*-INC TMATOP2
+-INC CCREEL
+-INC SMELEME
+*      POINTEUR KELEM.MELEME
+      POINTEUR KEXTO.MELEME
+      POINTEUR IBTLOC.MELEME
+      POINTEUR IPBTL2.MELEME
+      POINTEUR KTBES.MELEME
+      POINTEUR KTBES2.MELEME
+      POINTEUR IMCAND.MELEME
+-INC TMATOP1
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+      POINTEUR IPBTL.MELEMX
+      POINTEUR KELEMX.MELEMX
+-INC SMLENTI
+      POINTEUR KNNO.MLENTI
+      POINTEUR LIDXCA.MLENTI
+*      POINTEUR LOKVOL.MLENTI
+*      POINTEUR LNQUAL.MLENTI
+*      POINTEUR LINDI.MLENTI
+*      POINTEUR LINDJ.MLENTI
+-INC SMLREEL
+*      POINTEUR IQUAL.MLREEL
+*      POINTEUR LQUALS.MLREEL
+-INC SMCOORD
+*-INC STRAVJ
+      POINTEUR TRAVK.TRAVJ
+*-INC STRAVL
+*     
+      LOGICAL LOK
+      LOGICAL LTOIBO
+      LOGICAL LTOIBA
+      LOGICAL LLIMCA
+      INTEGER JCAND
+      LOGICAL LCHANG
+      LOGICAL LCHTOP
+* Liste de topologies de maillages candidates
+*      SEGMENT ITCAND(0)
+* Liste de topologies de maillages candidats de plus petit volume non nul
+*      SEGMENT ITVOL(JG)
+* Liste de topologies de maillages candidats de plus petit volume
+* et de meilleure qualité
+*      SEGMENT ILQUAL(JG)
+*      SEGMENT ILIND(JG)
+*      SEGMENT JLIND(JG)
+*     
+* Executable statements
+*     
+*      WRITE(IOIMP,*) 'coucou topv3'
+*      IDIMP1=IDIM+1
+      KEXTO=TRAVK.TOPO
+      KPVIRT=TRAVK.PVIRT
+*
+      LMCANS=TRAVL.MCANS
+      LIDXCA=TRAVL.IDXCA
+*      LOKVOL=TRAVL.OKVOL
+*      LQUALS=TRAVL.QUALS
+*      LNQUAL=TRAVL.NQUAL
+*      LINDI=TRAVL.INDI
+*      LINDJ=TRAVL.INDJ
+      IPBTL=TRAVL.PBTL
+*     Les noeud S et S' de Gruau p.42
+*kelemx      IARET=KELEM.NUM(/1)
+      IARET=KELEMX.NNCOU
+*      
+*      IS=KELEM.NUM(1,1)
+      IS=KELEMX.NUMX(1,1)
+      ISP=0
+      IS3=0
+      IS4=0
+*kelemx      IF (IARET.EQ.2) ISP=KELEM.NUM(2,1)
+*kelemx      IF (IARET.EQ.3) IS3=KELEM.NUM(3,1)
+*kelemx      IF (IARET.EQ.4) IS4=KELEM.NUM(4,1)
+      IF (IARET.EQ.2) ISP=KELEMX.NUMX(2,1)
+      IF (IARET.EQ.3) IS3=KELEMX.NUMX(3,1)
+      IF (IARET.EQ.4) IS4=KELEMX.NUMX(4,1)
+*      
+* Le premier candidat est toujours l'original qui n'est pas forcément un étoilement
+*anc      SEGINI ITCAND
+*      ITCAND(**)=KEXTO
+*      
+      NCCOUO=TRAVL.NCCOU
+      NLCOUO=LMCANS.NLCOU
+      NNC=NCCOUO+1
+*      NNL=NLCOUO+KEXTO.NUM(/2)
+      NNL=NLCOUO+TRAVK.NVCOU
+      CALL TRLADJ(TRAVL,NNC,NNL,lchang,'topv3 : TRAVL')
+      if (ierr.ne.0) return
+      IDX=LIDXCA.LECT(NNC)
+*      DO IEL=1,KEXTO.NUM(/2)
+      DO IEL=1,TRAVK.NVCOU
+         DO INO=1,KEXTO.NUM(/1)
+            LMCANS.NUMX(INO,IDX)=KEXTO.NUM(INO,IEL)
+         ENDDO
+         IDX=IDX+1
+      ENDDO
+      LIDXCA.LECT(NNC+1)=IDX
+      ICBES=1
+      if (iveri.ge.2) then
+         call trlver(travl,'topv3 : Apres initialisation KEXTO')
+         if (ierr.ne.0) return
+      endif
+* Extraction du bord (contour ou enveloppe)
+*      write(ioimp,*) 'Avant extraction bord'
+      IF (IDIM.EQ.2) THEN
+c$$$*         call ecmai1(kexto,0)
+c$$$         CALL ECRCHA('NOID')
+c$$$         CALL ECRCHA('TOUT')
+c$$$         CALL ECROBJ('MAILLAGE',KEXTO)
+c$$$         CALL PRCONT
+c$$$         CALL LIROBJ('MAILLAGE',IBTLOC,1,IRET)
+c$$$         IF (IERR.NE.0) RETURN
+c$$$         SEGACT KEXTO*MOD
+c$$$         SEGACT IBTLOC
+c$$$*     prcont le passe en SEGACT non *MOD ce qui pose ensuite problème à
+c$$$*     baryc4.eso
+c$$$         SEGACT MCOORD*MOD
+*
+         IELDEB=1
+         IELFIN=TRAVK.NVCOU
+         ICPR=0
+         IDCP=0
+         NPLOC=TRAVK.NPCOU
+*         ITYCON=1
+         ITYCON=3
+         INOID=1
+*         CALL CONTOO(KEXTO,IELDEB,IELFIN,ICPR,IDCP,NPLOC,ITYCON,INOID
+*     $        ,IBTLOC) 
+         CALL CONTOU(KEXTO,IELDEB,IELFIN,ICPR,IDCP,NPLOC,ITYCON,INOID
+     $        ,IBTLOC) 
+         IF (IERR.NE.0) RETURN
+         SEGACT IBTLOC
+      ELSEIF (IDIM.EQ.3) THEN
+*
+         IELDEB=1
+         IELFIN=TRAVK.NVCOU
+         ICLE=0
+         INOID=1
+         CALL ENVVO3(KEXTO,IELDEB,IELFIN,ICLE,INOID,IBTLOC)
+         IF (IERR.NE.0) RETURN
+      ELSE
+* 709 2
+*Fonction indisponible en dimension %i1.
+         INTERR(1)=IDIM
+         CALL ERREUR(709)
+      ENDIF
+      IF (IERR.NE.0) RETURN
+      
+      
+*      WRITE(IOIMP,*) 'KEXTO'
+*      CALL ECMAI1(kexto,0)
+      if (impr.ge.4) then
+         write(ioimp,*) 'KPVIRT=',KPVIRT
+         write(ioimp,*) 'Apres extraction bord IBTLOC=',IBTLOC
+         WRITE(IOIMP,*) 'IBTLOC'
+         CALL ECMAI1(ibtloc,0)
+         SEGACT IBTLOC
+      endif
+*
+*     On supprimme la référence au contour car on supprimme le contour
+*     après...
+*     Pas utile ici car on est en numérotation locale pour KEXTO...
+* 
+      NLBTL=IBTLOC.NUM(/2)
+* Il arrive quelquefois que la topologie locale n'ait pas de bord
+      IF (NLBTL.GT.0) THEN
+* Si la topologie locale n'a qu'un seul élément, il n'est pas nécessaire
+* de l'étoiler
+         NLTLOC=TRAVK.NVCOU
+*         
+         LTOIBO=(NLTLOC.GT.1)
+*ijob         LTOIBA=(IJOB.EQ.1.OR.IJOB.EQ.2)
+         LTOIBA=(IAJNO.EQ.1)
+* Si on doit etoiler, on contruit le maillage des points du bord
+* = chan IBTLOC 'POI1'
+* on applique ici une méthode locale en O(n^2) ce qui suppose que IBTLOC
+* n'a pas trop de points...
+         IF (LTOIBO.OR.LTOIBA) THEN
+            KNNO=TRAVK.NNO
+            NBELEM=IBTLOC.NUM(/2)
+*         WRITE(IOIMP,*) 'NBELEM=',NBELEM
+*         IF (NBELEM.GT.100) THEN
+*            WRITE(IOIMP,*) 'KEXTO'
+*            CALL ECMAI1(KEXTO,0)
+*            SEGACT KEXTO
+*            WRITE(IOIMP,*) 'IBTLOC'
+*            CALL ECMAI1(IBTLOC,0)
+*            SEGACT IBTLOC
+*            STOP 16
+*         ENDIF
+            NBNN=IBTLOC.NUM(/1)
+            IK=0
+            DO IBELEM=1,NBELEM
+               DO IBNN=1,NBNN
+                  INO=IBTLOC.NUM(IBNN,IBELEM)
+                  if (ino.eq.0) then
+                     write(ioimp,*) 'Noeud nul détecté !!!!'
+                     WRITE(IOIMP,*) 'KEXTO'
+                     call ecmai1(kexto,0)
+                     WRITE(IOIMP,*) 'IBTLOC'
+                     CALL ECMAI1(ibtloc,0)
+                     goto 9999
+                  endif
+                  IF (KNNO.LECT(INO).EQ.0) THEN
+                     IK=IK+1
+                     KNNO.LECT(INO)=IK
+                  ENDIF
+               ENDDO
+            ENDDO
+            CALL mlxadl(IPBTL,IK,lchang,'topv3 : IPBTL_IK')
+            if (ierr.ne.0) return
+            if (iveri.ge.2) then
+               call vemelx(ipbtl,'topv3 : Apres requisition ipbtl')
+               if (ierr.ne.0) return
+            endif           
+* On regarde également si IS ou ISP font partie du bord
+            IS2=IS
+            ISP2=ISP
+            IS32=IS3
+            IS42=IS4
+            DO IIPO=1,TRAVK.NPCOU
+*     DO IIPO=1,IPO(/1)
+               INLOC=KNNO.LECT(IIPO)
+               IF (INLOC.NE.0) THEN
+                  IPBTL.NUMX(1,INLOC)=IIPO
+                  IF (IS2.EQ.IIPO) IS2=0
+                  IF (ISP2.EQ.IIPO) ISP2=0
+                  IF (IS32.EQ.IIPO) IS32=0
+                  IF (IS42.EQ.IIPO) IS42=0
+*     Nettoyage de KNNO
+                  KNNO.LECT(IIPO)=0
+               ENDIF
+            ENDDO
+* Vérification du nettoyage de KNNO
+            if (iveri.ge.2) then
+               call vetopi(travk,
+     $              'topv3 : Apres creation points du bord')
+               if (ierr.ne.0) return
+            endif            
+            IF (IVERI.GE.2.and..false.) THEN
+* à corriger pour le nouveau ipbtl en melemx
+               IPBTL2=IBTLOC
+               CALL CHANGE(IPBTL2,1)
+               SEGACT IBTLOC
+               CALL OUEXCL(IPBTL,IPBTL2,IPT3)
+               IF (IERR.NE.0) RETURN
+               SEGACT IPBTL
+               SEGACT MCOORD*MOD
+               IF (IPT3.NE.0) THEN
+                  WRITE(IOIMP,*) 'IPT3 pour IPBTL'
+                  CALL ECMAI1(IPT3,0)
+                  IF (IERR.NE.0) RETURN
+                  WRITE(IOIMP,*) 'NEL1=',IPBTL.NLCOU
+                  CALL ECMELX(IPBTL,0)
+                  SEGACT IPBTL2
+                  WRITE(IOIMP,*) 'NEL2=',IPBTL2.NUM(/2)
+                  CALL ECMAI1(IPBTL2,0)
+                  CALL ERREUR(5)
+                  RETURN
+               ENDIF
+            ENDIF
+* On étoile à partir des éléments du bord
+* SEGACT en trop ? On est méfiant...
+*            SEGACT IBTLOC
+            IF (LTOIBO) THEN
+* On étoile à partir de S ou S' s'ils ne font pas partie du bord
+               DO IBIS=1,4
+                  IF (IBIS.EQ.1) THEN
+                     NODE=IS2
+                     MOTERR(1:4)='IS2 '
+                  ELSEIF (IBIS.EQ.2) THEN
+                     NODE=ISP2
+                     MOTERR(1:4)='ISP2'
+                  ELSEIF (IBIS.EQ.3) THEN
+                     NODE=IS32
+                     MOTERR(1:4)='IS32'
+                  ELSEIF (IBIS.EQ.4) THEN
+                     NODE=IS42
+                     MOTERR(1:4)='IS42'
+                  ELSE
+                     write(ioimp,*) 'pb boucle ibis'
+                     goto 9999
+                  ENDIF
+                  IF (NODE.NE.0) THEN
+*
+                     CALL ETOIL2(NODE,IBTLOC,TRAVL)
+                     IF (IERR.NE.0) RETURN
+                     if (iveri.ge.2) then
+                        call trlver(travl
+     $                       ,'topv3 : Apres etoil2, IBIS')
+                        if (ierr.ne.0) return
+                     endif
+                     ncc=travl.nccou
+                     if (lidxca.lect(ncc+1).eq.lidxca.lect(ncc)) goto
+     $                    666
+                  ENDIF
+               ENDDO
+*anc!!!  NPBTL=IPBTL.NUM(/2)
+               NPBTL=IPBTL.NLCOU
+*     WRITE(IOIMP,*) 'NPBTL=',NPBTL
+*               NPBTLM=10000000
+               IF (NPBTL.GT.INCMA) THEN
+                  LLIMCA=.TRUE.
+                  JNASCM=JNASCM+1
+                  IF (ISTMA.EQ.0) THEN
+                     NPBTLR=0
+                     LTOIBA=.FALSE.
+                  ELSEIF (ISTMA.EQ.1) THEN
+                     NPBTLR=1
+                     JNPBTL=(NPBTL+1)/2
+                  ELSEIF (ISTMA.EQ.2) THEN
+* Attention overflow potentiel...                     
+                     NPBTLR=MAX(1,NINT(INCMA*(DBLE(INCMA)/DBLE(NPBTL))))
+                     JNPBTL=(NPBTL+1)/2
+                  ELSE
+                     WRITE(IOIMP,*) 'ISTMA=',ISTMA,' non prevu'
+                     GOTO 9999
+                  ENDIF
+                  if (impr.ge.2) then 
+                     write(ioimp,*) 'topv3 : reduction nb cand de '
+     $                    ,NPBTL,' a ',NPBTLR
+                  endif
+               ELSE
+                  LLIMCA=.FALSE.
+                  NPBTLR=NPBTL
+               ENDIF
+               
+               DO INPBTL=1,NPBTLR
+                  IF (.NOT.LLIMCA) THEN
+                     NODE=IPBTL.NUMX(1,INPBTL)
+                  ELSE
+                     IF (ISTMA.EQ.1) THEN
+                        NODE=IPBTL.NUMX(1,JNPBTL)
+                     ELSEIF (ISTMA.EQ.2) THEN
+                        IF (NPBTLR.NE.1) JNPBTL=1+NINT((NPBTLR-1)
+     $                       *(DBLE(INPBTL-1)/DBLE(NPBTLR-1))) 
+                        NODE=IPBTL.NUMX(1,JNPBTL)
+                     ELSE
+                        WRITE(IOIMP,*) 'ISTMA=',ISTMA,' non prevu 2'
+                        GOTO 9999
+                     ENDIF
+                  ENDIF
+                     
+*            WRITE(IOIMP,*) 'INPBTL=',INPBTL,' NODE=',NODE
+                  MOTERR(1:4)='NBOR'
+*
+*                  write(ioimp,*) 'lmcans avant'
+*                  call ecmelx(lmcans,0)
+                  CALL ETOIL2(NODE,IBTLOC,TRAVL)
+                  IF (IERR.NE.0) RETURN
+*                  write(ioimp,*) 'lmcans apres'
+*                  call ecmelx(lmcans,0)
+                  if (iveri.ge.2) then
+                     call trlver(travl
+     $                    ,'topv3 : Apres etoil2, INPBTL')
+                     if (ierr.ne.0) return
+                  endif
+                  ncc=travl.nccou
+                  if (lidxca.lect(ncc+1).eq.lidxca.lect(ncc)) goto
+     $                 666
+               ENDDO
+            ENDIF
+            IF (LTOIBA) THEN 
+* Cas 1 : on étoile avec l'isobarycentre du contour
+               IF (IARET.EQ.1) THEN
+                  CALL BARYC5(IPBTL,KPVIRT,TRAVK,NODE)
+                  MOTERR(1:4)='BARC'
+* Cas 2 : on étoile avec l'isobarycentre de S et S'
+               ELSEIF (IARET.EQ.2) THEN
+*kelemx                  CALL BARYC4(KELEM,0,TRAVK,NODE)
+                  CALL BARYC5(KELEMX,0,TRAVK,NODE)
+                  MOTERR(1:4)='BARS'
+* Cas 3 ajout 2017/08/22                  
+               ELSEIF (IARET.EQ.3) THEN
+*kelemx                  CALL BARYC4(KELEM,0,TRAVK,NODE)
+                  CALL BARYC5(KELEMX,0,TRAVK,NODE)
+                  MOTERR(1:4)='BAR3'
+* Cas 4 ajout 2017/08/22                  
+               ELSEIF (IARET.EQ.4) THEN
+*kelemx                  CALL BARYC4(KELEM,0,TRAVK,NODE)
+                  CALL BARYC5(KELEMX,0,TRAVK,NODE)
+                  MOTERR(1:4)='BAR4'
+               ELSE
+                  Write(ioimp,*) 'iaret=',iaret
+                  call erreur(5)
+                  return
+               ENDIF
+               IF (IERR.NE.0) RETURN
+*
+               CALL ETOIL2(NODE,IBTLOC,TRAVL)
+               IF (IERR.NE.0) RETURN
+               if (iveri.ge.2) then
+                  call trlver(travl
+     $                 ,'topv3 : Apres etoil2, BARYC')
+                  if (ierr.ne.0) return
+               endif
+               ipopl2=travl.nccou
+               ncc=travl.nccou
+               if (lidxca.lect(ncc+1).eq.lidxca.lect(ncc)) goto
+     $              666
+            ENDIF
+*     SEGSUP IPBTL
+* Ne le faire que si iveri=1 ?
+            if (iveri.ge.1) then
+               DO IZER=1,IPBTL.NLCOU
+                  IPBTL.NUMX(1,IZER)=0
+               ENDDO
+            endif
+            CALL mlxadl(IPBTL,0,lchang,'topv3 : IPBTL_0')
+            if (ierr.ne.0) return
+            if (iveri.ge.2) then
+               call vemelx(ipbtl,'topv3 : Apres nettoyage ipbtl')
+               if (ierr.ne.0) return
+            endif           
+         ENDIF
+      ENDIF
+      SEGSUP IBTLOC
+      RETURN
+*     
+*     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPV3   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+ 666  CONTINUE
+      WRITE(IOIMP,*) 'topv3 : Pb candidat ',MOTERR(1:4)
+*a upgrader      CALL ECMAI1(IMCAND,0)
+      WRITE(IOIMP,*) 'KEXTO'
+      CALL ECMAI1(KEXTO,0)
+      WRITE(IOIMP,*) 'IBTLOC'
+      CALL ECMAI1(IBTLOC,0)
+      WRITE(IOIMP,*) 'IPBTL'
+      CALL ECMELX(IPBTL,0)
+      WRITE(IOIMP,*) 'NODE=',NODE
+      CALL ERREUR(5)
+      RETURN
+*     
+* End of subroutine TOPV3
+*     
+      END
+
+ 

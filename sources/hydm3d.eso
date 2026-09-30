@@ -1,0 +1,226 @@
+C HYDM3D    SOURCE    FD218221  24/02/07    21:15:13     11834          
+      subroutine hydm3d(hyd0,hydr,hyds,young00,young,nu00,nu,rt00,
+     #rt,rteff,reft00,reft,rc00,rc,rceff,delta00,delta,beta00,beta,
+     #gft00,gft,ept00,ept,epsm00,epsm,xnsat00,xnsat,biotw00,biotw,iso,
+     #lambda,Mub,Kb,rtg00,rtg,raideur66,souplesse66,xmt,dtiso,cwrt,err1,
+     #teta,href,tetar,tkvg,gfr00,gfr,rts00,rts,rtw00,rtw,hplt00,hplt,
+     #hplg00,hplg,hpls00,hpls,epc00,epc,xmc,dciso,dpict,dpicc,taum_ja,
+     #youn_ja,nu_ja,ss_ja,ssfl,taum00,taum,skdw00,skdw,dlja,tauk_ja,
+     #tauk00,tauk0,psi_ja,psi00,psi0,rcja,rtja)
+
+c     actualisation des parametres materiaux en fonction du degre
+c     d hydratation et du degre de saturation
+
+c     janvier 2016 : cwrt ne s applique que sur Rt macro (pas rtg)
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     declaration variables externes      
+      real*8 hyd0,hydr,hyds,young00,young,nu00,nu,rcinit00,rcinit,
+     #rt00,rt,reft00,reft,rc00,rc,delta00,delta,beta00,beta,
+     #pglim00,epsm00,epsm,xnsat00,xnsat,biotw00,biotw,dlja,
+     #gft00,gft,xmt,cwrt,teta,tetar,tkvg,href,taum00,taum,
+     #gfr00,gfr,rtg00,rtg,rts00,rts,rtw00,rtw,skdw00,skdw,
+     #epc00,epc,xmc,rceff,rteff,dpict,dpicc,taum_ja,youn_ja,nu_ja,
+     #ss_ja,tauk_ja,tauk00,tauk0,psi_ja,psi00,psi0,rcja,rtja
+      logical dciso
+      real*8 hplt00,hplt,hplg00,hplg,hpls00,hpls
+c     rt prenant en compte le degre de saturation
+      real*8 rt0,gft0    
+      logical iso,dtiso
+      real*8 lambda,Mub,Kb
+      real*8 raideur66(6,6),souplesse66(6,6)
+      integer err1
+c     petit coeff pour le variable non fournies au jeune age
+      real*8 c0
+      parameter (c0=1.0d-4)      
+      
+c     declarations variables locales      
+      real*8 usepsm,usepsm00,umb00,umb,z5mnu00,z5mnu
+
+c     rt et gft sont donnee pour le milieu sature
+      rt0=rt00
+      gft0=gft00      
+c     l actualisation n a lieu que si l hydratation evolue 
+c     ou bien est differente de 1  
+c     coeff d amplification pour passer de rt a rteff en milieu sature
+      xrteff=max((ept00/(rt0/young00)),1.d0)
+      xrceff=max((epc00/(rc00/young00)),1.d0)
+c     print*,'xrteff',xrteff 
+
+c     initialisation de la variable d erreur
+      err1=0
+      
+c     prise en compte de l evolution chimique      
+      if(hydr.ne.href) then
+c        young  
+         if(youn_ja.le.0.) then
+c             print*,'Young jeune age=0 ds hydm3d !'
+c             err1=1
+c             return
+              youn_ja=young00*c0
+         end if             
+         call hyxm3d(youn_ja,young00,young,hydr,hyds,href,0.66d0,err1)
+c        modules d ecrouissage traction directe
+         call hyxm3d(c0*hplt00,hplt00,hplt,hydr,hyds,href,0.66d0,err1)
+c        modules d ecrouissage traction gel        
+         call hyxm3d(c0*hplg00,hplg00,hplg,hydr,hyds,href,0.66d0,err1)
+c        modules d ecrouissage traction sel         
+         call hyxm3d(c0*hpls00,hpls00,hpls,hydr,hyds,href,0.66d0,err1)         
+c        poisson de la matrice  
+         call hyxm3d(nu_ja,nu00,nu,hydr,hyds,href,0.66d0,err1)         
+c        resistance a la traction         
+         call hyxm3d(rtja,rt0,rt,hydr,hyds,href,0.66d0,err1)
+c        resistance a la refermeture de fissure        
+         call hyxm3d(rtja,reft00,reft,hydr,hyds,href,0.66d0,err1)
+c        pour fissuration hydrique
+         call hyxm3d(rtja,rtw00,rtw,hydr,hyds,href,0.66d0,err1)  
+c        fissuration sel
+         call hyxm3d(rtja,rts00,rts,hydr,hyds,href,0.66d0,err1)
+c        contrainte seuil deviatorique pour l ecoulement de Maxwell
+         call hyxm3d(ss_ja,0.d0,ssfl,hydr,hyds,href,0.66d0,err1)         
+c        compression         
+         call hyxm3d(rcja,rc00,rc,hydr,hyds,href,1.00d0,err1)             
+c        coeff drucker prager         
+         call hyxm3d(dlja,delta00,delta,hydr,hyds,href,1.d0,err1)
+c        delta=delta00
+c        dilatance (si pas de dilatance a faible hydratation alors 
+c        pas d endo de compression)         
+c        call hyxm3d(beta00,beta,hydr,hyds,href,1.d0,err1) 
+         beta=beta00
+c        potentiel de fluage de maxwell : non actif car c est le taux 
+c        de chargement qui accelere le fluage au jeune age         
+         epsm=epsm00
+c        pris en compte de l hydratation sur biot en non sature
+         call hyxm3d(1.0d0,biotw00,biotw,hydr,hyds,href,0.50d0,err1)      
+c        module de biot pour le non sature
+         call hyxm3d(0.d0,xnsat00,xnsat,hydr,hyds,href,5.0d0,err1) 
+c        energie de fissuration pour la traction
+         call hyxm3d(c0*gft0,gft0,gft,hydr,hyds,href,0.50d0,err1) 
+c        energie de fissuration pour la refermeture
+         call hyxm3d(c0*gfr00,gfr00,gfr,hydr,hyds,href,0.50d0,err1)
+c        temps caracteristique de Maxwell
+         call hyxm3d(taum_ja,taum00,taum,hydr,hyds,href,0.66d0,err1) 
+c        contrainte d endo hydrique      
+c         call hyxm3d(c0*skdw00,skdw00,skdw,hydr,hyds,href,1.00d0,err1)
+         skdw=skdw00
+c        temps de kelvin tauk_ja,tauk00,tauk0,psi_ja,psi00,psi0
+         call hyxm3d(tauk_ja,tauk00,tauk0,hydr,hyds,href,0.66d0,err1)
+c        fraction elastique de Kalvin        
+         call hyxm3d(psi_ja,psi00,psi0,hydr,hyds,href,0.66d0,err1)
+      else
+         err1=0
+         young=young00
+         nu=nu00
+         rt=rt0
+         reft=reft00
+         rts=rts00
+         rtw=rtw00
+         rc=rc00
+         delta=delta00
+         beta=beta00
+         epsm=epsm00
+         biotw=biotw00
+         xnsat=xnsat00
+         gft=gft0
+         gfr=gfr00
+         hplt=hplt00
+         hplg=hplg00
+         hpls=hpls00
+         taum=taum00
+         ssfl=0.d0 
+         skdw=skdw00  
+         tauk0=tauk00
+         psi0=psi00         
+      end if
+c     consistance du critere / ecoulement
+      if(ssfl.gt.0.) then
+          if(rt.lt.ssfl) then
+             print*,'reajustement de rt dans hydm3d'
+             rt=(1.d0+c0)*ssfl
+          end if 
+c         consistance du critere / ecoulement
+          if(rc.lt.ssfl) then
+             print*,'reajustement de rc dans hydm3d'
+             rc=(1.d0+c0)*ssfl
+          end if
+       end if          
+         
+c     deformation au pic de traction
+c     on conserve le rapport imposee pour le materiau hydrate
+      ept=xrteff*(cwrt*rt/young)
+      epc=xrceff*(rc/young)
+c     on verifie qu il soit plus grand que la def elastique         
+      ept=max(ept,cwrt*rt/young)
+
+      
+c     actualisation resistance effective a la pression des rgi 
+c     resistance a la traction utilisee pour la propagation des fissures de gel
+c     ne considere pas l effet d echelle de Weibull
+      rtg=rt*xrteff  
+c     print*,'rtg',rtg  
+      
+c     actualisation parametres endo diffus de traction (ept prend en compte Weibull)
+      rteff=young*ept
+      dpict=1.d0-cwrt*rt/rteff    
+c     print*,'gft,rt',gft,rt
+      if(dpict.gt.1.d-4) then
+c       endommagement pre pic de traction non negligeable
+        dtiso=.true.      
+        xmt=-1.d0/log(1.d0-dpict)
+      else
+        xmt=1.d0
+        dtiso=.false.
+      end if
+c      print*,'dpict',dpict,'mt',xmt,'rteff',rteff
+c      read* 
+
+c     actualisation parametres endo diffus de compression
+      rceff=young*epc
+      dpicc=1.d0-rc/rceff
+c      print*,'rc',rc
+      if(dpicc.gt.1.d-4) then
+c       endommagement pre pic de compression non negligeable
+        dciso=.true.      
+        xmc=-1.d0/log(1.d0-dpicc)
+      else
+        xmc=1.d0
+        dciso=.false.
+      end if 
+
+c     actualisation des matrices d elasticite
+      call hoo03d(iso,young,nu,kb,mub,err1,raideur66,souplesse66)
+
+      return
+      
+      print*,'dans hydm3d'
+      print*,1,hyd0,hydr,hyds
+      print*,2,young00,young,nu00,nu
+      print*,3,rt00,rt,rteff
+      print*,3,2,reft00,reft
+      print*,4,rc00,rc,rceff
+      print*,5,delta00,delta,beta00,beta
+      print*,6,gft00,gft
+      print*,7,ept00,ept,epsm00,epsm
+      print*,8,xnsat00,xnsat,biotw00,biotw
+      print*,9,iso,lambda,Mub,Kb
+      print*,10,rtg00,rtg
+      call afic66(raideur66)
+      call afic66(souplesse66)
+      print*,11,xmt,dtiso,cwrt
+      print*,12,teta,href,tetar,tkvg
+      print*,13,gfr00,gfr
+      print*,14,rts00,rts,rtw00,rtw
+      print*,15,hplt00,hplt,hplg00,hplg,hpls00,hpls
+      print*,16,epc00,epc,xmc,dciso
+      print*,17,dpict,dpicc,taum_ja,youn_ja,nu_ja,ss_ja
+      print*,18,tauk_ja,tauk00,tauk0,psi_ja,psi00,psi0
+      print*,19,err1
+      read*
+      
+      return
+      end      
+ 
+ 
+ 

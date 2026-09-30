@@ -1,0 +1,97 @@
+C POSCHA    SOURCE    PV        20/03/07    07:39:05     10546          
+      SUBROUTINE POSCHA(NAM,IPOSCH)
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC CCASSIS
+* ithash tableau des segments de hash
+* ihash segments des positions dans ipchar des chaines du hash associe
+* lthash nombre de termes utiles dans ihash
+      parameter (nbhash=64)
+      INTEGER ITHASH(nbhash),LTHASH(nbhash),hmod
+      SEGMENT  IHASH(NH)
+      DATA ITHASH/nbhash*0/
+      DATA LTHASH/nbhash*0/
+      external long
+      CHARACTER*(*)NAM
+*  initialisation des segment de hash au premier appel
+*  comme ca a lieu avant l'initialisation du menage, les segments sont automatiquement proteges.
+      if (ithash(1).eq.0) then
+      do hmod=1,nbhash
+       nh=16
+       segini ihash
+       ithash(hmod)=ihash
+       lthash(hmod)=0
+       segdes ihash
+      enddo
+      endif
+      segact ipiloc
+      IL=LONG(NAM)
+      IO=IPCHAR(/1)
+      IA=0
+      DO 56 I=1,IL
+      IA = IA + ICHAR(NAM(I:I))
+   56 CONTINUE
+*      write(6,fmt='(''nam io lmncha ia'',a8,3i6)')nam,io,LMNCHA,ia
+      hmod=mod(ia,nbhash)+1
+      ihash=ithash(hmod)
+      segact ihash
+      LH=lthash(hmod)
+      do 1 ih=1,lh
+      ii=ihash(ih)
+      IF( IPHCOD(II).NE.IA) GO TO 1
+      ID=IPCHAR(II)
+      IFI=IPCHAR(II+1)
+      IF(IFI-ID.NE.IL) GO TO 1
+      IF(NAM.NE.ICHARA(ID:IFI-1)) GO TO 1
+      GO TO 2
+   1  CONTINUE
+  10  CONTINUE
+      segdes ihash
+      segact ipiloc*mod
+      LMNCHA=LMNCHA+1
+      M1=IPCHAR(LMNCHA)
+      M=M1+IL
+*      write(6,*) ' lmncha ' , lmncha , ' ipchar(/1))' , ipchar(/1)
+      IF(LMNCHA+1.GT.IPCHAR(/1) .or. M.GT.ICHARA(/1)) THEN
+         lmxx=xiflot(/1)
+         lmll=iplogi(/1)
+         lmmm=ichara(/1)
+         if(M.gt.ichara(/1)) lmmm= m+1000
+         lmcc= ipchar(/1)
+         if(LMNCHA+1.GT.lmcc) LMcc=LMNCHA+200
+*         write(6,*) ' lmxx,lmcc,lmmm,lmll',lmxx,lmcc,lmmm,lmll
+         SEGADJ IPILOC
+*      write(6,*) ' lmncha ' , lmncha,' m ',m
+       endif
+      IPCHAR(LMNCHA+1)=M
+      ICHARA(M1:M1+IL-1)=NAM
+      IPHCOD(LMNCHA)=IA
+      II=LMNCHA
+      if(nbesc.ne.0) segdes ipiloc
+*  remplir le tableau de hash
+      segact ihash*mod
+      lthash(hmod)=lthash(hmod)+1
+      if (lthash(hmod).gt.ihash(/1)) then
+        nh=lthash(hmod)+16
+        segadj ihash
+      endif
+      ihash(lthash(hmod))=ii
+   2  CONTINUE
+      IPOSCH=II
+      segdes ihash
+*      write(6,fmt='('' sortie poscha '',i8)') iposch
+      RETURN
+      END
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

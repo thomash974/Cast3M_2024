@@ -1,0 +1,25 @@
+C MODCLI    SOURCE    PV090527  23/05/09    21:15:05     11666          
+             SUBROUTINE MODCLI(MOMODL,NMOD)
+*----------------------------------------------------------------------
+*     -  CAS DE LA FORMULATION 'CONTRAINTE'
+*            DEFINITION Du comportement global
+*----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+*
+      CHARACTER*16 MOMODL(*)
+*
+*     Noms des modeles
+*
+      NMOD=3
+      MOMODL(1)='ROTATION'
+      MOMODL(2)='DEPLACEMENT'
+      MOMODL(3)='RELATION'
+      RETURN
+      END
+
+
+
+ 

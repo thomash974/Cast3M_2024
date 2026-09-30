@@ -1,0 +1,98 @@
+C FTNC3D    SOURCE    PV090527  23/01/27    21:15:35     11574          
+       subroutine ftnc3d(NBRINC,NINC,NDIMG,SIGMA,FRAC,GCH,
+     # bwPw,bgPg,FTH,AFFICHE,ERR1)
+      
+c     calcul des forces thermodynamiques
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+c     dimension de la base des variables generalisees      
+      integer NDIMG,ERR1
+c     nbr max inclusion, nbr reel inclusion      
+      integer NBRINC,NINC
+c     contrainte en base generalisees
+      real*8 sigma(NDIMG),ea(NDIMG),dea(NDIMG)
+c     fractions volumiques des phases      
+      real*8 FRAC(0:NBRINC)
+c     indicateur de diffusion produits chimiques dans fissure
+      real*8 GCH(0:NBRINC)        
+c     direction des ecoulements      
+      real*8 FTH(NDIMG)
+c     donnes poro-mechaniques (eau, gel, dechrage)      
+      real*8 bwPw(0:NBRINC),bgPg(0:NBRINC)     
+      
+      logical affiche,affiche_local
+      
+c     config affichage local      
+      affiche_local=affiche  
+c      affiche_local=.true.
+      
+      if(NDIMG.ne.12) then
+        print*,'PB NDIMG ne 3*NBRINC+3=12 dans ftnc3d'
+        err1=1
+        return
+      end if
+      
+      if (affiche_local) then
+        print*,'dans FthR1inc3d'
+        write(*,'(12(A4,i2,A2,e10.3,/))')
+     #  ('sig(',i,')=',sigma(i),i=1,12)                
+      end if 
+      
+      if (affiche_local) then
+        write(*,'(2(A4,i2,A2,e10.3,/))')
+     #  ('bwpw',i-1,'=',bwpw(i-1),i=1,2)                
+      end if  
+      if (affiche_local) then
+        write(*,'(2(A4,i2,A2,e10.3,/))')
+     #  ('bgpg',i-1,'=',bgpg(i-1),i=1,2)                
+      end if      
+c     initialisation
+      if(ninc.ne.1) then
+        print*,'Pb dans ftnc3d'
+        err1=1
+        return
+      end if
+      do i=1,NDIMG
+        FTH(i)=0.d0
+      end do
+      f=FRAC(1)
+
+      t7 = 0.1D1 - f
+      t8 = f * t7
+      t9 = sigma(10) - bwPw(0) - bgPg(0)
+      t10 = t9 * t8
+      t12 = sigma(11) - bwPw(0) - bgPg(0)
+      t13 = t12 * t8
+      t15 = sigma(12) - bwPw(0) - bgPg(0)
+      t16 = t15 * t8
+      t20 = (0.1D1 - 0.3D1 / 0.2D1 * f) * t7
+      Fth(1) = f * (sigma(1) - bwPw(1) - bgPg(1))
+      Fth(2) = f * (sigma(2) - bwPw(1) - bgPg(1))
+      Fth(3) = f * (sigma(3) - bwPw(1) - bgPg(1))
+      Fth(4) = t10 / 0.2D1
+      Fth(5) = t13 / 0.2D1
+      Fth(6) = t16 / 0.2D1
+      Fth(7) = t10
+      Fth(8) = t13
+      Fth(9) = t16
+      Fth(10) = t9 * t20
+      Fth(11) = t12 * t20
+      Fth(12) = t15 * t20
+
+
+
+
+      if (affiche_local) then
+        print*,'dans ftnc3d'
+        write(*,'(12(A4,i2,A2,e10.3,/))')
+     #  ('FTH(',i,')=',FTH(i),i=1,12)                
+      end if
+      
+      return
+      end
+      
+
+      
+ 

@@ -1,0 +1,13 @@
+C AMXVAL    SOURCE    PV090527  23/01/27    21:15:06     11574          
+      subroutine amxval(f,nl,fmax)   
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+          dimension f(nl)
+          fmax=f(1)
+      do i=2,nl
+          if(f(i).GT.fmax) fmax=f(i)          
+          enddo
+      return
+      end
+      
+ 

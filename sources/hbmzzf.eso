@@ -1,0 +1,86 @@
+C HBMZZF    SOURCE    BP208322  20/09/18    21:17:00     10718          
+
+       SUBROUTINE HBMZZF(NT,NDDL,OMEG,AiDi,Di,LAMBD,VCTCS,ZZ)
+       
+*=======================================================================   
+*      Rajoute a Z la raideur dynamique Zf de couplage fluide-elastique 
+*      de granger-paidoussis
+*=======================================================================  
+
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+       INTEGER NHBM,NT,NDDL,H
+       REAL*8 ZZ(NT,NT),VCTCS(7),LAMBD(NDDL),AiDi(2),Di(2),bi(2)
+       REAL*8 OMEG,V,cf0,mf0,sf0,cfei,dniR,dniI
+       
+*-----------------------------------------------------------------------
+* 0. Recuperation des coefficients
+*-----------------------------------------------------------------------
+       V = VCTCS(4)       
+*     Coefficient de couplage: mf0 = -(rho_f/2)*(dCLdy)*V^2              
+       mf0  = -VCTCS(1)*VCTCS(7)*(V**2)
+*     Coefficient d'amortissement: cf0 = (rho_f/2)*(DIAM)*(CD)*V  
+       cf0  = VCTCS(1)*VCTCS(5)*VCTCS(6)*V    
+*     Coefficient de raideur: sf0 = mf0*alpha_0
+       sf0  = mf0*VCTCS(3)
+       DO I = 1,2
+        bi(I) = (Di(I)/VCTCS(5))*V
+       ENDDO
+       NHBM = (NT/NDDL - 1)/2
+       
+*-----------------------------------------------------------------------
+* 1. Termes de raideur/amortissement ajoutes     
+*-----------------------------------------------------------------------
+*  1.1 Composante statique (harmonique 0)
+       DO I=1,NDDL
+         ZZ(I,I) = ZZ(I,I) + sf0*LAMBD(I)
+       ENDDO
+*  1.2 Boucle sur les harmoniques > 0
+       DO J=2,2*NHBM,2
+         DO I=1,NDDL         
+            AA = sf0*LAMBD(I)
+            BB = (J/2)*OMEG*cf0*LAMBD(I)     
+            ZZ(NDDL*(1+(J-2))+I,NDDL*(1+(J-2))+I) =
+     &                       ZZ(NDDL*(1+(J-2))+I,NDDL*(1+(J-2))+I)+AA        
+            ZZ(NDDL*(1+(J-2))+I,NDDL*(1+(J-1))+I) =
+     &                       ZZ(NDDL*(1+(J-2))+I,NDDL*(1+(J-1))+I)+BB 
+            ZZ(NDDL*(1+(J-1))+I, NDDL*(1+(J-2))+I) = 
+     &                       ZZ(NDDL*(1+(J-1))+I,NDDL*(1+(J-2))+I)-BB        
+            ZZ(NDDL*(1+(J-1))+I,NDDL*(1+(J-1))+I) = 
+     &                       ZZ(NDDL*(1+(J-1))+I,NDDL*(1+(J-1))+I)+AA         
+         ENDDO              
+       ENDDO
+       
+*-----------------------------------------------------------------------
+* 2. Effet memoire 
+*-----------------------------------------------------------------------
+* Boucle sur le nombre de termes
+* Les matrices sont de la forme: Zfi = Dfi*(bi*kron(I,Li)-w*kron(Nb,Li))
+* Elles ne sont pas stockees mais directement ajoutees a ZZ
+       DO JJ = 1,2         
+          cfei = mf0*AiDi(JJ)*V/VCTCS(5)
+* 2.1 Composante statique          
+          DO I=1,NDDL
+            ZZ(I,I) = ZZ(I,I) + cfei*LAMBD(I)/bi(JJ)
+          ENDDO
+* 2.2 Boucle sur les harmoniques
+         DO H = 2,2*NHBM,2
+            dniR = cfei*bi(JJ)/((bi(JJ))**2+((H/2)*OMEG)**2)
+            dniI = cfei*OMEG*(H/2)/((bi(JJ))**2+((H/2)*OMEG)**2)
+*           Boucle sur les DDL
+          DO K = 1,NDDL
+           ZZ(NDDL*(1+(H-2))+K,NDDL*(1+(H-2))+K) = LAMBD(K)*dniR
+     &                          + ZZ(NDDL*(1+(H-2))+K,NDDL*(1+(H-2))+K) 
+           ZZ(NDDL*(1+(H-2))+K,NDDL*(1+(H-1))+K)=-LAMBD(K)*dniI
+     &                          + ZZ(NDDL*(1+(H-2))+K,NDDL*(1+(H-1))+K)
+           ZZ(NDDL*(1+(H-1))+K,NDDL*(1+(H-2))+K)= LAMBD(K)*dniI
+     &                          + ZZ(NDDL*(1+(H-1))+K,NDDL*(1+(H-2))+K)                     
+           ZZ(NDDL*(1+(H-1))+K,NDDL*(1+(H-1))+K) = LAMBD(K)*dniR
+     &                          + ZZ(NDDL*(1+(H-1))+K,NDDL*(1+(H-1))+K)                     
+          ENDDO
+         ENDDO
+       ENDDO             
+       
+       END
+ 
+ 

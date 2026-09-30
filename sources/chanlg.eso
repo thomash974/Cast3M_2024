@@ -1,0 +1,332 @@
+C CHANLG    SOURCE    FANDEUR   21/04/26    21:15:07     10979          
+C   CE SOUS PROGRAMME FABRIQUE L'ENSEMBLE DES ARETES D'UN MAILLAGE
+C   IL FONCTIONNE SUIVANT UN PRINCIPE DERIVE DES TRACES
+C
+      SUBROUTINE CHANLG
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMELEME
+-INC SMCOORD
+      SEGMENT ICPR(nbpts)
+      SEGMENT IDCP(ITE)
+      SEGMENT NTSEG(0)
+      SEGMENT KON(NBCON,NMAX,3)
+
+      ICPR = 0
+      ICDP = 0
+      KON = 0
+
+      CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      SEGINI ICPR
+      ITE=0
+      NELTOT=0
+      idegre=0
+
+      SEGACT MELEME
+      IPT8 = MELEME
+c on peut faire un ACTOBJ !
+      NBSOU8 = meleme.LISOUS(/1)
+      IPT1=MELEME
+      DO 3 I=1,MAX(1,NBSOU8)
+         IF (NBSOU8.NE.0) THEN
+            IPT1 = meleme.LISOUS(I)
+            SEGACT IPT1
+         ENDIF
+         NBNOE1=IPT1.NUM(/1)
+         NBELT1=IPT1.NUM(/2)
+         NELTOT=NELTOT+NBELT1
+         K=IPT1.ITYPEL
+         idegre=KDEGRE(K)
+         IDEP=NSPOS(K)
+         if (idep.eq.0) goto 8
+         IF (NBSOM(K).GT.0) THEN
+            IFEP=IDEP+NBSOM(K)-1
+         ELSE
+C            Cas du polygone
+            IFEP=IDEP+NBNOE1-1
+         ENDIF
+         DO 4 JJ=IDEP,IFEP
+            J=IBSOM(JJ)
+            DO 41 K=1,NBELT1
+               IPOIT=IPT1.NUM(J,K)
+               IF (ICPR(IPOIT).NE.0) GOTO 41
+               ITE=ITE+1
+               ICPR(IPOIT)=ITE
+ 41         CONTINUE
+ 4       CONTINUE
+ 8       CONTINUE
+         IF (NBSOU8.NE.0) SEGDES IPT1
+ 3    CONTINUE
+      SEGDES MELEME
+*
+      IF (ITE.NE.0) GOTO 6
+      SEGSUP,ICPR
+* sg 2016/11/29 gestion maillage vide
+      IF (NELTOT.EQ.0) THEN
+* Par défaut SEG2, sinon en fonction du dernier KDEGRE lu.
+         ity=2
+         IF (idegre.ge.1.and.idegre.le.3) ity=idegre
+         CALL melvid(ity,meleme)
+         CALL ECROBJ('MAILLAGE',MELEME)
+      ELSE
+*  16 2
+*Type d'élément incorrect
+         CALL ERREUR(16)
+      ENDIF
+      RETURN
+ 6    CONTINUE
+
+C   ITE EST LE NOMBRE DE POINTS A CONSIDERER  ICPR LE TABLEAU
+C   ON VA MAINTENANT INITIALISER ET REMPLIR LE TABLEAU DES CONNECTIONS
+      NBCON=7
+      NBCONR=NBCON-1
+      NMAX= 10*ITE
+      SEGINI KON
+C   FABRICATION DU TABLEAU DES CONNECTIONS
+C    1  POINT FINAL
+C    2  POINT INTERMEDIAIRE EVENTUEL ET SENS
+      ICHAIN=ITE
+      SEGACT MELEME
+      IOO=0
+      IA=0
+      IPT1=MELEME
+      DO 30 IO=1,MAX(1,NBSOU8)
+         IF (NBSOU8.NE.0) IPT1=LISOUS(IO)
+         SEGACT IPT1
+         K=IPT1.ITYPEL
+         If ((K.eq.22).or.(K.eq.48)) then
+            segdes ipt1
+            goto 30
+         endif
+         NBNN=KDEGRE(K)
+c k=32 et nbnn=2
+         IF (IA.EQ.0)  IA=NBNN
+         IF (NBNN.NE.IA) THEN
+*           PRINT *,'*MAILLAGE IMPOSSIBLE'
+*           PRINT *,'*EXISTENCE D''ELEMENTS DONNANT'
+*           PRINT *,'*DES SEG2 ET DES SEG3'
+            CALL ERREUR(26)
+            GOTO 64
+         ENDIF
+         IPAS=NBNN-1
+         KKK=LTEL(1,K)
+c IPAS = 1 & KKK = 1
+* Cas des segments
+         IF (KKK.EQ.0) THEN
+            DO 122 I=1,IPT1.NUM(/2)
+               NMIL=1
+               N1=ICPR(IPT1.NUM(1,I))
+               JSUIV=1+IPAS
+               N2=ICPR(IPT1.NUM(JSUIV,I))
+               IF (N1*N2.EQ.0) THEN
+                 CALL ERREUR(26)
+                 GOTO 64
+               ENDIF
+               IF (IPAS.EQ.2) NMIL=IPT1.NUM(1+1,I)
+               NI=N1
+               NJ=N2
+               KSCOL=IPT1.ICOLOR(I)
+*                           PRINT *,'*KSCOL',KSCOL
+               IPO=0
+ 123           CONTINUE
+               DO 125 IK=1,NBCONR
+                  IF (KON(IK,NI,1).EQ.0) GOTO 126
+                  IF (KON(IK,NI,1).EQ.NJ) GOTO 129
+ 125           CONTINUE
+               IF (KON(NBCON,NI,1).EQ.0) GOTO 128
+               NI=KON(NBCON,NI,1)
+               GOTO 123
+ 126           CONTINUE
+               KON(IK,NI,1)=NJ
+               KON(IK,NI,2)=NMIL
+               KON(IK,NI,3)=KSCOL
+               GOTO 129
+ 128           ICHAIN=ICHAIN+1
+               IF (ICHAIN.GE.NMAX) THEN
+                 CALL ERREUR(26)
+                 GOTO 64
+               ENDIF
+               KON(NBCON,NI,1)=ICHAIN
+               IK=1
+               NI=ICHAIN
+               GOTO 126
+ 129           CONTINUE
+               IF (IPO.EQ.1) GOTO 122
+               NMIL=-NMIL
+               NI=N2
+               NJ=N1
+               IPO=1
+               GOTO 123
+ 122        CONTINUE
+         ELSE
+            IOO=1
+            KK=LTEL(2,K)-1
+c KKK = 1 && KK = 49
+            DO 300 III=1,KKK
+C ****BOUCLE PERMETTANT D'ALLER RECHERCHER TOUTES LES FACES
+               KK=KK+1
+               ITYP=LDEL(1,KK)
+               IDEP=LDEL(2,KK)
+               IF (K.EQ.32) ITYP = 0
+               IF (ITYP.GT.0) THEN
+                  IFEP=IDEP+KDFAC(1,ITYP)-1
+*     SG 20160711 pour les faces TRI7 et QUA9, on ignore le dernier
+*     point (centre de la face)
+                  IF (ITYP.EQ.7.OR.ITYP.EQ.8) IFEP=IFEP-1
+               ELSE
+C                    Cas du polygone
+                  IFEP= IDEP+IPT1.NUM(/1)-1
+               ENDIF
+               DO 22 I=1,IPT1.NUM(/2)
+                  KSCOL=IPT1.ICOLOR(I)
+                  DO 221 J=IDEP,IFEP,IPAS
+                     NMIL=1
+                     N1=ICPR(IPT1.NUM(LFAC(J),I))
+                     JSUIV=J+IPAS
+                     IF (JSUIV.GT.IFEP) JSUIV=IDEP
+                     N2=ICPR(IPT1.NUM(LFAC(JSUIV),I))
+                     IF (IPAS.EQ.2) NMIL=IPT1.NUM(LFAC(J+1),I)
+                     NI=N1
+                     NJ=N2
+                     IF (N1*N2.EQ.0) THEN
+                       CALL ERREUR(26)
+                       GOTO 64
+                     ENDIF
+                     IPO=0
+ 23                  CONTINUE
+                     DO 25 IK=1,NBCONR
+                        IF (KON(IK,NI,1).EQ.0) GOTO 26
+                        IF (KON(IK,NI,1).EQ.NJ) GOTO 29
+ 25                  CONTINUE
+                     IF (KON(NBCON,NI,1).EQ.0) GOTO 28
+                     NI=KON(NBCON,NI,1)
+                     GOTO 23
+ 26                  KON(IK,NI,1)=NJ
+                     KON(IK,NI,2)=NMIL
+                     KON(IK,NI,3)=KSCOL
+                     GOTO 29
+ 28                  ICHAIN=ICHAIN+1
+                     IF (ICHAIN.GE.NMAX) THEN
+                       CALL ERREUR(26)
+                       GOTO 64
+                     ENDIF
+                     KON(NBCON,NI,1)=ICHAIN
+                     IK=1
+                     NI=ICHAIN
+                     GOTO 26
+ 29                  IF (IPO.EQ.1) GOTO 221
+                     NMIL=-NMIL
+                     NI=N2
+                     NJ=N1
+                     IPO=1
+                     GOTO 23
+ 221              CONTINUE
+ 22            CONTINUE
+ 300        CONTINUE
+         ENDIF
+         IF (NBSOU8.NE.0) SEGDES IPT1
+ 30   CONTINUE
+
+      IF (IIMPI.EQ.2)WRITE (IOIMP,1122) (((KON(I,J,K),K=1
+     $     ,2),I=1,NBCON),J=1,NMAX)
+ 1122 FORMAT(1X,14I5)
+
+      SEGDES MELEME
+
+      SEGINI IDCP
+
+      DO 40 I=1,ICPR(/1)
+         IF (ICPR(I).EQ.0) GOTO 40
+         IDCP(ICPR(I))=I
+ 40   CONTINUE
+
+************************************************************************
+*  CREATION DE L'OBJET MAILLAGE
+      NBSOUS=0
+      NBREF=0
+      NBELEM=0
+
+C ****ON COMPTE LE NOMBRE D'ELEMENTS POUR ACTIVER LE SEGMENT
+
+      DO 170 J=1,ITE
+         JJ=J
+
+ 179     CONTINUE
+         DO 180 I=1,NBCONR
+            M=KON(I,JJ,1)
+            IF(M.LT.J) GOTO 180
+            NBELEM=NBELEM+1
+ 180     CONTINUE
+
+         IF (KON(NBCON,JJ,1) .EQ. 0) GOTO 170
+         JJ=KON(NBCON,JJ,1)
+         GOTO 179
+ 170  CONTINUE
+
+** TEST VERIFIANT SI AU DEPART ON A DEJA DES POINTS,SEG2 OU SEG3
+      IF (IOO.EQ.0) THEN
+*        LE MAILLAGE EXISTE DEJA
+*        PRINT *,'*LE MAILLAGE EXISTE DEJA'
+         CALL ECROBJ('MAILLAGE',IPT1)
+         GOTO 64
+      ENDIF
+
+      IF (NBELEM.EQ.0) THEN
+        CALL ERREUR(26)
+        GOTO 64
+      ENDIF
+
+C****ETABLISSEMENT DU MAILLAGE
+C****CONSTRUCTION DU TABLEAU NUM
+      SEGINI,MELEME
+      ITYPEL=NBNN
+      IEL=0
+      DO 100 J=1,ITE
+         JJ=J
+ 109     CONTINUE
+         DO 110 I=1,NBCONR
+            M=KON(I,JJ,1)
+            IF (M.LT.J) GOTO 110
+            IEL=IEL+1
+            NUM(1,IEL)=IDCP(J)
+            NUM(NBNN,IEL)=IDCP(M)
+            ICOLOR(IEL)=KON(I,JJ,3)
+            IF (NBNN.EQ.3) NUM(2,IEL)=ABS(KON(I,JJ,2))
+ 110     CONTINUE
+
+         IF (KON(NBCON,JJ,1).EQ.0) GOTO 100
+         JJ=KON(NBCON,JJ,1)
+         GOTO 109
+ 100  CONTINUE
+
+      SEGDES MELEME
+      CALL ECROBJ('MAILLAGE',MELEME)
+
+*  ON INSCRIT LE MAILLAGE  DANS LE MAILLAGE INITIAL
+*      SEGACT,IPT8*MOD
+*      IF (IPT8.LISREF(/1).EQ.0) THEN
+*          NBREF=1
+*          NBNN=IPT8.NUM(/1)
+*          NBELEM=IPT8.NUM(/2)
+*          NBSOUS=IPT8.LISOUS(/1)
+*          SEGADJ IPT8
+*          IPT8.LISREF(1)=MELEME
+*      ENDIF
+*      SEGDES IPT8
+
+ 64   CONTINUE
+      IF (KON.GT.0)  SEGSUP,KON
+      IF (IDCP.GT.0) SEGSUP,IDCP
+      IF (ICPR.GT.0) SEGSUP,ICPR
+c      CALL ACTOBJ pour meleme=ipt8
+      SEGDES,IPT8
+
+      RETURN
+      END
+
+ 

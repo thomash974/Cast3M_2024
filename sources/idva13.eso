@@ -1,0 +1,49 @@
+C IDVA13    SOURCE    CB215821  20/11/04    21:18:12     10766          
+         SUBROUTINE IDVA13(MFR,IPMODL,IPNOMC,NBROBL,NBRFAC,MATEPL)
+c variables internes IMPEDANCE
+      IMPLICIT INTEGER(I-N)
+      LOGICAL limped
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+-INC SMMODEL
+       POINTEUR nomid1.nomid
+
+       IMODEL = IPMODL
+
+       IF (MATEPL.EQ.10) THEN
+         nbrobl = 1
+         nbrfac = 0
+         segini nomid
+         
+         lesobl(1) = 'EPSE'
+
+C plastique cinematique
+         IF (inatuu.eq.3) THEN
+          jj = nbrfac
+          nbrfac = nbrfac + 2
+          segadj nomid
+          lesfac(jj + 1) = 'DMAX'
+          lesfac(jj + 2) = 'DANE'
+         ENDIF
+
+       ELSE IF(MATEPL.EQ.11) THEN
+C        Recuperation du NOMID des composantes primales
+         NOMID1=IMODEL.LNOMID(1)
+         nbrobl=NOMID1.LESOBL(/2)
+         nbrfac=NOMID1.LESFAC(/2)
+         segini,NOMID
+         do io = 1,nbrobl
+           LESOBL(io)='V'//NOMID1.LESOBL(io)(1:3)
+         enddo
+         do io = 1,nbrfac
+           LESFAC(io)='V'//NOMID1.LESFAC(io)(1:3)
+         enddo
+         
+       ENDIF
+
+       IPNOMC=NOMID
+
+       END
+ 

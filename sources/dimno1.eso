@@ -1,0 +1,103 @@
+C DIMNO1    SOURCE    MB234859  21/11/17    21:15:06     11190          
+      SUBROUTINE DIMNO1 (IPRIGI,NOYAU)
+************************************************************************
+*
+*                             D I M N O 1
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     DIMENSION DU NOYAU D'UN OBJET 'RIGIDITE'.
+*
+* MODE D'APPEL:
+* -------------
+*
+*     CALL DIMNO1 (IPRIGI,NOYAU)
+*
+* PARAMETRES:  (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPRIGI  ENTIER    (E)  POINTEUR D'UNE 'RIGIDITE'.
+*     NOYAU   ENTIER    (S)  DIMENSION DU NOYAU DE LA 'RIGIDITE'.
+*
+* REMARQUES:
+* ----------
+*
+*     LA VALEUR "NOYAU" RETOURNEE PEUT ETRE SUPERIEURE A LA REALITE:
+*     VOIR LA DEFINITION DE "NENS", CALCULE DANS LE SOUS-PROGRAMME
+*     TRAITANT DE LA DECOMPOSITION EN "L.D.LT".
+*     (LA DETECTION D'UN PIVOT NUL -- AU LIEU DE PIVOT MAXIMUM NUL --
+*     EST ABUSIVEMENT ASSIMILEE A UNE SINGULARITE DE MATRICE)
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL MANIGOT     10 SEPTEMBRE 1985
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE + FORTRAN77
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMATRI
+-INC SMRIGID
+-INC CCREEL
+C
+CC    INTEGER INSYM
+CC    INSYM = 0
+      MRIGID = IPRIGI
+      SEGACT,MRIGID
+C
+      IF (JRCOND.NE.0) THEN
+        MRIGID=JRCOND
+        SEGACT,MRIGID
+      ENDIF  
+C
+CC    NRG = IRIGEL(/1)
+CC    NBR = IRIGEL(/2)
+CC    IPMATR = ICHOLE
+CC    IF(NORINC.GT.0  .AND. NORIND.GT.0) THEN
+CC       INSYM = 1
+CC    ENDIF
+CC    IF (NRG.GE.7) THEN
+CC       DO  9 IN = 1,NBR
+CC          IANTI=IRIGEL(7,IN)
+CC          IF(IANTI.GT.0) THEN
+CC             INSYM = 1
+CC          ENDIF
+CC9      CONTINUE
+CC    ENDIF
+CC    SEGDES,MRIGID
+C
+CC    IF (IPMATR .EQ. 0) THEN
+CC      IF (INSYM .EQ. 0) THEN
+CC       CALL TRIANG (IPRIGI,xspeti,0)
+CC      ELSE
+CC       CALL ldmt1(IPRIGI,xspeti)
+CC      ENDIF
+CC       IF (IERR .NE. 0) RETURN
+CC       MRIGID = IPRIGI
+CC       SEGACT,MRIGID
+CC       IPMATR = ICHOLE
+CC       SEGDES,MRIGID
+CC    END IF
+C
+      MMATRI = ICHOLE
+      IF (MMATRI.EQ.0) THEN
+        CALL ERREUR(990)
+      ELSE  
+        SEGACT,MMATRI
+        NOYAU = NENS
+        SEGDES,MMATRI
+      ENDIF
+      SEGDES,MRIGID
+C
+      END
+ 

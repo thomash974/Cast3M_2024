@@ -1,0 +1,572 @@
+C D2VLFA    SOURCE    BP208322  20/09/18    21:15:17     10718          
+c
+      SUBROUTINE D2VLFA(Q1,Q2,FTOTA,NA1,IPALA,IPLIA,XPALA,XVALA,
+     &                  NLIAA,PDT,T,NPAS,IND,FINERT,IVINIT,FTEST,
+     &                  KTOTXA,KTOTVA,GETJAC)
+     
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+*--------------------------------------------------------------------*
+*     Operateur DYN* : Calcul des forces de choc base A              *
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+* e   Q1(.,.) Vecteur des deplacements generalises.                  *
+* e   Q2(.,.) Vecteur des vitesses generalisees.                     *
+* es  FTOTA   Forces exterieures totalisees sur la base A.           *
+* es  KTOTXA  Matrice tangente,X des efforts non-lineaires (base A)  *
+* es  KTOTVA  Matrice tangente,V des efforts non-lineaires (base A)  *
+* e   NA1     Nombre total d'inconnues en base A.                    *
+* e   IPALA   Renseigne sur le type de la liaison.                   *
+* e   IPLIA   Tableau contenant les numeros "DYNE" de la liaison.    *
+* e   XPALA   Tableau contenant les parametres de la liaison.        *
+* es  XVALA   Tableau contenant les variables internes des liaisons  *
+* e   NLIAA   Nombre de liaisons sur la base A.                      *
+* e   PDT     pas de temps                                           *
+* e   T       temps                                                  *
+* e   NPAS    Numero du pas de temps                                 *
+* e   IND     Indice du demi-pas de temps                            *
+*             = 2 si 1er demi-pas  = 1 si 2eme demi-pas              *
+* es  FINERT  Forces d'inertie                                       *
+* e   IVINIT  =1 si vitesses initiales, =0 sinon                     *
+* e   GETJAC  .TRUE. si on doit calculer la jacobienne KTOTXA,KTOTVA *
+*                                                                    *
+*   remarque:                                                        *
+*   =========                                                        *
+*   Si jeu negatif (cas particulier de la base A ou il n'y a pas de  *
+*      normale), on renverse les variables avec XNORM.               *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+      INTEGER IPALA(NLIAA,*),IPLIA(NLIAA,*)
+      REAL*8  XPALA(NLIAA,*),Q1(NA1,*),Q2(NA1,*),FTOTA(NA1,*)
+      REAL*8  XVALA(NLIAA,4,*),FINERT(NA1,*)
+      PARAMETER (XZERO = 0.D0, XONE=1.D0)
+      REAL*8  FTest(nA1,4)
+cbp, supprime le 2020-08-07          REAL*8  FTOTA0(NA1,4)
+      REAL*8  KTOTXA(NA1,*),KTOTVA(NA1,*) 
+      LOGICAL GETJAC
+*
+      XFIN = 0.D0
+      PDTS2 = PDT
+      
+*--------------------------------------------------------------------*
+*     BOUCLE SUR LES LIAISONS
+*--------------------------------------------------------------------*
+
+      DO 10 I = 1,NLIAA
+      
+         ITYP = IPALA(I,1)
+         icond= IPALA(I,2)
+         iannul= 0
+
+         IF (ICOND .NE. 1 ) GOTO 199
+*        CAS DES LIAISONS CONDITIONNELLES : 
+*>>>>>>> BOUCLE SUR LES LIAISONS "TESTS"     <<<<<<<<<<<<<<<<<<<<<<<<<<
+         DO 101 j = 4,20
+
+           jliai = ipala(i,j)
+           jpliai = abs ( jliai)
+           if (jliai.EQ.0) goto 101
+
+           jtyp = ipala(jpliai,1)
+           do 102 jk = 1,4
+           do 103 ik = 1,nA1
+                   ftest(ik,jk) = 0d0
+cbp, supprime le 2020-08-07    ftota0 (ik,jk) = ftota(ik,jk)
+ 103       continue
+ 102       continue
+ 
+*      >>> CALCUL DES FORCES DES LIAISONS TEST <<<
+*
+* ------ choc elementaire POINT_PLAN sans amortissement
+*
+         IF (JTYP.EQ.1) THEN
+            XRAID = XPALA(jpliai,1)
+            XJEU  = XPALA(jpliai,2)
+            ETA = 0.D0
+            XNORM = XONE
+            IF (XJEU.LT.0D0) THEN
+                XNORM = -XONE
+                XJEU = -XJEU
+            ENDIF
+            INA1 = IPLIA(jpliai,1)
+            XDEP = XNORM*Q1(INA1,IND)
+            CALL DYCHEL(XDEP,XRAID,XJEU,ETA,XFL,DFDX,iannul)
+            XVALA(jpliai,IND,1) = XNORM*XFL
+            XVALA(jpliai,IND,4) = XNORM*XDEP
+            FTest(INA1,IND) =Ftest(INA1,IND) + XNORM*XFL
+*
+* ------ choc elementaire POINT_PLAN avec amortissement
+*
+         ELSE IF (JTYP.EQ.2) THEN
+            XRAID = XPALA(jpliai,1)
+            XJEU = XPALA(jpliai,2)
+            XAMO = XPALA(jpliai,3)
+            ETA = 0.D0
+            XNORM = XONE
+            IPERM = 0
+            IF (XJEU.LT.XZERO) THEN
+                XNORM = -XONE
+                XJEU = -XJEU
+            ENDIF
+            INA1 = IPLIA(jpliai,1)
+            XDEP = XNORM * Q1(INA1,IND)
+cbp,2020-09            IF (((NPAS.EQ.1).AND.(IND.EQ.3))) THEN
+               XVIT = XNORM * Q2(INA1,IND)
+cbp,2020-09            ELSE
+cbp,2020-09               IND2 = IND + 1
+cbp,2020-09               XDEPM1 =  XNORM * Q1(INA1,IND2)
+cbp,2020-09               XVIT = (XDEP - XDEPM1) / PDTS2
+cbp,2020-09            ENDIF
+            XVALA(jpliai,IND,3) = XNORM*XVIT
+            CALL DYCHAM(XDEP,XVIT,XRAID,XJEU,XAMO,ETA,
+     &                  XFL,DFDX,DFDV,IPERM,iannul)
+*           bp,2020 : pertinence des 2 lignes ci-dessous (cf. dycham) ? 
+*           -> a verifier + tard ...
+c             IF(ETA.EQ.0.)THEN
+c             IF (XDEP.GT.0.D0 .AND. XFL.GT.0.D0) XFL = 0.D0
+c             IF (XDEP.LT.0.D0 .AND. XFL.LT.0.D0) XFL = 0.D0
+c             ENDIF
+            XVALA(jpliai,IND,1) = XNORM*XFL
+            XVALA(jpliai,IND,4) = XNORM*XDEP
+            FTest(INA1,IND) =Ftest(INA1,IND) + XNORM*XFL
+*
+* ------ choc elementaire POINT_PLAN_FLUIDE
+*
+         ELSE IF (JTYP.EQ.3) THEN
+            XINER = XPALA(jpliai,1)
+            XCONV = XPALA(jpliai,2)
+            XVISC = XPALA(jpliai,3)
+            XPCEL = XPALA(jpliai,4)
+            XPCRA = XPALA(jpliai,5)
+            XJEU = XPALA(jpliai,6)
+            INA1 = IPLIA(jpliai,1)
+            XDEP = Q1(INA1,IND)
+cbp,2020-09            IF ((NPAS.EQ.1).AND.(IND.EQ.3)) THEN
+               XVIT = Q2(INA1,IND)
+cbp,2020-09            ELSE
+cbp,2020-09               IND2 = IND + 1
+cbp,2020-09               XDEPM1 = Q1(INA1,IND2)
+cbp,2020-09               XVIT = (XDEP - XDEPM1) / PDTS2
+cbp,2020-09            ENDIF
+            IF (XJEU.GT.0D0) THEN
+               XDH= XJEU - XDEP
+               XNORM = XONE
+            ELSE
+               XDH= XDEP - XJEU
+               XNORM = -XONE
+            ENDIF
+*   Calcul de la masse ajoutee
+            XXIN = -XINER / XDH
+            FINERT(INA1,IND) = FINERT(INA1,IND) + XXIN
+*   Calcul de la force de convection
+            CALL DYFCON(XDH,XDEP,XVIT,XJEU,XCONV,XFCO,iannul)
+*   Calcul de la force de viscosite
+            CALL DYFVIS(XDH,XDEP,XVIT,XJEU,XVISC,XFVI,iannul)
+*   Calcul de la force de perte de charge
+            CALL DYFPDC(XDH,XDEP,XVIT,XJEU,XPCEL,XPCRA,XFPE,iannul)
+            XFL = (XFCO* XNORM )  + XFVI + XFPE
+            XVALA(jpliai,IND,1) = XDEP
+            XVALA(jpliai,IND,2) = XVIT
+            XVALA(jpliai,IND,3) = XXIN
+            XVALA(jpliai,IND,4) = XFCO*XNORM
+            XVALA(jpliai,IND,5) = XFVI
+            XVALA(jpliai,IND,6) = XFPE
+            FTest(INA1,IND) =Ftest(iNA1,IND) + XFL
+*
+* ------ force elementaire de COUPLAGE EN VITESSE
+*
+         ELSE IF (JTYP.EQ.4) THEN
+            INA1 = IPLIA(jpliai,1)
+            INA2 = IPLIA(jpliai,2)
+            XDEP = Q1(INA2,IND)
+cbp,2020-09            IF ((NPAS.EQ.1).AND.(IND.EQ.3)) THEN
+               XVIT = Q2(INA2,IND)
+cbp,2020-09            ELSE
+cbp,2020-09               IND2 = IND + 1
+cbp,2020-09               XDEPM1 = Q1(INA2,IND2)
+cbp,2020-09               XVIT = (XDEP - XDEPM1) / PDTS2
+cbp,2020-09            ENDIF
+            XCPLGE = XPALA(jpliai,1)
+            CALL DYCPLV(XVIT,XCPLGE,XFL,iannul)
+            XVALA(jpliai,IND,3) = XVIT
+            XVALA(jpliai,IND,1) = XFL
+            XVALA(jpliai,IND,4) = XDEP
+            FTest(INA1,IND) =Ftest(INA1,IND) + XFL
+*
+* ------ force elementaire de COUPLAGE EN DEPLACEMENT
+*
+         ELSE IF (JTYP.EQ.5) THEN
+            INA1 = IPLIA(jpliai,1)
+            INA2 = IPLIA(jpliai,2)
+            XDEP = Q1(INA2,IND)
+            XCPLGE = XPALA(jpliai,1)
+            jfonct = ipala(jpliai,3)
+            
+cbp       - calcul eventuel d'un produit de convolution :
+c           XDEP=\int_0^T h(\tau)*Qj(t-\tau) d\tau
+            if(jfonct.eq.100) then
+               IP1=IPALA(jpliai,4)
+c              t_{n+1} ou t_{n}
+c                if (IND.eq.1.or.IND.eq.3) then 
+c              t_{n+1} ou t_{0} pour diff centreee ?
+c                if (IND.eq.1.or.IND.eq.2) then 
+                 IP2=IPALA(jpliai,5)
+c c              t_{n+1/2} ou t_{n-1/2} (seulement pour devogelaere)
+c                else
+c                  IP2=IPALA(jpliai,6)
+c                endif
+               CALL DYCPL1(IP1,IP2,XDEP,NPAS,PDT,XCONV)
+               XFL=XCPLGE*XCONV
+               
+cbp       - calcul d'un produit de convolution GRANGER_PAIDOUSSIS
+            elseif(jfonct.eq.101) then
+               IP1=IPALA(jpliai,4)
+               IP2=IPALA(jpliai,5)
+               IP3=IPALA(jpliai,6)
+               VSD=XPALA(jpliai,2)
+               XA0=XPALA(jpliai,3)
+               CALL DYCPL2(IP1,IP2,IP3,VSD,XA0,XDEP,NPAS,PDT,XCONV)
+               XFL=XCPLGE*XCONV               
+
+cbp       - calcul du produit par une fonction trigo cos(q)
+c           rem : on pourrait aussi prevoir cos(coef2*q) avec coef2=XPALA(jpliai,2)
+            elseif(jfonct.eq.1) then
+                XFL = XCPLGE * COS(XDEP)
+            elseif(jfonct.eq.2) then
+                XFL = XCPLGE * SIN(XDEP)  
+                
+cbp       - calcul du produit par une fonction temporelle cos(wt)*q
+            elseif(jfonct.ge.11.and.jfonct.le.12) then
+                XFREQ  = XPALA(jpliai,2)
+                XTIME = DBLE(NPAS-1)*PDT
+                if(IND.EQ.2) XTIME=XTIME-PDTS2
+                if(jfonct.eq.1) XFONCT = COS(XFREQ*XTIME)
+                if(jfonct.eq.2) XFONCT = SIN(XFREQ*XTIME)
+                XFL = XCPLGE * XDEP * XFONCT
+                
+c         - simple raideur (ou raideur en puissance)
+            else
+                  Xexpo = XPALA(jpliai,2)
+                  if(Xexpo.eq.XONE) then
+                    XFL = XCPLGE * XDEP
+                  elseif(Xexpo.eq.3.D0) then
+                    XFL = XCPLGE * (XDEP**3)
+                    IF(GETJAC) DFDX = Xexpo*XCPLGE*(XDEP**2) 
+                  else
+                    XFL = XCPLGE * (XDEP**Xexpo)
+                  endif
+            endif
+cbp, ici    prise en compte de la possibilite de liaison conditionnelle 
+            IF(iannul.ne.0) XFL=0.D0           
+            XVALA(jpliai,IND,1) = XFL
+            XVALA(jpliai,IND,4) = XDEP
+            FTest(INA1,IND) =Ftest(INA1,IND) + XFL
+*
+* ------ force elementaire de type POLYNOMIALE
+*
+         ELSE IF (JTYP.EQ.6) THEN
+*           nombre de modes "origine"
+            NMOD = IPALA(I,2)
+            CALL D2POL1(Q1,Q2,NA1,IPLIA,XPALA,XVALA,NLIAA,IND,PDT,
+     &                  NPAS,jpliai,NMOD,FTest,IVINIT,iannul)
+*
+* ------ choc elementaire ...
+*
+*        ELSE IF (JTYP.EQ.  ) THEN
+*              .......
+*              .......
+*
+         ENDIF
+         
+         
+*       >>> TEST SUR j POUR VOIR SI ELLE ANNULE LA LIAISON I <<<
+           xff = 0d0
+           do 104 ik = 1,na1
+              do 105 jk = 1,4
+                   xff = xff + ( ftest(ik,jk) ** 2)
+ 105          continue
+ 104       continue
+           xff = xff ** .5
+           if (   ((xff .le. 1e-20 ) .and. ( jliai .gt. 0) )
+     &       .OR. ((xff .gt. 1e-20 ) .and. ( jliai .lt. 0) )  )
+     &        then
+              iannul = 1
+           endif
+           
+           
+ 101     CONTINUE
+*>>>>>>> FIN DE BOUCLE SUR LES LIAISONS "TESTS"     <<<<<<<<<<<<<<<<<<<<
+
+ 199     CONTINUE
+*>>>>>>> CALCUL DES FORCES DE LIAISONS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+* ------ choc elementaire POINT_PLAN sans amortissement
+*
+         IF (ITYP.EQ.1) THEN
+            XRAID = XPALA(I,1)
+            XJEU = XPALA(I,2)
+            ETA = 0.D0
+            XNORM = XONE
+            IF (XJEU.LT.0D0) THEN
+                XNORM = -XONE
+                XJEU = -XJEU
+            ENDIF
+            INA1 = IPLIA(I,1)
+            XDEP = XNORM*Q1(INA1,IND)
+            CALL DYCHEL(XDEP,XRAID,XJEU,ETA,XFL,DFDX,iannul)
+            XVALA(I,IND,1) = XNORM*XFL
+            XVALA(I,IND,4) = XNORM*XDEP
+            FTOTA(INA1,IND) = FTOTA(INA1,IND) + XNORM*XFL
+            IF (GETJAC) THEN
+              KTOTXA(INA1,INA1)  = KTOTXA(INA1,INA1) + DFDX
+            ENDIF
+            
+*
+* ------ choc elementaire POINT_PLAN avec amortissement
+*
+         ELSE IF (ITYP.EQ.2) THEN
+            XRAID = XPALA(I,1)
+            XJEU = XPALA(I,2)
+            XAMO = XPALA(I,3)
+            ETA = 0.D0
+            XNORM = XONE
+            IPERM = 0
+            IF (XJEU.LT.XZERO) THEN
+                XNORM = -XONE
+                XJEU = -XJEU
+            ENDIF
+            INA1 = IPLIA(I,1)
+            XDEP = XNORM * Q1(INA1,IND)
+cbp,2020-09            IF (((NPAS.EQ.1).AND.(IND.EQ.3))) THEN
+               XVIT = XNORM * Q2(INA1,IND)
+cbp,2020-09            ELSE
+cbp,2020-09               IND2 = IND + 1
+cbp,2020-09               XDEPM1 =  XNORM * Q1(INA1,IND2)
+cbp,2020-09               XVIT = (XDEP - XDEPM1) / PDTS2
+cbp,2020-09            ENDIF
+            XVALA(I,IND,3) = XNORM*XVIT
+            CALL DYCHAM(XDEP,XVIT,XRAID,XJEU,XAMO,ETA,
+     &                  XFL,DFDX,DFDV,IPERM,iannul)
+*           bp,2020 : pertinence des 2 lignes ci-dessous (cf. dycham) ? 
+*           -> on commente... a verifier + tard
+*            IF (XDEP.GT.0.D0 .AND. XFL.GT.0.D0) XFL = 0.D0
+*            IF (XDEP.LT.0.D0 .AND. XFL.LT.0.D0) XFL = 0.D0
+            XVALA(I,IND,1) = XNORM*XFL
+            XVALA(I,IND,4) = XNORM*XDEP
+            FTOTA(INA1,IND) = FTOTA(INA1,IND) + XNORM*XFL
+            IF (GETJAC) THEN
+              KTOTXA(INA1,INA1)  = KTOTXA(INA1,INA1) + DFDX
+              KTOTVA(INA1,INA1)  = KTOTVA(INA1,INA1) + DFDV
+            ENDIF
+*
+* ------ choc elementaire POINT_PLAN_FLUIDE
+*
+         ELSE IF (ITYP.EQ.3) THEN
+            XINER = XPALA(I,1)
+            XCONV = XPALA(I,2)
+            XVISC = XPALA(I,3)
+            XPCEL = XPALA(I,4)
+            XPCRA = XPALA(I,5)
+            XJEU = XPALA(I,6)
+            INA1 = IPLIA(I,1)
+            XDEP = Q1(INA1,IND)
+*
+cbp,2020-09            IF ((NPAS.EQ.1).AND.(IND.EQ.3)) THEN
+               XVIT = Q2(INA1,IND)
+cbp,2020-09            ELSE
+cbp,2020-09               IND2 = IND + 1
+cbp,2020-09               XDEPM1 = Q1(INA1,IND2)
+cbp,2020-09               XVIT = (XDEP - XDEPM1) / PDTS2
+cbp,2020-09            ENDIF
+            IF (XJEU.GT.0D0) THEN
+               XDH= XJEU - XDEP
+               XNORM = XONE
+            ELSE
+               XDH= XDEP - XJEU
+               XNORM = -XONE
+            ENDIF
+*   Calcul de la masse ajoutee
+            XXIN = -XINER / XDH
+            FINERT(INA1,IND) = FINERT(INA1,IND) + XXIN
+*   Calcul de la force de convection
+            CALL DYFCON(XDH,XDEP,XVIT,XJEU,XCONV,XFCO,iannul)
+*   Calcul de la force de viscosite
+            CALL DYFVIS(XDH,XDEP,XVIT,XJEU,XVISC,XFVI,iannul)
+*   Calcul de la force de perte de charge
+            CALL DYFPDC(XDH,XDEP,XVIT,XJEU,XPCEL,XPCRA,XFPE,iannul)
+            XFL = (XFCO* XNORM )  + XFVI + XFPE
+            XVALA(I,IND,1) = XDEP
+            XVALA(I,IND,2) = XVIT
+            XVALA(I,IND,3) = XXIN
+            XVALA(I,IND,4) = XFCO*XNORM
+            XVALA(I,IND,5) = XFVI
+            XVALA(I,IND,6) = XFPE
+            FTOTA(INA1,IND) = FTOTA(INA1,IND) + XFL
+* TODO :
+*           IF (GETJAC) THEN
+*             KTOTXA(INA1,INA1)=KTOTXA(INA1,INA1)+DFDXc*XNORM+DFDXv+DFDXp
+*             KTOTVA(INA1,INA1)=KTOTVA(INA1,INA1)+DFDVc*XNORM+DFDVv+DFDVp
+*           ENDIF
+*            
+*
+* ------ force elementaire de COUPLAGE EN VITESSE
+*
+         ELSE IF (ITYP.EQ.4) THEN
+            INA1 = IPLIA(I,1)
+            INA2 = IPLIA(I,2)
+            XDEP = Q1(INA2,IND)
+cbp,2020-09            IF ((NPAS.EQ.1).AND.(IND.EQ.3)) THEN
+               XVIT = Q2(INA2,IND)
+cbp,2020-09            ELSE
+cbp,2020-09               IND2 = IND + 1
+cbp,2020-09               XDEPM1 = Q1(INA2,IND2)
+cbp,2020-09               XVIT = (XDEP - XDEPM1) / PDTS2
+cbp,2020-09            ENDIF
+            XCPLGE = XPALA(I,1)
+            CALL DYCPLV(XVIT,XCPLGE,XFL,iannul)
+c             WRITE(*,*) 't=',(NPAS*PDT),'dx/dt=',XVIT,'F2=',XFL
+            XVALA(I,IND,3) = XVIT
+            XVALA(I,IND,1) = XFL
+            XVALA(I,IND,4) = XDEP
+            FTOTA(INA1,IND) = FTOTA(INA1,IND) + XFL
+            IF (GETJAC) THEN
+            IF(IANNUL.EQ.0) KTOTVA(INA1,INA2)=KTOTVA(INA1,INA2)+XCPLGE
+            ENDIF
+*
+* ------ force elementaire de COUPLAGE EN DEPLACEMENT
+*
+         ELSE IF (ITYP.EQ.5) THEN
+            INA1 = IPLIA(I,1)
+            INA2 = IPLIA(I,2)
+            XDEP = Q1(INA2,IND)
+            XCPLGE = XPALA(I,1)
+            jfonct = ipala(I,3)
+c           avant d'avoir defini DFDX pour toutes les liaisons, mise a 0
+            DFDX=0.d0
+
+cbp         calcul eventuel d'un produit de convolution :
+c           XDEP=\int_0^T h(\tau)*Qj(t-\tau) d\tau
+            if(jfonct.eq.100) then
+               IP1=IPALA(I,4)
+c              t_{n+1} ou t_{n}
+c                if (IND.eq.1.or.IND.eq.3) then 
+c              t_{n+1} ou t_{0} pour diff centreee ?
+c                if (IND.eq.1.or.IND.eq.2) then 
+                 IP2=IPALA(I,5)
+c c              t_{n+1/2} ou t_{n-1/2} (seulement pour devogelaere)
+c                else
+c                  IP2=IPALA(I,6)
+c                endif
+               CALL DYCPL1(IP1,IP2,XDEP,NPAS,PDT,XCONV)
+               XFL=XCPLGE*XCONV
+               
+cbp       - calcul d'un produit de convolution GRANGER_PAIDOUSSIS
+*TODO           (cas particulier HBM : la force fluide-elastique est 
+*            prise en compte dans Z directement)
+            elseif(jfonct.eq.101) then
+               IP1=IPALA(I,4)
+               IP2=IPALA(I,5)
+               IP3=IPALA(I,6)
+               VSD=XPALA(I,2)
+               XA0=XPALA(I,3)
+               CALL DYCPL2(IP1,IP2,IP3,VSD,XA0,XDEP,NPAS,PDT,XCONV)
+               XFL=XCPLGE*XCONV              
+
+cbp       - calcul du produit par une fonction trigo cos(q)
+c           rem : on pourrait aussi prevoir cos(coef2*q) avec coef2=XPALA(I,2)
+
+            elseif(jfonct.eq.1) then
+                XFL = XCPLGE * COS(XDEP)
+                IF(GETJAC) DFDX= -XCPLGE * SIN(XDEP)
+            elseif(jfonct.eq.2) then
+                XFL = XCPLGE * SIN(XDEP)
+                IF(GETJAC) DFDX= XCPLGE * COS(XDEP)
+                
+cbp       - calcul du produit par une fonction temporelle cos(wt)*q
+            elseif(jfonct.ge.11.and.jfonct.le.12) then
+                XFREQ  = XPALA(I,2)
+                XTIME = DBLE(NPAS-1)*PDT
+                if(IND.EQ.2) XTIME=XTIME-PDTS2
+                if(jfonct.eq.1) XFONCT = COS(XFREQ*XTIME)
+                if(jfonct.eq.2) XFONCT = SIN(XFREQ*XTIME)
+                XFL = XCPLGE * XDEP * XFONCT
+                
+c         - simple raideur (ou raideur en puissance)
+            else
+                  Xexpo = XPALA(I,2)
+                  if(Xexpo.eq.XONE) then
+                    XFL = XCPLGE * XDEP
+                    IF(GETJAC) DFDX = XCPLGE
+                  elseif(Xexpo.eq.3.D0) then
+                    XFL = XCPLGE * (XDEP**3)
+                    IF(GETJAC) DFDX = Xexpo*XCPLGE*(XDEP**2) 
+                  else
+                    XFL = XCPLGE * (XDEP**Xexpo)
+                    IF(GETJAC) DFDX = Xexpo*XCPLGE*(XDEP**(Xexpo-1.d0)) 
+                  endif
+            endif
+cbp, ici    prise en compte de la possibilite de liaison conditionnelle 
+            IF(iannul.ne.0) XFL=0.D0
+            XVALA(I,IND,1) = XFL
+            XVALA(I,IND,4) = XDEP
+            FTOTA(INA1,IND) = FTOTA(INA1,IND) + XFL
+            IF(GETJAC) THEN
+              KTOTXA(INA1,INA1)  = KTOTXA(INA1,INA1) + DFDX
+            ENDIF
+            
+*
+* ------ force elementaire de type POLYNOMIALE
+*
+         ELSE IF (ITYP.EQ.6) THEN
+*           nombre de modes "origine"
+            NMOD = IPALA(I,2)
+            CALL D2POL1(Q1,Q2,NA1,IPLIA,XPALA,XVALA,NLIAA,IND,PDT,
+     &                  NPAS,I,NMOD,FTOTA,IVINIT,iannul)
+*
+* ------ choc elementaire ...
+*
+*        ELSE IF (ITYP.EQ.  ) THEN
+*              .......
+*              .......
+*
+         ENDIF
+
+*
+* la suite n'est plus utile car on passe iannul aux s_p de calcul des
+* forces de liaisons.
+
+*       si la liaison etait annulee on l'annule
+*         if ( ( icond.eq. 1 ) .and. ( iannul.eq.1)) then
+*              on annule l'increment de ftotb
+*                do 112 ik = 1,na1
+*                  do 113 jk = 1,4
+*                        ftota (ik,jk) = ftota0(ik,jk)
+* 113              continue
+* 112            continue
+
+*         end if
+
+  10  CONTINUE
+*--------------------------------------------------------------------*
+*     FIN DE BOUCLE SUR LES LIAISONS
+*--------------------------------------------------------------------*
+*
+      END
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,114 @@
+C MASSE     SOURCE    JK148537  23/11/20    21:15:07     11790          
+      SUBROUTINE MASSE(ILUMP)
+*
+*_______________________________________________________________________
+*
+*            operateurs masse et lump
+*
+*
+*           ILUMP : =1 indique si il s'agit de l'opérateur LUMP
+*
+*
+*_______________________________________________________________________
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC CCHAMP
+-INC SMCOORD
+c
+      character*4 mcle(1)
+      data mcle/'PRES'/
+      CHARACTER*4  CMOT
+
+C
+      jlump = ilump
+* lecture eventuelle de 'PRES'
+      jpre = 0
+      call lirmot(mcle,1,jpre,0)
+      if (ierr.ne.0) return
+      if  (jpre.eq.1) jlump = 2
+      
+C     Lump d une matrice deja constituée ( formule initiale )
+      CALL LIROBJ('RIGIDITE',IRIG,0,IR1)
+      IF (IR1.NE.0) THEN
+      LMOT=0
+      CALL LIROBJ('LISTMOTS',LMOT,0,IR2)
+      IF (IERR.NE.0) RETURN
+      if (ir2.eq.0.and.ilump.eq.0) then
+       call ECROBJ('RIGIDITE',IRIG)
+       goto 10
+      endif
+
+*
+      CALL LUMPIN(IRIG,LMOT,ILUM)
+      IF (IERR.NE.0) RETURN
+*
+      CALL ECROBJ('RIGIDITE',ILUM)
+      RETURN
+      END IF
+c
+      segact mcoord
+c
+c     lecture du modele
+c
+ 10   IPCHE1=0
+c
+      CALL LIROBJ('MMODEL',IPMODL,0,IRT1)
+      IF(IRT1.NE.0) THEN
+      CALL ACTOBJ('MMODEL  ',IPMODL,1)
+c
+c        Cas de la matrice masse sur base element finis
+c        lecture du 1 ier mchaml
+c
+          CALL LIROBJ('MCHAML  ',IPCHE1,1,IRT2)
+          CALL ACTOBJ('MCHAML  ',IPCHE1,1)
+c
+c         si absent erreur
+c
+          IF (IRT2.EQ.0) THEN
+               MOTERR(1:16) ='CARACTERISTIQUE'
+               CALL ERREUR(565)
+               RETURN
+          ENDIF
+      call reduaf(ipche1,ipmodl,ipch,0,ir,ker)
+      if (ir.ne.1) call erreur(ker)
+      IF (IERR.NE.0) RETURN
+      ipche1=ipch
+c
+c     calcul de la masse
+c
+
+          CALL MASSE1 (IPMODL,IPCHE1,IPMASS,IRET,JLUMP)
+c
+c     ecriture du resultat
+c
+          CALL ECROBJ('RIGIDITE',IPMASS)
+
+      ELSE
+        IF (ILUMP .EQ. 0) THEN
+c
+c   cas des masses additionnelles
+c
+          CALL LIRCHA(CMOT,0,IRT1)
+          IF (IRT1.NE.0) THEN
+            CALL REFUS
+            CALL APPUI(2)
+          ELSE
+c
+c   cas de la masse sur base modale
+c
+            CALL MASSMO
+          ENDIF
+        ELSE
+          CALL ERREUR(26)
+        ENDIF
+      ENDIF
+      END
+
+ 
+ 
+ 

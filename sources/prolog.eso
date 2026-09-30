@@ -1,0 +1,16 @@
+C PROLOG    SOURCE    PV        22/01/27    21:15:04     11273          
+*  prologue et epilogue de cast3m
+*
+      subroutine prolog
+*
+*  appelle en debut d'execution dans main pour des fonctions variees
+*  license, metrologie, verification version a jour, etc
+*
+      entry epilog
+*
+*  appelle en fin d'execution dans fin pour des fonctions variees
+*  license, metrologie, facturation, etc
+*
+      end
+
+ 

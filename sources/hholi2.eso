@@ -1,0 +1,128 @@
+C HHOLI2    SOURCE    OF166741  24/05/06    21:15:11     11082          
+C HHOLI2    SOURCE    FANDEUR                                           
+C
+      SUBROUTINE HHOLI2 (chopt,IPGEO,IPOSL,INDSL,iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+c*-INC CCHHOPA
+c*-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMELEME
+
+      SEGMENT ipos(nbpt)
+      SEGMENT inds(mm)
+
+      CHARACTER*(*) chopt
+
+      iret = 0
+
+C Segment IPOS : creation si demande
+      IF (chopt(1:9).EQ.'INIT_IPOS') THEN
+        nbpt = NBPTS + 1
+        SEGINI,ipos
+        IPOSL = ipos
+        RETURN
+      END IF
+
+C Segment INDS : creation si demande
+      IF (chopt(1:9).EQ.'INIT_INDS') THEN
+        mm = IPOSL
+        SEGINI,inds
+        INDSL = inds
+        RETURN
+      END IF
+
+C Segments IPOS/INDS : Verification maillage avant remplissage
+      IF ((chopt(1:9).EQ.'REMP_IPOS') .OR.
+     &    (chopt(1:9).EQ.'REMP_INDS') .OR.
+     &    (chopt(1:9).EQ.'REMP_TOUS')) THEN
+        meleme = IPGEO
+C*        SEGACT,meleme <- Segment actif en Entree
+C Petits tests sur le maillage mais a priori inutiles :
+        nbsou = meleme.lisous(/1)
+        IF (nbsou.NE.0) THEN
+          iret = 21
+          RETURN
+        END IF
+c*        ityp = meleme.itypel
+        nbnoe = meleme.num(/1)
+        nbelt = meleme.num(/2)
+        IF (nbnoe.EQ.0 .OR. nbelt.EQ.0) THEN
+          iret = 21
+          RETURN
+        END IF
+      END IF
+
+C Segment IPOS : Remplissage
+      IF ((chopt(1:9).EQ.'REMP_IPOS') .OR.
+     &    (chopt(1:9).EQ.'REMP_TOUS')) THEN
+        ipos = IPOSL
+c*        SEGACT,ipos*MOD
+        nbpt = ipos(/1)
+        np = nbpt - 1
+        DO in = 1, nbpt
+          ipos(in) = 0
+        END DO
+        DO ie = 1, nbelt
+          DO in = 1, nbnoe
+            ia = meleme.num(in,ie)
+            ipos(ia) = ipos(ia)+1
+          END DO
+        END DO
+        i_z = ipos(1)
+        DO in = 2, np
+          i_z = i_z + ipos(in)
+          ipos(in) = i_z
+        END DO
+        ipos(nbpt) = ipos(np)
+        IF (chopt(6:9).EQ.'IPOS') THEN
+          INDSL = ipos(nbpt)
+C*          SEGDES,meleme  <- Segment actif en Sortie (non modifie)
+C*          SEGDES,ipos    <- Segment actif en Sortie
+          RETURN
+        END IF
+      END IF
+
+C Segment INDS : Remplissage
+      IF ((chopt(1:9).EQ.'REMP_INDS') .OR.
+     &    (chopt(1:9).EQ.'REMP_TOUS')) THEN
+        ipos = IPOSL
+c*        SEGACT,ipos*MOD
+        nbpt = ipos(/1)
+        inds = INDSL
+c*        SEGACT,inds*MOD
+        mm = inds(/1)
+        IF (mm.LT.ipos(nbpt)) THEN
+          iret = 5
+          RETURN
+        END IF
+        DO in = 1, mm
+          inds(in) = 0
+        END DO
+        DO ie = 1, nbelt
+          DO in = 1, nbnoe
+            ia = meleme.num(in,ie)
+            id = ipos(ia)
+            inds(id) = ie
+            ipos(ia) = id-1
+          END DO
+        END DO
+
+C*      SEGDES,meleme  <- Segment actif en Sortie (non modifie)
+C*      SEGDES,ipos,inds <- Segments actifs en Sortie
+        RETURN
+      END IF
+
+C= Erreur arnomale si on arrive ici
+      iret = 5
+
+C*      RETURN
+      END
+
+ 

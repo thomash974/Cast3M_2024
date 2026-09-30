@@ -1,0 +1,85 @@
+C LCCD3D    SOURCE    PV090527  23/02/13    21:15:09     11592          
+      SUBROUTINE lccd3d(pt0,pc0,M,s1,s2,s3,K,G,dcc,f1,lcc,precision3d)
+c     Multiplicateur plastique CamClay seul actif (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 pc0,pt0,M,s1,s2,s3,f1,lcc,K,G,dcc,precision3d
+      real*8 denom
+      
+C       t1 = M ** 2
+C       t2 = t1 ** 2
+C       t3 = t2 * K
+C       t4 = pc0 ** 2
+C       t5 = t4 ** 2
+C       t18 = pt0 ** 2
+C       t20 = t2 * K * t18
+C       t22 = s1 + s2 + s3
+C       t24 = pt0 * t22 * t3
+C       t26 = t22 ** 2
+C       t28 = K * t26 * t2
+C       t29 = 0.4D1 * t28
+C       t30 = s1 ** 2
+C       t33 = s2 ** 2
+C       t35 = s3 ** 2
+C       t37 = G * (t30 + (-s2 - s3) * s1 + t33 - s2 * s3 + t35)
+C       t38 = 0.12D2 * t37
+C       t43 = t28 / 0.3D1
+C       t62 = t18 ** 2
+C       denom=(0.9D1 * t5 * t4 * t3 + 0.54D2 * t5 * pc0 * K * (
+C      # pt0 + 0.2D1 / 0.9D1 * s1 + 0.2D1 / 0.9D1 * s2 + 0.2D1 / 0.9D1 * 
+C      # s3)* t2 + t5 * (0.135D3 * t20 + 0.60D2 * t24 + t29 + t38) - 
+C      # 0.48D2 *t4 * pc0 * (-0.15D2 / 0.4D1 * t20 - 0.5D1 / 0.2D1 * t24 
+C      #- t43 + t37) * pt0 + 0.72D2 * t4 * t18 * (0.15D2 / 0.8D1 * t20 + 
+C      #0.5D1 / 0.3D1 * t24 + t43 + t37) - 0.48D2 * pc0 * (-0.9D1 / 0.8D1
+C      # * t20 - 0.5D1 / 0.4D1 * t24 - t43 + t37) * t18 * pt0 + 0.9D1 * 
+C      #t62 * t18 * t3 + 0.12D2 * t62 * pt0 * t22 * t3 + t62 * (t29 + t38) 
+C      #- 0.144D3 * dcc)
+     
+      t1 = sqrt(0.4D1)
+      t6 = (s1 + s2 + s3 + 0.3D1 / 0.2D1 * pc0 + 0.3D1 / 0.2D1 * pt0) **
+     # 2
+      t7 = M ** 2
+      t8 = t7 ** 2
+      t10 = s1 ** 2
+      t12 = -s2 - s3
+      t15 = s2 ** 2
+      t17 = s2 * s3
+      t19 = s3 ** 2
+      t22 = pc0 - pt0
+      t23 = t22 ** 2
+      t24 = t23 ** 2
+      t26 = sqrt(t24 * (t8 * t6 + 0.81D2 / 0.2D1 * t10 + 0.81D2 / 0.2D1 
+     #* s1 * t12 + 0.81D2 / 0.2D1 * t15 - 0.81D2 / 0.2D1 * t17 + 0.81D2 
+     #/ 0.2D1 * t19))
+      t30 = t8 * K
+      t31 = pc0 ** 2
+      t42 = pt0 ** 2
+      t46 = s1 + s2 + s3
+      t50 = t46 ** 2
+      t59 = t22 ** 2
+      t60 = t59 ** 2
+      t62 = sqrt(0.3D1)
+      lcc = 0.36D2 / (-0.36D2 * dcc * t26 * t1 + 0.108D3 * t62 * t60 * (
+     #t31 * t30 / 0.12D2 + pc0 * t8 * (pt0 + 0.2D1 / 0.3D1 * s1 + 0.2D1 
+     #/ 0.3D1 * s2 + 0.2D1 / 0.3D1 * s3) * K / 0.6D1 + t8 * K * t42 / 0.
+     #12D2 + pt0 * t46 * t30 / 0.9D1 + K * t50 * t8 / 0.27D2 + (s1 * t12
+     # + t10 + t15 - t17 + t19) * G)) * t26 * t1 * f1
+
+
+     
+      if(lcc.ne.lcc) then
+         print*,'Pb dans lccd3d, denominateur nul'
+         print*,pt0,pc0,M,s1,s2,s3,K,G,dcc,f1,lcc
+         read*
+         lcc=0.d0         
+      end if
+      
+c     on ne prend que lcc/4 a cause de la sous estimation du module d ecrouissage non lineaire
+      lcc=lcc/2.d0   
+
+      return
+      end
+      
+ 
+ 

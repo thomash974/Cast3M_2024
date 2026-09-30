@@ -1,0 +1,171 @@
+C LMDTAB    SOURCE    OF166741  24/03/28    21:15:05     11811          
+
+C***********************************************************************
+C NOM         : lmdtab.eso
+C DESCRIPTION : Sortie d'un MCHAML au format .med
+C***********************************************************************
+C HISTORIQUE :  07/12/2017 : RPAREDES : Creation
+C HISTORIQUE :  10/01/2024 : OF       : Modifications legeres
+C HISTORIQUE :  24/01/2024 : OF       : Modifications legeres (2)
+C HISTORIQUE :  31/01/2024 : OF       : Modifications legeres (3)
+C HISTORIQUE :  12/02/2024 : OF       : Passage en MED 64b
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : operateur (LIRE 'MED') lirmed.eso
+C***********************************************************************
+C ENTREES :   MFID    : Id du fichier
+C             MTABLE  : Table avec la geometrie
+C             NBNOIN  : Numerotation de noeuds courant
+C             SLSCHA  : Segment avec l'information des champs
+C             SLSSOR  : Segment avec l'information de la table
+C SORTIES : ISOR : Pointeur vers la TABLE
+C***********************************************************************
+
+      SUBROUTINE LMDTAB(MFID, MTABLE, NBNOIN, SLSCHA, SLSSOR, ISOR)
+
+      IMPLICIT INTEGER(i-n)
+      IMPLICIT REAL*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCMED
+
+-INC SMELEME
+-INC SMLMOTS
+-INC SMTABLE
+-INC SMCHAML
+-INC SMCHPOI
+
+      CHARACTER*8               cha8a
+      CHARACTER*(MED_NAME_SIZE) fname
+
+      EXTERNAL LONG
+
+C ***** Declaration des segments
+C----- SEG SLSCHA
+C         LISMAI : nom du maillage
+C         ncham  : nombre de champs (CHPOINT ou MCHAML)
+C         LISCHA : liste des noms de champs
+C         LSCHIN : liste de SEG CHAINF (information)
+C         LSPARA : liste de SEG CHAPAR (parametres)
+      SEGMENT SLSCHA
+        CHARACTER*(MED_NAME_SIZE) LISMAI
+        CHARACTER*(MED_NAME_SIZE) LISCHA(ncham)
+        INTEGER                   LSCHIN(ncham), LSPARA(ncham)
+      ENDSEGMENT
+
+      SEGMENT SLSFUS
+        INTEGER      CHAFUS(nbfus)
+      ENDSEGMENT
+
+C----- SEG SLSSOR
+C         nbsor  : nombre de champs a sortir
+C         CHATYP : type de champ (CHPOINT, MCHAML ou TABLE)
+C         CHANOM : nom du champ
+C         CHALIS : liste de champs dans un segment SLSFUS(CHPOINT ou MCHAML)
+C                  ou SLSSOR(TABLE)
+      SEGMENT SLSSOR
+        CHARACTER*8               CHATYP(nbsor)
+        CHARACTER*(MED_NAME_SIZE) CHANOM(nbsor)
+        INTEGER                   CHALIS(nbsor)
+      ENDSEGMENT
+
+      SEGMENT CHAINF
+C         nseq   :   nombre de sequences de calcul dans le champ
+C         ncomp  :   nombre de composantes
+C         INUMDT :   liste de numeros de pas de tps
+C         INUMIT :   liste de numeros d'iteration
+C         ISCHPR :   liste de SEG CHAPRO (profil)
+C         XDT    :   liste de pas de tps
+C         CNAME  :   liste de noms des composants
+C         CUNIT  :   liste d'unites des composants
+        INTEGER      INUMDT(nseq), INUMIT(nseq), ISCHPR(nseq)
+        REAL*8       XDT(nseq)
+        CHARACTER*(MED_SNAME_SIZE) CNAME(ncomp), CUNIT(ncomp)
+      ENDSEGMENT
+
+      LOGICAL login,logre
+
+C***********************************************************************
+C      Ecriture de la TABLE
+C***********************************************************************
+
+C-----Initialisation
+      intin = 0
+      intre = 0
+      floin = 0.D0
+      flore = 0.D0
+      login = .FALSE.
+      logre = .TRUE.
+
+      ISOR  = 0
+ 
+      nbsor = SLSSOR.CHALIS(/1)
+      m     = nbsor + 1
+      SEGINI MTAB1
+
+      DO ia=1,nbsor
+        cha8a  = SLSSOR.CHATYP(ia)
+        fname  = SLSSOR.CHANOM(ia)
+        SLSFUS = SLSSOR.CHALIS(ia)
+        nbfus  = SLSFUS.CHAFUS(/1)
+        IF (nbfus .EQ. 0) THEN
+          CALL ERREUR(21)
+          RETURN
+        ENDIF
+        icha   = SLSFUS.CHAFUS(1)
+        CHAINF = SLSCHA.LSCHIN(icha)
+        m      = CHAINF.INUMDT(/1)
+
+C-------Ecriture du temps
+        IF (ia .EQ. 1) THEN
+          SEGINI MTAB2
+          DO ib = 1, m
+            indt = CHAINF.INUMDT(ib)
+            xndt = CHAINF.XDT(ib)
+            MTAB2.MTABTI(ib) = 'ENTIER'
+            MTAB2.MTABTV(ib) = 'FLOTTANT'
+            MTAB2.MTABII(ib) = indt
+            MTAB2.RMTABV(ib) = xndt
+          ENDDO
+          MTAB2.MLOTAB = m
+          SEGDES MTAB2
+          CALL ECCTAB(MTAB1,'MOT     ',intin,floin,'TEMPS',login,intin,
+     &                      'TABLE   ',intre,flore,'     ',logre,MTAB2)
+        ENDIF
+
+        SEGINI MTAB2
+        DO ib = 1, m
+          isor2 = 0
+          IF (cha8a .EQ. 'CHPOINT ') THEN
+            CALL LMDCHP(MFID, MTABLE, NBNOIN, SLSCHA,SLSFUS, ib, isor2)
+          ELSEIF (cha8a .EQ. 'MCHAML  ') THEN
+            CALL LMDCHM(MFID, MTABLE, SLSCHA,SLSFUS, ib, isor2)
+          ENDIF
+          IF (IERR.NE.0) RETURN
+          IF (isor2 .EQ. 0) THEN
+            CALL ERREUR(21)
+            RETURN
+          ENDIF
+          indt = CHAINF.INUMDT(ib)
+          MTAB2.MTABTI(ib) = 'ENTIER  '
+          MTAB2.MTABTV(ib) = cha8a
+          MTAB2.MTABII(ib) = indt
+          MTAB2.MTABIV(ib) = isor2
+        ENDDO
+        MTAB2.MLOTAB = m
+        SEGDES MTAB2
+        CALL ECCTAB(MTAB1,'MOT     ',intin,floin,fname,login,intin,
+     &                    'TABLE   ',intre,flore,'   ',logre,MTAB2)
+      ENDDO
+
+      ISOR = MTAB1
+
+C      RETURN
+      END
+
+ 

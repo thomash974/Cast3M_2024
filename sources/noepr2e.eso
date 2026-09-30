@@ -1,0 +1,81 @@
+C NOEPR2E   SOURCE    PV        20/11/26    21:15:09     10699          
+      subroutine noepr2e(iadj,jadjc,pivot,nrelong,noelon,isens,
+     > dimlon,nodes,ipos,nbtot,lfront,lfron,londim,fcout2,lpiv,
+     > ipoint,noel2,bool,fcout,ldim2,ith,nbthr,npoint,npoint2,
+     > imax,iccon,icouch)
+       implicit real*8 (a-h,o-z)
+       integer dimlon,diml2,bool
+       integer pivot(*),pivots
+       integer iadj(*),jadjc(*),nrelong(*),noelon(*),noel2(*)
+       integer ipos(*),londim(*)
+
+*      write (6,*) ' noepr2 dimlon lfront ipoint ',dimlon,lfront,ipoint
+       diml2=dimlon
+       nbz=  (diml2+1)/2
+       nbess= int(nbz**0.42)+8 
+       nbess=min(nbess,int((icouch)**(1.33333333333333333333)))
+       nbess=max(nbess,1)
+       do i=1,dimlon
+         noelon(i)=0
+       enddo
+         isig=2*mod(ipoint,2)-1
+       idec=((ipoint-1)*nbz)/npoint
+**     write(6,*) 'npoint ipoint ith idec',npoint,ipoint,ith,idec,nbz
+       do 520 ii=ith,nbess,nbthr
+        fcout2=1d50
+       i= (ii*nbz+idec)/nbess+1
+       if (isig.eq.1.and.i.lt.nbz) i=diml2+1-i
+       if (isig.eq.-1.and.i.gt.nbz) i=diml2+1-i
+       pivots=pivot(ipoint)
+** la situation arrive vraiment!
+       if (pivots.eq.noel2(i)) then
+**      write(6,*) 'pivot invariant ii dimlon ipoint ',ii,dimlon,ipoint
+        goto 520
+       endif
+       pivot(ipoint)=noel2(i)
+       dimlon=diml2
+       call noepr2(iadj(1),jadjc(1),pivot,nrelong(1),noelon(1),
+     >   isens,dimlon,nodes,ipos(1),nbtot,lfront,lfron,
+     >   londim(1),fcout2,lpiv,iccon,icouch)
+**     write (6,*) ' noepr2  ipoint ii i fcout fcout2 ',
+**   >       ipoint,fcout,fcout2,londim(1),londim(2),londim(3)
+       if (fcout2.lt.fcout.or.(fcout2.le.fcout.and.
+     >    pivots*isig.lt.pivot(ipoint)*isig)) then
+**     write (6,*) 'amelioration dimlon iii i nbz ith ',
+**   >        dimlon,iii,i,nbz,ith
+        if (fcout2.ne.fcout) bool=2
+        fcout=fcout2
+        ldim2=londim(2)
+        if (npoint.lt.50.and.imax.eq.0) then
+         npoint2=npoint+1
+         pivot(npoint2)=0
+        endif
+        if (fcout.lt.5 ) return
+       else
+        pivot(ipoint)=pivots
+       endif
+ 520   continue
+       end
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

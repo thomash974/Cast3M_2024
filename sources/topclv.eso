@@ -1,0 +1,221 @@
+C TOPCLV    SOURCE    GOUNAND   21/04/06    21:15:29     10940          
+      SUBROUTINE TOPCLV(TRAVJ,lchang)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPCLV
+C DESCRIPTION : Nettoyage des éléments nulles dans la topologie et
+C     dans son inverse (ces éléments nuls apparaissent dans TOPDIF et
+C     ne sont pas nettoyés tout de suite pour raison supposée de
+C     performance) 
+C
+* On utilise le segment JNBL pour noter le nouveau numéro d'élément
+C
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 17/10/2017, version initiale
+C HISTORIQUE : v1, 17/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMLENTI
+      POINTEUR JNBL.MLENTI
+      POINTEUR NEXTO.MLENTI
+-INC SMELEME
+*
+*     Le nombre d'éléments de JTOPO et le nombre de points de JCOORD
+*     vont être variables. Pour ne pas avoir à ajuster ces segments en
+*     permanence, on va dimensionner plus large, mais du coup, il faut
+*     aussi maintenir à la main le nombre de noeuds et d'éléments
+*     courants.
+*
+*     Le nombre d'éléments courants est NVCOU et le nombre d'éléments
+*     max est NVMAX. Idem pour le nombre de noeuds courants et max :
+*     NPCOU et NPMAX.
+*      
+* Numerotation locale des éléments JTOPO.NUM(NBNN,NBELEM)
+*      INTEGER NVCOU,NVMAX
+      POINTEUR JTOPO.MELEME
+-INC TMATOP1
+*-INC STOPINV
+*-INC STRAVJ
+*
+      logical lchang
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans topclv.eso'
+*
+* Initialisation et extension des segments JTOPO et JCOORD
+*
+      IDIMP=IDIM+1
+*      
+      JTOPO=TRAVJ.TOPO
+*
+*     On compte le nombre d'éléments à enlever et ceux qui sont en
+*     dernière position
+*
+      nvenle=0
+      do iel=1,nvcou
+         if (jtopo.num(1,iel).eq.0) nvenle=nvenle+1
+      enddo
+      do iel=nvcou,1,-1
+         if (jtopo.num(1,iel).ne.0) then
+            nvco2=iel
+            goto 44
+         endif
+      enddo
+ 44   continue
+      nvenl2=nvcou-nvco2
+*
+      if (impr.gt.5) then
+         write(ioimp,185) 'nvcou,nvenle,nvenle2=',nvcou,nvenle,nvenl2
+      endif         
+*
+      lchang=(nvenle.gt.0)
+      if (nvenle.gt.0) then
+         topinv=travj.topi
+         if (nvenle.ne.nvenl2) then
+            jnbl=travj.nbl
+            if (impr.gt.5) then
+               write(ioimp,*) 'Nettoyage elem avant'
+               call ecmai1(jtopo,0)
+               segact jtopo*mod
+               call ectopi(topinv,1)
+               call ectopi(topinv,2)
+               segact topinv*mod
+            endif
+
+            iell=0
+            do iel=1,nvcou
+               if (jtopo.num(1,iel).ne.0) then
+                  iell=iell+1
+                  jnbl.lect(iel)=iell
+                  do ino=1,idimp
+                     jtopo.num(ino,iell)=jtopo.num(ino,iel)
+                  enddo
+               endif
+            enddo
+            do iel=iell+1,nvcou
+               do ino=1,idimp
+                  jtopo.num(ino,iel)=0
+               enddo
+            enddo
+*     
+            if (impr.gt.5) then
+               write(ioimp,*) 'Jtopo nettoyée'
+               call ecmai1(jtopo,0)
+               segact jtopo*mod
+*     
+               write(ioimp,*) 'Elements de la topologie a nettoyer :'
+               write(ioimp,187) (jnbl.lect(I),I=1,nvcou)
+            endif
+         
+*
+            kell=0
+            do iel=1,nvcou
+               iell=jnbl.lect(iel)
+               if (iell.ne.0) then
+                  kell=iell
+                  do ino=1,idimp
+                     last=tlc((iel-1)*idimp+ino)
+                     if (last.gt.0) then
+                        jel=((last-1)/idimp)+1
+                        jell=jnbl.lect(jel)
+                        if (impr.gt.6) then
+                           write(ioimp,185)
+     $                          'last,ino,iel,iell,jel,jell=',last,ino
+     $                          ,iel,iell,jel,jell
+                        endif
+                        last=last-((jel-jell)*idimp)
+                        if (impr.gt.6) then
+                           write(ioimp,185) 'last2=',last
+                        endif
+                     endif                     
+                     tlc((iell-1)*idimp+ino)=last
+                  enddo
+               endif
+            enddo
+* kell est le dernier élément non nul de jnbl         
+            do iel=kell+1,nvcou
+               do ino=1,idimp
+                  tlc((iel-1)*idimp+ino)=0
+               enddo
+            enddo
+*     
+            do ino=1,npcou
+               last=tic(ino)
+               if (last.gt.0) then
+                  jel=((last-1)/idimp)+1
+                  jell=jnbl.lect(jel)
+                  last=last-((jel-jell)*idimp)
+               endif                     
+*faux            if (last.gt.0) last=last-(nvenle*idimp)
+               tic(ino)=last
+            enddo
+* Nettoyage de jnbl
+            do iel=1,nvcou
+               iell=jnbl.lect(iel)
+               if (iell.ne.0) jnbl.lect(iel)=0
+            enddo
+*     
+            if (impr.gt.6) then
+               write(ioimp,*) 'Topinv nettoyée'
+               call ectopi(topinv,1)
+               call ectopi(topinv,2)
+               goto 9999
+            endif
+         endif
+* Dimensions         
+         nvcou=nvcou-nvenle
+         ldgt=ldgt-(nvenle*idimp)
+      endif
+      if (impr.gt.2) then
+         if (lchang) write(ioimp,185) 'topclv : nvenle=',nvenle
+      endif         
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 186  FORMAT ('Segment ',A6,' ',A6,' ajusté de ',I6,' à ',I6)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPCLV  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TOPCLV
+*
+      END
+
+ 

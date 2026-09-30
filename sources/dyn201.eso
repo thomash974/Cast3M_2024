@@ -1,0 +1,520 @@
+C DYN201    SOURCE    BP208322  20/03/26    21:15:47     10562          
+      SUBROUTINE DYN201(I,ITLB,ITYP,KTLIAB,NPLB)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE :                                               *
+*     Remplissage des tableaux de description des liaisons sur       *
+*     pour les liaisons de type :                                    *
+*     la base des informations contenues dans la table ILIB          *
+*     - POINT_PLAN avec ou sans amortissement                        *
+*     - POINT_PLAN_FROTTEMENT avec ou sans amortissement             *
+*     - CERCLE_PLAN_FROTTEMENT avec ou sans amortissement            *
+*     - POINT_PLAN_FLUIDE                                            *
+*                                                                    *
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+* e   I       Numero de la liaison.                                  *
+* e   ITLB    Table rassemblant la description d'une liaison.        *
+* e   ITYP    Type de la liaison.                                    *
+*  s  KTLIAB  Segment descriptif des liaisons sur base B.            *
+* e   NPLB    Nombre total de points.                                *
+*                                                                    *
+*--------------------------------------------------------------------*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMEVOLL
+-INC SMLREEL
+*
+      SEGMENT MTLIAB
+         INTEGER IPALB(NLIAB,NIPALB),IPLIB(NLIAB,NPLBB),JPLIB(NPLB)
+         REAL*8 XPALB(NLIAB,NXPALB)
+         REAL*8 XABSCI(NLIAB,NIP),XORDON(NLIAB,NIP)
+      ENDSEGMENT
+*
+      LOGICAL L1,L0,LPERM,LVE
+      CHARACTER*8 MONAMO,MONSEUIL,CHARRE,TYPRET,MARAID,MONPER
+*
+      LVE=.FALSE.
+      MTLIAB = KTLIAB
+*
+*--------------------------------------------------------------------*
+* --- choc elementaire POINT_PLAN avec ou sans amortissement
+*--------------------------------------------------------------------*
+*
+      IF (ITYP.EQ.1) THEN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'SUPPORT',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IMOD)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'NORMALE',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IPOI)
+         IF (IERR.NE.0) RETURN
+
+         MARAID = ' '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'RAIDEUR',L0,IP0,
+     &                    MARAID,I0,XRAID,CHARRE,L1,IP1)
+         IF (MARAID .EQ. 'ENTIER  ') THEN
+           XRAID = 1.D0*I1
+           MARAID = 'FLOTTANT'
+         ENDIF
+         IF (IERR.NE.0) RETURN
+
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'JEU',L0,IP0,
+     &                    'FLOTTANT',I0,XJEU,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+
+         MONPER = ' '
+         LPERM = .FALSE.
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'LIAISON_PERMANENTE',L0,
+     &                    IP0,MONPER,I0,X1,CHARRE,LPERM,IP1)
+         IF (IERR.NE.0) RETURN
+
+         TYPRET = ' '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'LOI_DE_COMPORTEMENT',L0,IP0,
+     &                    TYPRET,I1,X1,CHARRE,L1,IPEVO)
+         IF (IERR.NE.0) RETURN
+*
+         MONAMO = ' '
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'AMORTISSEMENT',L0,IP0,
+     &                    MONAMO,I1,XAMON,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         IF (MONAMO .EQ. 'ENTIER  ') THEN
+           XAMON = 1.D0*I1
+           MONAMO = 'FLOTTANT'
+         ENDIF
+
+         MONSEUIL = ' '
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'SEUIL_PLASTIQUE',L0,IP0,
+     &                    MONSEUIL,I1,XSEUIL,CHARRE,L1,IP1)
+         IF (MONSEUIL .EQ. 'ENTIER  ') THEN
+           XSEUIL = 1.D0*I1
+           MONSEUIL = 'FLOTTANT'
+         ENDIF
+         IF (IERR.NE.0) RETURN
+
+
+         IF (MARAID.EQ.'FLOTTANT' .EQV. TYPRET.EQ.'EVOLUTIO') THEN
+            CALL ERREUR(891)
+            RETURN
+         ENDIF
+*
+*
+         IPALB(I,1) = ITYP
+         IPALB(I,3) = IDIM
+         IF(LPERM) IPALB(I,4)=2
+         XPALB(I,1) = XRAID
+         XPALB(I,2) = XJEU
+*
+         IPNV  = (IDIM + 1) * (IPOI - 1)
+         PS = 0.D0
+         DO 10 ID = 1,IDIM
+            XC = XCOOR(IPNV + ID)
+            PS = PS + XC * XC
+ 10         CONTINUE
+*        end do
+         IF (PS.LE.0.D0) THEN
+            CALL ERREUR(162)
+            RETURN
+         ENDIF
+         ID1 = 3
+         IF (MONAMO.EQ.'FLOTTANT') THEN
+            XPALB(I,3) = XAMON
+         ELSE
+            XPALB(I,3) = 0.D0
+         ENDIF
+         IF (MONSEUIL .EQ.'FLOTTANT') THEN
+             IF (TYPRET .EQ. 'EVOLUTIO') THEN
+                IPALB(I,1) = 101
+             ELSE
+                IPALB(I,1) = 100
+             ENDIF
+             ID1 = 4
+             XPALB(I,ID1) = XSEUIL
+         ELSE
+             IF (TYPRET .EQ. 'EVOLUTIO') THEN
+                IPALB(I,1) = 102
+             ENDIF
+         ENDIF
+
+*
+         DO 12 ID = 1,IDIM
+            XPALB(I,ID1+ID) = XCOOR(IPNV + ID) / SQRT(PS)
+ 12         CONTINUE
+*        end do
+         IF (IPALB(I,1) .EQ. 101 .OR. IPALB(I,1) .EQ. 102) THEN
+         MEVOLL = IPEVO
+*
+*  si IEVOLL(/1) different de 1 => probleme (on veut une seule courbe)
+* Ici, on recupere les abscisses et les ordonnees de l'evolution dans des
+* tableaux xabsci et xordon
+*
+         SEGACT MEVOLL
+         KEVOLL = IEVOLL(1)
+         SEGACT KEVOLL
+         MLREE1 = IPROGX
+         MLREE2 = IPROGY
+         SEGACT MLREE1
+         SEGACT MLREE2
+         NIP = XABSCI(/2)
+*
+          DO 16 MM=1,NIP
+            XABSCI (I,MM) = MLREE1.PROG(MM)
+            XORDON (I,MM) = MLREE2.PROG(MM)
+ 16       CONTINUE
+*
+         SEGDES MLREE1
+         SEGDES MLREE2
+         SEGDES KEVOLL
+         SEGDES MEVOLL
+         ENDIF
+*
+         CALL PLACE2(JPLIB,NPLB,IPLAC,IMOD)
+         IPLIB(I,1) = IPLAC
+*
+*--------------------------------------------------------------------*
+* --- choc elementaire POINT_PLAN_FROTTEMENT avec ou sans amortissement
+*--------------------------------------------------------------------*
+*
+      ELSE IF (ITYP.EQ.3) THEN
+      
+*     -- LECTURE --
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'SUPPORT',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IMOD)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'NORMALE',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IPOI)
+         IF (IERR.NE.0) RETURN
+         MARAID = ' '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'RAIDEUR',L0,IP0,
+     &                    MARAID,I0,XRAIN,CHARRE,L1,IP1)
+         IF (MARAID .EQ. 'ENTIER  ') THEN
+           XRAIN = DBLE(I0)
+           MARAID = 'FLOTTANT'
+         ELSEIF(MARAID.NE.'FLOTTANT') THEN
+           XRAIN = 0.D0
+         ENDIF
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'JEU',L0,IP0,
+     &                    'FLOTTANT',I0,XJEU,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_GLISSEMENT',L0,IP0,
+     &                    'FLOTTANT',I0,XGLIS,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_ADHERENCE',L0,IP0,
+     &                    'FLOTTANT',I0,XADHE,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'RAIDEUR_TANGENTIELLE',L0,IP0,
+     &                    'FLOTTANT',I0,XRAIT,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'AMORTISSEMENT_TANGENTIEL',L0,
+     &                    IP0,'FLOTTANT',I0,XAMOT,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         TYPRET = ' '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'LOI_DE_COMPORTEMENT',L0,IP0,
+     &                    TYPRET,I1,X1,CHARRE,L1,IPEVO)
+         IF (IERR.NE.0) RETURN
+         IF (MARAID.EQ.'FLOTTANT' .EQV. TYPRET.EQ.'EVOLUTIO') THEN
+            CALL ERREUR(891)
+            RETURN
+         ENDIF
+         IF (TYPRET.EQ.'EVOLUTIO') THEN
+            ITYP = 103
+            XRAIN = 0.d0
+         ENDIF
+*        amortissement (facultatif)
+         MONAMO = '        '
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'AMORTISSEMENT',L0,IP0,
+     &                    MONAMO,I1,XAMON,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         IF (MONAMO .EQ. 'ENTIER  ') THEN
+           XAMON = DBLE(I1)
+           MONAMO = 'FLOTTANT'
+c        bp,2020 : ajout pour simplifier la suite           
+         ELSEIF(MONAMO.NE.'FLOTTANT') THEN
+           XAMON=0.D0
+         ENDIF
+
+*        bp,2016 petit message informatif pour ceux qui, comme moi,  
+*        n'auraient pas lu la notice jusqu'au bout :
+         IF(XRAIT.LT.0.D0) THEN
+           IF(XAMOT.LE.0D0.OR.IIMPI.GT.0) THEN
+           WRITE(IOIMP,*) 'Liaison elementaire ..._FROTTEMENT numero',I
+           WRITE(IOIMP,*) 
+     &      'utilisation du modele de frottement regularise d ODEN'
+           ENDIF
+           IF(XAMOT.LE.0D0) THEN
+c             ERREUR:  %m1:8 = %r1 inferieur a %r2
+              MOTERR(1:8)='AMOR*_T*'
+              REAERR(1)=XAMOT
+              REAERR(2)=0.D0
+              CALL ERREUR(41)
+              RETURN
+           ENDIF
+         ENDIF
+*        bp,2020 : lecture eventuelle des regularisations (n et t)
+         TYPRET='        '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'REGULARISATION',L0,IP0,
+     &                    TYPRET,IREG,XREG,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         IF (TYPRET .EQ. 'ENTIER  ') THEN
+           XREG=DBLE(IREG)
+         ELSEIF (TYPRET.NE.'FLOTTANT') THEN
+           XREG=0.D0
+         ENDIF
+         TYPRET='        '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'REGULARISATION_TANGENTIELLE',
+     &               L0,IP0,TYPRET,IREGT,XREGT,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         IF (TYPRET .EQ. 'ENTIER  ') THEN
+           XREGT=DBLE(IREGT)
+         ELSEIF (TYPRET.NE.'FLOTTANT') THEN
+           XREGT=0.D0
+         ENDIF
+*        bp,2020 : lecture eventuelle d'une vitesse d'entrainement
+         TYPRET='        '
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'VITESSE_ENTRAINEMENT',L0,IP0,
+     &                    TYPRET,I1,X1,CHARRE,L1,IPVE)
+         IF (IERR.NE.0) RETURN
+         IF(TYPRET.NE.'POINT   ') IPVE=0
+         
+*     -- STOCKAGE --
+         IPALB(I,1) = ITYP
+         IPALB(I,3) = IDIM
+         XPALB(I,1) = XRAIN
+         XPALB(I,2) = XJEU
+         XPALB(I,3) = XGLIS
+         XPALB(I,4) = XADHE
+         XPALB(I,5) = XRAIT
+         XPALB(I,6) = XAMOT
+cbp,2020         IF (MONAMO.EQ.'FLOTTANT') THEN
+            XPALB(I,7) = XAMON
+cbp,2020         ELSE
+cbp,2020            XPALB(I,7) = 0.D0
+cbp,2020         ENDIF
+         XPALB(I,8) = XREG
+         XPALB(I,9) = XREGT
+c        NORMALE
+         IPNV  = (IDIM + 1) * (IPOI - 1)
+         PS = 0.D0
+         DO 20 ID = 1,IDIM
+            XC = XCOOR(IPNV + ID)
+            PS = PS + XC * XC
+ 20      CONTINUE
+         IF (PS.LE.0.D0) THEN
+            CALL ERREUR(162)
+            RETURN
+         ENDIF
+         DO 22 ID = 1,IDIM
+            XPALB(I,9+ID) = XCOOR(IPNV + ID) / SQRT(PS)
+ 22      CONTINUE
+c        VITESSE_ENTRAINEMENT
+         IF(IPVE.NE.0) THEN
+           IPVE  = (IDIM + 1) * (IPVE - 1)
+           DO 23 ID = 1,IDIM
+              XPALB(I,9+IDIM+ID) = XCOOR(IPVE + ID)
+ 23        CONTINUE
+         ENDIF
+*        LOI_DE_COMPORTEMENT
+         IF (IPALB(I,1) .EQ. 103) THEN
+         MEVOLL = IPEVO
+*  si IEVOLL(/1) different de 1 => probleme (on veut une seule courbe)
+* Ici, on recupere les abscisses et les ordonnees de l'evolution dans des
+* tableaux xabsci et xordon
+         SEGACT MEVOLL
+         KEVOLL = IEVOLL(1)
+         SEGACT KEVOLL
+         MLREE1 = IPROGX
+         MLREE2 = IPROGY
+         SEGACT MLREE1
+         SEGACT MLREE2
+         NIP = XABSCI(/2)
+          DO 26 MM=1,NIP
+            XABSCI (I,MM) = MLREE1.PROG(MM)
+            XORDON (I,MM) = MLREE2.PROG(MM)
+ 26       CONTINUE
+         SEGDES MLREE1
+         SEGDES MLREE2
+         SEGDES KEVOLL
+         SEGDES MEVOLL
+         ENDIF
+*
+         CALL PLACE2(JPLIB,NPLB,IPLAC,IMOD)
+         IPLIB(I,1) = IPLAC
+
+         
+*--------------------------------------------------------------------*
+* --- choc elementaire CERCLE_PLAN_FROTTEMENT avec ou sans amortissement
+*--------------------------------------------------------------------*
+*
+      ELSE IF (ITYP.EQ.5) THEN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'SUPPORT',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IMOD)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'NORMALE',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IPOI)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'RAIDEUR',L0,IP0,
+     &                    'FLOTTANT',I0,XRAIN,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'JEU',L0,IP0,
+     &                    'FLOTTANT',I0,XJEU,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'RAYON_SUPPORT',L0,IP0,
+     &                    'FLOTTANT',I0,XRAYP,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_GLISSEMENT',L0,IP0,
+     &                    'FLOTTANT',I0,XGLIS,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_ADHERENCE',L0,IP0,
+     &                    'FLOTTANT',I0,XADHE,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'RAIDEUR_TANGENTIELLE',L0,IP0,
+     &                    'FLOTTANT',I0,XRAIT,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'AMORTISSEMENT_TANGENTIEL',L0,
+     &                    IP0,'FLOTTANT',I0,XAMOT,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+*
+         MONAMO = ' '
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'AMORTISSEMENT',L0,IP0,
+     &                    MONAMO,I1,XAMON,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+*
+*bp,2016 petit message informatif pour ceux qui, comme moi, n'auraient 
+*        pas lu la notice jusqu'au bout :
+         IF(XRAIT.LT.0.D0) THEN
+           IF(XAMOT.LE.0D0.OR.IIMPI.GT.0) THEN
+           WRITE(IOIMP,*) 'Liaison elementaire ..._FROTTEMENT numero',I
+           WRITE(IOIMP,*) 
+     &      'utilisation du modele de frottement regularise d ODEN'
+           ENDIF
+           IF(XAMOT.LE.0D0) THEN
+c             ERREUR:  %m1:8 = %r1 inferieur a %r2
+              MOTERR(1:8)='AMOR*_T*'
+              REAERR(1)=XAMOT
+              REAERR(2)=0.D0
+              CALL ERREUR(41)
+              RETURN
+           ENDIF
+         ENDIF
+         
+         IPALB(I,1) = ITYP
+         IPALB(I,3) = IDIM
+         XPALB(I,1) = XRAIN
+         XPALB(I,2) = XJEU
+         XPALB(I,3) = XGLIS
+         XPALB(I,4) = XADHE
+         XPALB(I,5) = XRAIT
+         XPALB(I,6) = XAMOT
+*
+         IPNV  = (IDIM + 1) * (IPOI - 1)
+         PS = 0.D0
+         DO 30 ID = 1,IDIM
+            XC = XCOOR(IPNV + ID)
+            PS = PS + XC * XC
+ 30         CONTINUE
+*        end do
+         IF (PS.LE.0.D0) THEN
+            CALL ERREUR(162)
+            RETURN
+         ENDIF
+         IF (MONAMO.EQ.'FLOTTANT') THEN
+            IPALB(I,1) = 6
+            XPALB(I,7) = XAMON
+            ID1 = 7
+         ELSE
+            ID1 = 6
+         ENDIF
+         ID8 = ID1 + 7*IDIM
+         XPALB(I,ID8+1) = XRAYP
+         DO 32 ID = 1,IDIM
+            XPALB(I,ID1+ID) = XCOOR(IPNV + ID) / SQRT(PS)
+ 32        CONTINUE
+*       end do
+         CALL PLACE2(JPLIB,NPLB,IPLAC,IMOD)
+         IPLIB(I,1) = IPLAC
+*
+*--------------------------------------------------------------------*
+* --- choc elementaire POINT_PLAN_FLUIDE
+*--------------------------------------------------------------------*
+*
+      ELSE IF (ITYP.EQ.7) THEN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'SUPPORT',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IMOD)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I0,X0,'NORMALE',L0,IP0,
+     &                    'POINT',I1,X1,CHARRE,L1,IPOI)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_INERTIE',L0,IP0,
+     &                    'FLOTTANT',I0,XINER,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_CONVECTION',L0,IP0,
+     &                    'FLOTTANT',I0,XCONV,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'COEFFICIENT_VISCOSITE',L0,IP0,
+     &                    'FLOTTANT',I0,XVISC,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,
+     &                    'COEFFICIENT_P_D_C_ELOIGNEMENT',L0,IP0,
+     &                    'FLOTTANT',I0,XPCEL,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,
+     &                    'COEFFICIENT_P_D_C_RAPPROCHEMENT',L0,IP0,
+     &                    'FLOTTANT',I0,XPCRA,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+         CALL ACCTAB(ITLB,'MOT',I1,X0,'JEU_FLUIDE',L0,IP0,
+     &                    'FLOTTANT',I0,XJEU,CHARRE,L1,IP1)
+         IF (IERR.NE.0) RETURN
+*
+         IPALB(I,1) = ITYP
+         IPALB(I,3) = IDIM
+         XPALB(I,1) = XINER
+         XPALB(I,2) = XCONV
+         XPALB(I,3) = XVISC
+         XPALB(I,4) = XPCEL
+         XPALB(I,5) = XPCRA
+         XPALB(I,6) = XJEU
+*
+         IPNV  = (IDIM + 1) * (IPOI - 1)
+         PS = 0.D0
+         DO 70 ID = 1,IDIM
+            XC = XCOOR(IPNV + ID)
+            PS = PS + XC * XC
+ 70         CONTINUE
+*        end do
+         IF (PS.LE.0.D0) THEN
+            CALL ERREUR(162)
+            RETURN
+         ENDIF
+         ID1 = 6
+         DO 72 ID = 1,IDIM
+            XPALB(I,ID1+ID) = XCOOR(IPNV + ID) / SQRT(PS)
+ 72         CONTINUE
+*        end do
+         CALL PLACE2(JPLIB,NPLB,IPLAC,IMOD)
+         IPLIB(I,1) = IPLAC
+*
+*--------------------------------------------------------------------*
+* --- choc elementaire ..._PLAN...
+*--------------------------------------------------------------------*
+*
+*     ELSE IF (ITYP.EQ.  ) THEN
+*        ...
+*        ...
+      ENDIF
+*
+      END
+
+
+
+
+
+
+ 
+ 
+ 

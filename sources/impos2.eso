@@ -1,0 +1,1287 @@
+C IMPOS2    SOURCE    MB234859  22/03/22    21:15:02     11319          
+
+*  impo bloc en 2D
+
+      SUBROUTINE IMPOS2(ipt6,ipt8,itcont)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCOORD
+-INC SMELEME
+-INC SMRIGID
+-INC SMCHPOI
+-INC SMCHAML
+-INC CCREEL
+
+* directions moyennes aux sommets
+      segment mfopa2
+        real*8 xms(nbpts),yms(nbpts)
+      endsegment
+
+      character*4 modepl(4),moforc(4)
+
+      data modepl /'UX  ','UY  ','UR  ','UZ  '/
+      data moforc /'FX  ','FY  ','FR  ','FZ  '/
+
+* definition de tableaux utilises pour mortar
+      real*8 xiG(2)
+      real*8 zetaG(2)
+      real*8 wg(2)
+*
+      idimp1 = IDIM + 1
+*
+*  Lecture du maillage support des conditions de contact
+*
+      call lirobj('MAILLAGE',ipt1,1,iretou)
+      call lirent(isous,0,iretou)
+      mchel1=0
+      call lirent(mchel1,0,iretou)
+      if (ierr.ne.0) return
+*
+*  Activation du maillage et petites verifications
+*
+      segact ipt1,ipt6,ipt8
+      nbno1 = ipt1.num(/1)
+      nbel1 = ipt1.num(/2)
+      nbno6 = ipt6.num(/1)
+      nbel6 = ipt6.num(/2)
+      nbno8 = ipt8.num(/1)
+      nbel8 = ipt8.num(/2)
+      if (ipt1.lisous(/1).ne.0) call erreur(25)
+**    write(6,*) 'nbno1 nbno6 nbno8 ',nbno1,nbno6,nbno8
+      if (ipt6.itypel.ne.2) call erreur(16)
+      if (nbno6.ne.2) call erreur(16)
+      if (ierr.ne.0) goto 900
+*
+*  Indice des ddls concernes en fonction du mode 2D
+*
+      imo = 1
+      if (ifour.eq.0) imo = 3
+*
+*   Increment sur le nombre d'elements de contact retenus et utilises
+*   dans le chpoint (mpoval et igeoc) et rigidite pour agrandir les
+*   longueurs des segments adequats
+      incnel = 2000
+*
+*  Creation de la raideur des conditions de contact
+*  Remplissage de l'entete commun
+*
+      nrigel = 1
+      segini mrigid
+      ichole = 0
+      imgeo1 = 0
+      imgeo2 = 0
+      isupeq = 0
+      iforig = ifour
+      coerig(1)=1.d0
+      mtymat='RIGIDITE'
+*
+*     MCHAML materiau associe au MMODEL     
+      MELVA1 = 0
+      MELVA2 = 0
+      IF (MCHEL1.NE.0) THEN
+        SEGACT, MCHEL1
+*  recherche rapide d'un maillage correspondant dans le mchaml
+        DO 210 n2 = 1,mchel1.imache(/1)
+*        write(ioimp,*) ' n2 imache(n2) ipt1 ',n2,mchel1.imache(n2),ipt1
+          if (mchel1.imache(n2).eq.ipt1) goto 220
+ 210    continue
+
+        goto 230
+ 220    continue
+        MCHAM1 = MCHEL1.ICHAML(n2)
+        SEGACT, MCHAM1
+        NBCO = MCHAM1.NOMCHE(/2)
+        DO JCMP = 1,NBCO
+          IF (MCHAM1.NOMCHE(JCMP).EQ.'JEU') THEN
+            MELVA1 = MCHAM1.IELVAL(JCMP)
+            SEGACT, MELVA1
+            NELJ = MELVA1.VELCHE(/2)
+            NPTELJ = min(MELVA1.VELCHE(/1),4)
+C            WRITE(*,*) 'NELJ NPTELJ ',NELJ,NPTELJ
+          ENDIF
+          IF (MCHAM1.NOMCHE(JCMP).EQ.'ADHE') THEN
+            MELVA2 = MCHAM1.IELVAL(JCMP)
+            SEGACT, MELVA2
+            NELA = MELVA2.VELCHE(/2)
+            NPTELA = min(MELVA2.VELCHE(/1),4)
+          ENDIF
+        ENDDO
+      ENDIF
+ 230  continue
+*
+*     Creation du chpoint de depi
+*
+      nat=1
+      nsoupo=1
+      segini mchpoi
+      mtypoi='DEPIMP'
+      mochde='engendré par impose'
+      ifopoi=ifour
+      jattri(1)=2
+*
+      nc=2
+      IF (MELVA2.NE.0) nc=3
+      segini msoupo
+      ipchp(1)=msoupo
+      nocomp(1)='FLX '
+      nocomp(2)='SCAL'
+      IF (MELVA2.NE.0) THEN 
+        nocomp(3)='FADH'
+      ENDIF
+*
+      nbnn  =1
+      nbelem=incnel
+      nbref =0
+      nbsous=0
+      segini ipt7
+      ipt7.itypel=1
+      igeoc=ipt7
+*
+      n=incnel
+      segini mpoval
+      ipoval=mpoval
+*      
+*  Calcul des directions moyennes
+      segact mcoord*mod
+      segini mfopa2
+*      write (6,*) ' impos2 iel1 ',nbel1,idimp1
+      do 820 iel6=1,nbel6
+*
+        ip1=ipt6.num(1,iel6)
+        ip2=ipt6.num(2,iel6)
+        ipv1 = (ip1-1)*idimp1
+        xp1 = xcoor(ipv1+1)
+        yp1 = xcoor(ipv1+2)
+        ipv2 = (ip2-1)*idimp1
+        xp2 = xcoor(ipv2+1)
+        yp2 = xcoor(ipv2+2)
+*
+*    normale a la droite (12)
+*
+        x12 = xp2 - xp1
+        y12 = yp2 - yp1
+        xn =  -y12
+        yn =   x12
+        sn = sqrt (xn*xn + yn*yn)
+        sn = max(xpetit,sn)
+        xn = xn/sn
+        yn = yn/sn
+        xms(ip1)=xms(ip1)+xn
+        yms(ip1)=yms(ip1)+yn
+        xms(ip2)=xms(ip2)+xn
+        yms(ip2)=yms(ip2)+yn
+ 820  continue
+      do 822 iel8=1,nbel8
+*
+        ip1=ipt8.num(1,iel8)
+        ip2=ipt8.num(2,iel8)
+        ipv1 = (ip1-1)*idimp1
+        xp1 = xcoor(ipv1+1)
+        yp1 = xcoor(ipv1+2)
+        ipv2 = (ip2-1)*idimp1
+        xp2 = xcoor(ipv2+1)
+        yp2 = xcoor(ipv2+2)
+*
+*    normale a la droite (12)
+*
+        x12 = xp2 - xp1
+        y12 = yp2 - yp1
+        xn =  -y12
+        yn =   x12
+        sn = sqrt (xn*xn + yn*yn)
+        sn = max(xpetit,sn)
+        xn = xn/sn
+        yn = yn/sn
+        xms(ip1)=xms(ip1)+xn
+        yms(ip1)=yms(ip1)+yn
+        xms(ip2)=xms(ip2)+xn
+        yms(ip2)=yms(ip2)+yn
+ 822  continue
+        do 821 ip = 1,nbpts
+         sn = xms(ip)*xms(ip)+yms(ip)*yms(ip)
+         sn = max(sqrt(abs(sn)),xpetit*1d10)
+         xms(ip)=xms(ip)/sn
+         yms(ip)=yms(ip)/sn
+ 821  continue
+*
+*
+*  Nombre de noeuds dans le chpoint (en totalite) : ipt7 et mpoval
+      nelch = 0
+*
+*=======================================================================
+* Formulation "faible" du contact : relation segment-segment (type 0)
+*=======================================================================
+* Nouvelle formulation, une seule relation par element maitre
+* Il faut donc reunir les relations portant sur le meme multiplicateur
+************************************************************************
+
+*   itcont 2 formulation faible
+      if (itcont.ne.2) goto 1500
+*
+*  Creation du meleme associe a la relation
+      nbnn  =5
+      nbelem=incnel
+      nbsous=0
+      nbref =0
+      segini meleme
+      itypel=22
+      irigel(1,nrigel) = meleme
+*
+*  Creation du descriptif commun a toutes les raideurs
+*
+      nligrp=9
+      nligrd=nligrp
+      segini,descr
+      lisinc(1)='LX  '
+      lisdua(1)='FLX '
+      noelep(1)=1
+      noeled(1)=1
+      do 100 i = 2, nligrp, 2
+        lisinc(i  )=modepl(imo)
+        lisinc(i+1)=modepl(imo+1)
+        lisdua(i  )=moforc(imo)
+        lisdua(i+1)=moforc(imo+1)
+        noelep(i  )=(i+2)/2
+        noelep(i+1)=noelep(i)
+        noeled(i  )=noelep(i)
+        noeled(i+1)=noelep(i)
+ 100  continue
+      segdes,descr
+      irigel(3,nrigel) = descr
+*
+*     creation du segment xmatri
+*
+      nelrig=incnel
+      segini xmatri
+      irigel(4,nrigel) = xmatri
+*
+*     ce qu'on cree est unilateral
+*
+      irigel(6,nrigel) = 1
+*
+*     ce qu'on cree est symetrique
+*
+      irigel(7,nrigel) = 0
+*
+*  Nombre d'elements crees dans meleme=irigel(nrigel,1), ipt7 et mpoval
+      nelri0 = 0
+*
+*  boucle sur le maillage support
+*
+      do 111 iel1 = 1, nbel1
+*
+        xjr = 0d0
+        if (MELVA1.ne.0) then
+           nel1 = min (iel1,nelj)
+           xjr = melva1.velche(nptelj,nel1)
+        endif
+        ip1 = ipt1.num(2,iel1)
+        ip2 = ipt1.num(3,iel1)
+        ipv = (ip1-1)*idimp1
+        xp1 = xcoor(ipv+1)
+        yp1 = xcoor(ipv+2)
+        ipv = (ip2-1)*idimp1
+        xp2 = xcoor(ipv+1)
+        yp2 = xcoor(ipv+2)
+        xp12 = xp2 - xp1
+        yp12 = yp2 - yp1
+*
+      do 110 iel6 = 1, nbel6
+        ip3 = ipt6.num(1,iel6)
+        ip4 = ipt6.num(2,iel6)
+*        write(ioimp,*) iel,ip1,ip2,ip3,ip4,ipt1.num(1,iel)
+*  verification (provisoire) que pas de noeuds doubles
+        if (ip1.eq.ip3) goto 110
+        if (ip1.eq.ip4) goto 110
+        if (ip2.eq.ip3) goto 110
+        if (ip2.eq.ip4) goto 110
+*
+        ipv = (ip3-1)*idimp1
+        xp3 = xcoor(ipv+1)
+        yp3 = xcoor(ipv+2)
+        ipv = (ip4-1)*idimp1
+        xp4 = xcoor(ipv+1)
+        yp4 = xcoor(ipv+2)
+        xp34 = xp4 - xp3
+        yp34 = yp4 - yp3
+*
+*   orientations respectives correctes des 2 segments :
+*   "normales de sens opposes" = produit scalaire negatif ou nul
+        scal = xp12*xp34 + yp12*yp34
+        xl12 = sqrt(xp12**2+yp12**2)
+        xl34 = sqrt(xp34**2+yp34**2)
+*       if (scal.gt.-xl12*xl34*0.5) goto 110
+        if (scal.gt.0.d0) goto 110
+*
+*   critere d'acceptation de l'élément :
+*   angles des diagonales
+        xl13 = sqrt((xp3-xp1)**2+(yp3-yp1)**2)
+        xl14 = sqrt((xp4-xp1)**2+(yp4-yp1)**2)
+        xl23 = sqrt((xp3-xp2)**2+(yp3-yp2)**2)
+        xl24 = sqrt((xp4-xp2)**2+(yp4-yp2)**2)
+        sca312 = (xp3-xp1)*(xp3-xp2)+(yp3-yp1)*(yp3-yp2)
+        sca412 = (xp4-xp1)*(xp4-xp2)+(yp4-yp1)*(yp4-yp2)
+        sca134 = (xp1-xp3)*(xp1-xp4)+(yp1-yp3)*(yp1-yp4)
+        sca234 = (xp2-xp3)*(xp2-xp4)+(yp2-yp3)*(yp2-yp4)
+*        write(ioimp,*) sca312/(xl13*xl23),sca412/(xl14*xl24),
+*    &                  sca134/(xl13*xl14),sca234/(xl23*xl24)
+**      if (sca312/(xl13*xl23).gt.0.50.and.
+**   >      sca412/(xl14*xl24).gt.0.50.and.
+**   >      sca134/(xl13*xl14).gt.0.50.and.
+**   >      sca234/(xl23*xl24).gt.0.50)  goto 110
+
+*   nouveau critere acceptation
+*   pts dans un cercle centree sur 1-2 aggrandi
+        xp1e=xp1-(xp2-xp1)
+        yp1e=yp1-(yp2-yp1)
+        xp2e=xp2+(xp2-xp1)
+        yp2e=yp2+(yp2-yp1)
+*
+*       Tenir compte du jeu dans le critere de selection
+        xpp3=xp3
+        ypp3=yp3
+        xpp4=xp4
+        ypp4=yp4
+        if (MELVA1.ne.0) then
+          xnorm=max(xl12,xpetit)
+          xn =  yp12/xnorm
+          yn = -xp12/xnorm
+          xjrxn = xn * xjr
+          xjryn = yn * xjr
+          xpp3=xpp3-xjrxn
+          ypp3=ypp3-xjryn
+          xpp4=xpp4-xjrxn
+          ypp4=ypp4-xjryn
+        endif
+*
+        sca312 = (xpp3-xp1e)*(xpp3-xp2e)+(ypp3-yp1e)*(ypp3-yp2e)
+        sca412 = (xpp4-xp1e)*(xpp4-xp2e)+(ypp4-yp1e)*(ypp4-yp2e)
+        if (sca312.gt.0.d0.and.
+     >      sca412.gt.0.d0) goto 110
+
+
+
+
+
+
+
+
+
+*
+* Quelle est la relation ???
+*
+*   direction du contact unitaire
+*
+        xr = xp12 - xp34
+        yr = yp12 - yp34
+        sr = sqrt(xr*xr + yr*yr)
+        xr = xr/sr
+        yr = yr/sr
+*        write(ioimp,*) 'direction contact',xr,yr,yr,-xr
+*
+*   projection des points sur la direction du contact
+*
+        xl1 = xp1*xr + yp1*yr
+        xl2 = xp2*xr + yp2*yr
+        xl3 = xp3*xr + yp3*yr
+        xl4 = xp4*xr + yp4*yr
+
+*        write(ioimp,*) 'projection pts sur contact',xl1,xl2,xl3,xl4
+*
+*   calcul de l'intersection des projections
+*
+        xm1 = min(xl1,xl2)
+        xm2 = max(xl1,xl2)
+        xm3 = min(xl3,xl4)
+        xm4 = max(xl3,xl4)
+*        write(ioimp,*) ' xmi',xm1,xm2,xm3,xm4
+*
+*  critere de precision sur l'intersection
+*
+        xcr = min(xm2-xm1,xm4-xm3)*(1.d-10)
+*
+*  taille de l'intersection
+*
+        xi = max(xm1,xm3)
+        xj = min(xm2,xm4)
+        xl = xj - xi
+*       write(ioimp,*) ' intersection',xi,xj,xl,xcr
+*
+*              write (6,*) ' impos2 ',ip1,ip2,ip3,ip4,xcr,xl
+*       if (xl.le.xcr) goto 110
+        if (xl.le.0.d0) goto 110
+*
+*   distance des points a leur projection
+*
+        d1 = (xp1-xl1*xr)*yr-(yp1-xl1*yr)*xr
+        d2 = (xp2-xl2*xr)*yr-(yp2-xl2*yr)*xr
+        d3 = (xp3-xl3*xr)*yr-(yp3-xl3*yr)*xr
+        d4 = (xp4-xl4*xr)*yr-(yp4-xl4*yr)*xr
+*
+*  coordonnées paramétriques de l'intersection sur les segments 1-2 et 3-4
+*
+        xi2 = (xi-xl1) / (xl2-xl1)
+        xi1 = (xl2-xi) / (xl2-xl1)
+
+        xj2 = (xj-xl1) / (xl2-xl1)
+        xj1 = (xl2-xj) / (xl2-xl1)
+
+        xi4 = (xi-xl3) / (xl3-xl4)
+        xi3 = (xl4-xi) / (xl3-xl4)
+
+        xj4 = (xj-xl3) / (xl3-xl4)
+        xj3 = (xl4-xj) / (xl3-xl4)
+*
+*        write(ioimp,*) ' xi1 xi2 xi3 xi4 xj1 xj2 xj3 xj4 xl '
+*        write(ioimp,*)  xi1,xi2,xi3,xi4,xj1,xj2,xj3,xj4,xl
+*        write(ioimp,*) ' d1 d2 d3 d4 ',d1,d2,d3,d4
+*
+* surface actuelle
+*
+        sc = ((xi1+xj1)*d1+(xi2+xj2)*d2+(xi3+xj3)*d3+(xi4+xj4)*d4)*0.5
+*        write(ioimp,*) 'Surface actuelle :',sc
+*
+* on a un element ou imposer la relation a ajouter
+*
+        nelri0 = nelri0 + 1
+        nelch  = nelch +1
+*
+*   on ajuste les differents segments
+*
+        if (nelri0.gt.nelrig) then
+          nelrig = nelrig + incnel
+          segadj,xmatri
+          nbelem = nbelem + incnel
+          nbnn = 5
+          segadj,meleme
+          nbnn = 1
+          segadj,ipt7
+          n = n + incnel
+          segadj,mpoval
+        endif
+*
+*   on range dans le meleme
+*
+        num(1,nelri0) = ipt1.num(1,iel1)
+        num(2,nelri0) = ip1
+        num(3,nelri0) = ip2
+        num(4,nelri0) = ip3
+        num(5,nelri0) = ip4
+        icolor(nelri0)=1
+*
+*   on remplit le xmatri
+*
+*  lambda
+        re(1,1,nelri0)= 0.d0
+*  ip1
+        re(2,1,nelri0)=  yr * (xi1+xj1) * 0.5  * xl
+        re(3,1,nelri0)= -xr * (xi1+xj1) * 0.5  * xl
+*  ip2
+        re(4,1,nelri0)=  yr * (xi2+xj2) * 0.5  * xl
+        re(5,1,nelri0)= -xr * (xi2+xj2) * 0.5  * xl
+*  ip3
+        re(6,1,nelri0)=  yr * (xi3+xj3) * 0.5  * xl
+        re(7,1,nelri0)= -xr * (xi3+xj3) * 0.5  * xl
+*  ip4
+        re(8,1,nelri0)=  yr * (xi4+xj4) * 0.5  * xl
+        re(9,1,nelri0)= -xr * (xi4+xj4) * 0.5  * xl
+*
+*  on transpose
+        do 120 ic = 2, nligrp
+          re(1,ic,nelri0)=re(ic,1,nelri0)
+ 120    continue
+*
+*  Le reste est nul
+*
+*  remplissage du champoint de depi et du maillage support
+*
+        ipt7.num(1,nelch)=ipt1.num(1,iel1)
+        vpocha(nelch,1) = (-sc - xjr) * xl
+        vpocha(nelch,2) = xl
+        IF (MELVA2.NE.0) THEN  
+          NEL2 = min (iel1,NELA)
+          VPOCHA(nelch,3) = max(MELVA2.VELCHE(NPTELA,NEL2),0.D0)*xl
+        ENDIF  
+*     write (6,*) 'impos2 vpocha re ',vpocha(nelch,1),
+*    >  (re(ip,1,nelri0),ip=2,9)
+*
+ 110   continue
+ 111   continue
+
+*     write (ioimp,*) ' nb relation type 0 ',nbelem,n,nelri0
+
+* Ajustement au plus juste puis desactivation des segments lies
+* a la rigidite du type 0
+      if (nelri0.ne.nelrig) then
+        nelrig = nelri0
+        segadj,xmatri
+        nbelem = nelri0
+        nbnn = 5
+        segadj,meleme
+      endif
+      segdes,xmatri
+*
+* S'il n'y a pas d'elements en contact, alors pas de relation unilaterale
+*     if (nelri0.eq.0) irigel(6,nrigel)=0
+
+
+
+
+
+
+      GOTO 1000
+
+*
+*=======================================================================
+* Formulation "mortar" du contact 
+*=======================================================================
+* 
+* 
+************************************************************************
+
+ 1500 continue
+
+*   itcont 3 formulation mortar
+      if (itcont.ne.4) goto 500
+*
+
+*  Creation du meleme associe a la relation
+      nbnn  =5
+      nbelem=incnel
+      nbsous=0
+      nbref =0
+      segini meleme
+      itypel=22
+      irigel(1,nrigel) = meleme
+*
+*  Creation du descriptif commun a toutes les raideurs
+*
+      nligrp=9
+      nligrd=nligrp
+      segini,descr
+      lisinc(1)='LX  '
+      lisdua(1)='FLX '
+      noelep(1)=1
+      noeled(1)=1
+      do 300 i = 2, nligrp, 2
+        lisinc(i  )=modepl(imo)
+        lisinc(i+1)=modepl(imo+1)
+        lisdua(i  )=moforc(imo)
+        lisdua(i+1)=moforc(imo+1)
+        noelep(i  )=(i+2)/2
+        noelep(i+1)=noelep(i)
+        noeled(i  )=noelep(i)
+        noeled(i+1)=noelep(i)
+ 300  continue
+      segdes,descr
+      irigel(3,nrigel) = descr
+*
+*     creation du segment xmatri
+*
+      nelrig=incnel
+      segini xmatri
+      irigel(4,nrigel) = xmatri
+*
+*     ce qu'on cree est unilateral
+*
+      irigel(6,nrigel) = 1
+*
+*     ce qu'on cree est symetrique
+*
+      irigel(7,nrigel) = 0
+*
+*  Nombre d'elements crees dans meleme=irigel(nrigel,1), ipt7 et mpoval
+      nelri0 = 0
+*
+*  boucle sur le maillage non mortar
+*
+      do 311 iel8 = 1, nbel8
+*
+*  Si jeu :
+        xjr = 0d0
+        if (MELVA1.ne.0) then
+           nel8 = min (iel8,nelj)
+           xjr = melva1.velche(nptelj,nel8)
+        endif
+        ip1 = ipt8.num(1,iel8)
+        ip2 = ipt8.num(2,iel8)
+        ipv = (ip1-1)*idimp1
+        xp1 = xcoor(ipv+1)
+        yp1 = xcoor(ipv+2)
+        ipv = (ip2-1)*idimp1
+        xp2 = xcoor(ipv+1)
+        yp2 = xcoor(ipv+2)
+        xp12 = xp2 - xp1
+        yp12 = yp2 - yp1
+*
+      do 310 iel6 = 1, nbel6
+        ip3 = ipt6.num(1,iel6)
+        ip4 = ipt6.num(2,iel6)
+*        write(ioimp,*) iel,ip1,ip2,ip3,ip4,ipt1.num(1,iel)
+*  verification (provisoire) que pas de noeuds doubles
+        if (ip1.eq.ip3) goto 310
+        if (ip1.eq.ip4) goto 310
+        if (ip2.eq.ip3) goto 310
+        if (ip2.eq.ip4) goto 310
+*
+        ipv = (ip3-1)*idimp1
+        xp3 = xcoor(ipv+1)
+        yp3 = xcoor(ipv+2)
+        ipv = (ip4-1)*idimp1
+        xp4 = xcoor(ipv+1)
+        yp4 = xcoor(ipv+2)
+        xp34 = xp4 - xp3
+        yp34 = yp4 - yp3
+*
+*   orientations respectives correctes des 2 segments :
+*   "normales de sens opposes" = produit scalaire negatif ou nul
+        scal = xp12*xp34 + yp12*yp34
+        xl12 = sqrt(xp12**2+yp12**2)
+        xl34 = sqrt(xp34**2+yp34**2)
+        if (scal.gt.0.d0) goto 310
+*
+*   nouveau critere acceptation
+*   pts dans un cercle centree sur 1-2 aggrandi
+        xp1e=xp1-(xp2-xp1)
+        yp1e=yp1-(yp2-yp1)
+        xp2e=xp2+(xp2-xp1)
+        yp2e=yp2+(yp2-yp1)
+*
+*       Tenir compte du jeu dans le critere de selection
+        xpp3=xp3
+        ypp3=yp3
+        xpp4=xp4
+        ypp4=yp4
+*   Si jeu :
+        if (MELVA1.ne.0) then
+          xnorm=max(xl12,xpetit)
+          xn =  yp12/xnorm
+          yn = -xp12/xnorm
+          xjrxn = xn * xjr
+          xjryn = yn * xjr
+          xpp3=xpp3-xjrxn
+          ypp3=ypp3-xjryn
+          xpp4=xpp4-xjrxn
+          ypp4=ypp4-xjryn
+        endif
+*
+        sca312 = (xpp3-xp1e)*(xpp3-xp2e)+(ypp3-yp1e)*(ypp3-yp2e)
+        sca412 = (xpp4-xp1e)*(xpp4-xp2e)+(ypp4-yp1e)*(ypp4-yp2e)
+        if (sca312.gt.0.d0.and.
+     >      sca412.gt.0.d0) goto 310
+
+*   Vecteurs unitaires tangent et normal (element Mortar)
+        xt34 = xp34/xl34
+        yt34 = yp34/xl34
+        xn34 = yt34
+        yn34 = -xt34
+*
+*   Projection des points non-Mortar sur le segment Mortar
+*
+        xl1 = (xp1-xp3)*xt34 + (yp1-yp3)*yt34
+        xl2 = (xp2-xp3)*xt34 + (yp2-yp3)*yt34
+*
+*   Intersection des projections et taille de l'intersection
+*
+        xm1 = min(xl1,xl2)
+        xm2 = max(xl1,xl2)
+        xi  = max(xm1,0.D0)
+        xj  = min(xm2,xl34)
+        xlmo  = xj - xi
+*       if (xlmo.le.0.d0) goto 310
+        if (xlmo.le.1.D-10) goto 310
+*
+*   Coordonnees parametriques de l'intersection des segments
+*
+*   - sur le segment 1-2 
+        xtest12 = xm2 - xm1
+        xi1 = (xi-xl2) / xtest12
+        xi2 = 1.D0 - xi1
+
+        xj1 = (xj-xl2) / xtest12
+        xj2 = 1.D0 - xj1
+*
+*   - sur le segment 3-4 
+        xi4 = xi / xl34
+        xi3 = 1.D0 - xi4
+
+        xj4 = xj / xl34
+        xj3 = 1.D0 - xj4
+*
+*   Coordonnees des points limites de la surface de contact
+*
+*   - sur le segment 1-2 
+        xnm1 = xp1 + xi2*xp12
+        ynm1 = yp1 + xi2*yp12
+        xnm2 = xp1 + xj2*xp12
+        ynm2 = yp1 + xj2*yp12
+        xnm12 = xnm2 - xnm1
+        ynm12 = ynm2 - ynm1
+        xlnm  = sqrt(xnm12**2 + ynm12**2) 
+*
+*   - sur le segment 3-4 
+        xmo1 = xp3 + xi4*xp34
+        ymo1 = yp3 + xi4*yp34
+        xmo2 = xp3 + xj4*xp34
+        ymo2 = yp3 + xj4*yp34
+        xmo12 = xmo2 - xmo1
+        ymo12 = ymo2 - ymo1
+*
+*   Points de Gauss a positionner sur l'intersection cote Non Mortar
+*
+        xref1 = 0.5 - 0.5*(1.d0/sqrt(3.d0))
+        xref2 = 0.5 + 0.5*(1.d0/sqrt(3.d0))
+*
+*   Coordonnees des points de Gauss sur Non Mortar
+*
+        xksi1 = xnm1+xref1*xnm12
+        yksi1 = ynm1+xref1*ynm12
+        xksi2 = xnm1+xref2*xnm12
+        yksi2 = ynm1+xref2*ynm12
+C
+        xnmg1 = (xksi1-xnm1)*xt34 + (yksi1-ynm1)*yt34
+        xnmg2 = (xksi2-xnm1)*xt34 + (yksi2-ynm1)*yt34
+        zksi1 = xnmg1 / xlmo
+        zksi2 = xnmg2 / xlmo
+*
+*   Projection des points de Gauss Non Mortar sur Mortar
+*
+        xmog1 = (xksi1-xmo1)*xt34 + (yksi1-ymo1)*yt34
+        xmog2 = (xksi2-xmo1)*xt34 + (yksi2-ymo1)*yt34
+        zeta1 = xmog1 / xlmo
+        zeta2 = xmog2 / xlmo
+C
+        xtau1 = xmo1+zeta1*xmo12
+        ytau1 = ymo1+zeta1*ymo12
+        xtau2 = xmo1+zeta2*xmo12
+        ytau2 = ymo1+zeta2*ymo12
+C
+        xiG(1)   = ((xi1*xl12) + (zksi1*xlnm)) / xl12
+        xiG(2)   = ((xi1*xl12) + (zksi2*xlnm)) / xl12
+        zetaG(1) = ((xi4*xl34) + (zeta1*xlmo)) / xl34
+        zetaG(2) = ((xi4*xl34) + (zeta2*xlmo)) / xl34
+C
+        wG(1) = 1.D0
+        wG(2) = 1.D0
+C
+        if (iimpi.eq.2505) then
+          write(*,*) 'NOUVELLE RELATION DE CONTACT ENTRE LES NOEUDS :' 
+          write(*,*) '==============================================='
+          write(*,*) '(ELEMENT ',iel8, 'DU MAILLAGE ',ipt8,')'
+          write(*,*) '- IP1=',ip1,'x=',xp1,'y=',yp1
+          write(*,*) '- IP2=',ip2,'x=',xp2,'y=',yp2
+          write(*,*) 'INTERSECTION DE CONTACT SUR IP1-IP2, L=',xlnm
+          write(*,*) '- POINT1(x,y) PT1=',xnm1,ynm1,';'
+          write(*,*) '- POINT2(x,y) PT2=',xnm2,ynm2,';'
+          write(*,*) 'COORDONNES DES POINTS DE GAUSS SUR IP1-IP2'
+          write(*,*) '- PDG1(x,y) PG1=',xksi1,yksi1,';'
+          write(*,*) '- PDG2(x,y) PG2=',xksi2,yksi2,';'
+          write(*,*) 'COEF PDG1 IP1=',xiG(1),' IP2=',(1.D0-xiG(1))
+          write(*,*) 'COEF PDG2 IP1=',xiG(2),' IP2=',(1.D0-xiG(2))
+C
+          write(*,*) '(ELEMENT ',iel6, 'DU MAILLAGE ',ipt6,')'
+          write(*,*) '- IP3=',ip3,'x=',xp3,'y=',yp3
+          write(*,*) '- IP4=',ip4,'x=',xp4,'y=',yp4
+          write(*,*) '- VECTEUR NORMAL ', xn34,yn34
+          write(*,*) 'INTERSECTION DE CONTACT SUR IP3-IP4, L=',xlmo
+          write(*,*) '- POINT1(x,y) PT1=',xmo1,ymo1,';'
+          write(*,*) '- POINT1(x,y) PT2=',xmo2,ymo2,';'
+          write(*,*) 'COORDONNES DES POINTS DE GAUSS SUR IP1-IP2'
+          write(*,*) '- PDG1(x,y) PG1=',xtau1,ytau1,';'
+          write(*,*) '- PDG2(x,y) PG2=',xtau2,ytau2,';'
+          write(*,*) 'COEF PDG1 IP3=',(1.D0-zetaG(1)),' IP4=',zetaG(1)
+          write(*,*) 'COEF PDG2 IP3=',(1.D0-zetaG(2)),' IP4=',zetaG(2)
+        endif
+*
+* on a un element ou imposer la relation a ajouter
+*
+        nelri0 = nelri0 + 2
+        nelch  = nelch  + 2
+*
+*   on ajuste les differents segments
+*
+        if (nelri0.gt.nelrig) then
+          nelrig = nelrig + incnel
+          segadj,xmatri
+          nbelem = nbelem + incnel
+          nbnn = 5
+          segadj,meleme
+          nbnn = 1
+          segadj,ipt7
+          n = n + incnel
+          segadj,mpoval
+        endif
+*
+*   on range dans le meleme
+*
+*   Il faut retrouver dans ipt1 les noeuds support des mult de Lag.
+        ilamb1 = 0
+        ilamb2 = 0
+        do 330 iel1 = 1, nbel1
+          if ((ipt1.num(2,iel1)).eq.ip1) then
+            ilamb1 = ipt1.num(1,iel1)
+          endif
+          if ((ipt1.num(2,iel1)).eq.ip2) then
+            ilamb2 = ipt1.num(1,iel1)
+          endif
+          if (ilamb1.ne.0.and.ilamb2.ne.0) GOTO 331
+ 330    continue
+ 331    continue
+CCCC    WRITE(*,*) 'RELATION ',ip1,ip2,ilamb1,ilamb2,ip3,ip4
+*
+        num(1,nelri0-1) = ilamb1
+        num(2,nelri0-1) = ip1
+        num(3,nelri0-1) = ip2
+        num(4,nelri0-1) = ip3
+        num(5,nelri0-1) = ip4
+*
+        num(1,nelri0) = ilamb2
+        num(2,nelri0) = ip1
+        num(3,nelri0) = ip2
+        num(4,nelri0) = ip3
+        num(5,nelri0) = ip4
+*
+**      icolor(nelri0)=2
+
+*   on initialise le xmatri
+*
+*  Matrice elementaire associee au multiplicateur lambda1
+        re(1,1,nelri0-1)= 0.d0
+*  ip1 - lambda1
+        re(2,1,nelri0-1)= 0.d0
+        re(3,1,nelri0-1)= 0.d0
+*  ip2 - lambda1
+        re(4,1,nelri0-1)= 0.d0
+        re(5,1,nelri0-1)= 0.d0 
+*  ip3 - lambda1
+        re(6,1,nelri0-1)= 0.d0
+        re(7,1,nelri0-1)= 0.d0
+*  ip4 - lambda1
+        re(8,1,nelri0-1)= 0.d0 
+        re(9,1,nelri0-1)= 0.d0
+*
+*  Matrice elementaire associee au multiplicateur lambda2
+        re(1,1,nelri0)= 0.d0
+*  ip1 - lambda2
+        re(2,1,nelri0)= 0.d0 
+        re(3,1,nelri0)= 0.d0
+*  ip2 - lambda2
+        re(4,1,nelri0)= 0.d0 
+        re(5,1,nelri0)= 0.d0
+*  ip3 - lambda2
+        re(6,1,nelri0)= 0.d0 
+        re(7,1,nelri0)= 0.d0
+*  ip4 - lambda2
+        re(8,1,nelri0)= 0.d0 
+        re(9,1,nelri0)= 0.d0 
+*
+*  CHPOINT depi
+        vpocha(nelch-1,1) = 0.d0
+        vpocha(nelch,1)   = 0.d0
+* 
+        do 350 iGauss = 1,2
+*   On recupere les valeurs des pts de Gauss et des poids
+          xiGi = xiG(iGauss)
+          zetaGi = zetaG(iGauss)
+          wGi = wG(iGauss)
+*
+*   On evalue les fonctions d'interpolation au pt de Gauss
+          fM1Gi = xiGi
+          fM2Gi = 1.D0 - xiGi
+*
+          fN1Gin = xiGi
+          fN2Gin = 1.D0 - xiGi
+          fN1Gim = 1.D0 - zetaGi
+          fN2Gim = zetaGi
+*
+*   on remplit le xmatri
+*
+*  Matrice elementaire associee au multiplicateur lambda1
+*         re(1,1,nelri0-1)= 0.d0
+*  ip1 - lambda1
+          re(2,1,nelri0-1)=re(2,1,nelri0-1) - wGi*fM1Gi*xn34*fN1Gin*xlnm
+          re(3,1,nelri0-1)=re(3,1,nelri0-1) - wGi*fM1Gi*yn34*fN1Gin*xlnm
+*  ip2 - lambda1
+          re(4,1,nelri0-1)=re(4,1,nelri0-1) - wGi*fM1Gi*xn34*fN2Gin*xlnm
+          re(5,1,nelri0-1)=re(5,1,nelri0-1) - wGi*fM1Gi*yn34*fN2Gin*xlnm
+*  ip3 - lambda1
+          re(6,1,nelri0-1)=re(6,1,nelri0-1) + wGi*fM1Gi*xn34*fN1Gim*xlnm
+          re(7,1,nelri0-1)=re(7,1,nelri0-1) + wGi*fM1Gi*yn34*fN1Gim*xlnm
+*  ip4 - lambda1
+          re(8,1,nelri0-1)=re(8,1,nelri0-1) + wGi*fM1Gi*xn34*fN2Gim*xlnm
+          re(9,1,nelri0-1)=re(9,1,nelri0-1) + wGi*fM1Gi*yn34*fN2Gim*xlnm
+*
+*  Matrice elementaire associee au multiplicateur lambda2
+*         re(1,2,nelri0)= 0.d0
+*  ip1 - lambda2
+          re(2,1,nelri0)= re(2,1,nelri0) - wGi*fM2Gi*xn34*fN1Gin*xlnm
+          re(3,1,nelri0)= re(3,1,nelri0) - wGi*fM2Gi*yn34*fN1Gin*xlnm
+*  ip2 - lambda2
+          re(4,1,nelri0)= re(4,1,nelri0) - wGi*fM2Gi*xn34*fN2Gin*xlnm
+          re(5,1,nelri0)= re(5,1,nelri0) - wGi*fM2Gi*yn34*fN2Gin*xlnm
+*  ip3 - lambda2
+          re(6,1,nelri0)= re(6,1,nelri0) + wGi*fM2Gi*xn34*fN1Gim*xlnm
+          re(7,1,nelri0)= re(7,1,nelri0) + wGi*fM2Gi*yn34*fN1Gim*xlnm
+*  ip4 - lambda2
+          re(8,1,nelri0)= re(8,1,nelri0) + wGi*fM2Gi*xn34*fN2Gim*xlnm
+          re(9,1,nelri0)= re(9,1,nelri0) + wGi*fM2Gi*yn34*fN2Gim*xlnm
+
+*  CHPOINT de jeu pour lambda1 et lamda2
+*
+          xjeu = fN1Gin*xp1+fN2Gin*xp2-(fN1Gim*xp3+fN2Gim*xp4)
+          yjeu = fN1Gin*yp1+fN2Gin*yp2-(fN1Gim*yp3+fN2Gim*yp4)
+          zjeu = xjeu*xn34 + yjeu*yn34
+*
+          ipt7.num(1,nelch-1) = ilamb1
+          vpocha(nelch-1,1) = vpocha(nelch-1,1) + wGi*fM1Gi*zjeu*xlnm
+*
+          ipt7.num(1,nelch) = ilamb2
+          vpocha(nelch,1) = vpocha(nelch,1) + wGi*fM2Gi*zjeu*xlnm
+
+ 350    continue
+*
+        vpocha(nelch-1,2) = xlnm
+        vpocha(nelch  ,2) = xlnm
+*
+*  on transpose
+        do 320 ic = 2, nligrp
+          re(1,ic,nelri0-1)= re(ic,1,nelri0-1)
+          re(1,ic,nelri0)  = re(ic,1,nelri0)
+ 320    continue
+*
+ 310   continue
+ 311   continue
+
+*     write (ioimp,*) ' nb relation type 0 ',nbelem,n,nelri0
+
+* Ajustement au plus juste puis desactivation des segments lies
+* a la rigidite du type 0
+      if (nelri0.ne.nelrig) then
+        nelrig = nelri0
+        segadj,xmatri
+        nbelem = nelri0
+        nbnn = 5
+        segadj,meleme
+      endif
+      segdes,xmatri
+*
+* S'il n'y a pas d'elements en contact, alors pas de relation unilaterale
+*     if (nelri0.eq.0) irigel(6,nrigel)=0
+      GOTO 1000
+
+*=======================================================================
+* Formulation "forte" (standard) du contact :
+*=======================================================================
+ 500  continue
+*
+* Relation type 2 : noeud-segment
+*---------------------------------
+*     creation du meleme associe a la relation
+*
+      nbnn   = 4
+      nbelem = incnel
+      nbsous = 0
+      nbref  = 0
+      segini meleme
+      itypel=22
+      irigel(1,nrigel)=meleme
+*
+*     creation du descriptif commun a toutes les raideurs
+*
+      nligrp=7
+      nligrd=nligrp
+      segini descr
+      lisinc(1)='LX  '
+      lisdua(1)='FLX '
+      noelep(1)=1
+      noeled(1)=1
+      do 510 i=2,nligrp,2
+        lisinc(i  )=modepl(imo)
+        lisinc(i+1)=modepl(imo+1)
+        lisdua(i  )=moforc(imo)
+        lisdua(i+1)=moforc(imo+1)
+        noelep(i  )=(i+2)/2
+        noelep(i+1)=noelep(i)
+        noeled(i  )=noelep(i)
+        noeled(i+1)=noelep(i)
+ 510  continue
+      segdes,descr
+      irigel(3,nrigel)=descr
+*
+*     creation du segment xmatri
+*
+      nelrig=incnel
+      segini xmatri
+      irigel(4,nrigel)=xmatri
+*
+*     ce qu'on cree est unilateral
+*
+      irigel(6,nrigel)=1
+*
+*     ce qu'on cree est symetrique
+*
+      irigel(7,nrigel)=0
+*
+*  Nombre d'elements dans la rigidite de type 2
+      nelri2=0
+*
+*  boucle sur le maillage support
+*
+*     write(6,*) 'nbel6 nbel1',nbel6,nbel1
+
+
+      do 519 iel6 = 1,nbel6
+        ip1 = ipt6.num(1,iel6)
+        ip2 = ipt6.num(2,iel6)
+        ipv = (ip1-1)*idimp1
+        xp1 = xcoor(ipv+1)
+        yp1 = xcoor(ipv+2)
+        ipv = (ip2-1)*idimp1
+        xp2 = xcoor(ipv+1)
+        yp2 = xcoor(ipv+2)
+        x12 = xp2 - xp1
+        y12 = yp2 - yp1
+        sr2=x12**2+y12**2
+        sr= sqrt (max(xpetit,sr2))
+
+        do 520 iel1=1,nbel1
+        xjr = 0.d0
+        if (MELVA1.ne.0) then
+          nel1 = min (iel1,nelj)
+          xjr = melva1.velche(nptelj,nel1)
+*        write(ioimp,*) iel,xjr,mchel1
+        endif
+        jp  = ipt1.num(2,iel1)
+*      write(ioimp,*) iel1,ip1,ip2,jp
+*
+*  verification que pas relation du point sur lui meme
+        if (jp.eq.ip1) goto 520
+        if (jp.eq.ip2) goto 520
+
+        ipv = (jp-1)*idimp1
+        xp  = xcoor(ipv+1)
+        yp  = xcoor(ipv+2)
+
+        x1p = xp - xp1
+        y1p = yp - yp1
+        x2p = xp - xp2
+        y2p = yp - yp2
+*  distance signee de p a la ligne 1-2
+        dp12s = x1p * y12 - y1p * x12
+*        write(ioimp,*) 'dist. signee',dp12s
+*   verif que le point est du bon cote du segment (a une tolerance de ratrapage pres)
+*       if (dp12s.lt.-sr2) goto 520
+
+*  verification si autre point dans le cercle de selection (tres legerement agrandi)      
+        tx12=x12/sr
+        ty12=y12/sr
+*
+        x1e = xp1-tx12*xszpre 
+        y1e = yp1-ty12*xszpre 
+        x2e = xp2+tx12*xszpre 
+        y2e = yp2+ty12*xszpre 
+*
+*       Tenir compte du jeu dans le critere de selection
+        xpp=xp
+        ypp=yp
+        if (MELVA1.ne.0) then
+          xn =  ty12
+          yn = -tx12
+          xjrxn = xn * xjr
+          xjryn = yn * xjr
+          xpp=xpp-xjrxn
+          ypp=ypp-xjryn
+        endif
+        x1pe=xpp-x1e
+        y1pe=ypp-y1e
+        x2pe=xpp-x2e
+        y2pe=ypp-y2e
+*
+        d1pe = x1pe*x1pe + y1pe*y1pe
+        d2pe = x2pe*x2pe + y2pe*y2pe
+        if (abs(d1pe).lt.XPETIT) d1pe=1
+        if (abs(d2pe).lt.XPETIT) d2pe=1
+        scal = (x1pe*x2pe + y1pe*y2pe) / sqrt(d1pe*d2pe)
+*       write(ioimp,*) 'cos(angle_1p2)',scal,d1pe,d2pe
+        if (scal.gt.0.8) goto 520
+*
+* on a un point ou imposer la relation
+* Quelle est la relation ???
+*
+*   direction de la relation
+*
+* initialisation avec la direction normale, calcul du point projete, puis
+* iteration en reestimant la normale a partir du point projete
+*
+         xn =  -y12
+         yn =   x12
+*        sn = sqrt (max(xpetit,xn*xn + yn*yn))
+         xn = xn/sr
+         yn = yn/sr
+
+        do iter=1,16
+*   calcul du pt a mettre en relation avec ip : alpha ip2 + (1-alpha) ip1
+*  projection suivant la normale
+           beta=(x1p*y12-y1p*x12)
+           beta=beta/((xn*y12-yn*x12))
+           xpr=xp-beta*xn
+           ypr=yp-beta*yn
+           alpha=((xpr-xp1)*x12+(ypr-yp1)*y12)/sr2
+           alpha=min(max(0.d0,alpha),1.d0)
+*
+* nouvelle normale normalisee
+        xn=(1.-alpha)*xms(ip1)+alpha*xms(ip2)
+        yn=(1.-alpha)*yms(ip1)+alpha*yms(ip2)
+           sn = sqrt (max(xpetit,xn*xn + yn*yn))
+         xn = xn/sn
+         yn = yn/sn
+        enddo
+* verif dans le segment
+        alpha=((xpr-xp1)*x12+(ypr-yp1)*y12)/sr2
+C
+C       Ecrire la relation si point legerement (1D-4) en dehors du segment
+        pond = 1.d0
+        if (alpha.lt.0.d0) pond = 1.D0 + alpha*1.D4
+        if (alpha.gt.1.d0) pond = 1.D0 + (1.D0 - alpha)*1.D4
+        pond = max(pond,0.D0)
+        pond = min(pond,1.D0)
+        if (pond.le.0.d0) goto 520
+*  verif compatibilite avec la normale au poin impactant
+           if (xms(jp)*xn+yms(jp)*yn.gt. -0.0d0) then
+**        write (6,*) ' impos2 normales incompatibes 1 ',
+**   >  jp,xjeu,dpm,dist
+             goto 520
+           endif
+ 1954   continue
+*
+* on a un element ou imposer la relation a ajouter
+*
+        nelri2 = nelri2 + 1
+        nelch = nelch + 1
+*
+*   on ajuste les differents segments
+*
+        if (nelri2.gt.nelrig) then
+          nelrig = nelrig + incnel
+          segadj,xmatri
+          nbelem = nbelem + incnel
+          nbnn = 4
+          segadj,meleme
+          nbnn = 1
+          segadj,ipt7
+          n = n + incnel
+          segadj,mpoval
+        endif
+*
+*   on range dans le meleme
+*
+        num(1,nelri2)=ipt1.num(1,iel1)
+        num(2,nelri2)=ip1
+        num(3,nelri2)=ip2
+        num(4,nelri2)=jp
+*
+*   on remplit le xmatri
+*
+*  lambda
+        re(1,1,nelri2)= 0.d0
+*  ip1
+        re(2,1,nelri2)=  -xn * (1.-alpha) * sr * pond
+        re(3,1,nelri2)=  -yn * (1.-alpha) * sr * pond
+*  ip2
+        re(4,1,nelri2)=  -xn * alpha      * sr * pond
+        re(5,1,nelri2)=  -yn * alpha      * sr * pond
+*  jp
+        re(6,1,nelri2)= xn              * sr   * pond
+        re(7,1,nelri2)= yn              * sr   * pond
+*  on transpose
+        re(1,2,nelri2) = re(2,1,nelri2)
+        re(1,3,nelri2) = re(3,1,nelri2)
+        re(1,4,nelri2) = re(4,1,nelri2)
+        re(1,5,nelri2) = re(5,1,nelri2)
+        re(1,6,nelri2) = re(6,1,nelri2)
+        re(1,7,nelri2) = re(7,1,nelri2)
+*  le reste est nul
+*
+*  remplissage du champoint de depi
+*
+        xjeu1 = x1p*xn + y1p*yn
+        xjeu2 = x2p*xn + y2p*yn
+        xjeu  = (1.-alpha)*xjeu1 + alpha * xjeu2
+        ipt7.num(1,nelch) = ipt1.num(1,iel1)
+        vpocha(nelch,1) = (-xjeu - xjr)*sr * pond
+        vpocha(nelch,2) = sr * pond
+        IF (MELVA2.NE.0) THEN  
+          NEL2 = min (iel1,NELA)
+          VPOCHA(nelch,3) = max(MELVA2.VELCHE(NPTELA,NEL2),0.D0)*sr
+        ENDIF  
+**      write(ioimp,*) ' jeu type 2 ',nelri2,nelch,vpocha(nelch,1),
+**   &                 ipt7.num(1,nelch),ip1,ip2,jp
+ 520  continue
+ 519  continue
+*
+*      write (ioimp,*) ' nb relation type 2 ',nelri2
+*
+* Ajustement au plus juste puis desactivation des segments lies
+* a la rigidite du type 2
+      if (nelri2.ne.nelrig) then
+        nelrig = nelri2
+        segadj,xmatri
+        nbelem = nelri2
+        nbnn = 4
+        segadj,meleme
+      endif
+      segdes,xmatri
+*
+*  si il n'y a rien on dit que pas unilateral pour pas passer dans unilater
+*     if (nbelem.eq.0) irigel(6,nrigel) = 0
+*
+ 700  CONTINUE
+*
+      GOTO 1000
+*
+*----------------------------
+*    on renvoie le resultat
+*----------------------------
+ 1000 CONTINUE
+      segsup mfopa2
+*
+* Ajustement au plus juste du chpoint de depi (jeu) : mpoval et ipt7
+* puis desactivation du chpoint
+      if (n.ne.nelch) then
+        n = nelch
+        segadj,mpoval
+        nbnn   = 1
+        nbelem = nelch
+        nbsous = 0
+        nbref  = 0
+        segadj,ipt7
+      endif
+* Desctivation de la matrice de raideur de contact
+      segdes,mrigid
+*
+* Reunion des relations portant sur le meme multiplicateur de lagrange
+*
+      call impofu(MRIGID,MCHPOI)
+*
+* Ecriture des objets resultats
+      call ecrobj('RIGIDITE',mrigid)
+      call actobj('CHPOINT ',mchpoi,1)
+      call ecrobj('CHPOINT ',mchpoi)
+
+ 900  continue
+      end
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

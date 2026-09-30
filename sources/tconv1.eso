@@ -1,0 +1,115 @@
+C TCONV1    SOURCE    CB215821  21/02/11    21:15:29     10886          
+      SUBROUTINE TCONV1(ipmail,IPINTE,IVAMAT,ipmatr,LRE,NLG,NEF)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+C=======================================================================
+C=                            T C O N V 1                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=  Calcul de la matrice de CONVECTION des elements a integration      =
+C=  numerique                                                          =
+C=                                                                     =
+C=  Clement BERTHINIER, le 04 fevrier 2021.                            =
+C=======================================================================
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+-INC SMRIGID
+-INC SMCHAML
+-INC SMINTE
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS),IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+      
+      SEGMENT MMAT1
+        REAL*8 CEL(LRE,LRE),XE(3,NBNN)
+        REAL*8 SHP(6,NBNN),FORME(NBNN)
+      ENDSEGMENT
+
+      MELEME = IPMAIL
+      NBNN   = NUM(/1)
+      NBELEM = NUM(/2)
+      
+      MINTE  = IPINTE
+      NBPGAU = POIGAU(/1)
+
+C     Preparation du champ de caracteristiques 'H'
+      MPTVAL = IVAMAT
+      MELVAL = MPTVAL.IVAL(1)
+      IVEL1  = VELCHE(/1)
+      IVEL2  = VELCHE(/2)
+        
+      XMATRI = IPMATR
+      
+      SEGINI,MMAT1
+      
+C 1.7 - Comme on traite la CONVECTION et les echanges FACE A FACE, on
+C       introduit le nombre de NOEUDS pour les elements FACE A FACE.
+C ===
+      NBN2 = NBNN
+      IF ((NEF.EQ.12) .OR. (NEF.EQ.13) .OR. (NEF.EQ.18) .OR.
+     &    (NEF.EQ.19) .OR. (NEF.EQ.20) .OR. (NEF.EQ.21) .OR.
+     &    ((IDIM.EQ.1).AND.(NEF.EQ.2)) )
+     &  NBN2 = NBNN / 2
+C     Equivalent a ?  IF (ICON.GE.7) NBN2 = NBNN / 2
+
+ 
+C 3.2 - Boucle sur les elements du maillage elementaire (ipmail)
+C ==============================================================
+        DO iel = 1, nbelem
+
+          iemn = MIN(iel,IVEL2)
+C- Mise a zero de la matrice de CONVECTION de l'element iel
+          CALL ZERO(CEL,LRE,LRE)
+C- Recuperation des coordonnees GLOABLES des noeuds de l'element
+          CALL DOXE(XCOOR,IDIM,NBNN,NUM,iel,XE)
+
+C- BOUCLE sur les points de Gauss de l'element iel
+          iFois = 0
+          DO igau = 1, NBPGAU
+
+C-- Calcul du jacobien, des fonctions de forme et de leurs
+C-- derivees au point de Gauss igau
+            CALL TCONV3(NLG,igau,NBNN,NBN2,XE,SHPTOT,SHP,FORME,DJAC)
+            IF (IERR.NE.0) RETURN
+            IF (DJAC.LT.XZERO) iFois=iFois+1
+            DJAC = ABS(DJAC)
+C-- Erreur si le jacobien est nul en ce point de Gauss
+            IF (DJAC.LT.XPETIT) THEN
+              INTERR(1) = iel
+              CALL ERREUR(259)
+              RETURN
+            ENDIF
+C-- Calcul du terme .Vol en ce point de Gauss
+            igmn = MIN(igau,IVEL1)
+            COEF = DJAC * POIGAU(igau) * VELCHE(igmn,iemn)
+C-- Calcul de la contribution du point de Gauss a la matrice de
+C-- CONVECTION elementaire pour cet element fini
+            CALL NTNST(FORME,COEF,LRE,1,CEL)
+          ENDDO
+C- FIN DE LA BOUCLE sur les points d'integration de l'element iel
+
+C- Erreur si, en un point de Gauss, le jacobien change de signe.
+          IF (iFois.NE.0.AND.iFois.NE.NBPGAU) THEN
+            INTERR(1) = iel
+            CALL ERREUR(195)
+            RETURN
+          ENDIF
+C- Stockage de la matrice de CONVECTION pour cet element fini :
+C- remplissage de xmatri
+          CALL REMPMT(CEL,LRE,xmatri.re(1,1,iel))
+
+        ENDDO
+C= FIN DE LA BOUCLE sur les elements
+
+        SEGSUP,MMAT1
+      END 

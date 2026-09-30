@@ -1,0 +1,90 @@
+C BWCW3D    SOURCE    PV090527  23/01/27    21:15:11     11574          
+      subroutine bwcw3d(bw,pw,mshr,kmat,epse6,epsk6,
+     # epsm6,epspc6,epspt6,epspw6,epspg6,epsps6,bw1,pw1,mwat,
+     # np,dp_deplc,dp_deplt,dp_deplw,dp_deplg,dp_depls,
+     # dp_depse,dp_depsk,dp_depsm,slimtp)
+      
+c     calcul de la pression de gel et du coeff de biot associé
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+c     variables externes
+      real*8 bw,pw,mwat,bw1,pw1,mshr,kmat
+      integer np
+      real*8 dp_deplc(np,6),dp_deplt(np,6),dp_deplw(np,6),dp_deplg(np,6)
+      real*8 dp_depls(np,6),dp_depse(np,6),dp_depsk(np,6),dp_depsm(np,6) 
+      real*8 epse6(6),epsk6(6),epsm6(6),epspc6(6),epspt6(6),slimtp(np)
+      real*8 epspg6(6),epspw6(6),epsps6(6)
+          
+c     variables locales
+      real*8 trepsw,trepse,trepsk,trepsm 
+
+c     contrainte maxi de traction compatible
+      slimtp(1)=0.d0       
+
+      if(pw.ne.0.) then
+       if(bw.gt.0.) then
+c        raideur des clusters hydriques       
+         mwat=-kmat/bw
+         trepsw=0.d0
+         do i=1,3
+             trepsw=trepsw+epspw6(i)
+         end do
+c        reduction de l effet de leau a cause de la fissuration         
+         pw1=pw-mwat*trepsw
+         bw1=bw
+         if(pw1.gt.0.d0) then
+           pw1=0.d0
+         end if
+         do i=1,6
+            dp_depse(1,i)=0.d0
+            dp_depsk(1,i)=0.d0
+            dp_depsm(1,i)=0.d0
+            dp_deplc(1,i)=0.d0
+            dp_deplt(1,i)=0.d0
+            if (i.le.3) then
+               dp_deplw(1,i)=-mwat
+            else
+               dp_deplw(1,i)=0.d0
+            end if
+            dp_deplg(1,i)=0.d0
+            dp_depls(1,i)=0.d0
+         end do
+       else
+c       bwPw tend vers 0 bwpw tend vers Mshr (que si mvg=1/2 !)      
+        pw1=-mshr
+        bw1=1.0d0
+        do i=1,6
+            dp_depse(1,i)=0.d0
+            dp_depsk(1,i)=0.d0
+            dp_depsm(1,i)=0.d0
+            dp_deplc(1,i)=0.d0
+            dp_deplt(1,i)=0.d0
+            dp_deplw(1,i)=0.d0
+            dp_deplg(1,i)=0.d0
+            dp_depls(1,i)=0.d0
+         end do
+       end if
+      else
+        pw1=0.d0
+        bw1=bw
+        do i=1,6
+            dp_depse(1,i)=0.d0
+            dp_depsk(1,i)=0.d0
+            dp_depsm(1,i)=0.d0        
+            dp_deplc(1,i)=0.d0
+            dp_deplt(1,i)=0.d0
+            dp_deplw(1,i)=0.d0
+            dp_deplg(1,i)=0.d0
+            dp_depls(1,i)=0.d0
+         end do          
+      end if
+c      do i=1,6
+c       print*, 'bwcw3d dp_depse(1,',i,')=',dp_depse(1,i)
+c      end do
+      return
+      end
+         
+         
+ 

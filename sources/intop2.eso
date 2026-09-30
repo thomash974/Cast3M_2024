@@ -1,0 +1,68 @@
+C INTOP2    SOURCE    GOUNAND   21/04/06    21:15:13     10940          
+      SUBROUTINE INTOP2(TRAVJ,IMPR)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : INTOP2
+C DESCRIPTION : Initialise une topologie inverse
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 02/10/2017, version initiale
+C HISTORIQUE : v1, 02/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP1      
+*-INC STOPINV
+*-INC STRAVJ
+*
+      INTEGER IMPR
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans intop2.eso'
+      IDIMP=IDIM+1
+      NBELEM=NVMAX
+      NBPTS=NPMAX
+      SEGINI TOPINV
+      TRAVJ.TOPI=TOPINV
+*
+* Initialisation de la topologie inverse
+*     
+*      SEGINI TOPINV
+      DO IPO=1,NBPTS
+         TIC(IPO)=-1
+      ENDDO
+      LDGT=0
+*
+* Normal termination
+*
+      RETURN
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='INTOP2  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine INTOP2
+*
+      END
+
+ 

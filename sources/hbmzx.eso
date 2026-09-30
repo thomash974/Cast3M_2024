@@ -1,0 +1,129 @@
+C HBMZX     SOURCE    BP208322  20/10/05    21:15:22     10742          
+
+        SUBROUTINE HBMZX(NT,NDDL,ISD,X,OMEG,XM,XC,XK,ZX,LOGAMO)
+              
+*=======================================================================
+* ZX: calcul du produit Z(w)*X
+*
+* Z : Matrice de raideur dynamique
+*     = | w²*kron(DL²,M) + w*kron(DL,C) + kron(I,K)  si LOGAMO
+*       | w²*kron(DL²,M)                + kron(I,K)  sinon
+* X : coefficients de Fourier
+* w : frequence
+*=======================================================================
+
+
+*----- Declarations ----------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+        
+        REAL*8 X(NT),ZX(NT),OMEG
+        REAL*8 XM(NDDL,NDDL),XC(NDDL,NDDL),XK(NDDL,NDDL)
+        REAL*8 CF
+        INTEGER NT,NDDL,ISD,H,I,J,M,P,Q
+        LOGICAL LOGAMO
+        
+*       Nombre d'harmoniques
+        NH = (NT/NDDL - 1)/2
+*
+
+*------ Matrices diagonales --------------------------------------------
+        IF (ISD.EQ.1) THEN
+        
+*         Termes constants
+          DO 1 P=1,NDDL
+             ZX(P) = XK(P,1)*X(P)
+ 1        CONTINUE
+*
+c        -cas non conservatif (i.e. avec amortissement)
+          IF (LOGAMO) THEN
+          
+           DO 10 J=1,2*NH           
+*             Termes paires (sin)
+              IF (MOD(J,2).EQ.0) THEN
+                  cf = -J/2.D0
+                  DO 11 I = 1,NDDL 
+              ZX(J*nddl+I)=(XK(I,1)-((OMEG*cf)**2)*XM(I,1))*x(J*nddl+I)+
+     &        OMEG*cf*XC(I,1)*x((J-1)*nddl+I)
+ 11               CONTINUE
+*             Termes impaires (cos)     
+              ELSE
+                  cf = (J+1)/2.D0
+                  DO 12 I = 1,NDDL
+                    ZX(J*nddl+I)=(XK(I,1)-((OMEG*cf)**2)*XM(I,1))* 
+     &                X(J*nddl+I)+ OMEG*cf*XC(I,1)*x((J+1)*NDDL+I)                       
+ 12               CONTINUE
+              ENDIF              
+ 10        CONTINUE
+
+c        -cas conservatif (i.e. sans amortissement)
+          ELSE
+           DO 20 J=1,2*NH           
+*             Termes paires (sin)
+              IF (MOD(J,2).EQ.0) THEN
+                  cf = -J/2.D0
+                  DO 21 I = 1,NDDL 
+              ZX(J*nddl+I)=(XK(I,1)-((OMEG*cf)**2)*XM(I,1))*x(J*nddl+I)
+ 21               CONTINUE
+*             Termes impaires (cos)     
+              ELSE
+                  cf = (J+1)/2.D0
+                  DO 22 I = 1,NDDL
+                   ZX(J*nddl+I)=(XK(I,1)-((OMEG*cf)**2)*XM(I,1))* 
+     &                X(J*nddl+I)                  
+ 22               CONTINUE
+              ENDIF              
+ 20        CONTINUE
+          ENDIF              
+
+
+*------ Matrices generales ---------------------------------------------
+        ELSE
+        
+*         Termes constants
+          DO 101 P=1,NDDL
+          DO 102 Q=1,NDDL
+                 ZX(P) = ZX(P) + XK(P,Q)*X(Q)
+102       CONTINUE        
+101       CONTINUE
+
+c        -cas non conservatif (i.e. avec amortissement)
+          IF (LOGAMO) THEN          
+
+            DO 111 J=2,2,2*NH
+               DO 112 M=1,NDDL
+                  ZX(J*NDDL+M) = 0.D0 
+                  DO 113 H=1,NDDL
+             ZX(J*NDDL+M)=ZX(J*NDDL+M)+(XK(M,H)-((J*OMEG)**2)*XM(M,H))    
+     &       *X(J*NDDL+H)+(J*OMEG)*XC(M,H)*X((J+1)*NDDL+H)
+             ZX((J+1)*NDDL+M)=ZX((J+1)*NDDL+M)-(XK(M,H)+((J*OMEG)**2)
+     &       *XM(M,H))*X((J+1)*NDDL+H)-(J*OMEG)*XC(M,H)*X(J*NDDL+H)          
+ 113              CONTINUE
+ 112           CONTINUE
+ 111        CONTINUE
+
+c        -cas conservatif (i.e. sans amortissement)
+          ELSE
+            DO 121 J=2,2,2*NH
+               DO 122 M=1,NDDL
+                  ZX(J*NDDL+M) = 0.D0 
+                  DO 123 H=1,NDDL
+             ZX(J*NDDL+M)=ZX(J*NDDL+M)+(XK(M,H)-((J*OMEG)**2)*XM(M,H))    
+     &       *X(J*NDDL+H)
+             ZX((J+1)*NDDL+M)=ZX((J+1)*NDDL+M)+(XK(M,H)-((J*OMEG)**2)
+     &       *XM(M,H))*X((J+1)*NDDL+H)         
+ 123              CONTINUE
+ 122           CONTINUE
+ 121        CONTINUE
+          
+          ENDIF              
+
+        ENDIF
+        
+        RETURN
+        END
+        
+ 
+ 
+ 

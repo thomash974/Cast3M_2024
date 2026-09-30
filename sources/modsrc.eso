@@ -1,0 +1,16 @@
+C MODSRC    SOURCE    PASCAL    19/11/19    21:15:35     10384          
+      subroutine modsrc(momodl,nmod)
+
+      implicit integer(i-n)
+      implicit real*8(a-h,o-z)
+      CHARACTER*16 MOMODL(*)
+*
+      nmod=3
+      MOMODL(1)='GAUSSIENNE'
+      MOMODL(2)='ISOTROPE'
+      MOMODL(3)='ISOTROPE_TRANSVE'
+
+      return
+      end
+
+ 

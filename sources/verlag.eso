@@ -1,0 +1,200 @@
+C VERLAG    SOURCE    FANDEUR   22/01/19    21:15:18     11256          
+        subroutine verlag(mrigid)
+*  verification que les noeuds supports des LX n'aparaissent
+*  qu'une seule fois
+*  si ce n'est pas le cas et si c'est le meme descr, fusion des raideurs elementaires
+      IMPLICIT INTEGER(I-N)
+        IMPLICIT REAL*8(A-H,O-Z)
+-INC SMRIGID
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMCOORD
+-INC SMELEME
+*  tableau de compression general
+      segment ncpr(nbpts)
+*  tableau ir par lx
+      segment lxir(nbpt)
+*  tableau elem par lx
+      segment lxel(nbpt)
+*  tableau descripteur par lx
+      segment lxde(nbpt)
+*
+      segini ncpr
+      nbpt=0
+       segact mrigid
+       do irig=1,irigel(/2)
+         meleme=irigel(1,irig)
+         segact meleme
+         if (itypel.eq.22) then
+         do iel=1,num(/2)
+           ipt=num(1,iel)
+           if (ncpr(ipt).eq.0) then
+             nbpt=nbpt+1
+             ncpr(num(1,iel))=nbpt
+           endif
+         enddo
+         endif
+       enddo
+*
+       segini lxir,lxel,lxde
+       nrigel=0
+       segini ri1
+       ri1.mtymat = 'VERLAG'
+       ri1.iforig = mrigid.iforig
+       do ir=1,irigel(/2)
+         meleme=irigel(1,ir)
+         descr =irigel(3,ir)
+         xmatri=irigel(4,ir)
+**       write(6,*) ' verlag ir meleme xmatri',ir,meleme,xmatri
+         segact xmatri
+         if(itypel.eq.22) then
+           do iel=1,num(/2)
+            lx=ncpr(num(1,iel))
+            if (lxir(lx).eq.0) then
+               lxir(lx)=ir
+               lxel(lx)=iel
+               lxde(lx)=descr
+*             write(6,*) 'premier passage ',iel,lx,lxir(lx),lxel(lx)
+            else
+*  doit t'on faire une fusion?
+               if (lxde(lx).ne.descr.or.lxir(lx).lt.0) then
+            write(6,*) 'lxde lxel lxir',ir,lx,lxde(lx),lxel(lx),lxir(lx)
+                interr(1)=num(2,iel)
+                interr(2)=num(1,iel)
+                call erreur(919)
+                return
+               endif
+**            write(6,*) 'fusion avec ',iel,lx,lxir(lx),lxel(lx)
+*  ok on fusionne
+               nrigel=nrigel+1
+               segadj ri1
+               nbsous=0
+               nbref=0
+               nbelem=1
+               nbnn=num(/1)
+               segini ipt1
+               ipt1.itypel=22
+               ipt2=irigel(1,lxir(lx))
+               segact ipt2
+               do ip=1,nbnn
+                 ipt1.num(ip,1)=num(ip,iel)
+             if(ipt2.num(ip,lxel(lx)).ne.num(ip,iel))call erreur(919)
+               enddo
+               ri1.irigel(1,nrigel)=ipt1
+               ri1.irigel(3,nrigel)=descr
+                xmatr1=irigel(4,lxir(lx))
+                segact xmatr1
+                ielo=lxel(lx)
+                nelrig=1
+                nligrd=re(/1)
+                nligrp=re(/2)
+          if(nligrd.ne.xmatr1.re(/1).or.nligrp.ne.xmatr1.re(/2)) then
+                 call erreur(919)
+          endif
+**              write(6,*) 'xmatr2 nligrd,nligrp,nelrig ',
+**   >             nligrd,nligrp,nelrig
+                segini xmatr2
+                xmatr2.symre=max(symre,xmatr1.symre)
+                do ip=1,re(/2)
+                do id=1,re(/1)
+         xmatr2.re(id,ip,1)=re(id,ip,iel)*coerig(ir)+
+     >   xmatr1.re(id,ip,ielo)*coerig(lxir(lx))
+                enddo
+                enddo
+                ri1.irigel(4,nrigel)=xmatr2
+                ri1.coerig(nrigel)=1.d0
+                ri1.irigel(6,nrigel)=irigel(6,ir)
+                ri1.irigel(7,nrigel)=max(irigel(7,ir),
+     >                                   irigel(7,lxir(lx)))
+                ri1.irigel(8,nrigel)=max(irigel(8,ir),
+     >                                   irigel(8,lxir(lx)))
+*  flag raideur a supprimer
+                lxir(lx)=-nrigel
+            endif
+           enddo
+         endif
+       enddo
+*  ri1 contient les matrices fusionnees
+*  il ne reste plus qu'a comprimer mrigid
+       if(nrigel.eq.0) then
+           segsup ncpr,lxir,lxel,lxde
+           segsup ri1
+           return
+       endif
+       nrigcr=nrigel
+       nrigel=nrigcr+irigel(/2)
+       segadj ri1
+       ir2=nrigcr
+       do ir=1,irigel(/2)
+        meleme=irigel(1,ir)
+        xmatri=irigel(4,ir)
+        iel2=0
+*  si pas de lx, on ne fait rien
+        if(itypel.ne.22) then
+         iel2=num(/2)
+        else
+        do iel=1,num(/2)
+         if(lxir(ncpr(num(1,iel))).gt.0) iel2=iel2+1
+        enddo
+        endif
+        if (iel2.ne.num(/2)) then
+         nbsous=0
+         nbref=0
+         nbnn=num(/1)
+         nbelem=iel2
+         segini ipt1
+         ipt1.itypel=itypel
+         nligrd=re(/1)
+         nligrp=re(/2)
+         nelrig=iel2
+**          write(6,*) 'verlag ipt1 nbnn nbelem ',ipt1,nbnn,nbelem
+         segini xmatr1
+         xmatr1.symre=symre
+         iel2=0
+         do iel=1,num(/2)
+           if(lxir(ncpr(num(1,iel))).gt.0) then
+             iel2=iel2+1
+             do ip=1,num(/1)
+              ipt1.num(ip,iel2)=num(ip,iel)
+             enddo
+**           write(6,*) (ipt1.num(ii,iel2),ii=1,nbnn)
+             do ip=1,nligrp
+             do id=1,nligrd
+               xmatr1.re(id,ip,iel2)=re(id,ip,iel)
+             enddo
+             enddo
+           endif
+         enddo
+         if(nbelem.ne.0) then
+          ir2=ir2+1
+          ri1.irigel(1,ir2)=ipt1
+          ri1.irigel(4,ir2)=xmatr1
+         ri1.irigel(7,ir2)=xmatr1.symre
+         endif
+        else
+          ir2=ir2+1
+          nbelem=num(/2)
+         ri1.irigel(1,ir2)=meleme
+         ri1.irigel(4,ir2)=xmatri
+         ri1.irigel(7,ir2)=symre
+        endif
+        if(nbelem.ne.0) then
+         ri1.coerig(ir2)=coerig(ir)
+         ri1.irigel(3,ir2)=irigel(3,ir)
+         ri1.irigel(5,ir2)=irigel(5,ir)
+         ri1.irigel(6,ir2)=irigel(6,ir)
+         ri1.irigel(8,ir2)=irigel(8,ir)
+        endif
+            xmatri=ri1.irigel(4,ir2)
+**      write(6,*) 'ir2 xmatr1 irigel ',ir2,xmatri.symre,
+**   >         ri1.irigel(7,ir2)
+       enddo
+       nrigel=ir2
+       segadj ri1
+       mrigid=ri1
+*      call prrigi(mrigid,0)
+       segsup ncpr,lxir,lxel,lxde
+       end
+
+ 

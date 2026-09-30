@@ -1,0 +1,35 @@
+C PRJC3D    SOURCE    PV090527  23/01/27    21:15:57     11574          
+      subroutine prjc3d(x06,v33,v33t,x03,x16,gamma)
+      
+c     projection d un tenseur x033 sur les axes d une base v33
+c     calcul du tenseur complementaire dans la base fixe
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)  
+      
+c     variables externes      
+      real*8 x06(6),v33(3,3),v33t(3,3),x03(3),x16(6)
+c     variables logique pour savoir si les termes extra diagonaux sont
+c     des gamma ou des epsilons      
+      logical gamma
+c     variables locales
+      real*8 xp6(6)      
+      
+c     expression dans la nouvelle base
+      call chrep6(x06,v33,gamma,xp6)
+c     recuperation des valeurs normales sur les axes 
+      do i=1,3
+        x03(i)=xp6(i)
+      end do
+c     recuperation du tenseur complementaire en pase principale
+      do i=1,3
+        xp6(i)=0.d0
+      end do
+c     retour du tenseur complementaire en base fixe      
+c     expression dans la nouvelle base
+      call chrep6(xp6,v33t,gamma,x16)
+      return
+      end
+      
+      
+ 

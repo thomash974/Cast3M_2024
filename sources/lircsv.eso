@@ -1,0 +1,590 @@
+C LIRCSV    SOURCE    CB215821  23/08/09    21:15:03     11721          
+      SUBROUTINE LIRCSV
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C
+C BUT: Lecture des donnes dans un fichier ASCII sous forme 'CSV'
+C      Possibilite de changer le separateur
+C      Pas besoin de specifier la longueur des objets LISTREEL a lire,
+C      un premier decompte est fait jusqu'à atteindre la fin du fichier
+C
+C Auteur : Clement BERTHINIER
+C Date   : ORIGINAL  Avril 2014
+C
+C Améliorations à prévoir :
+C      Possibilite de changer la virgule (Options Regionales)
+C
+C
+C Liste des Corrections :
+C CB215821 09/03/2016 : Fortran runtime error en cas de fichier VIDE...
+C CB215821 09/06/2016 : Possibilite d''utiliser le séparateur ' '
+C CB215821 10/06/2016 : Tentative de lire la case 0 d'une chaine
+C                       Meilleure gestion des SEGMENTS
+C CB215821 14/04/2017 : Declaration  de la  ligne dans  un  SEGMENT pour
+C                       lire toutes les tailles de lignes
+C                       Ajout d''un DATA contenant les caracteres qu''il
+C                       est possible de lire (sinon ' ')
+C CB215821 07/11/2019 : Traduction du separateur decimal ',' par '.'
+C CB215821 05/12/2019 : Lecture en colonne 'COLO' ou en ligne 'LIGN'
+C CB215821 10/12/2019 : Si le separateur est ' ' les separateurs successifs
+C                       ne sont consideres que comme 1 seul !
+C CB215821 18/10/2020 : Ajout de clarte dans les messages d'erreur pour
+C                       l'existence, l'ouverture et la fermeture des fichiers lus
+C JB251061 04/07/2022 : Ajout de la possibilite de mettre des en-tetes sur la
+C                       premiere ligne du fichier. Ces en-tetes sont utilises
+C                       comme indices de la table resultats si la lecture est
+C                       faite en colonnes, et sont retournes sous forme de LISTMOTS
+C                       si elle est faite en lignes.
+C CB215821 15/11/2022 : Initialisation necessaire de la premiere ligne lue (IFIRST)
+C                       a cause d'un UNDERFLOW sur un INTEGER sous WIN32
+C Augustin 06/06/2023 : Ajout du mot clé 'FIN' suivi d'un entier afin de pouvoir
+C                       donner la derniere ligne a lire.
+C
+C Appelee par : LIREFI
+C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC                       DEBUT DES DECLARATIONS                       CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREDLE
+-INC SMLREEL
+-INC SMLMOTS
+-INC SMTABLE
+
+C Declaration des chaines de caracteres
+      CHARACTER*1 SEP,CHA1
+      CHARACTER*(LOCHAI) Fichier,INDICE,MOVAR
+      CHARACTER*4 CHA4
+      CHARACTER*10 CHA10
+
+C     Liste des CARACTERES RECONNUS pour détecter les CR et LF
+      CHARACTER*93 CARAOK
+      DATA CARAOK /' 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO
+     &PQRSTUVWXYZ+-/*.,:;_#$%&()[]{}<=>?@`|~!"'''/
+
+C Liste des mots clé OPTIONNELS
+      PARAMETER (NBOPT=5)
+      CHARACTER*4 MCLOPT(NBOPT)
+      DATA MCLOPT / 'DEBU','SEPA','COLO','LIGN','FIN' /
+
+C     MACRO reprenant les options fournies pour ne pas tester de chaines
+      MACRO, (DEBU, SEPA, COLO, LIGN, FIN)
+
+      INTEGER        MCLLUS(NBOPT)
+C                    MCLLUS : Tableau indiquant qu'un mot cle a ete lu
+      LOGICAL EN_COLONNES,EXISTE_FICHIER,EST_OUVERT,SEP_PAS_VIRGULE
+     &       ,EXISTE_ENTETE
+
+C Declaration des PARAMETER
+C     Unite logique du fichier d'impression au format CSV
+      PARAMETER (IUCSV=67)
+
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C Declaration des SEGMENTS                                             C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+C     Segment pour s'adapter a la taille de la ligne a lire
+      SEGMENT SLIGNE
+C       LONGLI  : Longueur de la ligne la plus longue a lire dans le fichier
+        CHARACTER*(LONGLI) LignFi
+      ENDSEGMENT
+
+C     Segment contenant les Valeurs lues
+      SEGMENT XVALU(NVALIG, NLIGLU)
+C       NVALIG  : Nombre de valeurs sur une ligne
+C       NLIGLU  : Nombre de lignes utiles lues
+
+C     SEGMENT CONTENANT LES ENTETES
+      SEGMENT SENTETE
+        CHARACTER*(LOCHAI) ENTETE(NVALIG)
+      ENDSEGMENT
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC                          Initialisations                           CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+      NVALIG = 0
+      NLIGLU = 1024
+      LONGLI = 2048
+      ICOEF = 2
+      IDEB = 0
+      IFIN = 0
+      EN_COLONNES = .TRUE.
+
+      DO IOPT=1,NBOPT
+        MCLLUS(IOPT) = 0
+      ENDDO
+
+C     Le separateur de nombre par defaut est le ';'
+      SEP = ';'
+
+C     Par defaut la premiere ligne lue est la ligne n°1
+      IFIRST = 1
+
+C     Par defaut la dernière ligne lue est initialisee negative (car optionnel)
+      ILAST = -1
+
+C Lecture des arguments : Nom du fichier a lire
+      CALL LIRCHA(Fichier, 1, IRETO1)
+      IF (IERR.NE.0) RETURN
+
+C Ouverture du fichier
+C     Test d'existence
+      INQUIRE(FILE=Fichier(1:LEN(Fichier)), EXIST=EXISTE_FICHIER)
+      IF (EXISTE_FICHIER) THEN
+C       Teste si le fichier est deja ouvert
+        INQUIRE(FILE=Fichier(1:LEN(Fichier)), OPENED=EST_OUVERT)
+
+        IF (EST_OUVERT) THEN
+          CLOSE(UNIT=IUCSV, IOSTAT=IOSTA1)
+C         Traitement des erreurs de fermeture
+          IF (IOSTA1.NE.0) THEN
+            MOTERR = Fichier
+            CALL ERREUR(1131)
+            RETURN
+          ENDIF
+
+          OPEN (UNIT=IUCSV, STATUS='OLD', FILE=Fichier(1:LEN(Fichier)),
+     &          IOSTAT=IOSTA1, FORM='FORMATTED')
+C         Traitement des erreurs d'ouverture des fichiers
+          IF (IOSTA1.NE.0) THEN
+C           Erreur 424 : Probleme %i1 en ouvrant le fichier : %M1:128
+            MOTERR = Fichier
+            INTERR(1) = IOSTA1
+            CALL ERREUR(424)
+            RETURN
+          ENDIF
+
+        ELSE
+          OPEN (UNIT=IUCSV, STATUS='OLD', FILE=Fichier(1:LEN(Fichier)),
+     &          IOSTAT=IOSTA1, FORM='FORMATTED')
+
+C         Traitement des erreurs d'ouverture des fichiers
+          IF (IOSTA1.NE.0) THEN
+C           Erreur 424 : Probleme %i1 en ouvrant le fichier : %M1:128
+            MOTERR = Fichier
+            INTERR(1) = IOSTA1
+            CALL ERREUR(424)
+            RETURN
+          ENDIF
+        ENDIF
+
+      ELSE
+        MOTERR = Fichier
+        CALL ERREUR(1130)
+        RETURN
+      ENDIF
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC                        DECODAGE DES OPTIONS                        CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+ 150  CONTINUE
+C     Lecture OPTIONNELLE des Options
+      CALL LIRMOT(MCLOPT, NBOPT, IRETO1, 0)
+      IF (IERR .NE. 0) RETURN
+      IF (IRETO1 .EQ. 0) GOTO 2
+
+      IF (MCLLUS(IRETO1).EQ.1) THEN
+C     Le MOT CLE a deja ete lu
+        MOTERR = MCLOPT(IRETO1)
+        CALL ERREUR(1105)
+        RETURN
+
+      ELSE
+        MCLLUS(IRETO1) = 1
+      ENDIF
+
+      CASE,IRETO1
+
+        WHEN, DEBU
+C         Lecture OBLIGATOIRE d'un ENTIER (Ligne/Colonne du debut)
+          CALL LIRENT(IFIRST, 1, IRETO2)
+          IF (IERR.NE.0) RETURN
+          IF (IFIRST.LT.1) THEN
+            CALL ERREUR(1107)
+            RETURN
+          ENDIF
+
+        WHEN, FIN
+C         Lecture OBLIGATOIRE d'un ENTIER (Ligne/Colonne de fin)
+          CALL LIRENT(ILAST, 1, IRETO3)
+          IF (IERR .NE. 0) RETURN
+          IF (ILAST.LT. 1) THEN
+            INTERR(1) = 1
+            INTERR(2) = ILAST
+            CALL ERREUR(190)
+            RETURN
+          ENDIF
+
+        WHEN, SEPA
+C         Lecture OBLIGATOIRE d'un MOT (SEP)
+          CALL LIRCHA(SEP, 1, IRETO1)
+          IF (IERR.NE.0) RETURN
+C         Le separateur doit etre dans la liste des caracteres autorises
+          INDXE = INDEX(CARAOK, SEP)
+          IF (INDXE.EQ.0) THEN
+            MOTERR = SEP
+            CALL ERREUR(1106)
+            RETURN
+          ENDIF
+
+        WHEN, COLO
+C         Lecture en COLONNE (c'est le defaut)
+          EN_COLONNES = .TRUE.
+
+        WHEN, LIGN
+C         Lecture en LIGNE
+          EN_COLONNES = .FALSE.
+      ENDCASE
+      GOTO 150
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC                         LECTURE DU FICHIER                         CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ 2    CONTINUE
+      NUMLIG = 0
+      NBLIGN = 0
+      NBSEP  = 0
+
+      SEP_PAS_VIRGULE = SEP.NE.','
+      EXISTE_ENTETE = .FALSE.
+
+      SEGINI,SLIGNE
+      CALL INIRED(SREDLE)
+
+C     On saute les (IFIRST-1) premieres lignes
+      DO I=1,(IFIRST-1)
+        NUMLIG = NUMLIG + 1
+        READ(IUCSV, 1000, IOSTAT=IOSTA1, ERR=902, END=901) LignFi
+        IF (IOSTA1.NE.0) GOTO 902
+      ENDDO
+
+
+C     Boucle de lecture des lignes
+10    CONTINUE
+      IF (IERR.NE.0) RETURN
+      NUMLIG = NUMLIG + 1
+      IF (NUMLIG .EQ. ILAST+1) GOTO 100
+
+
+C     Lecture de la ligne complete
+      READ(IUCSV, 1000, IOSTAT=IOSTA1, ERR=902, END=100) LignFi
+      IF (IOSTA1.NE.0) GOTO 902
+      LCOURA = LONGLI
+
+      DO J=1,LCOURA
+C       Remplacement des caracteres non present dans le DATA par ' '
+        INDXE = INDEX(CARAOK, LignFi(J:J))
+        IF (INDXE.EQ.0) THEN
+          LignFi(J:J) = ' '
+        ENDIF
+      ENDDO
+
+C     Detection du dernier caractere qui n'est pas ' ' ou le separateur
+      J = LCOURA
+      DO WHILE (J.GT.0.AND.
+     &          (LignFi(J:J).EQ.' '.OR.LignFi(J:J).EQ.SEP))
+        J = J - 1
+      ENDDO
+
+      IF (J.EQ.0) THEN
+C       Que des espaces et des separateurs sur la ligne => on saute la ligne
+        GOTO 10
+
+      ELSEIF (J.GT.(LONGLI - 64)) THEN
+C       Un caractere non espace et non separateur dans les 64 derniers caracteres
+C       => On augmente la taille de la ligne pour ne pas manquer des caracteres
+        LONGLI = J * ICOEF
+        SEGADJ,SLIGNE
+C       On recommence le fichier depuis le depart
+        REWIND(UNIT=IUCSV, IOSTAT=IOSTA1, ERR=902)
+        IF (IOSTA1.NE.0) GOTO 902
+        GOTO 2
+
+      ELSE
+C       Sinon on peut utiliser la longueur trouvee
+        LLIGN = J
+      ENDIF
+
+C     Detection du premier caractere qui n'est pas ' '
+      IF (SEP.EQ.' ') THEN
+        J = 1
+        DO WHILE (J.LT.LLIGN.AND.LIGNFI(J:J).EQ.' ')
+          J = J + 1
+        ENDDO
+        IF (J.EQ.LLIGN.AND.LIGNFI(J:J).EQ.' ') GOTO 10
+        IDEBLI = J
+
+      ELSE
+        IDEBLI = 1
+      ENDIF
+
+C     Cas ou la ligne n'est pas vide
+      NBLIGN = NBLIGN + 1
+
+C     Compte le nombre de separateurs
+      NBSEP = 0
+      DO J=IDEBLI,LLIGN
+        CHA1 = LignFi(J:J)
+        IF (CHA1.EQ.SEP) THEN
+          NBSEP = NBSEP + 1
+          IF (J.GT.1) THEN
+            CHA1 = LignFi(J-1:J-1)
+            IF(CHA1.EQ.SEP.AND.SEP.EQ.' ') THEN
+              NBSEP = NBSEP - 1
+            ENDIF
+          ENDIF
+        ENDIF
+      ENDDO
+      IF (NBLIGN.EQ.1) THEN
+        NBSEP1 = NBSEP
+      ENDIF
+
+      IF (NBSEP.NE.NBSEP1) THEN
+        INTERR(1) = NBSEP1
+        INTERR(2) = IFIRST
+        INTERR(3) = NBSEP
+        INTERR(4) = NUMLIG
+        MOTERR = SEP
+        CALL ERREUR(1109)
+        RETURN
+      ENDIF
+
+      IF (NBLIGN.EQ.1) THEN
+C       Creation de XVALU
+        NVALIG = NBSEP+1
+        SEGINI,XVALU,SENTETE
+      ELSEIF (NBLIGN.GT.NLIGLU) THEN
+C       Ajustement de XVALU a la volee
+        NLIGLU = NBLIGN * ICOEF
+        SEGADJ,XVALU
+      ENDIF
+
+C     Remplissage de XVALU ET SENTETE avec les valeurs lues
+      IDEB = IDEBLI
+      IFIN = IDEB
+      NUVALU = 0
+      DO WHILE (IFIN .LT. LLIGN)
+        NUVALU = NUVALU + 1
+        IF (NUVALU.GT.NVALIG) THEN
+          CALL ERREUR(217)
+          RETURN
+        ENDIF
+
+        IFIN = INDEX(LIGNFI(IDEB:LLIGN), SEP)
+        IF (IFIN.EQ.0) THEN
+          IFIN = LLIGN
+
+        ELSE
+          IFIN = IDEB + IFIN - 2
+        ENDIF
+
+        IF (NBLIGN.EQ.1) THEN
+C         Au cas on la sauvegarde la premiere ligne comme entete
+          IENTE=IDEB
+          DO WHILE (LIGNFI(IENTE:IENTE) .EQ. ' ')
+            IENTE = IENTE + 1
+          ENDDO
+          ENTETE(NUVALU)=LIGNFI(IENTE:IFIN)
+        ENDIF
+
+C       Decodage de la chaine (Tel quel)
+        NRAN  = 0
+        ICOUR = IFIN - IDEB + 1
+        TEXT  = LIGNFI(IDEB:IFIN)
+
+C       On converti le separateur decimal ',' en '.' a la volee si le separateur de valeur n'est pas ',' lui meme
+        IF(SEP_PAS_VIRGULE)THEN
+          IVIRG = INDEX(TEXT, ',')
+          IF (IVIRG .GT. 0) THEN
+            TEXT(IVIRG:IVIRG) = '.'
+          ENDIF
+        ENDIF
+
+        CALL REDLEC(SREDLE)
+        IRE_1 = SREDLE.IRE
+
+        I_Compt=0
+        DO WHILE (IRE .NE. 0)
+          I_Compt = I_Compt + 1
+          CALL REDLEC(SREDLE)
+        ENDDO
+
+C       Si on a lu quelque chose en 1 seul coup ==> On remet le 1er type lu
+        IF (I_Compt .EQ. 1)THEN
+          IRE = IRE_1
+
+        ELSE
+          IRE = 3
+        ENDIF
+
+C       On n'a lu ni un ENTIER ni un FLOTTANT, est-ce la premiere ligne ? ==> Entetes
+        IF (IRE .NE. 1 .AND. IRE.NE.2)THEN
+          IF (NBLIGN.EQ.1)THEN
+            EXISTE_ENTETE = .TRUE.
+          ELSE
+            GOTO 902
+          ENDIF
+        ENDIF
+
+C       Enregistrement des valeurs dans les LISTREELS
+        IF (EXISTE_ENTETE .AND. NBLIGN.GT.1) THEN
+          XVALU(NUVALU, NBLIGN - 1) = SREDLE.FLOT
+
+        ELSE
+          XVALU(NUVALU, NBLIGN) = SREDLE.FLOT
+        ENDIF
+
+        IF (SEP.EQ.' ') THEN
+C         SI LE SEAPARATEUR EST ' ' ON AVANCE JUSQU'AU DERNIER ' ' CONSECUTIF
+          IFIN = IFIN + 1
+          DO WHILE (LIGNFI(IFIN:IFIN).EQ.' ')
+            IFIN = IFIN + 1
+          ENDDO
+          IFIN = IFIN - 1
+          IDEB = IFIN + 1
+
+        ELSE
+C         SINON IL NE PEUT Y AVOIR QU'UN SEUL SEPARATEUR AVANT LA PROCHAINE VALEUR
+          IDEB = IFIN + 2
+        ENDIF
+      ENDDO
+
+C     Lecture d'une nouvelle ligne
+      GOTO 10
+
+
+100   CONTINUE
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC                        FIN LECTURE FICHIER                         CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+      CLOSE(UNIT=IUCSV, IOSTAT=IOSTA1)
+C     Traitement des erreurs de fermeture
+      IF (IOSTA1.NE.0) THEN
+        MOTERR = Fichier
+        CALL ERREUR(1131)
+        RETURN
+      ENDIF
+
+C     Creation du resultat TABLE et des LISTREELS solution
+      IF (EXISTE_ENTETE) THEN
+        NBLIGN = NBLIGN - 1
+      ENDIF
+
+      IF (EN_COLONNES) THEN
+C       Cas lecture en COLONNES
+        M = NVALIG
+        SEGINI,MTABLE
+        MTABLE.MLOTAB = M
+        JG=NBLIGN
+        DO IVA=1,NVALIG
+          SEGINI,MLREEL
+          DO ILI=1,NBLIGN
+            MLREEL.PROG(ILI) = XVALU(IVA, ILI)
+          ENDDO
+          IF (EXISTE_ENTETE) THEN
+            INDICE = ENTETE(IVA)
+C           ON ENLEVE LES ESPACES A LA FIN
+            J = LOCHAI
+            DO WHILE (INDICE(J:J).EQ.' ')
+              J = J - 1
+            ENDDO
+C           ON APPELLE POSCHA POUR DONNER LA POSITION EN MEMOIRE DE LA CHAINE A LA TABLE
+            CALL POSCHA(INDICE(1:J), IRET)
+            MTABLE.MTABTI(IVA) = 'MOT'
+            MTABLE.MTABII(IVA) = IRET
+
+          ELSE
+            MTABLE.MTABTI(IVA) = 'ENTIER'
+            MTABLE.MTABII(IVA) = IVA
+          ENDIF
+          MTABLE.MTABTV(IVA) = 'LISTREEL'
+          MTABLE.MTABIV(IVA) = MLREEL
+          SEGACT,MLREEL
+        ENDDO
+
+      ELSE
+C       Cas lecture en LIGNES
+        M = NBLIGN
+        IF (EXISTE_ENTETE) M = M + 1
+        SEGINI,MTABLE
+        MTABLE.MLOTAB = M
+        JG = NVALIG
+        IF (EXISTE_ENTETE) THEN
+          JGN = 0
+          JGM = NVALIG
+          SEGINI,MLMOTS
+          DO IVA=1,NVALIG
+            INDICE = ENTETE(IVA)
+C           ON DETERMINE LA LONGUEUR DE L'EN-TETE
+            J = LOCHAI
+            DO WHILE (INDICE(J:J).EQ.' ')
+              J = J - 1
+            ENDDO
+            IF (JGN.LT.J) THEN
+C             SI L'EN-TETE EST PLUS LONG, ON AJUSTE MLMOTS
+              JGN = J
+              SEGADJ,MLMOTS
+            ENDIF
+            MLMOTS.MOTS(IVA) = INDICE(1:J)
+          ENDDO
+          MTABLE.MTABTI(1) = 'ENTIER'
+          MTABLE.MTABII(1) = 1
+          MTABLE.MTABTV(1) = 'LISTMOTS'
+          MTABLE.MTABIV(1) = MLMOTS
+          SEGACT,MLMOTS
+        ENDIF
+        DO ILI=1,NBLIGN
+          SEGINI,MLREEL
+          DO IVA=1,NVALIG
+            MLREEL.PROG(IVA) = XVALU(IVA, ILI)
+          ENDDO
+          IIND = ILI
+          IF (EXISTE_ENTETE) IIND = IIND + 1
+          MTABLE.MTABTI(IIND) = 'ENTIER'
+          MTABLE.MTABII(IIND) = IIND
+          MTABLE.MTABTV(IIND) = 'LISTREEL'
+          MTABLE.MTABIV(IIND) = MLREEL
+          SEGACT,MLREEL
+        ENDDO
+      ENDIF
+
+      SEGDES,MTABLE
+      SEGSUP,SLIGNE,SREDLE
+      IF (NBLIGN.GT.0) SEGSUP,XVALU,SENTETE
+
+C     Ecriture du resultat en sortie
+      CALL ECROBJ('TABLE   ',MTABLE)
+      RETURN
+
+ 901  CONTINUE
+C     La fin du fichier est atteinte avant même d'avoir commencé la lecture...
+      INTERR(1) = IFIRST
+      CALL ERREUR(36)
+      RETURN
+
+ 902  CONTINUE
+      INTERR(1) = NUMLIG
+      CALL ERREUR(1069)
+      RETURN
+
+ 1000 FORMAT(A)
+
+      END
+
+
+
+
+ 

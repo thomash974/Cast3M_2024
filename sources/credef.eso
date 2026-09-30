@@ -1,0 +1,141 @@
+C CREDEF    SOURCE    CB215821  23/01/25    21:15:08     11573          
+C  CE SOUS-PROGRAMME CREE LES CHAMPS DE COORDONNEES ASSOCIES AUX
+C  DEFORMES. IL ACTUALISE LES ELEMENTS SUR CES CHAMPS
+C
+      SUBROUTINE CREDEF(KABEL,KABCOR,KABCPR,MDEFOR,LABCO2,sdef)
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMELEME
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMDEFOR
+-INC SMVECTE
+-INC SMLMOTS
+      SEGMENT KABEL(NDEF)
+      SEGMENT KABCOR(NDEF)
+      SEGMENT KABCPR(NDEF)
+      SEGMENT LABCO2(3,NDEF)
+      SEGMENT SXCO
+       REAL     XCO(IDIM,NCO)
+      ENDSEGMENT
+      SEGMENT ICPR(nbpts)
+c* segment sdef non utilise ?
+      SEGMENT SDEF
+       REAL      AMPIMP(NDEF)
+      ENDSEGMENT
+
+      IDIMP1 = IDIM + 1
+
+************************************************************************
+*     COMPOSANTES DU DEPLACEMENT SELON MODE DE CALCUL
+************************************************************************
+      JGN = LOCHPO
+      JGM = IDIM
+      SEGINI,MLMOTS
+      IF      (IFOMOD.EQ.2 .OR. IFOMOD.EQ.6) THEN
+        MLMOTS.MOTS(1) = 'UX        '
+        MLMOTS.MOTS(2) = 'UY        '
+        MLMOTS.MOTS(3) = 'UZ        '
+      ELSE IF (IFOMOD.EQ.-1) THEN
+        MLMOTS.MOTS(1) = 'UX        '
+        MLMOTS.MOTS(2) = 'UY        '
+      ELSE IF (IFOMOD.EQ.0 .OR. IFOMOD.EQ.1) THEN
+        MLMOTS.MOTS(1) = 'UR        '
+        MLMOTS.MOTS(2) = 'UZ        '
+      ELSE IF (IFOMOD.EQ.3) THEN
+        MLMOTS.MOTS(1) = 'UX        '
+      ELSE IF (IFOMOD.EQ.4.OR.IFOMOD.EQ.5) THEN
+        MLMOTS.MOTS(1) = 'UR        '
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+
+************************************************************************
+*     
+************************************************************************
+      SEGACT MDEFOR
+      NDEF=AMPL(/1)
+
+      LABCO2=0
+      SEGINI KABEL,KABCOR,KABCPR,LABCO2
+
+      SEGACT,MCOORD
+      DO 200 IDEF=1,NDEF
+        SEGINI ICPR
+        KABCPR(IDEF)=ICPR
+        DO I=1,nbpts
+          ICPR(I)=0
+        ENDDO
+        MELEME=IELDEF(IDEF)
+        KABEL(IDEF)=MELEME
+        CALL ACTOBJ('MAILLAGE',MELEME,1)
+        NBSOUS=LISOUS(/1)
+        IPT1=MELEME
+        NCO = 0
+        DO ISOUS=1,MAX(1,NBSOUS)
+          IF (NBSOUS.NE.0) IPT1=LISOUS(ISOUS)
+          DO J=1,IPT1.NUM(/2)
+            DO I=1,IPT1.NUM(/1)
+              IP=IPT1.NUM(I,J)
+              IF (ICPR(IP).EQ.0) THEN
+                NCO=NCO+1
+                ICPR(IP)=NCO
+              ENDIF
+            ENDDO
+          ENDDO
+        ENDDO
+C  MAINTENANT CREER LES COORDONNEES DEFORMES
+        SEGINI sxco
+        DO J=1,nbpts
+          IPC=ICPR(J)
+          IF (IPC.NE.0) THEN
+            IREF=IDIMP1*(J-1)
+            DO I=1,IDIM
+              XCO(I,IPC)=XCOOR(IREF+I)
+            ENDDO
+          ENDIF
+        ENDDO
+        KABCOR(IDEF)=SXCO
+        IF (AMPIMP(IDEF).LT.REAL(XSGRAN)/2.D0) THEN
+          AMP=AMPIMP(IDEF)
+        ELSE
+          AMP=AMPL(IDEF)
+        ENDIF
+        MCHPOI=ICHDEF(IDEF)
+        CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+        NSOUPO=IPCHP(/1)
+        DO ISOUP = 1, NSOUPO
+          MSOUPO=IPCHP(ISOUP)
+          MPOVAL=IPOVAL
+          IPT2=IGEOC
+          NC=NOCOMP(/2)
+          DO IC=1,NC
+            DO INUM = 1, IDIM
+              IF (NOCOMP(IC).EQ.MLMOTS.MOTS(INUM)) THEN
+                DO J = 1, IPT2.NUM(/2)
+                  IP=ICPR(IPT2.NUM(1,J))
+                  IF (IP.NE.0) THEN
+                    XCO(INUM,IP)=XCO(INUM,IP)+AMP*VPOCHA(J,IC)
+                  ENDIF
+                ENDDO
+              ENDIF
+            ENDDO
+          ENDDO
+        ENDDO
+        MVECTE = MTVECT(IDEF)
+        LABCO2(3,IDEF) = MVECTE
+        IF (MVECTE.NE.0) THEN
+C  IL FAUT ICI REGARDER LES VECTEURS QUI SONT DANS LA DEFORME
+          CALL CREVEC(MELEME,ICPR,KABCOR,LABCO2,MVECTE,IDEF)
+        ENDIF
+ 200  CONTINUE
+ 
+      SEGSUP,MLMOTS
+
+C      RETURN
+      END
+ 

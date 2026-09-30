@@ -1,0 +1,116 @@
+C MLXADL    SOURCE    GOUNAND   21/04/06    21:15:14     10940          
+      SUBROUTINE MLXADL(MELEMX,NLDONN,lchang,mmot)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : MLXADL
+C DESCRIPTION : Ajustement (SEGADJ) du nombre d'éléments d'un
+C     segment MELEMX 
+C
+C     On calcule un NLMAX automatiquement, éventuellement
+C     supérieur à la valeur NLDONN donnée et on modifie NLCOU qui
+C     devient égal à NLDONN
+C
+C     Inspiré de topadv en supprimmant iopt
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 30/10/2017, version initiale
+C HISTORIQUE : v1, 30/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+*del-INC SMLENTI
+*del      POINTEUR JNBL.MLENTI
+*del-INC SMELEME
+*del      POINTEUR JTOPO.MELEME
+*(pour impr)       
+-INC TMATOP2
+*del*-INC STOPINV
+-INC TMATOP1
+*-INC SMELEMX
+      logical lchang
+      character*(*) mmot
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans mlxadl.eso'
+*
+      lchang=.false.
+      NLMAXO=MELEMX.NUMX(/2)
+      NNMAX =MELEMX.NUMX(/1)
+      NLCOUO=MELEMX.NLCOU
+*      elseif (iopt.eq.1) then
+      NLCOUN=NLDONN
+      IF (NLCOUN.LE.NLMAXO) THEN
+*     write(ioimp,*) 'pas besoin d''appeler mlxadl ???'
+*     goto 9999
+*         MELEMX.NLCOU=NLCOUN
+*         return
+      ELSE
+*            NVMAXN=NVDONN+0
+*     Stratégie d'augmentation
+         NLMAX1=NLDONN
+*     XCOF=1.414D0
+         XCOF=2.D0
+         NLMAX2=MELEMX.NLINI+INT(((NLMAXO-MELEMX.NLINI)*XCOF)+0.5D0)
+         NLMAXN=MAX(NLMAX1,NLMAX2)
+*      endif
+      
+         IF (NLCOUN.LT.NLCOUO.or.NLMAXN.LT.NLCOUO) THEN
+            write(ioimp,*) 'On ne peut pas redimensionner à une ',
+     $           'valeur plus petite que nlcou' 
+            goto 9999
+         endif
+         
+         lchang=.true.
+         NLMAX=NLMAXN
+         if (isgadj.gt.0)
+*     $        write(ioimp,386) MELEMX,NLMAXO,NLMAXN,NLCOUN
+     $        write(ioimp,386) mmot,NLMAXO,NLMAXN,NLCOUN
+*     
+         SEGADJ MELEMX
+      ENDIF
+      MELEMX.NLCOU=NLCOUN
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+* 386  FORMAT ('Segment MELEMX=',I8,' nbel max ajusté de ',I6,' à ',I6,
+*     $     ' (nbel. courant=',I6,')') 
+ 386  FORMAT (A25,' nbel max ajusté de ',I6,' à ',I6,
+     $     ' (nbel. courant=',I6,')') 
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='MLXADL  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine MLXADL
+*
+      END
+
+ 

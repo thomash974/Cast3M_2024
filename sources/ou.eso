@@ -1,0 +1,28 @@
+C OU        SOURCE    PV090527  23/12/15    21:15:03     11810          
+      SUBROUTINE OU
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+      LOGICAL IR1,IR2,IR3,IR
+      ir1=.false.
+      ir2=.false.
+      ICOD=1
+      CALL LIRLOG(IR1,ICOD,IRETOU)
+      IF(IERR.NE.0) RETURN
+      CALL LIRLOG(IR2,ICOD,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IR=IR1.OR.IR2
+      ICOD=0
+      do i=1,1000
+      CALL LIRLOG(IR3,ICOD,IRETOU)
+      if(iretou.ne.1) goto 1001
+      ir=ir.or.ir3
+      enddo
+ 1001 continue
+      CALL ECRLOG(IR)
+      RETURN
+      END
+
+ 
+ 

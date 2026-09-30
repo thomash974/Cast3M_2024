@@ -1,0 +1,165 @@
+C MJVR3D    SOURCE    FD218221  24/02/07    21:15:20     11834          
+       subroutine mjvr3d(NBRINC,NINC,ACH,VGT,VGF,ETH,SEW,EPH,
+     # SEFFR,EPSER,EPSMR,EPSKR,EPSTR,EPSCR,EPSLR,EPSRH,STOTR,
+     # SEFFI,EPSEI,EPSMI,EPSKI,EPSTI,EPSCI,
+     # SEFFO,EPSEO,EPSMO,EPSKO,EPSTO,EPSCO)
+            
+c      mise a jour des vari en fin de sous iteration: debut(0)<--fin(1)           
+
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+       
+       integer NBRINC,NINC
+       
+c     variables internes a actualiser    
+c     avancement des reactions chimique par phase DEBUT DE PAS
+      real*8 ACH(0:NBRINC,0:1)
+c     differentiel de deformation chimique isotrope imposee/ttref     
+      real*8 VGT(0:NBRINC,0:1),VGF(0:NBRINC,0:1)           
+c     differentiel de deformation thermique isotrope imposee/ttref     
+      real*8 ETH(0:NBRINC,0:1)
+c     contrainte effective hydrique
+      real*8 SEW(0:NBRINC,0:1)
+c     deformation osmotique     
+      real*8 EPH(0:NBRINC,0:1)   
+      
+c     remarque (le dimensionnement a -1 des phases et interfaces est 
+c     necessaire pour pouvoir utiliser dcmp3d et recm3d 
+    
+c     contraintes effectives(radiale pour inclusions, infini pour matrice)
+      real*8 SEFFR(-1:NBRINC,6,0:1)
+c     deformation elastique (radiale pour inclusions infini pour matrice)
+      real*8 EPSER(-1:NBRINC,6,0:1)
+c     deformation maxwell (radiale pour inclusions infini pour matrice)
+      real*8 EPSMR(-1:NBRINC,6,0:1)
+c     deformation Kelvin (radiale pour inclusions infini pour matrice)
+      real*8 EPSKR(-1:NBRINC,6,0:1)    
+c     deformations plastiques de traction (radiale pour inclusions,infini pour matrice)
+      real*8 EPSTR(-1:NBRINC,6,0:1)
+c     deformations plastiques de cisaillement (radiale pour inclusions,infini pour matrice)
+      real*8 EPSCR(-1:NBRINC,6,0:1) 
+c     deformations plastiques en volume (radiale pour inclusions,infini pour matrice)
+      real*8 EPSLR(-1:NBRINC,6,0:1)    
+c     contraintes effectives radiales(radiale pour interface pour matrice)
+      real*8 SEFFI(-1:NBRINC,6,0:1)
+c     contraintes effectives orthoradiales(radiale pour inclusions infini pour matrice)
+      real*8 SEFFO(-1:NBRINC,6,0:1)    
+c     deformation radiale elastique a l interface      
+      real*8 EPSEI(-1:NBRINC,6,0:1)  
+c     deformation orthoradiale elastique a l interface      
+      real*8 EPSEO(-1:NBRINC,6,0:1)     
+c     deformation radiale maxwell a l interface      
+      real*8 EPSMI(-1:NBRINC,6,0:1)    
+c     deformation orthoradiale maxwell a l interface      
+      real*8 EPSMO(-1:NBRINC,6,0:1)
+c     deformation kelvin radiale axisymetrique a l interface      
+      real*8 EPSKI(-1:NBRINC,6,0:1)
+c     deformation kelvin orthoradiale axisymetrique a l interface      
+      real*8 EPSKO(-1:NBRINC,6,0:1)  
+c     deformation plastique radiale axisymetrique a l interface      
+      real*8 EPSTI(-1:NBRINC,6,0:1)
+c     deformation plastique orthoradiale a l interface      
+      real*8 EPSTO(-1:NBRINC,6,0:1)   
+c     deformation plastique cisaillement radiale axisymetrique a l interface      
+      real*8 EPSCI(-1:NBRINC,6,0:1)
+c     deformation plastique cisaillement orthoradiale a l interface      
+      real*8 EPSCO(-1:NBRINC,6,0:1) 
+C c     deformation plastique en volume radiale axisymetrique a l interface      
+C       real*8 EPSVI(-1:NBRINC,6,0:1)   
+C c     deformation plastique en volume orthoradiale a l interface      
+C       real*8 EPSVO(-1:NBRINC,6,0:1)
+c     deformation chemo-plastique homogene 
+      real*8 EPSRH(-1:NBRINC,6,0:1)  
+c     contraintes totales dans les phases
+      real*8 STOTR(-1:NBRINC,6,0:1)
+      
+c     declarations locales
+      integer IPHASE,ICOMP      
+
+c     *** variables internes pour le milieu homogeneisé ****************
+
+      IPHASE=-1               
+      do ICOMP=1,6
+c           contraintes effectives homogeneisees         
+            SEFFR(IPHASE,ICOMP,0)=SEFFR(IPHASE,ICOMP,1)
+c           deformation plastique traction localisee         
+            EPSTR(IPHASE,ICOMP,0)=EPSTR(IPHASE,ICOMP,1)
+c     contraintes totales dans les phases
+            STOTR(IPHASE,ICOMP,0)=STOTR(IPHASE,ICOMP,1)       
+      end do
+
+c     *** variables internes des phases ********************************
+
+      do IPHASE=0,NINC     
+c       avancement reaction chimique 
+        ACH(IPHASE,0)=ACH(IPHASE,1)          
+c       volume chimique
+        VGT(IPHASE,0)=VGT(IPHASE,1)
+c       volume gel ds fissure        
+        VGF(IPHASE,0)=VGF(IPHASE,1)  
+c       deformation thermique imposee
+        ETH(IPHASE,0)=ETH(IPHASE,1)
+c       contrainte hydrique imposee
+        SEW(IPHASE,0)=SEW(IPHASE,1) 
+c       deformation osmotique
+        EPH(IPHASE,0)=EPH(IPHASE,1)              
+        do ICOMP=1,6
+c           contrainte effective radiale dans la phase    
+            SEFFR(IPHASE,ICOMP,0)=SEFFR(IPHASE,ICOMP,1)            
+c           deformation elastique 
+            EPSER(IPHASE,ICOMP,0)=EPSER(IPHASE,ICOMP,1)
+c           deformation maxwell 
+            EPSMR(IPHASE,ICOMP,0)=EPSMR(IPHASE,ICOMP,1)     
+c           deformation Kelvin 
+            EPSKR(IPHASE,ICOMP,0)=EPSKR(IPHASE,ICOMP,1)
+c           deformations plastiques de traction 
+            EPSTR(IPHASE,ICOMP,0)=EPSTR(IPHASE,ICOMP,1)
+c           deformations plastiques de cisaillement
+            EPSCR(IPHASE,ICOMP,0)=EPSCR(IPHASE,ICOMP,1)
+c           deformations plastiques en volume
+            EPSLR(IPHASE,ICOMP,0)=EPSLR(IPHASE,ICOMP,1)           
+        end do        
+      end do
+
+c       *******variables internes des interfaces *******************
+
+      do IPHASE=1,NINC  
+        do ICOMP=1,6       
+c           contraintes effectives radiales(radiale pour inclusions infini pour matrice)
+            SEFFI(IPHASE,ICOMP,0)=SEFFI(IPHASE,ICOMP,1)      
+c           contraintes effectives orthoradiales(radiale pour inclusions infini pour matrice)
+            SEFFO(IPHASE,ICOMP,0)=SEFFO(IPHASE,ICOMP,1)
+c           deformation radiale elastique a l interface
+            EPSEI(IPHASE,ICOMP,0)=EPSEI(IPHASE,ICOMP,1) 
+c           deformation orthoradiale elastique a l interface
+            EPSEO(IPHASE,ICOMP,0)=EPSEO(IPHASE,ICOMP,1)       
+c           deformation radiale maxwell a l interface 
+            EPSMI(IPHASE,ICOMP,0)=EPSMI(IPHASE,ICOMP,1) 
+c           deformation orthoradiale maxwell a l interface 
+            EPSMO(IPHASE,ICOMP,0)=EPSMO(IPHASE,ICOMP,1)      
+c           deformation kelvin radiale  a l interface
+            EPSKI(IPHASE,ICOMP,0)=EPSKI(IPHASE,ICOMP,1)
+c           deformation kelvin orthoradiale axisymetrique a l interface
+            EPSKO(IPHASE,ICOMP,0)=EPSKO(IPHASE,ICOMP,1)      
+c           deformation plastique radiale traction a l interface
+            EPSTI(IPHASE,ICOMP,0)=EPSTI(IPHASE,ICOMP,1) 
+c           deformation plastique orthoradiale a l interface 
+            EPSTO(IPHASE,ICOMP,0)=EPSTO(IPHASE,ICOMP,1)
+c           deformation plastique cisaillement radiale axisymetrique a l interface  
+            EPSCI(IPHASE,ICOMP,0)=EPSCI(IPHASE,ICOMP,1)
+c           deformation plastique cisaillement orthoradiale a l interface
+            EPSCO(IPHASE,ICOMP,0)=EPSCO(IPHASE,ICOMP,1)
+C c           deformation plastique en volume radiale axisymetrique a l interface
+C             EPSVI(IPHASE,ICOMP,0)=EPSVI(IPHASE,ICOMP,1)
+C c           deformation plastique en volume orthoradiale a l interface
+C             EPSVO(IPHASE,ICOMP,0)=EPSVO(IPHASE,ICOMP,1)             
+        end do       
+      end do 
+      
+      return
+      
+      end
+      
+      
+ 
+ 

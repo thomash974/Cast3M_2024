@@ -1,0 +1,35 @@
+C MSHEXO    SOURCE    PV        22/04/25    21:15:09     11344          
+C
+
+      SUBROUTINE MSHEXO(NOMPRG,IMESS,IERR,IENTIE,REEL,CARAC)
+C     **********************************************************************
+C     OBJET MSHEXO : MESSAGES D'ERREUR DE HEXOS
+C
+C     EN ENTREE   :
+C           NOMPRG: NOM DU PROGRAMME
+C           IMESS : NUMERO DU MESSAGE
+C           IERR  : TYPE DE MESSAGE (ERREUR, INTERRUPTION, ECHO, TRACE...'
+C           IENTIE: TABLEAU D'ENTIERS
+C           REEL  : TABLEAU DE REELS
+C           CARAC : TABLEAU DE CARACTERES
+C
+C     **********************************************************************
+      IMPLICIT INTEGER(I-N)
+      CHARACTER*(*) NOMPRG
+      INTEGER       IERR,IMESS
+      INTEGER       IENTIE
+      REAL*8        REEL
+       CHARACTER*(*)  CARAC
+C
+C     ---------------------------
+      IF((IMESS.GE.11).AND.(IMESS.LE.32))THEN
+        CALL ERREUR(IMESS+796)
+      ELSE
+        CALL ERREUR(26)
+      ENDIF
+C
+ 9999 END
+
+
+
+ 

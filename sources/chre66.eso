@@ -1,0 +1,73 @@
+C CHRE66    SOURCE    FD218221  24/02/07    21:15:04     11834          
+      subroutine chre66(H066,H166,P033,TP033,P133,TP133)
+
+c     A Sellier 2023 12 18  
+
+c     P033 matrice de passage en base d orthotropie
+c     TPo33 son inverse
+c     Pb33 matrice de passage enbase quelconque 
+c     TPb33 son inverse  
+
+c     changement de base des matrices de souplesse et de raideur
+c     attention la matrice H ne s adresse pas a des gamma pour permettre
+c     le meme passage pour C et H
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables globales
+      real*8 H066(6,6),H166(6,6)
+      real*8 P033(3,3),TP033(3,3),P133(3,3),TP133(3,3)
+      
+c     variables locales
+      real*8 epsb(6),epsf(6),epso(6)
+      real*8 sigb(6),sigf(6),sigo(6)
+      
+c     methode par deformation virtuelle base d orthotropie
+
+c     boucle sur les composantes virtuelle en base b
+      do i=1,6      
+         do j=1,6
+             if(j.eq.i) then
+                epsb(j)=1.d0
+             else
+                epsb(j)=0.d0
+             end if
+         end do
+c         print*,'epsb',epsb         
+c        passage en base fixe
+         call chrep6(epsb,TP133,.false.,epsf)
+c         print*,'epsf',epsf
+c        passage en base d orthotropie
+         call chrep6(epsf,P033,.false.,epso)
+c         print*,'epso',epso
+c        calcul des contrainte en base orthotropie
+         do j=1,6
+            sigo(j)=0.d0
+            do k=1,6
+                sigo(j)=sigo(j)+H066(j,k)*epso(k)
+            end do
+         end do
+c         print*,'sigo',sigo
+c        retour des contraintes en base fixe
+         call chrep6(sigo,TP033,.false.,sigf)
+c         print*,'sigf',sigf
+c        retour des contraintes en base b         
+         call chrep6(sigf,P133,.false.,sigb)
+c         print*,'sigb',sigb         
+c        stockage de la colonne i de la matrice de rigidite en base b
+c         print*,'colonne', i
+         do j=1,6
+            H166(j,i)=sigb(j)
+c            print*,'ligne',j,H166(j,i)
+         end do
+      end do
+c     matrice H en base b
+c      call afic66(H166)  
+c      read*      
+
+      return
+      end
+      
+
+ 

@@ -1,0 +1,25 @@
+C COCHPT    SOURCE    CB215821  20/11/25    13:21:41     10792          
+      SUBROUTINE COCHPT(NC,MCHP)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+-INC SMCHPOI
+-INC SMELEME
+      CHARACTER*8 TYPE
+
+      NBNN=1
+      NBELEM=1
+      NBSOUS=0
+      NBREF=0
+      SEGINI MELEME
+      ITYPEL=1
+      NUM(1,1)=1
+      SEGDES MELEME
+      TYPE=' '
+      CALL CRCHPT(TYPE,MELEME,NC,MCHP)
+      RETURN
+      END
+
+
+
+
+ 

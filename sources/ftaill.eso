@@ -1,0 +1,87 @@
+C FTAILL    SOURCE    CB215821  23/01/25    21:15:16     11573          
+C   
+      SUBROUTINE FTAILL(IPT3,MCHPOI)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMELEME
+C
+      SEGMENT ICPR(NBPTS)
+C
+      MSOUPO = MCHPOI.IPCHP(1)
+      NBCMP  = MSOUPO.NOCOMP(/2)
+      MPOVAL = MSOUPO.IPOVAL
+      MELEME = MSOUPO.IGEOC
+      NBCONT = MELEME.NUM(/2)
+C
+      NBNODE = IPT3.NUM(/1)
+      NBELTC = IPT3.NUM(/2)
+      SEGINI,ICPR
+      DO IEL = 1,NBELTC
+        ICPR(IPT3.NUM(1,IEL)) = IEL
+      ENDDO
+C
+C     Pour creer le nouveau maillage support
+      NBNN = 1
+      NBELEM = NBCONT
+      NBSOUS = 0
+      NBREF = 0
+C
+C     Pour creer les nouveaux msoupo et mpoval
+      N = NBCONT
+      NC = 1
+      NAT = MCHPOI.JATTRI(/1)
+C
+C     Mettre a jour le mchpoi actuel
+      NSOINI = MCHPOI.IPCHP(/1)
+      NSOUPO = NSOINI + 1
+      IF (IDIM.EQ.3) NSOUPO = NSOINI + 2
+      SEGADJ,MCHPOI
+C
+      IADD = 1
+      IPOSI = 0
+      IMF = NBNODE
+ 100  CONTINUE 
+C
+      SEGINI,MSOUP1,MPOVA1,IPT1
+C 
+      IF (IPOSI.EQ.0) THEN
+        DO 10 ICOMP = 1,NBCMP
+          IF (NOCOMP(ICOMP).EQ.'TAIL') THEN
+            IPOSI = ICOMP
+            GOTO 11
+          ENDIF
+  10    CONTINUE
+  11    CONTINUE
+      ENDIF
+C
+      MSOUP1.NOCOMP(1) = 'TAIL'
+      MSOUP1.NOHARM(1) = MSOUPO.NOHARM(IPOSI)
+      MSOUP1.IGEOC  = IPT1
+      MSOUP1.IPOVAL = MPOVA1
+C
+      IPT1.ITYPEL = 1
+C
+      DO 20 IELT = 1,NBCONT
+        IELC = ICPR(MELEME.NUM(1,IELT))
+        IPT1.NUM(1,IELT) = IPT3.NUM(IMF,IELC)
+        MPOVA1.VPOCHA(IELT,1) = MPOVAL.VPOCHA(IELT,IPOSI) 
+  20  CONTINUE
+C
+      IPCHP(NSOINI+IADD) = MSOUP1
+C
+      IF (IDIM.EQ.3.AND.IADD.NE.2) THEN 
+        IADD = 2
+        IMF = NBNODE - 1
+        GOTO 100
+      ENDIF
+C
+      SEGSUP,ICPR
+C
+      RETURN
+      END
+ 

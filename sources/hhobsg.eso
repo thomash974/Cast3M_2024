@@ -1,0 +1,500 @@
+C HHOBSG    SOURCE    OF166741  24/05/06    21:15:07     11082          
+C HHOBSG    SOURCE    FANDEUR                                           
+
+C----------------------------------------------------------------------*
+C Elements massifs HHO en FORMULATION 'MECANIQUE'
+C HHO    calcul des efforts internes (B.Sigma)
+C----------------------------------------------------------------------*
+
+      SUBROUTINE HHOBSG(imoHHO, nmoFOR, IVASTR, NCSTR,
+     &                  IIPDPG, ADPG,BDPG,CDPG,
+     &                  IVACAR, NCARR, IPMINT, NBPTEL,
+     &                  ichDEP, ICHBSG, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCHAML
+c* si besoin des coordonnees -INC SMCOORD
+-INC SMCHPOI
+-INC SMELEME
+-INC SMMODEL
+-INC SMINTE
+-INC SMLENTI
+      POINTEUR mlent4.mlenti, mlenPF.mlenti
+-INC SMLMOTS
+-INC SMLREEL
+      POINTEUR mlrdef.mlreel, mlrdec.mlreel, mlrmbh.mlreel
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS)
+        INTEGER IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      SEGMENT MWKHHO
+        INTEGER TABINT(NBINT)
+        REAL*8  TABFLO(NBFLO)
+      ENDSEGMENT
+
+      LOGICAL B_GDEF, b_z
+      CHARACTER*(LOCHAI) chaHHO
+
+      EXTERNAL LONG
+
+      iret = 0
+
+      NDPGE = 0
+      ADPG = XZero
+      BDPG = XZero
+      CDPG = XZero
+
+      imodel = imoHHO
+c*      segact,imodel <- actif en entree/sortie
+
+C- Premieres verifications :
+      CALL HHONOB(imoHHO, nobHHO, iret)
+      IF (nobHHO.LE.0)THEN
+        write(ioimp,*) 'HHOEPS: IMODEL incorrect (not HHO)'
+        iret = 5
+        RETURN
+      END IF
+
+C- Recuperation des donnees de infell en entree
+c*      MELE   = imodel.NEFMOD
+c*      MFR    = imodel.infele(13)
+      meleme = imodel.IMAMOD
+      NBNOE  = meleme.NUM(/1)
+      NBELT  = meleme.NUM(/2)
+
+      iva = imodel.IVAMOD(nobHHO)
+      CALL QUEVAL(iva,'MOT     ',iret,lenHHO,r_z,chaHHO,b_z,i_z)
+      B_GDEF = chaHHO(8:10).EQ.'_ft'
+*AV      B_GDEF = chaHHO(10:12).EQ.'_ft'
+c-dbg      write(ioimp,*) 'HHOBSG : je suis ici '//chaHHO(1:lenHHO),B_GDEF
+
+      mlenti = imodel.IVAMOD(nobHHO+1)
+c*      segact,mlenti
+      mlent2 = imodel.IVAMOD(nobHHO+2)
+c*      segact,mlent2
+      mlent3 = imodel.IVAMOD(nobHHO+3)
+c*      segact,mlent3
+      mlent4 = imodel.IVAMOD(nobHHO+4)
+c*      segact,mlent4
+
+      n_d_face = mlenti.lect(3)
+      n_d_cell = mlenti.lect(5)
+      nb_faces = mlenti.lect(7)
+      NBPGAU   = mlenti.lect(8)
+      idifo    = mlenti.lect(9)
+      NBDDL    = mlenti.lect(11)
+      NFORF    = idifo * n_d_face
+      NFORC    = idifo * n_d_cell
+      lhook    = 9
+
+      nbel2 = mlent2.lect(/1) / 2
+      nbel3 = mlent3.lect(/1) / 2
+      nbfa3 = 2 * nb_faces
+      nbel4 = mlent4.lect(/1) / 2
+
+      IF (mlenti.lect(6).NE.NBNOE) THEN
+        write(ioimp,*) 'HHOBSG: Bizarre nb_vertices'
+      END IF
+      IF (NBDDL .NE. imodel.INFELE(9)) then
+        write(ioimp,*) 'HHOBSG: Bizarre NBDDL'
+      END IF
+c NBPGAU =? (NBPTEL = imodel.INFELE(4))
+      IF (NBPGAU .NE. imodel.INFELE(4)) then
+        write(ioimp,*) 'HHOBSG: Bizarre nb.p.gau(1)'
+      END IF
+c NBPGAU =? minte.POIGAU(/1)
+      minte = IPMINT
+c*      SEGACT minte <- actif en E/S
+      if (NBPGAU .NE. minte.POIGAU(/1)) then
+        write(ioimp,*) 'HHOBSG: Bizarre nb.p.gau (2)'
+      end if
+c-dbg      write(ioimp,*) 'HHOBSG nbpgau=',NBPGAU
+c-dbg      write(ioimp,*) 'HHOBSG: dof face/cell',n_d_face,n_d_cell,nb_faces
+      if (nbel3.NE.(NBELT*nb_faces)) then
+        write(ioimp,*) 'HHOBSG: Bizarre nbel3'
+      end if
+      if (nbel4.NE.NBELT) then
+        write(ioimp,*) 'HHOBSG: Bizarre nbel4'
+      end if
+
+C- Verification des caracteristiques :
+      mptval = IVACAR
+      IVPIHO = mptval.IVAL(NCARR-1)
+      melval = IVPIHO
+      IGPI = melval.VELCHE(/1)
+      IEPI = melval.VELCHE(/2)
+c-dbg      write(ioimp,*) 'IVPIHO',melval,igpi,iepi,tyval(ncarr-1)
+      IF (IGPI.NE.NBPGAU .AND. IGPI.NE.1) THEN
+        write(ioimp,*) 'HHOBSG: PIHO vector size incorrect'
+        iret = 21
+        RETURN
+      END IF
+      IVMBHO = mptval.IVAL(NCARR)
+      melval = IVMBHO
+      IGMB = melval.IELCHE(/1)
+      IEMB = melval.IELCHE(/2)
+c-dbg      write(ioimp,*) 'IVMBHO',melval,igmb,iemb,tyval(ncarr)
+      mlrmbh = melval.IELCHE(1,1)
+c*      segact,mlrmbh
+c*      write(ioimp,*) 'HHOBSG MBHHO SIZE:',mlrmbh.prog(/1),
+c*     &               NBDDL,9*NBDDL,mlenti.lect(14)
+      IF ((mlrmbh.prog(/1).NE.(9*NBDDL)) .OR. 
+     &    (mlrmbh.prog(/1).NE.mlenti.lect(14))) THEN
+        write(ioimp,*) 'HHOBSG: BHHO matrix size incorrect'
+        iret = 21
+        RETURN
+      END IF
+
+C- Forces des faces et des cellules :
+      nomid = nmoFOR
+c      segact,nomid
+c-dbg      write(ioimp,*) 'HHOBSG=',NFORC,NFORF,lesobl(/2),lesfac(/2)
+      nfac = 0
+      JGN = nomid.lesobl(/1)
+
+C- Le chapeau du champ point de forces interieures
+      NAT = 2
+      NSOUPO = 2
+      SEGINI,MCHPOI
+      mchpoi.MTYPOI = 'FORCES  '
+      mchpoi.MOCHDE = '  '
+      mchpoi.JATTRI(1) = 2
+      mchpoi.JATTRI(2) = 0
+      mchpoi.IFOPOI = IFOUR
+      ICHBSG = MCHPOI
+
+C- 2 sous-zones : les points supports des cellules et des faces
+      NC = NFORC
+      N = nbel4
+      SEGINI,MSOUP1
+      SEGINI,MPOVA1
+      DO i = 1, NC
+        msoup1.NOCOMP(i) = '        '
+        msoup1.NOCOMP(i)(1:JGN) = nomid.lesobl(i)(1:JGN)
+        msoup1.NOHARM(i) = 0
+      END DO
+      msoup1.IPOVAL = MPOVA1
+      CALL HHOMPO('CELL',mlent4,IPT1)
+      msoup1.IGEOC  = IPT1
+      mchpoi.IPCHP(1) = MSOUP1
+
+      NC = NFORF
+      N = nbel2
+      SEGINI,MSOUP2
+      SEGINI,MPOVA2
+      DO i = 1, NC
+        msoup2.NOCOMP(i) = '        '
+        msoup2.NOCOMP(i)(1:JGN) = nomid.lesobl(NFORC+i)(1:JGN)
+        msoup2.NOHARM(i) = 0
+      END DO
+      msoup2.IPOVAL = MPOVA2
+      CALL HHOMPO('FACE',mlent2,IPT2)
+      msoup2.IGEOC  = IPT2
+      mchpoi.IPCHP(2) = MSOUP2
+
+C- La liste mlenPF devrait etre initialisee une seule fois et remplie
+      CALL HHOMPO('LGFA',mlent2,mlenPF)
+      IPT4 = MPFHHO
+c      segact,ipt4
+
+C- Le modele est en grandes deformations : Il donc transporter le 
+C- tenseur des contraintes (de Cauchy SIGC) sur la geometrie initiale 
+C- (tenseur de Piola-Kirchhoff 1 = PK1) PK1 = SIGC.[det(F).inv(transF)] 
+      IF ( B_GDEF ) THEN
+        NDEPC = NFORC
+        NDEPF = NFORF
+        nomid = imodel.LNOMID(1)
+        if (nomid.eq.0) then
+          write(ioimp,*) 'HHOBSG - IMODEL - MODEPL incorrect'
+          iret = 5
+          return
+        end if
+c*        segact,nomid
+        JGN = nomid.lesobl(/1)
+        ivid = 1
+C- Deplacements des faces et des cellules :
+c-dbg      write(ioimp,*) 'HHOBSG=',NDEPC,NDEPF,lesobl(/2),lesfac(/2)
+        nfac = 0
+C Deplacements des cellules - Points supports des cellules
+        JGM = NDEPC + nfac
+        SEGINI,mlmots
+        DO i = 1, NDEPC
+          mlmots.MOTS(i)(1:JGN) = nomid.lesobl(i)(1:JGN)
+        END DO
+        CALL EXTR23(ichDEP,mlmots,MPCHHO,mlrDEC,ivid)
+        SEGACT,mlrDEC
+C Deplacements des faces - Points supports des faces
+        JGM = NDEPF + nfac
+        SEGADJ,mlmots
+        DO i = 1, NDEPF
+          mlmots.MOTS(i)(1:JGN) = nomid.lesobl(NDEPC+i)(1:JGN)
+        END DO
+        CALL EXTR23(ichDEP,mlmots,MPFHHO,mlrDEF,ivid)
+        SEGACT,mlrDEF
+      END IF
+
+C- Indices et tableau de travail
+      ir_coo =          0
+c* si besoin des coordonnees      ir_sig = ir_coo + (IDIM*NBNOE)
+      ir_sig = ir_coo + 0
+c* si besoin des contraintes      ir_fce = ir_sig + lhook
+      ir_fce = ir_sig + 0
+      ir_ffa = ir_fce + NFORC
+      ir_fge = ir_ffa + (NFORF*nb_faces)
+      ir_fin = ir_fge + NDPGE
+      IF (B_GDEF) THEN
+        ir_gra = ir_fin
+c* si besoin des gradients        ir_uce = ir_gra + lhook
+        ir_uce = ir_gra + 0
+        ir_ufa = ir_uce + NDEPC
+        ir_uge = ir_ufa + (NDEPF*nb_faces)
+        ir_fin = ir_uge + NDPGE
+      END IF
+
+      NBINT = nb_faces
+      NBFLO = ir_fin
+      SEGINI,MWKHHO
+
+C Pour l'instant NDPGE = 0, a recuperer dans ichDEP ?
+      IF (NDPGE.GT.0) THEN
+        DO ic = 1, NDPGE
+ccc?          TABFLO(ir_fge+ic) = XZero
+ccc?          TABFLO(ir_uge+ic) = A recuperer dans ichDEP
+        END DO
+      END IF
+c* si besoin des coordonnees        SEGACT,mcoord*nomod
+
+C-------------------------
+C Boucle sur les elements
+C-------------------------
+      DO IEL = 1, NBELT
+
+C- Recuperation des coordonnees des noeuds de l element IEL
+c*        CALL HHOCOO(meleme.num,NBNOE, mcoord.xcoor, IEL,
+c*    &               TABFLO(ir_coo+1), iret)
+c*        IF (iret.NE.0) RETURN
+
+C- Reperage des faces :
+        in1 = (IEL-1) * nbfa3
+        DO j1 = 1, nb_faces
+          in2 = in1 + (2 * j1)
+          je = mlent3.lect(in2-1)
+          ip = ABS(mlent3.lect(in2))
+c-dbg      if (ip.eq.0) write(ioimp,*) 'HHOEPS IFAE Bizarre...',iel,j1,je,ip
+          TABINT(j1) = ip + NBFHHO(je-1)
+        END DO
+C- Remise a zero des forces
+        DO jc = ir_fce+1, ir_fge
+          TABFLO(jc) = XZero
+        END DO
+C- Valeurs des inconnues primales pour l'element IEL (cell+faces)
+        IF (B_GDEF) THEN
+          in1 = IEL * 2
+          je = mlent4.lect(in1-1)
+          ip = mlent4.lect(in1)
+c-dbg      if (ip.le.0) write(ioimp,*) 'HHOBSG ICEL Bizarre...',iel,je,ip
+          jp = ip + NBCHHO(je-1)
+c-dbg      write(ioimp,*) 'HHOBSG ICEL :',iel,je,ip,jp
+c-dbg      write(ioimp,*) 'HHOBSG      :',NDEPC,NCEHHO,ir_uce
+c-dbg      write(ioimp,*) 'HHOBSG      :',NDEPF,NFAHHO,ir_ufa
+          DO ic = 1, NDEPC
+            jc = NCEHHO * (ic - 1)
+c-dbg      write(ioimp,*) 'HHOBSG    ic:',ic,jc,jp,mlrDEC.prog(/1),
+c-dbg     &             TABFLO(/1),ir_uce+ic,jp+jc
+            TABFLO(ir_uce + ic) = mlrDEC.prog(jp + jc)
+          END DO
+          ir_kc = ir_ufa
+          DO j1 = 1, nb_faces
+            jp = TABINT(j1)
+            DO ic = 1, NDEPF
+              jc = NFAHHO * (ic - 1)
+              TABFLO(ir_kc + ic) = mlrDEF.prog(jp + jc)
+            END DO
+            ir_kc = ir_kc + NDEPF
+          END DO
+        END IF
+
+        JEPI = MIN(IEL,IEPI)
+        JEMB = MIN(IEL,IEMB)
+C--  --  --  --  --  --  --  --  --
+C - Boucle sur les points de Gauss
+C--  --  --  --  --  --  --  --  --
+        DO IGAU = 1, NBPGAU
+
+          melval = IVPIHO
+          JGPI = MIN(IGAU,IGPI)
+          pgau = melval.VELCHE(JGPI,JEPI)
+
+          melval = IVMBHO
+          JGMB = MIN(IGAU,IGMB)
+          mlrmbh = melval.IELCHE(JGMB,JEMB)
+c*          segact,mlrmbh
+c* !! matrice BHHO stockee colonne par colonne : lhook*NBDDL
+
+C -- Recuperation des "contraintes" de Cauchy
+          mptval = IVASTR
+C -- Contraintes "Diagonales" SIG(11,22,33)
+          melval = mptval.IVAL(1)
+          IEMN = MIN(IEL ,melval.VELCHE(/1))
+          IGMN = MIN(IGAU,melval.VELCHE(/2))
+          SIGC11 = melval.velche(IGMN,IEMN)
+          melval = mptval.IVAL(2)
+          IEMN = MIN(IEL ,melval.VELCHE(/1))
+          IGMN = MIN(IGAU,melval.VELCHE(/2))
+          SIGC22 = melval.velche(IGMN,IEMN)
+          melval = mptval.IVAL(3)
+          IEMN = MIN(IEL ,melval.VELCHE(/1))
+          IGMN = MIN(IGAU,melval.VELCHE(/2))
+          SIGC33 = melval.velche(IGMN,IEMN)
+C -- Contraintes de cisaillement SIG(12,13,23)
+          melval = mptval.IVAL(4)
+          IEMN = MIN(IEL ,melval.VELCHE(/1))
+          IGMN = MIN(IGAU,melval.VELCHE(/2))
+          SIGC12 = melval.velche(IGMN,IEMN)
+          IF (NCSTR.GT.4) THEN
+            melval = mptval.IVAL(5)
+            IEMN = MIN(IEL ,melval.VELCHE(/1))
+            IGMN = MIN(IGAU,melval.VELCHE(/2))
+            SIGC13 = melval.velche(IGMN,IEMN)
+            melval = mptval.IVAL(6)
+            IEMN = MIN(IEL ,melval.VELCHE(/1))
+            IGMN = MIN(IGAU,melval.VELCHE(/2))
+            SIGC23 = melval.velche(IGMN,IEMN)
+          ELSE
+            SIGC13 = XZero
+            SIGC23 = XZero
+          END IF
+          SIGC21 = SIGC12
+          SIGC31 = SIGC13
+          SIGC32 = SIGC23
+
+c* !! matrice BHHO stockee colonne par colonne : lhook*NBDDL
+          IF ( B_GDEF ) THEN
+C- Il faut calculer le tenseurs des contraintes de Piola-Kirchhoff 1
+C- F = gradient_transformation
+            F11 = 1.D0
+            F22 = 1.D0
+            F33 = 1.D0
+            F12 = XZero
+            F21 = XZero
+            F13 = XZero
+            F31 = XZero
+            F23 = XZero
+            F32 = XZero
+            DO jc = 1, NBDDL
+              jnc = lhook * (jc-1)
+              r_z = TABFLO(ir_uce + jc)
+              F11 = F11 + mlrmbh.prog(1 + jnc) * r_z
+              F22 = F22 + mlrmbh.prog(2 + jnc) * r_z
+              F33 = F33 + mlrmbh.prog(3 + jnc) * r_z
+              F12 = F12 + mlrmbh.prog(4 + jnc) * r_z
+              F21 = F21 + mlrmbh.prog(5 + jnc) * r_z
+              F13 = F13 + mlrmbh.prog(6 + jnc) * r_z
+              F31 = F31 + mlrmbh.prog(7 + jnc) * r_z
+              F23 = F23 + mlrmbh.prog(8 + jnc) * r_z
+              F32 = F32 + mlrmbh.prog(9 + jnc) * r_z
+            END DO
+c- DIFT = det(F).inv(trans(F))
+            DIFT11 = F22*F33 - F32*F23
+            DIFT12 = F31*F23 - F21*F33
+            DIFT13 = F21*F32 - F31*F22
+            DIFT21 = F32*F13 - F12*F33
+            DIFT22 = F11*F33 - F31*F13
+            DIFT23 = F31*F12 - F11*F32
+            DIFT31 = F12*F23 - F22*F13
+            DIFT32 = F21*F13 - F11*F23
+            DIFT33 = F11*F22 - F21*F12
+c- Contraintes de Piola-Kirchhoff 1 : PIKU = SIGC.DIFT
+            PIKU11 = SIGC11 * DIFT11 + SIGC12 * DIFT21 + SIGC13 * DIFT31
+            PIKU22 = SIGC21 * DIFT12 + SIGC22 * DIFT22 + SIGC23 * DIFT32
+            PIKU33 = SIGC31 * DIFT13 + SIGC32 * DIFT23 + SIGC33 * DIFT33
+            PIKU12 = SIGC11 * DIFT12 + SIGC12 * DIFT22 + SIGC13 * DIFT32
+            PIKU21 = SIGC21 * DIFT11 + SIGC22 * DIFT21 + SIGC23 * DIFT31
+            PIKU13 = SIGC11 * DIFT13 + SIGC12 * DIFT23 + SIGC13 * DIFT33
+            PIKU31 = SIGC31 * DIFT11 + SIGC32 * DIFT21 + SIGC33 * DIFT31
+            PIKU23 = SIGC21 * DIFT13 + SIGC22 * DIFT23 + SIGC23 * DIFT33
+            PIKU32 = SIGC31 * DIFT12 + SIGC32 * DIFT22 + SIGC33 * DIFT32
+c* !! matrice BHHO stockee colonne par colonne : lhook*NBDDL
+            DO jc = 1, NBDDL
+              jnc = lhook * (jc-1)
+              r_z =   mlrmbh.prog(1 + jnc) * PIKU11
+     &              + mlrmbh.prog(2 + jnc) * PIKU22
+     &              + mlrmbh.prog(3 + jnc) * PIKU33
+     &              + mlrmbh.prog(4 + jnc) * PIKU12
+     &              + mlrmbh.prog(5 + jnc) * PIKU21
+              IF (NCSTR.GT.4) THEN
+                r_z = r_z + mlrmbh.prog(6 + jnc) * PIKU13
+     &                    + mlrmbh.prog(7 + jnc) * PIKU31
+     &                    + mlrmbh.prog(8 + jnc) * PIKU23
+     &                    + mlrmbh.prog(9 + jnc) * PIKU32
+              END IF
+              TABFLO(ir_fce + jc) = TABFLO(ir_fce + jc) + pgau * r_z
+            END DO
+          ELSE
+            DO jc = 1, NBDDL
+              jnc = lhook * (jc-1)
+              r_z =   mlrmbh.prog(1 + jnc) * SIGC11
+     &              + mlrmbh.prog(2 + jnc) * SIGC22
+     &              + mlrmbh.prog(3 + jnc) * SIGC33
+     &              + mlrmbh.prog(4 + jnc) * SIGC12
+     &              + mlrmbh.prog(5 + jnc) * SIGC21
+              IF (NCSTR.GT.4) THEN
+                r_z = r_z + mlrmbh.prog(6 + jnc) * SIGC13
+     &                    + mlrmbh.prog(7 + jnc) * SIGC31
+     &                    + mlrmbh.prog(8 + jnc) * SIGC23
+     &                    + mlrmbh.prog(9 + jnc) * SIGC32
+              END IF
+              TABFLO(ir_fce + jc) = TABFLO(ir_fce + jc) + pgau * r_z
+            END DO
+          END IF
+
+C--  --  --  --  --  --  --  --  --
+        END DO
+C--  --  --  --  --  --  --  --  --
+
+C Pour les cellules
+c-dbg      write(ioimp,*) 'mpova1',iel,NBELT,nbel4,ir_fce
+        DO ic = 1, NFORC
+          mpova1.VPOCHA(IEL,ic) =   mpova1.VPOCHA(IEL,ic)
+     &                            + TABFLO(ir_fce + ic)
+        END DO
+C Pour les faces
+        ir_kc = ir_ffa
+        DO j1 = 1, nb_faces
+          jp = TABINT(j1)
+          kp = ipt4.num(1,jp)
+          IFA = mlenPF.lect(kp)
+c-dbg      write(ioimp,*) 'mpova2',iel,j1,nb_faces,kp,IFA,nbel2,ir_kc
+          DO ic = 1, NFORF
+            mpova2.VPOCHA(IFA,ic) =   mpova2.VPOCHA(IFA,ic)
+     &                              + TABFLO(ir_kc + ic)
+          END DO
+          ir_kc = ir_kc + NFORF
+        END DO
+
+C-------------------------
+      END DO
+C-------------------------
+      SEGSUP,MWKHHO
+      SEGSUP,mlenPF
+      IF ( B_GDEF ) THEN
+        SEGSUP,mlrDEC,mlrDEF
+        SEGSUP,mlmots
+      END IF
+
+c*      RETURN
+      END
+
+ 

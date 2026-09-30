@@ -1,0 +1,49 @@
+C EPSW3D    SOURCE    PV090527  23/01/27    21:15:33     11574          
+      subroutine epsw3d(PORO,SRW,MW,M,K,G,EPSW,SIGW,ERR1)
+
+c      sous programme de calcul de la deformation due a la capillarite
+
+c   ********************************************************************
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+c   ********************************************************************
+
+      real*8 PORO,SRW,MW,M,PCW,BIOT,SIGW,EPSW
+      
+c     coeffs de compressibilite ; cisaillement, dilatation thermique
+      real*8 G,K
+      integer err1
+      
+c     variable locale      
+      real*8 precision3d 
+      parameter (precision3d=1.d-6)
+
+c   **pression capillaire suivant Van Genuchten ************************
+      if((Srw.gt.0.).and.(Srw.le.1.)) then
+         t2 = Srw ** (0.1D1 / m)
+         t6 = (0.1D1 / t2 - 0.1D1) ** (0.1D1 - m)
+         Pcw = t6 * Mw
+         call bitm3d(K,G,poro,biot,err1,precision3d)
+c        contribution de la contrainte hydrique -biot*sw*pw si pg=0           
+         sigw=biot*Srw*Pcw
+c        deformation induite dans la matrice solide       
+         epsw=-sigw/(3.d0*K)
+C          print*,'dans epsw3d:'
+C          print*,'sigw=',sigw
+C          print*,'epsw=',epsw
+      else
+         if((Srw.le.0.).or.(Srw.gt.1.)) then
+            print*,'Pb dans epsw3d, valeur Srw incoherente:',Srw
+            err1=1
+            return
+         else
+            epsw=0.d0
+            sigw=0.d0
+         end if
+      end if
+      
+      return
+      end
+      
+      
+ 

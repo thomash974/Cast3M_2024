@@ -1,0 +1,19 @@
+C NON       SOURCE    PV        22/04/27    21:15:09     11344          
+      SUBROUTINE NON
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+      LOGICAL IR1,IR
+      ir=.false.
+      ir1=.false.
+      ICOD=1
+      CALL LIRLOG(IR1,ICOD,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IR=.NOT.IR1
+      CALL ECRLOG(IR)
+      RETURN
+      END
+
+ 
+ 

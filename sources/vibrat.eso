@@ -1,0 +1,457 @@
+C VIBRAT    SOURCE    BP208322  21/03/17    21:15:10     10921          
+      SUBROUTINE VIBRAT
+************************************************************************
+*
+*                             V I B R A T
+*                             -----------
+*
+*            SOUS-PROGRAMME ASSOCIE A L'OPERATEUR "VIBRation"
+*
+* FONCTION:
+* ---------
+*
+*     CALCUL DE MODES PROPRES.
+*
+* PHRASE D'APPEL (EN GIBIANE):
+* ----------------------------
+*
+*     ..... = VIBRATION | PROCHE .....     | ;
+*                       | INTERVALLE ..... |
+*                       | SIMULTANE .....  |
+*                       | IRAM .....       |
+*
+*     VOIR LES DETAILS DANS LES SOUS-PROGRAMMES ASSOCIES AUX OPTIONS
+*     "PROCHE", "INTERVALLE", ETC...
+*
+* SOUS-PROGRAMMES APPELES:
+* ------------------------
+*
+*     INTVAL, LIRMOT, PROCHE, SIMULT, ARPACK
+*
+*
+* CREATION et MODIFICATION:
+* ------------------------
+*     PASCAL MANIGOT, 13 NOVEMBRE 1984: creation
+*     PASCAL BOUDA, 24 JUIN 2015: AJOUT DE L'OPTION IRAM
+*     BP, 2019-09-28: LIMAGE=VRAI PAR DEFAUT
+*     BP, 2019-09-28: LOG1=VRAI PAR DEFAUT
+*     EN PREVISION SUPPRESSION DES OBJETS SOLUTIONS
+*     PB 2020-12: TRAVAIL SUR LES MATRICES CONDENSEES + 
+*     MENAGE (TRI DES RIGIDITES, TRAITEMENT DE L'OBJET SOLUTION)
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+*-INC SMSOLUT
+-INC SMCHPOI
+-INC SMRIGID
+-INC SMTABLE
+-INC CCHAMP
+
+      SEGMENT IDEMEM(0)
+      SEGMENT IDEME0(IDEMEM(/1),2)
+      SEGMENT IDEME1(IDEMEM(/1),2)
+
+      COMMON/CITINV/ NBITER,IACCEL,NUMAC,IPX2,IPX0,IPX1,IPBX1,
+     C IBBX1,IBBX2,ITPRO,DIFREL
+*
+      PARAMETER (NBRMOT = 10)
+      PARAMETER (NBIMOT = 9)          
+
+      CHARACTER*4 LISMOT(NBRMOT)
+      CHARACTER*8 letyp,charre
+      CHARACTER*2 LIRAM(NBIMOT)
+
+      COMPLEX*16 SHIFT
+      CHARACTER*2 SOLU
+
+
+      LOGICAL LOG1, LIMAGE, LMULT,boolin, LVIBC
+*
+      DATA LISMOT/'PROC','INTE','SIMU','IRAM',
+     &                   'IMPR','BASS','HAUT','TBAS','MULT','SOLU'/
+
+*     LISTE SPECIFIQUE IRAM
+      DATA LIRAM/'LM','SM','LR','SR','LI','SI','LA','SA','BE'/
+
+
+************************************************************************
+*     INITIALISATIONS et VERIFICATION
+************************************************************************
+*
+      IBASS  = 0
+      IHAUT  = 0
+      NOPT   = 0
+      ivalin = 0
+      LOG1 = .TRUE.
+      LMULT = .FALSE.
+      LIMAGE=  .TRUE.
+      NIMP=IIMPI
+      ICODE = 0
+      NBMOT = NBRMOT
+      NBMOTI= NBIMOT
+      NBMO=0
+      SHIFT=CMPLX(0.D0,0.D0)
+
+
+c *     verification de l'option de calcul des deformations
+c       IF(MEPSIL.NE.1) THEN
+c         CALL ERREUR(1037)
+c         RETURN
+c       ENDIF
+cbp, 2020-12-10 : ci dessus n'a plus lieu d'etre car SIGSOL travaille 
+c                 toujours en hypothese de deformations lineaires
+*
+************************************************************************
+*     LECTURE DES MOTS-CLE ET DONNEES SPECIFIQUES ASSOCIEES
+************************************************************************
+
+***** 1ere liste de mots-cles ******************************************
+      DO 10 I=1,5
+
+      CALL LIRMOT (LISMOT,NBMOT,NUMLIS,ICODE)
+      IF (IERR .NE. 0) RETURN
+      IF (NUMLIS.EQ.0) GOTO 10
+
+c    -lecture effective de 'PROC','INTE','SIMU' ou 'IRAM'
+      IF (NUMLIS.LE.4) THEN
+        IF (NUMLIS.EQ.1) THEN
+           CALL LIROBJ ('LISTREEL',IPFREQ,1,IRETOU)
+           IF (IERR.NE.0) RETURN
+           IPNMOD = 0
+           CALL LIROBJ ( 'LISTENTI', IPNMOD, 0, IRETOU )
+           IF (IERR .NE. 0) RETURN
+        ENDIF
+        IF (NUMLIS.EQ.2) THEN
+           CALL LIRREE(XINT1,1,IRETOU)
+           IF (IERR.NE.0) RETURN
+           CALL LIRREE(XINT2,1,IRETOU)
+           IF(IERR.NE.0) RETURN
+        ENDIF
+        IF (NUMLIS.GE.3) THEN
+           CALL LIRREE(XINT1,1,IRETOU)
+           IF (IERR.NE.0) RETURN
+           CALL LIRENT (IBASS,1,IRETOU)
+           IF (IERR.NE.0) RETURN
+        ENDIF
+        NOPT=NUMLIS
+        GOTO 10
+      ENDIF
+
+c    -autres options
+      IF (NUMLIS.EQ.5) THEN
+***     IIMPI=2
+        CALL GINT2
+      ENDIF
+
+      IF (NUMLIS.EQ.6)  CALL LIRENT (IBASS,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IF (NUMLIS.EQ.7)  CALL LIRENT(IHAUT,1,IRETOU)
+
+      IF(IERR.NE.0) RETURN
+cbp 2017-09-28      IF (NUMLIS.EQ.8) LOG1 = .TRUE.
+      IF (NUMLIS.EQ.8) THEN
+        MOTERR(1:12)='mot-cle TBAS'
+        MOTERR(13:40)=' '
+        CALL ERREUR(1070)
+c       WARNING : mot-cle TBAS soon obsolete
+      ENDIF
+      IF (NUMLIS.EQ.10) THEN
+        LOG1  = .FALSE.
+        MOTERR(1:14)='OBJET SOLUTION'
+        MOTERR(15:40)=' '
+        CALL ERREUR(1070)
+c       WARNING : OBJET SOLUTION soon obsolete
+      ENDIF
+      IF (NUMLIS.EQ.9) LMULT = .TRUE.
+
+10    CONTINUE
+
+
+***** MOTS CLES SPECIFIQUES IRAM *****************
+      IF (NOPT .EQ. 4) THEN
+
+c       on recupere shift Re + i Im et nbmo a calculer
+        X=XINT1
+        Y=0.D0
+        CALL LIRREE(Y,0,IRETOU)
+        SHIFT=CMPLX(X,Y)
+        NBMO=IBASS
+
+        SOLU='LM'
+        CALL LIRMOT (LIRAM,NBMOTI,NUMIRA,ICODE)
+        IF (IERR .NE. 0) RETURN
+        IF (NUMIRA.NE.0) SOLU=LIRAM(NUMIRA)
+
+      ENDIF
+
+
+************************************************************************
+*     LECTURE DES RIGIDITES (sans se soucier de leur type)
+************************************************************************
+
+      CALL LIROBJ('RIGIDITE',IPRIG0,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+
+      CALL LIROBJ ('RIGIDITE',IPMAS0,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      CALL LIROBJ ('RIGIDITE',IPAMO0,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+** pb dec20: le travail desormais uniformise en amont des options
+**On trie les rigidites lues
+      IF (IRETOU .EQ. 0) THEN
+**deux matrices lues
+         CALL WHICH1(IPRIG0,IPMAS0,IPRIG1,IPMAS1)
+         IPRIG0=IPRIG1
+         IPMAS0=IPMAS1
+         IPAMO0=0
+      ELSEIF (IRETOU .EQ. 1) THEN
+**trois matrices
+         CALL QZTRIR (IPMAS0,IPRIG0,IPAMO0)
+      ENDIF    
+      IF (IERR.NE.0) RETURN     
+*     Lecture d'un logique optionnel pour savoir que faire si (2pi*w)^2
+*     est negatif (faux --> on renvoie |w|, vrai --> on renvoie -|w|
+*     car pas d'imaginaire)
+      CALL LIRLOG(LIMAGE,0,IRETOU)
+      IF (IRETOU.NE.0) THEN
+*       avertissement : syntaxe bientot obsolete
+        MOTERR(1:40)='use of a logical'
+        CALL ERREUR(1070)
+      ENDIF
+
+***pb dec20: devenu caduque (travail sur matrice condensee)   
+****     dualisation des mult de Lagrange pour la matrice de sstype RIGI
+*      MRIGID=IPRIG0
+*      SEGINI,RI1=MRIGID
+*      SEGDES MRIGID
+*      MRIGID=RI1
+*      IMGEO2=0
+*      CALL DBBLX(MRIGID,LAGDUA)
+*      IMLAG=LAGDUA
+*      IPRIG2=MRIGID
+*      SEGDES MRIGID
+
+***************************
+*Condensation des matrices*
+***************************
+* Chpoint primal "dummy" pour enregistrer l'elimination des composantes
+      CALL DECALE(IPRIG0,IPMAS0,1D0,IPINIT)
+      IF (IERR.NE.0) RETURN
+      CALL UNIFO1(IPINIT,0D0,IPCHPO)
+      IF (IERR.NE.0) RETURN
+      CALL MUCPRI(IPCHPO,IPINIT,IPCHP0)
+      IF (IERR.NE.0) RETURN
+      CALL DTCHPO(IPCHPO)
+      CALL DTRIGI(IPINIT)
+      IF (IERR.NE.0) RETURN
+     
+      SEGINI IDEMEM
+      IDEMEM(**)=IPCHP0
+      SEGINI IDEME0,IDEME1
+      
+*Condensation sur matrices copiees => MYMAT =  TEMPORAI
+      CALL RIGELI(IPRIG0,IPMAS0,IPAMO0,IPRIGI,IPMASS,IPAMOR,
+     &                                 IDEMEM,IDEME0,IDEME1,IELIM)
+      IF (IERR.NE.0) RETURN
+************************************************************************
+*     APPEL DES ROUTINES SELON L'OPTION
+************************************************************************
+
+***** PROCHE *****
+      IF (NOPT .EQ. 1) THEN
+         ITPRO=1
+         CALL PROCHE (IPSOLU,IPFREQ,IPMASS,IPRIGI,LIMAGE,
+     &                IPNMOD,MBASC,INSYM)
+        
+         IF (IERR.NE.0) RETURN
+c        TODO : debrancher le solveur non-symetrique de PROCHE
+***** INTERVALLE *****
+      ELSE IF (NOPT .EQ. 2) THEN
+         ITPRO=0
+         INSYM=0
+         CALL INTVAL (IPSOLU,XINT1,XINT2,IBASS,IHAUT,
+     $                 LIMAGE,IPMASS,IPRIGI,LMULT)
+         IF (IERR.NE.0) RETURN
+***** SIMULTANE *****
+      ELSE IF (NOPT .EQ. 3) THEN
+         ITPRO=0
+         INSYM=0
+         CALL SIMULT (IPSOLU,IPMASS,IPRIGI,LIMAGE,XINT1,IBASS)
+         IF (IERR.NE.0) RETURN
+
+***** IRAM *****
+      ELSE IF (NOPT .EQ. 4) THEN
+         CALL ARPACK (IPSOLU,IPMASS,IPRIGI,IPAMOR,SHIFT,
+     $                NBMO,SOLU,INSYM,LAGDUA)
+         IF (IERR.NE.0) RETURN
+
+*pb dec20: suppression des goto pour uniformiser le canal de 
+*posttraitement        
+*        
+*        cas Hermitien/non-Hermitien
+*         IF (INSYM.EQ.0) THEN
+*          cas Hermitien --> modes Reels
+*           GOTO 901
+*        ELSE
+*          cas non-Hermitien --> modes Complexes
+*           GOTO 902
+*         ENDIF
+
+      ELSE
+         CALL ERREUR (533)
+         RETURN
+      ENDIF
+
+************************************************************************
+*     POST TRAITEMENT DES RESULTATS
+************************************************************************
+      IF (INSYM .EQ. 0) THEN
+         LVIBC=.FALSE.      
+      ELSE
+         LVIBC=.TRUE.
+      ENDIF
+
+c NB: INSYM=0 si pb aux v.p. Hermitien (K et M Reels et symetriques)
+*bp,2019 : erreur si pb non symetrique, car debranche sauf pour IRAM
+      IF (NOPT .NE. 4 .AND. LVIBC) THEN
+        CALL ERREUR(969)
+        RETURN
+      ENDIF
+
+*pb dec20: devenu caduque (travail sur matrice condensee)   
+c***** Appel a dbbcf pour dedualiser les modes (chpoints) *****                                  
+*      MSOLUT=IPSOLU
+*      SEGACT MSOLUT*MOD                
+*      DO ILX=1,MSOLIT(/1)
+*         IF (MSOLIT(ILX).EQ.2) THEN
+*            MSOLEN=MSOLIS(ILX)          
+*            SEGACT MSOLEN*MOD       
+*            DO ISO=1,ISOLEN(/1)
+*               MCHPOI=ISOLEN(ISO)          
+*               SEGACT MCHPOI*MOD
+*               IF (LAGDUA.NE.0) CALL DBBCF(MCHPOI,LAGDUA)
+*               ISOLEN(ISO)=MCHPOI
+*               SEGDES MCHPOI
+*            ENDDO
+*            SEGDES MSOLEN
+*         ENDIF
+*      ENDDO
+*      SEGDES MSOLUT
+
+**pb dev20: dedualisation des mult de lagrange substituee par une 
+**reconstruction des modes necessaire suite a la condensation
+      CALL VIRECO(LVIBC,IPSOLU,IPRIGI,IPMASS,IPAMOR,IELIM,IDEME0,IDEME1)
+      IF (IERR.NE.0) RETURN
+                 
+*bp,2019      IF (insym.eq.0) then
+*        dedualisation de la solution
+*         msolut=ipsolu
+*         segact msolut*mod
+*         do 210 ilx=1,msolit(/1)
+*          if (msolit(ilx).eq.2) then
+*          msolen=msolis(ilx)
+*          segact msolen*mod
+*          do 200 iso=1,isolen(/1)
+*           mchpoi=isolen(iso)
+*           segact mchpoi*mod
+*           if (lagdua.ne.0) call dbbcf(mchpoi,lagdua)
+*           isolen(iso)=mchpoi
+* 200      continue
+*          endif
+* 210     continue
+
+*bp,2019      ELSE
+c        if (lagdua.ne.0)  then
+c          mtable=mbasc
+c          segact mtable
+c          call acctab(mbasc,'MOT     ',iva,xvalin,'MODES',boolin,iobin,
+c      $              'TABLE  ',ivalre,xvalre,charre,boolin,mtab1)
+c          do 250 i=1,10000
+c           letyp=' '
+c           call acctab (mtab1,'ENTIER  ',i,xva,charre,boolin,iobin,
+c      $           letyp,ivalre,xvalre,charre,boolin,mtab2)
+c           if(letyp.ne.'TABLE   ') go to 251
+c            letyp=' '
+c            call acctab(mtab2,'MOT',iva,xva,'DEFORMEE_MODALE_REELLE',
+c      $   boolin,iobin,letyp,ivalre,xvalre,charre,boolin,iobre)
+c          if(letyp.eq.'CHPOINT') then
+c             mchpoi=iobre
+c             segact mchpoi*mod
+c             call dbbcf(mchpoi,lagdua)
+c             call ecctab(mtab2,'MOT',iva,xva,'DEFORMEE_MODALE_REELLE',
+c      $      boolin,iobin,letyp,ivalre,xvalre,charre,boolin,mchpoi)
+c          else
+c           call erreur(5)
+c           return
+c          endif
+c
+c           letyp=' '
+c           call acctab(mtab2,'MOT',iva,xva,'DEFORMEE_MODALE_IMAGINAIRE',
+c      $   boolin,iobin,letyp,ivalre,xvalre,charre,boolin,iobre)
+c          if(letyp.eq.' ')go to 250
+c             mchpoi=iobre
+c             segact mchpoi*mod
+c             call dbbcf(mchpoi,lagdua)
+c             call ecctab(mtab2,'MOT',ivalin,xva,'DEFORMEE_MODALE_IMAG',
+c      $      boolin,iobin,letyp,ivalre,xvalre,charre,boolin,mchpoi)
+c   250    continue
+c        endif
+c   251  continue
+c       ENDIF
+
+*pb dev20 suppression des goto pour uniformiser le canal
+*bp,2019      IF (INSYM .EQ. 0) THEN
+      IF (INSYM .EQ. 0) THEN
+***** CREATION D'UNE BASE MODALE REELLE *****
+c901   CONTINUE
+         IF (LOG1) THEN
+          CALL CRTBAS (IPSOLU,IPMAS0)
+          IF (IERR.NE.0) RETURN
+C          CALL DESOLU (IPSOLU)
+          IF (IERR.NE.0) RETURN
+         ELSE
+          CALL ECROBJ ('SOLUTION',IPSOLU)
+         ENDIF
+*bp,2019      ELSE
+*bp,2019          CALL LIROBJ('CHPOINT', IPOINT, 0, IRETOU)
+*bp,2019          CALL ECROBJ('TABLE', MBASC)
+*bp,2019      ENDIF
+
+C      GOTO 100
+      ELSE
+***** CREATION D'UNE BASE MODALE COMPLEXE (IRAM SEULEMENT) *****
+c902   CONTINUE
+         IF (LOG1) THEN
+           CALL CCTBAS (IPSOLU,IPMAS0)
+           IF (IERR.NE.0) RETURN
+           CALL DESOLU (IPSOLU)
+           IF (IERR.NE.0) RETURN
+         ELSE
+*       ce cas ci-apres n'est pas terrible...
+           CALL ECROBJ ('SOLUTION',IPSOLU)
+         ENDIF
+*
+      ENDIF
+
+*menage sur les matrices copiees      
+      IF (IPRIGI.NE.0) CALL DTRIGI(IPRIGI)
+      IF (IPMASS.NE.0) CALL DTRIGI(IPMASS)
+      IF (IPAMOR.NE.0) CALL DTRIGI(IPAMOR)
+
+************************************************************************
+*     FIN NORMALE
+************************************************************************
+C100   CONTINUE      
+      IIMPI=NIMP
+      CALL GINT2
+
+      END
+ 
+ 

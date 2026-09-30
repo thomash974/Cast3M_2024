@@ -1,0 +1,445 @@
+C INTGEV    SOURCE    SP204843  23/01/18    21:15:03     11560          
+C
+C=======================================================================
+C
+C   INTEGRATION DE L'ORDONNEE SUR LES ABSCISSES D'UN OBJET DE TYPE
+C   EVOLUTION
+C
+C   APPELEE PAR INTGRA
+C
+C   L'INTEGRATION EST EFFECTUEE PAR LA METHODE DES TRAPEZES,
+C   LE PAS D'INTEGRATION EST CALCULE A CHAQUE INSTANT
+C
+C   SI IABSO=1, ON INTEGRE LA VALEUR ABSOLUE DES ORDONNEES
+C
+C=======================================================================
+C
+      SUBROUTINE INTGEV(IPEVO,IABSO,ILENTA,ILENTB,ILREEA,ILREEB,
+     &                  XINT,IPINT,IK)
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C
+      CHARACTER*6 NOMC
+C
+      SEGMENT LEVINT(NINT),LOPP(NINT),LRESU(NEVO)
+C
+      POINTEUR MLREE4.MLREEL,MLREE5.MLREEL,MLREE6.MLREEL
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLENTI
+-INC SMLREEL
+-INC SMEVOLL
+-INC SMNUAGE
+-INC CCREEL
+C
+      IPEVOL = IPEVO
+      IPINT  = 0
+      XINT   = 0.D0
+      IK     = 0 
+
+C=======================================================================
+C     QUELQUES VERIFICATIONS SUR EVOLUTION EN ENTREE
+C=======================================================================
+C
+      CALL ACTOBJ('EVOLUTIO',IPEVOL,1)
+      MEVOLL= IPEVOL
+      NEVOLL= IEVOLL(/1)
+
+c     on n'accepte pas les evolutions VIDES (c'est un choix discutable)
+      IF(NEVOLL.EQ.0) THEN
+        MOTERR(1:8)='EVOLUTIO'
+        CALL ERREUR(555)
+        RETURN
+      ENDIF
+
+C     RESTRICTION AUX EVOLUTIONS AVEC LISTREEL EN ABSC ET ORDO
+      SEGINI,MEVOL1=MEVOLL
+      N1 = 0 
+      DO 10 IE=1,NEVOLL
+        KEVOLL=IEVOLL(IE)
+        IF (TYPX(1:8).EQ.'LISTREEL'.AND. TYPY(1:8).EQ.'LISTREEL') THEN
+          MLREE1 = IPROGX
+          IF (MLREE1.PROG(/1).LE.1) THEN
+            CALL ERREUR(897)
+            RETURN
+          ELSE
+            N1 = N1 + 1
+            MEVOL1.IEVOLL(N1) = KEVOLL
+          ENDIF
+        ENDIF
+ 10   CONTINUE
+      IF (N1.EQ.0) THEN
+        CALL ERREUR(1116)
+        RETURN
+      ENDIF 
+      IF (N1.NE.NEVOLL) THEN
+        N = N1
+        SEGADJ,MEVOL1
+        IPEVOL = MEVOL1
+        NEVOLL = N1
+      ENDIF
+
+C=======================================================================
+C     RESTRICTION DE L'EVOLUTION AUX INTERVALLES D'INTEGRATION
+C=======================================================================
+C
+C---- CAS DES LISTENTI -------------------------------------------------
+C
+      IF (ILENTA.NE.0) THEN
+        CALL ACTOBJ('LISTENTI',ILENTA,1)
+        CALL ACTOBJ('LISTENTI',ILENTB,1)
+        MLENT1 = ILENTA
+        MLENT2 = ILENTB
+
+        IF (MLENT1.LECT(/1).NE.MLENT2.LECT(/1)) THEN
+          CALL ERREUR(1115)
+          RETURN
+        ENDIF
+
+C       LEVINT(i) : POINTEUR SUR EVOLUTION RESTREINTE AU ie INTERVALLE
+C       LOPP(i)   : VAUT 1 SI BORNES INTERVALLE INTEGRATION INVERSEE
+C                   => PRENDRE VALEYR OPPOSEE INTG DANS CE CAS
+        NINT = MLENT1.LECT(/1)
+        SEGINI,LEVINT,LOPP
+        DO 20 IL=1,NINT
+          IA = MLENT1.LECT(IL)
+          IB = MLENT2.LECT(IL)
+          IF (IA.GT.IB) THEN
+            LOPP(IL) = 1
+            IX = IA
+            IA = IB
+            IB = IX
+          ELSEIF (IA.EQ.IB) THEN
+            LOPP(IL) = 2
+            IB = IA + 1
+          ENDIF
+          CALL ECRENT(IB)
+          CALL ECRENT(IA)
+          CALL ECRCHA('INDI')
+          CALL TEVOLU(IPEVOL,'COMP')
+C         CALL PRLIST
+          CALL LIROBJ('EVOLUTION',IPEVI,1,IRET)
+          IF (IERR.NE.0) RETURN
+          LEVINT(IL) = IPEVI
+ 20     CONTINUE
+
+C---- CAS DES LISTREEL -------------------------------------------------
+C
+      ELSEIF (ILREEA.NE.0) THEN
+        CALL ACTOBJ('LISTREEL',ILREEA,1)
+        CALL ACTOBJ('LISTREEL',ILREEB,1)
+        MLREE1 = ILREEA
+        MLREE2 = ILREEB
+
+        IF (MLREE1.PROG(/1).NE.MLREE2.PROG(/1)) THEN
+          CALL ERREUR(577)
+          RETURN
+        ENDIF
+
+        MEVOLL = IPEVOL
+        NINT = MLREE1.PROG(/1)
+        SEGINI,LEVINT,LOPP
+        DO 25 IL=1,NINT
+          XA = MLREE1.PROG(IL)
+          XB = MLREE2.PROG(IL)
+          IF (XB.LT.XA) THEN
+            LOPP(IL) = 1
+            XX = XA
+            XA = XB
+            XB = XX
+          ELSEIF (XA.EQ.XB) THEN
+            LOPP(IL) = 2
+            XB = XA + 1.D0
+          ENDIF
+C
+          N = NEVOLL
+          SEGINI, MEVOL1
+          DO 250 IE=1,NEVOLL
+            KEVOLL = MEVOLL.IEVOLL(IE)
+            MLREE3 = KEVOLL.IPROGX
+            MLREE4 = KEVOLL.IPROGY
+
+C         RESTRICTION KEVOLL A [XA;XB]
+C         Je parcours la liste :
+C           - quand je suis entre les bornes, je copie
+C           - quand je passe les bornes, j'interpolle
+C           - quand je suis en dehors, je saute
+            JG0    = MLREE3.PROG(/1)
+            JG     = 3 * JG0
+            SEGINI, MLREE5, MLREE6
+            NVAL = 0 
+            DO 251 IX=1,JG0
+              XI = MLREE3.PROG(IX)
+
+              IF (XI.LT.XA) THEN
+                IF (IX.LT.JG0) THEN
+                  XII = MLREE3.PROG(IX+1)
+                  IF (XII.GT.XA) THEN
+C     write(6,*) 'cas 1 : IX , XI', IX , XI
+                    NVAL = NVAL+1 
+                    MLREE5.PROG(NVAL) = XA
+                    FXI = (XII - XA) / (XII - XI)
+                    YI1 = MLREE4.PROG(IX)
+                    YI2 = MLREE4.PROG(IX+1)
+                    MLREE6.PROG(NVAL) = FXI*YI1+(1.d0-FXI)*YI2
+                    IF (XII.GT.XB) THEN
+C     write(6,*) 'cas 1b : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XB
+                      FXI = (XII - XB) / (XII - XI)
+                      YI1 = MLREE4.PROG(IX)
+                      YI2 = MLREE4.PROG(IX+1)
+                      MLREE6.PROG(NVAL) = FXI*YI1+(1.d0-FXI)*YI2
+                    ENDIF
+                  ENDIF
+                ELSE
+C                 Rien a faire !
+                ENDIF
+
+              ELSEIF (A_EGALE_B(XI,XA)) THEN
+C     write(6,*) 'cas 2 : IX , XI', IX , XI
+                  NVAL = NVAL+1 
+                  MLREE5.PROG(NVAL) = XI
+                  MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+
+              ELSE
+                IF (IX.EQ.1) THEN
+                  NVAL = NVAL+1
+                  MLREE5.PROG(NVAL) = XA
+                  MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                ENDIF
+
+                IF (XI.LT.XB) THEN
+                  IF (IX.LT.JG0) THEN
+                    XII = MLREE3.PROG(IX+1)
+                    IF (XII.GT.XB) THEN
+C     write(6,*) 'cas 3 : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XI
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XB
+                      FXI = (XII - XB) / (XII - XI)
+                      YI1 = MLREE4.PROG(IX)
+                      YI2 = MLREE4.PROG(IX+1)
+                      MLREE6.PROG(NVAL) = FXI*YI1+(1.d0-FXI)*YI2
+                    ELSEIF (XII.LT.XA) THEN
+C                   Xi+1 < XA
+C     write(6,*) 'cas 3b : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XI
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XA
+                      FXI = (XII - XA) / (XII - XI)
+                      YI1 = MLREE4.PROG(IX)
+                      YI2 = MLREE4.PROG(IX+1)
+                      MLREE6.PROG(NVAL) = FXI*YI1+(1.d0-FXI)*YI2
+                    ELSE
+C     write(6,*) 'cas 3c : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XI
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                    ENDIF
+                  ELSE
+                    IF (NVAL.EQ.0) THEN
+                      CALL ERREUR(21)
+                      RETURN
+                    ENDIF
+                    IF (XI.GE.MLREE5.PROG(NVAL)) THEN
+C     write(6,*) 'cas 5 : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XI
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XB
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                    ELSE
+C     write(6,*) 'cas 5b : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XI
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XA
+                      MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+                    ENDIF
+                  ENDIF
+
+                ELSEIF (A_EGALE_B(XI,XB)) THEN
+C     write(6,*) 'cas 6 : IX , XI', IX , XI
+                    NVAL = NVAL+1 
+                    MLREE5.PROG(NVAL) = XI
+                    MLREE6.PROG(NVAL) = MLREE4.PROG(IX)
+
+                ELSEIF (XI.GT.XB) THEN
+C     write(6,*) 'XI GT XB',XI,XB
+                  IF (IX.GT.1) THEN
+                    XII = MLREE3.PROG(IX-1)
+                    IF (XII.LT.XB) THEN
+C     write(6,*) 'cas 7 : IX , XI', IX , XI
+                      NVAL = NVAL+1 
+                      MLREE5.PROG(NVAL) = XB
+                      FXI = (XII - XB) / (XII - XI)
+                      YI1 = MLREE4.PROG(IX)
+                      YI2 = MLREE4.PROG(IX-1)
+                      MLREE6.PROG(NVAL) = FXI*YI1+(1.d0-FXI)*YI2
+                      IF (XII.LT.XA) THEN
+C     write(6,*) 'cas 7b : IX , XI', IX , XI
+                        NVAL = NVAL+1 
+                        MLREE5.PROG(NVAL) = XA
+                        FXI = (XII - XA) / (XII - XI)
+                        YI1 = MLREE4.PROG(IX)
+                        YI2 = MLREE4.PROG(IX-1)
+                        MLREE6.PROG(NVAL) = FXI*YI1+(1.d0-FXI)*YI2
+                      ENDIF
+                    ENDIF
+                  ELSE
+C     write(6,*) 'cas 7c : IX , XI', IX , XI
+                    NVAL = NVAL+1
+                    MLREE5.PROG(NVAL) = XA
+                    MLREE6.PROG(NVAL) = MLREE4.PROG(1)
+                    NVAL = NVAL+1
+                    MLREE5.PROG(NVAL) = XB
+                    MLREE6.PROG(NVAL) = MLREE4.PROG(1)
+
+                  ENDIF
+                ENDIF
+              ENDIF
+ 251        CONTINUE
+            JG = NVAL
+            SEGADJ, MLREE5, MLREE6
+C     write(6,*) 'MLREE5 =',(MLREE5.PROG(II),II=1,NVAL)
+C     write(6,*) 'MLREE6 =',(MLREE6.PROG(II),II=1,NVAL)
+
+C           MAJ IEeme EVOLUTION 
+            SEGINI, KEVOL1 
+            KEVOL1.IPROGX = MLREE5
+            KEVOL1.IPROGY = MLREE6
+            KEVOL1.TYPX = KEVOLL.TYPX
+            KEVOL1.TYPY = KEVOLL.TYPY
+            MEVOL1.IEVOLL(IE) = KEVOL1
+ 250      CONTINUE
+C         Fin de boucle sur les evolutions 
+
+          LEVINT(IL) = MEVOL1
+ 25     CONTINUE
+C       Fin de boucle sur les intervalles
+
+      ELSE
+        NINT = 1
+        SEGINI,LEVINT,LOPP
+        LEVINT(1) = IPEVOL
+      ENDIF
+
+C=======================================================================
+C     CALCUL DES INTEGRALES 
+C=======================================================================
+
+C     LRESU(i) : POINTEUR SUR LISTREEL RESULTAT INTEGRATION ie COURBE
+      NEVO = NEVOLL
+      SEGINI,LRESU
+
+C --- BOUCLE SUR LES COURBES KEVOLL ---
+      DO 31 I1=1,NEVOLL
+
+C       Initialisation LISTREEL SOLUTION POUR I1e COURBE
+        JG = NINT
+        SEGINI,MLREEL
+
+C       BOUCLE SUR LES INTERVALLES D'INTEGRATION
+        DO 32 J2=1,NINT
+
+          MEVOLL = LEVINT(J2)
+C         SEGACT,MEVOLL
+          KEVOLL = IEVOLL(I1)
+
+C         INTEGRATION I1e COURBE SUR J2e INTERVALLE
+          MLREE1=IPROGX
+C         SEGACT MLREE1
+          MLREE2=IPROGY
+C         SEGACT MLREE2
+          L1=MLREE1.PROG(/1)
+          XINT = 0.D0
+          DO 33 K3=1,(L1-1)
+            XPAS = MLREE1.PROG(K3+1)-MLREE1.PROG(K3)
+            IF (IABSO.EQ.1) THEN
+              XVAL = ABS(MLREE2.PROG(K3))+ABS(MLREE2.PROG(K3+1))
+            ELSE
+              XVAL = MLREE2.PROG(K3)+MLREE2.PROG(K3+1)
+            ENDIF
+            XINT = 0.5D0*XVAL*XPAS + XINT
+ 33       CONTINUE
+
+C         ON PREND L'OPPOSEE SI BORNES INVERSEE
+          IF (LOPP(J2).EQ.1) XINT = -1.D0*XINT
+          IF (LOPP(J2).EQ.2) XINT = -0.D0*XINT
+          MLREEL.PROG(J2) = XINT
+
+ 32     CONTINUE
+
+C       ON STOCKE LE RESULTAT POUR LA I1e COURBE
+        LRESU(I1) = MLREEL
+
+ 31    CONTINUE
+
+C=======================================================================
+C     MISE EN FORME DES RESULTATS
+C=======================================================================
+      IF (NEVOLL.GT.1) THEN
+        IF (NINT.GT.1) THEN
+          IK = 3
+          NVAR = NEVOLL
+          NBCOUP = 1
+          SEGINI, MNUAGE
+          DO 40 I4=1,NVAR
+            IF (                  I4.LT.10) WRITE(NOMC,51) I4
+            IF (     I4.GE.10.AND.I4.LT.100) WRITE(NOMC,52) I4
+            IF (    I4.GE.100.AND.I4.LT.1000) WRITE(NOMC,53) I4
+            IF (   I4.GE.1000.AND.I4.LT.10000) WRITE(NOMC,54) I4
+            IF (  I4.GE.10000.AND.I4.LT.100000) WRITE(NOMC,55) I4
+            IF ( I4.GE.100000.AND.I4.LT.1000000) WRITE(NOMC,56) I4
+            IF (I4.GE.1000000) THEN
+              CALL ERREUR(21)
+              RETURN
+            ENDIF
+            NUANOM(I4) = 'IE'//NOMC
+            NUATYP(I4) = 'LISTREEL'
+            SEGINI, NUAVIN
+            NUAPOI(I4) = NUAVIN
+            NUAINT(1) = LRESU(I4)
+ 40       CONTINUE
+          IPINT = MNUAGE
+        ELSE
+          IK = 2
+          JG = NEVOLL
+          SEGINI, MLREE1
+          DO 45 I4=1,NEVOLL
+            MLREEL = LRESU(I4)
+            MLREE1.PROG(I4) = MLREEL.PROG(1)
+ 45       CONTINUE
+          IPINT = MLREE1
+        ENDIF
+      ELSE
+        IF (NINT.GT.1) THEN
+          IK = 2
+          IPINT = MLREEL
+        ELSE
+          IK = 1
+        ENDIF
+      ENDIF
+
+ 51   FORMAT (I1)
+ 52   FORMAT (I2)
+ 53   FORMAT (I3)
+ 54   FORMAT (I4)
+ 55   FORMAT (I5)
+ 56   FORMAT (I6)
+
+      RETURN
+      END
+
+ 
+ 
+ 

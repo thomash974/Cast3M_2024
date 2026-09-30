@@ -1,0 +1,315 @@
+$$$$ BRUCHE
+* BRUCHE    PROCEDUR  SERRE     21/06/28    21:15:01     11045          
+'DEBP' bruche rxt*'TABLE';
+*
+* E/   rxt  : TABLE    : Données de la procédure execrxt
+*  /S  qb_i : FLOTTANT : Débit massique de i injecté (en kg/s) 
+*  /S  qtot : FLOTTANT : Débit massique injecté (en kg/s) 
+*  /S  srcs : FLOTTANT : Débit volumique injecté (en m3/s) 
+*  /S  drhb : FLOTTANT : Débit enthalpique injecté (en W) 
+*
+idim = 'VALE' 'DIME' ;
+'SI' ('EGA' idim 2) ;
+     LMOT1 = 'MOTS' '1UN' '2UN' ;
+     LNUL1 = 'PROG' 0.D0 0.D0 ;
+'SINO' ;
+     LMOT1 = 'MOTS' '1UN' '2UN' '3UN' ;
+     LNUL1 = 'PROG' 0.D0 0.D0 0.D0 ;
+'FINS' ;
+*
+TIC = rxt . 'TIC' ;
+TBT = rxt . 'TBT' ;
+$menvf = rxt . 'GEO' . '$menvf' ;
+$vtf   = rxt . 'GEO' . '$vtf'   ;
+ndl = 'DIME' tic . 'PT' ;
+Pt  = 'EXTR' tic . 'PT' ndl ;
+*
+* Les donnees physiques
+Cpvapj = TBT . 'Cpvap' ;
+Lv     = TBT . 'Lv'    ;
+Rabs   = TBT . 'Rabs'  ;
+Rgvap  = TBT . 'Rgvap' ; Mkvap  = TBT . 'Mkvap' ;
+Rgair  = TBT . 'Rgair' ; Mkair  = TBT . 'Mkair' ;
+Rghe   = TBT . 'Rghe'  ; Mkhe   = TBT . 'Mkhe'  ;
+Rgh2   = TBT . 'Rgh2'  ; Mkh2   = TBT . 'Mkh2'  ;
+Rgo2   = TBT . 'Rgo2'  ; Mko2   = TBT . 'Mko2'  ;
+Rgn2   = TBT . 'Rgn2'  ; Mkn2   = TBT . 'Mkn2'  ;
+Rgco   = TBT . 'Rgco'  ; Mkco   = TBT . 'Mkco'  ;
+Rgco2  = TBT . 'Rgco2' ; Mkco2  = TBT . 'Mkco2' ;
+*
+* Initialisation des bilans 0D
+qb_liq qb_eau qb_air qb_he qb_h2 qb_o2 qb_n2 qb_co qb_co2 =
+0.D0   0.D0   0.D0   0.D0  0.D0  0.D0  0.D0  0.D0  0.D0 ;
+qtot = 0. ;
+srcs = 0. ;
+drhb = 0. ;
+*
+* Initialisation des conditions aux limites scalaire aux breches
+cltf mat1 = 'KOPS' 'MATRIK' ;
+clrvp  = 'COPI' cltf ;
+clrh2  = 'COPI' cltf ;
+clro2  = 'COPI' cltf ;
+clrn2  = 'COPI' cltf ;
+clrhe  = 'COPI' cltf ;
+clrco  = 'COPI' cltf ;
+clrco2 = 'COPI' cltf ;
+clrair = 'COPI' cltf ;
+*
+* Initialisation des CL vectorielles aux breches
+club = 'COPI' cltf ;
+*
+*
+* Boucle sur les Breches
+*
+*
+nbrbr = 'DIME' rxt . 'Breches' ;
+ibr   = 'INDE' rxt . 'Breches' ;
+'REPE' nub nbrbr ;
+  Briches = rxt . 'Breches' . (ibr . &nub) ;
+  rxtsce  = Briches . 'scenario' ;
+  GEO     = Briches ;
+  'SI' ('EXIS' rxtsce 'hair') ;
+    'MESS' 'Option indisponible' ;
+    'MESS' 'On attend Tinj plutot que HAIR' ;
+    'ERRE' 5 ;
+  'FINS' ;
+*
+* Initialisation des débits locaux
+  qeau qair qhe  qh2  qo2  qn2  qco  qco2 =
+  0.D0 0.D0 0.D0 0.D0 0.D0 0.D0 0.D0 0.D0 ;
+  Ksi  = 1.D0 ;
+  qliq = 0.D0 ;
+  hliq = 0.D0 ;
+*
+* Interpolation des débits (+ verrue option CATHARE2)
+  'SI' TBT . 'CATHARE2' ;
+    'MESS' ' CATHAR2 ' ;
+    'MESS' ' HELLO   ' ;
+    titi = 'EXTE' 'cat < CASCAR' ;
+    tinj = titi . 1 ;
+    qair = titi . 2 ;
+    qeau = titi . 3 ;
+    mess 'tinj qair qeau = ' tinj qair qeau ;
+  'SINO' ;
+    t    = rxtsce . 't' ;
+    tinj = 'IPOL' tps t (rxtsce .'tinj') ;
+    qair = 'IPOL' tps t (rxtsce .'qair') ;
+    'SI' TBT . 'VAPEUR' ; qeau = 'IPOL' tps t (rxtsce .'qeau') ; 'FINS';
+    'SI' TBT . 'THE'    ; qhe  = 'IPOL' tps t (rxtsce .'qhe')  ; 'FINS';
+    'SI' TBT . 'TH2'    ; qh2  = 'IPOL' tps t (rxtsce .'qh2')  ; 'FINS';
+    'SI' TBT . 'TO2'    ; qo2  = 'IPOL' tps t (rxtsce .'qo2')  ; 'FINS';
+    'SI' TBT . 'TN2'    ; qn2  = 'IPOL' tps t (rxtsce .'qn2')  ; 'FINS';
+    'SI' TBT . 'TCO'    ; qco  = 'IPOL' tps t (rxtsce .'qco')  ; 'FINS';
+    'SI' TBT . 'TCO2'   ; qco2 = 'IPOL' tps t (rxtsce .'qco2') ; 'FINS';
+  'FINS' ;
+*
+* Débit total gaz avant séparation à la brèche
+  Qj  = qeau '+' qair '+' qhe '+' qh2 '+' qo2 '+' qn2 '+' qco '+' qco2 ;
+*
+* Séparation éventuelle de la vapeur à la brèche
+  'SI' TBT . 'VAPEUR' ;
+    'SI' ('NEG' qeau 0.) ;
+      iQj = 1.D0 '/' Qj ;
+      Mj = (qeau/Mkvap) '+' (qair/Mkair) '+' (qhe/Mkhe) '+' (qh2/Mkh2)
+       '+' (qo2/Mko2)   '+' (qn2/Mkn2)   '+' (qco/Mkco) '+' (qco2/Mkco2)
+       '*' iQj '**' (-1.D0) ;
+      Xvj  = qeau '*' iQj '*' Mj '/' Mkvap ;
+      Pvj  = Pt '*' Xvj ;
+      Hinj = 'VARI' 'HVS' Pvj (Tinj + 273.15) ;
+      Tsat = 'VARI' 'TSATP' Pt ;
+      Hliq = 'VARI' 'HLS' Pt Tsat ;
+      Hvap = 'VARI' 'HVS' Pvj Tsat ;
+      Ksi  = (Hinj '-' Hliq) '/' (Hvap '-' Hliq) ;
+      Ksi  = 'MINI' ('PROG' 1.D0 Ksi) ;
+      Ksi  = 'MAXI' ('PROG' 0.D0 Ksi) ;
+      qliq = qeau * (1.D0 '-' Ksi) ;
+      qeau = qeau * Ksi ;
+      Qj   = Qj '-' qliq ;
+    'FINSI' ;
+  'FINSI' ;
+*
+  'SI' ('EGA' Qj 0.D0) ;
+     FQj = vrai ;
+     iQj = 0.D0 ;
+  'SINO' ;
+     FQj = faux ;
+     iQj = 1.D0 '/' Qj ;
+  'FINS' ;  
+*
+* Pptés du mélange à l'injection à Tinj 
+  Cph2j Cphej Cpo2j Cpn2j Cpco2j Cpcoj Cpairj = CALCP Tinj ;
+  Cpj   = (Cpvapj '*' qeau) '+' (Cpairj '*' qair) '+' (Cphej '*' qhe)
+      '+' (Cph2j  '*' qh2)  '+' (Cpo2j  '*' qo2)  '+' (Cpn2j '*' qn2)
+      '+' (Cpcoj  '*' qco)  '+' (Cpco2j '*' qco2)
+      '*' iQj ;
+  Rgj   = (Rgvap * qeau) '+' (Rgair '*' qair) '+' (Rghe * qhe)
+      '+' (Rgh2  * qh2 ) '+' (Rgo2  '*' qo2)  '+' (Rgn2 * qn2)
+      '+' (Rgco  * qco)  '+' (Rgco2 '*' qco2)
+      '*' iQj ;
+  Cvj   = Cpj '-' Rgj ;
+*
+* Densité totale et partielles à l'injection
+  'SI' FQj ;
+    Roj = 0.D0 ;
+  'SINO' ;
+    Roj = Pt '/' (Tinj '+' 273.15) '/' Rgj ;
+  'FINS' ;
+  Rvapj = Roj '*' qeau '*' iQj ;
+  Rairj = Roj '*' qair '*' iQj ;
+  Rhej  = Roj '*' qhe  '*' iQj ;
+  Rh2j  = Roj '*' qh2  '*' iQj ;
+  Ro2j  = Roj '*' qo2  '*' iQj ;
+  Rn2j  = Roj '*' qn2  '*' iQj ;
+  Rcoj  = Roj '*' qco  '*' iQj ;
+  Rco2j = Roj '*' qco2 '*' iQj ;
+*
+  $breche  = Briches . '$breche' ;
+  brchp    = Briches . 'breche'  ;
+  brchi    = Briches . 'brechei' ;
+  brchc    = Briches . 'brechec' ;
+  diru     = Briches . 'diru'    ;
+  Sbreche  = Briches . 'Sbreche' ;
+  facgeo   = Briches . 'facgeo'  ;
+*
+* Dbit corrigé du facteur géométrique
+  Qjf = Qj '*' facgeo             ;
+  Hj  = Cpj '*' (Tinj '+' 273.15D0) ;
+  Ej  = Cvj '*' (Tinj '+' 273.15D0) ;
+  'SI' ('EGA' Qj 0.0) ;
+    guj = 0.0 ;
+  'SINO' ;
+    guj = (Qjf '/' Sbreche '/' Roj ) ;
+  'FINS' ;
+*
+* Conditions aux limites en vitesse (en m/s)
+  gj  = 'KCHT' $breche 'VECT' 'SOMMET' 'COMP' LMOT1 (diru * guj) ;
+  'SI' TBT . 'FPAROI' ;
+    gj  = 'REDU' gj brchp ;
+    gjc = 'MANU' 'CHPO' brchc LMOT1 LNUL1 ;
+    gjx = 'KCHT' $breche 'VECT' 'SOMMET' 'COMP' LMOT1 gj gjc ;
+  'SINO' ;
+    gj  = 'REDU' gj brchi ;
+    gjx = 'KCHT' $breche 'VECT' 'SOMMET' 'COMP' LMOT1 gj ;
+  'FINS' ;
+  club = club 'ET' gj ;
+*
+  unvf0 = 'KCHT' $menvf  'VECT' 'SOMMET' 'COMP' LMOT1 gjx ;
+  src   = 'DBIT' unvf0 $menvf ;
+  srcs  = srcs '+' src ;
+  asrc  = Roj  '*' ('ABS' src) ;
+  Qtot  = Qtot '+' asrc ;
+*  'MESS' 'Qj Qtot' Qj ' ' Qtot ;
+*  'MESS' 'gj src' ;
+*  'LIST' gj ;
+*  'LIST' src ;  
+*  'MESS' 'gjx' ;
+*  'LIST' gjx ;
+*  'LIST' brchp ;
+*  'LIST' brchi ;
+*  'LIST' brchc ;
+*
+* Conditions aux limites en température (en C)
+  cltf   = cltf 'ET'
+  ('MANU' 'CHPO' BRCHI 1 'TF' Tinj 'NATURE' 'DISCRET') ;
+*
+* Conditions aux limites en densités partielles (en kg/m3)
+  clrvp  = clrvp  'ET'
+  ('MANU' 'CHPO' BRCHI 1 'RVP'  Rvapj 'NATURE' 'DISCRET') ;
+  clrh2  = clrh2  'ET'
+  ('MANU' 'CHPO' BRCHI 1 'RH2'  RH2j  'NATURE' 'DISCRET') ;
+  clro2  = clro2  'ET'   
+  ('MANU' 'CHPO' BRCHI 1 'RO2'  RO2j  'NATURE' 'DISCRET') ;
+  clrn2  = clrn2  'ET'  
+  ('MANU' 'CHPO' BRCHI 1 'RN2'  RN2j  'NATURE' 'DISCRET') ;
+  clrhe  = clrhe  'ET'  
+  ('MANU' 'CHPO' BRCHI 1 'RHE'  RHEj  'NATURE' 'DISCRET') ;
+  clrco  = clrco  'ET'  
+  ('MANU' 'CHPO' BRCHI 1 'RCO'  RCOj  'NATURE' 'DISCRET') ;
+  clrco2 = clrco2 'ET'
+  ('MANU' 'CHPO' BRCHI 1 'RCO2' RCO2j 'NATURE' 'DISCRET') ;
+  clrair = clrair 'ET'
+  ('MANU' 'CHPO' BRCHI 1 'RAIR' Rairj 'NATURE' 'DISCRET') ;
+*
+* Contribution des Breches aux bilans de masse 0D (Qb_beta en kg/s)
+  qb_liq = qb_liq '+' qliq ;
+  qb_eau = qb_eau '+' qeau ;
+  qb_he  = qb_he  '+' qhe  ; 
+  qb_h2  = qb_h2  '+' qh2  ;
+  qb_o2  = qb_o2  '+' qo2  ;
+  qb_n2  = qb_n2  '+' qn2  ;
+  qb_co  = qb_co  '+' qco  ;
+  qb_co2 = qb_co2 '+' qco2 ;
+  qb_air = qb_air '+' qair ;
+*
+* Contribution des Breches au bilan d'énergie (drhb en W)
+  drhb = drhb '+' (Qj '*' Hj) ;
+*
+* Affichage local
+  'SI' (TBT . 'IMPR' '>EG' 2) ;
+  'MESS' ' ' ;
+  'MESS' '==> Débits injectés (kg/s) Brèche' ' ' (ibr . &nub) ;
+  'MESS' 'Qj  =' Qj   ' ' 'Qliq=' qliq ;
+  'MESS' '------------------------------------------------------------'; 
+  'MESS' 'Qvap=' qeau ' ' 'Qair=' qair ' ' 'Qhe =' qhe ' ' 'Qh2 =' qh2 ;
+  'MESS' 'Qo2 =' qo2  ' ' 'Qn2 =' qn2  ' ' 'Qco =' qco ' ' 'Qco2=' qco2;
+  'MESS' '------------------------------------------------------------'; 
+  'MESS' 'Vitesse Injection  guj=' guj ' ' 'm/s'    ;
+  'MESS' 'Densité Injection  Roj=' Roj ' ' 'kg/m3'  ;
+  'MESS' 'R/M     Injection  Rgj=' Rgj ' ' 'J/kg/K' ;
+  'MESS' '------------------------------------------------------------'; 
+  'MESS' ' ' ;
+  'FINS' ;
+*
+* Sauvegarde locale
+  Briches . 'qeau' = qeau ;
+  Briches . 'qair' = qair ;
+  Briches . 'qhe'  = qhe  ;
+  Briches . 'qh2'  = qh2  ;
+  Briches . 'qo2'  = qo2  ;
+  Briches . 'qn2'  = qn2  ;
+  Briches . 'qco'  = qco  ;
+  Briches . 'qco2' = qco2 ;
+  Briches . 'iQ'   = iQj  ;
+*
+  Briches . 'Rvapj' = Rvapj ;
+  Briches . 'Rairj' = Rairj ;
+  Briches . 'Rhej'  = Rhej  ;
+  Briches . 'Rh2j'  = Rh2j  ;
+  Briches . 'Ro2j'  = Ro2j  ;
+  Briches . 'Rn2j'  = Rn2j  ;
+  Briches . 'Rco2j' = Rco2j ;
+  Briches . 'Rcoj'  = Rcoj  ;
+  Briches . 'Rgj'   = Rgj   ;
+  Briches . 'Tj'    = Tinj  ;
+  Briches . 'Roj'   = Roj   ;
+*  Briches . 'gj'    = gj    ;
+*  Briches . 'unvf0' = unvf0 ;
+  Briches . 'src'   = src   ;
+*
+  Briches . 'Tinj' = Briches . 'Tinj' 'ET' ('PROG' Tinj) ;
+  Briches . 'Ksi'  = Briches . 'Ksi' 'ET' ('PROG' Ksi)  ;
+  Briches . 'Qlj'  = Briches . 'Qlj' 'ET' ('PROG' qliq) ;
+  Briches . 'Hlj'  = Briches . 'Hlj' 'ET' ('PROG' hliq) ;
+  Briches . 'guj'  = Briches . 'guj' 'ET' ('PROG' guj) ;
+  Briches . 'Qj'   = Briches . 'Qj'  'ET' ('PROG' asrc) ;
+  Briches . 'Hj'   = Briches . 'Hj'  'ET' ('PROG' Hj) ;
+  Briches . 'Ej'   = Briches . 'Ej'  'ET' ('PROG' Ej) ;
+'FIN' nub ;
+*
+* Sauvegarde des conditions aux limites
+tic . 'Breches' . 'UN'   = club ;
+tic . 'Breches' . 'TF'   = cltf   ;
+tic . 'Breches' . 'RVP'  = clrvp  ;
+tic . 'Breches' . 'RH2'  = clrh2  ;
+tic . 'Breches' . 'RO2'  = clro2  ;
+tic . 'Breches' . 'RN2'  = clrn2  ;
+tic . 'Breches' . 'RHE'  = clrhe  ;
+tic . 'Breches' . 'RCO'  = clrco  ;
+tic . 'Breches' . 'RCO2' = clrco2 ;
+tic . 'Breches' . 'RAIR' = clrair ;
+*
+'RESP' qb_eau qb_liq qair qb_he qb_h2 qb_o2 qb_n2 qb_co qb_co2 qtot
+       srcs drhb ;
+'FINP' ;
+ 
+ 

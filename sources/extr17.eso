@@ -1,0 +1,77 @@
+C EXTR17    SOURCE    CB215821  20/11/04    21:17:07     10766          
+      SUBROUTINE EXTR17(MCHELM,MLMOTS)
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+C-----------------------------------------------------------------------
+C
+C                             E X T R 1 7
+C                             -----------
+C
+C FONCTION:
+C ---------
+C
+C     EXTRAIT LES NOMS DES COMPOSANTES D'UN MCHAML
+C     ET LES RANGE DANS UN LISTMOTS MLMOTS
+C
+C MODULES UTILISES:
+C -----------------
+C
+-INC PPARAM
+-INC SMCHAML
+-INC SMLMOTS
+C
+C PARAMETRES:   (E)=ENTREE   (S)=SORTIE   (+ = CONTENU DANS UN COMMUN)
+C -----------
+C
+C     MCHELM  (E)  POINTEUR SUR LE MCHAML
+C     MLMOTS  (S)  POINTEUR SUR LE LISTMOTS
+C
+C-----------------------------------------------------------------------
+
+      INCJGM=10
+      
+      JGN=LOCOMP
+      N1 =IMACHE(/1)
+
+      IF (N1.EQ.0) THEN
+        JGM   =0
+        SEGINI,MLMOTS
+        GOTO 90
+      ENDIF
+
+      MCHAML=ICHAML(1)
+      JGM=NOMCHE(/2)
+      SEGINI,MLMOTS
+      DO 20 I=1,JGM
+        MOTS(I)=NOMCHE(I)
+ 20   CONTINUE
+
+      NBCOMP=JGM
+      IF (N1.GT.1) THEN
+         DO 30 I=2,N1
+            MCHAML=ICHAML(I)
+            DO 40 K=1,NOMCHE(/2)
+               DO 50 J=1,NBCOMP
+                 IF (MOTS(J).EQ.NOMCHE(K)) GOTO 40
+ 50            CONTINUE
+               NBCOMP = NBCOMP + 1
+               IF (NBCOMP .GT. JGM)THEN
+                 JGM=JGM+INCJGM
+                 INCJGM = INCJGM * 2
+                 SEGADJ,MLMOTS
+               ENDIF
+               MOTS(NBCOMP)=NOMCHE(K)
+ 40         CONTINUE
+ 30      CONTINUE
+      ENDIF
+      
+      IF (NBCOMP .NE. JGM)THEN
+        JGM=NBCOMP
+        SEGADJ,MLMOTS
+      ENDIF
+
+ 90   RETURN
+      END
+ 

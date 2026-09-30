@@ -1,0 +1,946 @@
+C CONNE1    SOURCE    KICH      22/11/21    21:15:02     11505          
+      SUBROUTINE CONNE1(IPMODL,XLONG,IXLONG,CONSTI,ICLE,JPT1,JPT2,JPT3,
+     >                  IPCHCO,IRET)
+C_______________________________________________________________________
+C
+C           CALCUL DES CONNECTIVITES APPELE PAR CONNEC
+C
+C    Entrees:
+C    ________
+C
+C           IPMODL Pointeur sur un objet MMODEL
+C           XLONG  Longeur caracteristique
+C           IXLONG Champ de longeur caracteristique
+C           CONSTI nom du constituant
+C           ICLE   mode de modification du maillage pour le calcul
+C                  (1=NORM, 3=POIN, 4=DROI, 5=PLAN, 2=TRAN)
+C           JPT1|
+C           JPT2|  pointeurs eventuels sur des objets de type point
+C           JPT3|
+C
+C
+C    Sorties:
+C    ________
+C
+C           IPCHCO Pointeur sur un MCHAML de Connectivite
+C           de composantes obligatoires ...
+C
+C                  'NLAR': Non local Longueur cARacteristique
+C                  'PMOD': Pointeur sur un MMODEL contenant
+C                          l'ensemble des IMODEL accessibles
+C                          pour la sous zone
+C                  'NPNI': Non local Pointeur Numero Imodel de nmod
+C                  'NPLI': Non local Pointeur LIstenti
+C
+C           ... et eventuellement
+C
+C                  'POT1': Point ou vecteur de construction de symetrie
+C                          (POIN, DROI, PLAN, TRAN)
+C                  'POT2': Point de construction de symetrie (DROI)
+C                  'DISP': Distance pour calcul de symetrie PLAN (PLAN)
+C
+C           IRET   1 ou 0 suivant succes ou pas
+C
+C    Appele par: CONNEC
+C    -----------
+C
+C    Appel a:
+C    --------
+C
+C    LOADPO : lecture d'un point (pointeur --> x(3))
+C    NORPLA : calcul de l'eq. canonique d'un plan passant par 3 pts
+C    ADJUPO : ajout d'un point dans la pile des points (x(3) --> pointeur)
+C    NORDRO : calcul du vect. dir. norme de la droite passant par 2 pts
+C    DISYPT : distance a un point
+C    DISYDR : distance a une droite
+C    DISYPL : distance a un plan
+C    TRTRVE : point translate
+C    TRSYPT : point symetrique par rapport a un point
+C    TRSYDR : point symetrique par rapport a une droite
+C    TRSYPL : point symetrique par rapport a un plan
+C    ELQUOI, DOXE, DTSHAM
+C
+C    AUTEUR P.PEGON 22/10/92 d'apres C. LA BORDERIE d'apres P.PEGON
+C_______________________________________________________________________
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      CHARACTER*16 CONSTI
+      DIMENSION PT3(3)
+      
+C
+-INC SMMODEL
+-INC CCREEL
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCOORD
+-INC SMCHAML
+-INC SMLENTI
+   
+-INC CCASSIS      
+
+      PARAMETER(MASDIM=64)
+      common/CCONNE/iwrk3,ipmodl1,xmultl,icle1,ihgsel
+      common/CCONNE/jconl,ihg1,ihg2,ihg,nbthr,ixlong1
+      COMMON/CHSELE/imfopa,ishg,ihug,imcord,ihgt
+      common/CCONN1/d,pt1(3),pt2(3)
+      common/CCONN1/xmn(masdim),ymn(masdim),zmn(masdim)
+      common/CCONN1/xmx(masdim),ymx(masdim),zmx(masdim)
+      common/CCONN1/hmxt(masdim),xlg2m(masdim)
+      external crbary
+      external hselei
+      logical zthr
+      SEGMENT,WRK1
+        REAL*8 XE(3,nbno1)
+C coord des noeuds
+      ENDSEGMENT
+      
+      SEGMENT,WRK2
+        REAL*8 XEJ(3,nbno1)
+      ENDSEGMENT
+      
+      SEGMENT,WRK3
+         INTEGER IWRK1(NSOUS,nbthr), IWRK2(NSOUS,nbthr)
+     +   ,imptv(nsous)
+C iwrk1 pointe vers les wrk1 et iwrk2 pointe sur les wrk2         
+      ENDSEGMENT
+      
+      pointeur IPMAIL.MELEME
+      pointeur MLNIMO.MLENTI
+      pointeur MLNUEL.MLENTI
+      pointeur MCORD2.MCOORD
+      
+      CHARACTER*(NCONCH) CONM
+      PARAMETER (NINF=3)
+      INTEGER INFOS(NINF)
+      
+      SEGMENT NOTYPE
+        CHARACTER*16 TYPE(NBTYPE)
+      ENDSEGMENT  
+      
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS), NSOF(NS)
+        INTEGER IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+    
+      SEGMENT INFO
+        INTEGER INFELL(JG)
+      ENDSEGMENT
+C hg1 contient les coordonnees des barycentres de la zone de travail
+C hg2 contient les coordonnees des barycentres  de la deuxieme zone      
+      SEGMENT HG1      
+        REAL*8 HCOOR(3*nbpb)
+      ENDSEGMENT 
+      pointeur hg2.hg1
+C HG contient les correspondances entre numérotation locale et numerotation castem
+C    ainsi que des donnees permettant d'ecrire le resultat      
+      SEGMENT HG
+        INTEGER IELH(nbpb,2) 
+C IELH(i,1)=numero de l'element dans la sous zone
+C IELH(i,2)=numero de la sous zone
+C Tableau qui contient le max d(noeuds, barycentre)
+        REAL*8 HMax(nbpb)
+C si ixlong different de zero contient le max de ixlong dans l'element
+        REAL*8 XLL(nbpb)
+C Tableau qui contient nombre d'ele en connex par sous zone        
+        INTEGER INOA(nbpb,NSOUS+1)
+      ENDSEGMENT
+C hgt contient les tableaux utile pour le tri
+      SEGMENT HGT
+C       integer ka(nels),kb(nels)
+C Tableau contenant proj ortho sur la droite apres tri
+        REAL*8 Xp(nels)
+C Tableau auxiliaire  pour triflot
+        REAL*8 Xw(nels)
+C Tableau auxiliaire pour triflot 
+        INTEGER Ke(nels)
+C Tableau donne la correspondance entre le tableau trie et la numerotation de la zone 2 
+        INTEGER ICO(nels)
+      ENDSEGMENT
+      
+       
+      SEGMENT mfopa
+C Premier element dans un segment de la droite      
+        INTEGER ind(indt)     
+      ENDSEGMENT 
+C  lhug la liste des elements en relation - on s'y retrouve grace a inoa     
+      SEGMENT iVECTI
+        INTEGER Lhug(JG)
+      ENDSEGMENT
+      pointeur ivect1.ivecti
+
+      segment mlhug
+         integer ilhug(nbthr)
+         integer nhug(nbthr)
+      endsegment
+C VECTEUR corresp entre numero des elements conserves (cas symetrie) et numerotation locale    
+      SEGMENT SHG
+        INTEGER NSYM(NELS)
+      ENDSEGMENT
+       
+C permet de ne pas recalculer le symetrique d'un noeud      
+      SEGMENT NOETR
+        INTEGER NDEJVU(NBPTS)
+      ENDSEGMENT 
+C permet de savoir s'il faut creer un segment resultat (1 oui 0 non) 
+      SEGMENT CONL
+        INTEGER ICONL(NBPB)
+      ENDSEGMENT                                                             
+      segment kkzt
+        integer kzt(nbpb)
+      endsegment
+
+      segment hgsele
+         real*8 xmult,ymult,zmult
+         real*8 hmaxt,xlong2,tmax,tmin,xlong2m
+         integer nels,nbpb,ipass
+         integer nbzt,indt,khug
+      endsegment
+
+
+      integer ittime(4) 
+      data xmultl/1.5D0/
+c
+C      i232 = 2**32
+
+      ixlong1 = ixlong
+      icle1 = icle
+C LECTURE DES POINTS
+      CALL LOADPO(JPT1,PT1)
+      CALL LOADPO(JPT2,PT2)
+      CALL LOADPO(JPT3,PT3)
+      
+C CALCUL DE LA NORMALE NORMEE ET DE LA DISTANCE POUR KE CAS DU PLAN 
+C ET AJOUT DU POINT A LA PILE
+     
+      segini hgsele
+       ihgsel = hgsele
+       khug = 0
+C     call timespv(ittime,othrd)
+C     ide = ittime(1) + ittime(2)
+      IF (ICLE.EQ.5) then
+         CALL NORPLA(PT1,PT2,PT3,pt1,D)
+         CALL ADJUPO(PT1,JPT1)
+      ENDIF
+C CALCUL DU VECTEURE DIRECTEUR NORME DANS 
+C DANS LE CAS DE LA DROITE ET AJOUT DU POINT A LA PILE
+C
+      IF (ICLE.EQ.4) THEN
+        CALL NORDRO(PT1,PT2,PT2) 
+        CALL ADJUPO(PT2,JPT2)
+      ENDIF
+C
+C
+           
+      iret=1
+C
+C
+C____________________________________________________________________
+C
+C     PREPARATIONS DE LA LONGUEUR CARACTERISTIQUE
+C____________________________________________________________________
+C
+      IF(IXLONG.NE.0)THEN
+C
+        INFOS(1)=0
+        INFOS(2)=0
+        INFOS(3)=NIFOUR
+C
+        NBROBL=1
+        NBRFAC=0
+        SEGINI NOMID
+        NOMLAR=NOMID
+        LESOBL(1)='LCAR'
+        NBTYPE=1
+        SEGINI NOTYPE
+        MOTYPE=NOTYPE
+        TYPE(1)='REAL*8'
+      ELSE
+        XLONG2 = XMULTl * XLONG
+      ENDIF
+C
+C     ACTIVATION DU MODELE
+C
+      MMODEL=IPMODL
+      SEGACT,MMODEL
+      NSOUS=KMODEL(/1)
+C
+C     ACTIVATION DES ZONES ELEMENTAIRES DU MAILLAGE
+C
+       nbthr = nbthrs
+       segini wrk3
+       nbelz=0
+       DO ISOUS=1,NSOUS
+          IMODEL=KMODEL(ISOUS)
+          SEGACT,IMODEL
+          IPMAIL=IMAMOD
+          SEGACT,IPMAIL
+          nbno1=IPMAIL.num(/1)
+          nbelz=nbelz + IPMAIL.num(/2)
+          do i = 1, nbthrs
+             segini wrk1
+             segini wrk2
+             wrk3.iwrk1(isous,i)=wrk1
+             wrk3.iwrk2(isous,i)=wrk2
+          enddo
+          if (ixlong.ne.0) then
+             conm = conmod
+             mele = ipmail.itypel
+             if (infmod(/1).lt.7) then
+                call elquoi(mele,0,5,ipinf,imodel)
+                if (ierr.ne.0) goto 9999
+                info = ipinf
+                minte = infell(11)
+                segsup info
+             else
+                minte = infmod(7)
+             endif
+             call komcha(ixlong,ipmail,conm,nomlar,motype,1,infos,3
+     +                  ,ivalar)
+             if (ierr.ne.0) then
+                nomid  = nomlar
+                notype = motype
+                segsup ,nomid,notype
+                goto 9999
+             endif
+             mptval = ivalar
+             melval = ival(1)
+             segact melval
+             imptv(isous) = melval
+             call dtmval(ivalar,2)
+          endif
+       ENDDO
+      
+       nbpb=nbelz
+
+       segini kkzt
+       SEGINI HG 
+       ihg = hg
+       segini hg1
+       ihg1   = hg1
+       ihg2   = hg1
+       xmin=xgrand
+       ymin=xgrand
+       zmin=xgrand
+       xmax=-xgrand
+       ymax=-xgrand
+       zmax=-xgrand
+       hmaxt = 0d0
+       xlong2m = 0d0
+C 
+       mcord2=mcoord
+       imcord = mcord2
+       hg2=hg1
+       SEGINI CONL
+       do ib1=1,nbpb
+          iconl(ib1)=1
+       ENDDO
+C on regarde si on parallelise
+       if (LODESL.or.nbthrs.eq.1.or.nbpb.lt.nbthrs) then
+          zthr = .FALSE.
+          nbthr = 1
+       else
+          zthr = .TRUE.
+          nbthr = nbthrs 
+C         nbthr = 20     
+       endif
+C        zthr = .FALSE.
+C        nbthr = 1
+C On fait une boucle pour créer une numerotation
+C
+       ib1 = 0
+       NELS = NBPB
+       ishg = 0
+       if (icle.ne.1) then
+         SEGINI SHG,hg2
+         ishg   = shg
+         ihg2   = hg2
+       endif
+       do isous = 1, nsous
+          IMODEL   = KMODEL(ISOUS)
+          IPMAIL   = IMAMOD
+          nbel1    = IPMAIL.num(/2)
+          nbno1    = IPMAIL.num(/1)
+          do iel1 = 1, nbel1
+             IB1         = IB1 + 1           
+             IELH(IB1,1) = iel1
+             IELH(IB1,2) = ISOUS
+          enddo
+       enddo
+       jconl  = conl
+       inoetr = noetr
+       iwrk3  = wrk3
+C       ihg    = hg
+       ipmodl1 = ipmodl
+       
+C On fait une boucle sur tous les éléments pour créer les centres de gravité et une numérotation      
+       if (zthr) then
+          call threadii
+          do ith = 2, nbthr
+             call threadid(ith,crbary)
+          enddo
+          call crbary(1)
+          do ith = 2, nbthr
+             call threadif(ith)
+          enddo
+          call threadis
+       else
+          call crbar1(iwrk3,ipmodl1,1,nbpb,xmultl,icle,d,pt1,pt2
+     +      ,jconl,ihg1,ihg2,xmn,ymn,zmn,xmx,ymx,zmx
+     +      ,hmxt,ihg,1,ixlong,xlong2,xlg2m)
+       endif
+c
+       do i = 1, nbthr
+          xmax = max (xmax,xmx(i))
+          ymax = max (ymax,ymx(i))
+          zmax = max (zmax,zmx(i))
+          xmin = min (xmin,xmn(i))
+          ymin = min (ymin,ymn(i))
+          zmin = min (zmin,zmn(i))
+          hmaxt = max (hmaxt,hmxt(i))
+          xlong2m = max(xlong2m,xlg2m(i))
+       enddo
+
+C      
+C on fait une boucle pour tasser les tableaux dans le cas icle = 3,4,5
+       if (icle.eq.2.or.icle.eq.3.or.icle.eq.4.or.icle.eq.5) then
+       ik1 = 0
+       ib  = 0
+       do ib = 1, nbpb
+          if (iconl(ib).eq.1) then
+             ik1 = ik1 + 1
+             nsym(ik1) = ib
+             hg2.HCOOR((IK1-1)*3+1) = hg2.HCOOR((Ib-1)*3+1)
+             hg2.HCOOR((IK1-1)*3+2) = hg2.HCOOR((Ib-1)*3+2)
+             hg2.HCOOR((IK1-1)*3+3) = hg2.HCOOR((Ib-1)*3+3)
+                 HCOOR((IK1-1)*3+1) =     HCOOR((Ib-1)*3+1)
+                 HCOOR((IK1-1)*3+2) =     HCOOR((Ib-1)*3+2)
+                 HCOOR((IK1-1)*3+3) =     HCOOR((Ib-1)*3+3)
+             
+          endif
+       enddo
+       endif
+       if (icle.ne.1) then
+          NELS=IK1
+          SEGADJ SHG,hg2,hg1
+       endif
+C CALCUL DES NOEUDS DES SYM QU'ON STOCKE DANS HCOR2
+        if (icle.ne.1) then
+           SEGINI MCORD2
+           imcord = mcord2
+           SEGINI NOETR 
+           DO IB = 1, NELS
+              ib1 = ib
+              if (icle.eq.5) IB1 = NSYM(IB)
+              if (icle.eq.4) IB1 = NSYM(IB)
+              if (icle.eq.3) IB1 = NSYM(IB)
+              IEL = IELH(IB1,1)
+              IZO = IELH(IB1,2)  
+              imodel = kmodel(izo)
+              ipmail = imamod
+              nn2    = ipmail.num(/1)
+              do ij = 1, nn2
+                 ino1=ipmail.num(ij,iel)
+                 IF (NDEJVU(INO1).EQ.0) THEN
+                    NDEJVU(INO1) = 1
+                    B = D
+                    if (icle.eq.5) then
+                       DO J = 1, idim
+                          B = B + XCOOR((ino1-1)*(idim+1)+J)*PT1(J)
+                      ENDDO
+                      B = B * 2
+                      DO J = 1, idim
+                         MCORD2.XCOOR((ino1-1)*(idim+1)+J) = 
+     +                        XCOOR((ino1-1)*(idim+1)+J) - B * PT1(J)
+                      enddo 
+C
+                    elseif(icle.eq.4) then
+                      b=0D0
+                      DO J = 1, idim
+                         B = B + PT2(J)
+     +                     * (xcoor((ino1-1)*(idim+1)+J)-PT1(J))
+                      ENDDO
+                      
+                      DO J = 1, idim
+                         tata = +2*(PT1(J)-xcoor((ino1-1)*
+     +                    (idim+1)+J)+B*PT2(J))
+                         titi=(xcoor((ino1-1)*(idim+1)+J))+tata
+                         MCORD2.XCOOR((ino1-1)*(idim+1)+J)=titi
+                      enddo
+                       
+                    elseif(icle.eq.3) then
+                      DO J=1,idim
+                          MCORD2.XCOOR((ino1-1)*(idim+1)+J)=
+     +                      xcoor((ino1-1)*(idim+1)+J)+2*(PT1(J)
+     +                     -xcoor((ino1-1)*(idim+1)+J))
+                      ENDDO
+                   elseif(icle.eq.2) then
+                      DO J=1,idim
+                          MCORD2.XCOOR((ino1-1)*(idim+1)+J)=
+     +                      xcoor((ino1-1)*(idim+1)+J)+PT1(J)
+                      ENDDO 
+                   endif
+                 ENDIF
+              enddo
+           ENDDO
+        endif
+C
+C debut du tri des projs
+C
+C      
+C     
+C    
+       segini hgt
+       ihgt = hgt
+       xmult = 3.1415926 * (xmax-xmin)
+       ymult = 2.7182818 * (ymax-ymin)
+       zmult = 1.        * (zmax-zmin)
+       tmult = sqrt(xmult**2+ymult**2+zmult**2)
+       if (tmult.le.xpetit) then
+          xmult = 3.1415926
+          ymult = 2.7182818
+          zmult = 1.      
+          tmult = sqrt(xmult**2+ymult**2+zmult**2)
+       endif
+       xmult = xmult / tmult
+       ymult = ymult / tmult
+       zmult = zmult / tmult  
+       tmin =   xgrand
+       tmax =  -xgrand  
+       DO ib1 = 1, nels
+          xproj = hg2.HCOOR((IB1-1)*3+1) * xmult
+     +          + HG2.HCOOR((IB1-1)*3+2) * ymult
+     +          + HG2.HCOOR((IB1-1)*3+3) * zmult 
+        
+          Xp(ib1)  = xproj
+          tmin     = min(xproj,tmin)
+          tmax     = max(xproj,tmax)
+          ico(ib1) = ib1
+       ENDDO
+       if (abs(tmin-tmax).le.xpetit) then
+          tmin = tmin - 0.5
+          tmax = tmax + 0.5 
+       endif
+       if (ixlong.ne.0)  xlong2 = xlong2m
+*  quelques contorsions pour eviter un integer overflow
+       xbzt = (tmax-tmin) / xlong2
+       xbzt = max(xbzt,1.d0)
+       xels=nels
+       xbzt = min(xels,xbzt)
+       nbzt=xbzt
+      
+       CALL TRIFLO(Xp,Xw,ico,Ke,nels)          
+
+       if (icle.eq.3) then
+
+       endif
+       indt=nbzt+1   
+       segini mfopa   
+       imfopa = mfopa
+       DO i = nels, 1, -1
+         id = nbzt*(Xp(i)-tmin) / (tmax-tmin) + 1
+         ind(id)=i
+       ENDDO
+       DO i = 1, nbzt
+          if (ind(i+1).eq.0) ind(i+1)=ind(i)
+          if(ind(i+1).lt.ind(i)) call erreur(5)
+       ENDDO
+       if (zthr) then
+          ilon1 = nels / nbthr + 1
+       else
+          ilon1 = nels
+       endif
+C         jg = I232
+C         jg1 = jg / nbthr 
+C         jg = jg1
+C double passage pour estimation taille de ivecti
+       do ipas = 1, 2
+          ipass = ipas 
+       if (ipas.eq.1) then
+       segini mlhug
+       ihug = mlhug
+       endif
+C       JG= ilon1 * nels
+C       jg = min(jg,jg1)
+C       khug = jg
+       if (ipas.eq.2) then
+       do i = 1, nbthr
+          jg = nhug(i)
+          segini ivecti
+          ilhug(i) = ivecti
+          nhug(i) = 0
+       enddo 
+       endif
+
+       if (zthr) then
+          call threadii
+          do ith = 2, nbthr
+             call threadid(ith,hselei)
+          enddo
+          call hselei(1)
+          do ith = 2, nbthr
+             call threadif(ith)
+          enddo
+          call threadis
+       else
+          call hsele1(1,1,nels,imfopa,ihg1,ihg2,iwrk3,ishg,ihug
+     +          ,ihgsel,ihg,ipmodl,icle,imcord,ihgt,ixlong)
+       endif
+C fin de la boucle ipass
+       enddo
+C
+C ecriture du chamelem resultat
+C
+       N1=NSOUS
+       L1=22
+       N3=6
+       SEGINI,MCHELM
+       IPCHCO=MCHELM
+       TITCHE='CONNECTIVITE NON LOCAL'
+       IFOCHE=IFOUR
+       DO ISOUS = 1, NSOUS
+          IMODEL = KMODEL(ISOUS)
+          IPMAIL = IMAMOD
+          CONCHE(ISOUS) = CONSTI
+          CONM = CONMOD
+          NBEL = IPMAIL.NUM(/2)
+          NBNN = IPMAIL.NUM(/1)
+C INFORMATIONS SUR L'ELEMENT FINI
+          MELE=IPMAIL.ITYPEL 
+          IF (infmod(/1).lt.7) then        
+             CALL ELQUOI(MELE,0,5,IPINF,IMODEL)
+             IF (IERR.NE.0) THEN
+                GOTO 9999
+             endif       
+             INFO=IPINF
+             MINTE=INFELL(11)
+             SEGSUP INFO
+          ELSE
+              minte=infmod(7)
+          ENDIF
+C
+C COMPLEMENT DU CHAMELEM
+C
+         IMACHE(ISOUS)=IPMAIL
+         INFCHE(ISOUS,1)=0
+         INFCHE(ISOUS,2)=0
+         INFCHE(ISOUS,3)=NIFOUR
+         INFCHE(ISOUS,4)=MINTE
+         INFCHE(ISOUS,5)=0
+         INFCHE(ISOUS,6)=5
+                  
+C____________________________________________________________________
+C
+  
+  
+        IF (ICLE.EQ.1) n2=4
+        IF (ICLE.EQ.2.OR.ICLE.EQ.3) N2=5
+        IF(ICLE.EQ.4.OR.ICLE.EQ.5)  N2=6    
+C TAILLE DES MELVALS A ALLOUER ET ALLOCATION
+C CREATION DU MCHAML DE LA SS ZONE
+C CAS SYMETRIE A PAS OUBLIER 
+        SEGINI MCHAML
+        ICHAML(ISOUS) = MCHAML
+C CREATION DU PREMIER MELVAL
+C        'NLAR': DONNE LA LONGUEUR CARACTERISTIQUE
+C CE MELVAL EST CONSTANT DANS CHAQUE SS ZONE
+         NOMCHE(1) = 'NLAR'
+         TYPCHE(1) = 'REAL*8'
+         N2PTEL = 0
+         N2EL   = 0
+C CAS CHAMP CARA
+         if (ixlong.ne.0) then
+            melval = imptv(isous)
+            segini,melva1=melval
+            ielval(1) = melva1
+         else
+            N1PTEL = 1
+            N1EL   = 1
+            SEGINI, MELVAL
+            IELVAL(1)   = MELVAL
+            VELCHE(1,1) = XLONG
+         endif
+C CREATION DU DEUXIEME MELVAL 
+C 'PMOD': PONTE SUR UN MODELE INDIQUANT LES ZONES GEOMETRIQUES
+C CE MELVAL EST CONSTANT
+         N1PTEL = 0
+         N1EL   = 0
+         N2PTEL = 1
+         N2EL   = 1
+         NOMCHE(2) = 'PMOD'
+         TYPCHE(2) = 'POINTEURMMODEL '
+         SEGINI MELVAL
+         IELVAL(2)   = MELVAL
+         IELCHE(1,1) = MMODEL
+         
+C 'NPNI : POINTE SUR UN LISTENTI CONTENANT LE NUMERO DU IMODEL 
+C ACCESSIBLE POUR CHAQUE ELEMENT
+C 'NPLI': POINTE SUR UN LISTENTI CONTENANT UNE LINKED 
+C LISTE DES ELEMENTS ACCESSIBLES SUR CHAQUE ZONE
+
+          N1EL   = 0
+          N1PTEL = 0
+          N2PTEL = 1
+          N2EL   = NBEL
+          NOMCHE(3) = 'NPNI'
+          TYPCHE(3) = 'POINTEURLISTENTI'
+          SEGINI, MELVAL
+          IELVAL(3) = MELVAL
+          NOMCHE(4) = 'NPLI'
+          TYPCHE(4) = 'POINTEURLISTENTI'
+          SEGINI, MELVAL
+          IELVAL(4) = MELVAL
+          
+          
+          
+C
+C
+C     'POT1' : POINTE SUR UN OBJET DE TYPE POINT
+C
+C              CE MELVAL EST CONSTANT DANS CHAQUE SS_ZONE
+C
+        IF(ICLE.NE.1)THEN
+          N1PTEL=0
+          N1EL=0
+          N2PTEL=1
+          N2EL=1
+          NOMCHE(5)='POT1'
+          TYPCHE(5)='POINTEURPOINT   '
+          SEGINI MELVAL
+          IELVAL(5)=MELVAL
+          IELCHE(1,1)=JPT1
+        ENDIF
+C
+C
+C     'POT2' : POINTE SUR UN OBJET DE TYPE POINT
+C
+C              CE MELVAL EST CONSTANT DANS CHAQUE SS_ZONE
+C
+        IF(ICLE.EQ.4)THEN
+          N1PTEL=0
+          N1EL=0
+          N2PTEL=1
+          N2EL=1
+          NOMCHE(6)='POT2'
+          TYPCHE(6)='POINTEURPOINT   '
+          SEGINI MELVAL
+          IELVAL(6)=MELVAL
+          IELCHE(1,1)=JPT2
+        ENDIF
+C
+C     'DISP' : DONNE LA DISTANCE AU PLAN
+C
+C              CE MELVAL EST CONSTANT DANS CHAQUE SS_ZONE
+C
+        IF(ICLE.EQ.5)THEN
+          N2PTEL=0
+          N2EL=0
+          N1PTEL=1
+          N1EL=1
+          NOMCHE(6)='DISP'
+          TYPCHE(6)='REAL*8'
+          SEGINI,MELVAL
+          IELVAL(6)=MELVAL
+          VELCHE(1,1)=D
+        ENDIF
+C
+       ENDDO
+        
+               
+C debut de la boucle pour ranger les numeros d element
+
+       DO IB1= 1, nbpb
+         kzt(ib1) = 0
+         knb=0
+         DO ISOUS=1, NSOUS
+            IF(inoa(IB1,ISOUS).NE.0) then
+              kzt(ib1)=kzt(ib1)+1
+              knb=knb+inoa(IB1,ISOUS)+1
+            ENDIF
+              
+         ENDDO
+         IZO=IELH(IB1,2)
+         IEL=IELH(IB1,1)
+         MCHAML=ICHAML(IZO)
+         if(iconl(ib1).eq.0.or.kzt(ib1).eq.0) then           
+           melval=ielval(3)
+           ielche(1,iel)=0
+           melval=ielval(4)
+           ielche(1,IEL)=0
+         else
+           melval=ielval(3)
+             jg=kzt(ib1)
+             SEGINI MLENTI         
+             Ielche(1,Iel)=MLENTI
+             melval=ielval(4)
+             JG=KNB
+             SEGINI MLENTI
+             ielche(1,IEL)=MLENTI
+         endif       
+       ENDDO
+C REMPLISSAGE DES LISTENTI 
+
+       do ith = 1, nbthr
+          ivecti = ilhug(ith)
+          nbthr1 = nbthr
+          if (ith.gt.nbthr1) goto 999
+          ires = mod(nels,nbthr1)
+          if (ires.eq.0) then
+             ilon1 = nels / nbthr1
+             ideb = (ith - 1) * ilon1 + 1
+          else
+             if (ith.le.ires) then
+                ilon1 = nels / nbthr1 + 1
+                ideb = (ith - 1) * ilon1 + 1
+             else
+                ilon1 = nels / nbthr1
+                ideb = (ires * (ilon1 + 1)) + (ith - ires - 1)*ilon1+1
+             endif
+          endif
+          ifin = ideb + ilon1 - 1
+          if (ifin.ge.ideb) then
+          ICP=0    
+          DO iIB1=ideb, ifin
+             ib1 = iib1
+             if (icle.eq.3.or.icle.eq.4.or.icle.eq.5) ib1=nsym(iib1)
+             if (iconl(IB1).eq.1.and.kzt(ib1).ne.0) then
+                KZTl=0         
+                IEL=IELH(IB1,1)
+                IZO=IELH(IB1,2)
+                MCHAML=ICHAML(IZO)
+                MELVAL=IELVAL(3)
+                MLENTI=IELCHE(1,IEL)
+                MELVAL=IELVAL(4)
+                MLNIMO=IELCHE(1,IEL)
+                N1=MLNIMO.LECT(/1)
+                NCP1=0
+                NTOT=0
+                DO ISOUS=1, NSOUS
+                IF (INOA(IB1,ISOUS).NE.0) THEN
+                   NTOT=NTOT+INOA(IB1,ISOUS)
+                   NCP=INOA(IB1,ISOUS)
+              
+                   NCP1=NCP1+1
+                   MLNIMO.LECT(NCP1)=INOA(IB1,ISOUS)
+
+                   KZTl=KZTl+1
+                   MLENTI.LECT(KZTl)=ISOUS
+                   DO I1=1, INOA(IB1,NSOUS+1)
+                      IB2=LHUG(ICP+I1)
+                      IZO2=IELH(IB2,2)
+                      IF (IZO2.EQ.ISOUS) THEN
+                         IEL2=IELH(IB2,1)
+                         NCP1=NCP1+1
+                         MLNIMO.LECT(NCP1)=IEL2
+                      ENDIF             
+                   ENDDO
+                ENDIF
+         
+          ENDDO
+         ICP=ICP+NTOT
+         endif
+C fin de la boucle sur les éléments
+       ENDDO
+       endif
+ 999  continue
+C fin de la boucle sur nbthr
+          segsup ivecti
+       enddo
+         
+
+       segsup mlhug
+      segsup hg1,hgt,hg,conl
+      do ii = 1, nsous
+         do i = 1, nbthr
+            wrk1 =iwrk1(ii,i)
+            wrk2 =iwrk2(ii,i)
+            segsup wrk1,wrk2
+         enddo
+      enddo
+      segsup wrk3
+      segsup mfopa
+      segsup ivecti
+      segsup kkzt
+      if (icle.ne.1) then
+         segsup hg2,shg,noetr,mcord2
+      endif
+c
+C desactivation de l'objet resultat pour qu'il ne soit plus actif en ecriture
+C ce qui n'a pas ete cree dans la routine est laisse ouvert
+c
+
+      mchelm = ipchco
+      do isous = 1, nsous
+         mchaml = ichaml(isous)
+         melval = ielval(1)
+         segdes melval
+         melval = ielval(2)
+         segdes melval
+         if (icle.ne.1) then
+            melval = ielval(5)
+            segdes melval
+         endif
+         if (icle.eq.4.or.icle.eq.5) then
+            melval = ielval(6)
+            segdes melval
+         endif
+         melval = ielval(3)
+         do jj = 1, ielche(/2)
+            if (ielche(1,jj).ne.0) then
+               mlenti = ielche(1,jj)
+               segdes mlenti
+            endif
+         enddo            
+         segdes melval
+         melval = ielval(4)
+         do jj = 1, ielche(/2)
+            if (ielche(1,jj).ne.0) then
+               mlenti = ielche(1,jj)
+               segdes mlenti
+            endif
+         enddo            
+         segdes melval
+         segdes mchaml
+      enddo    
+      segdes mchelm
+
+       if (zthr) then
+          call threadis
+       endif
+      return
+C____________________________________________________________________
+C
+C     ERREUR DANS UNE SOUS ZONE, DESACTIVATION ET RETOUR
+C____________________________________________________________________
+C
+ 9999 CONTINUE
+      IF(ISOUS.GT.1)THEN
+          DO  IE1=1,ISOUS
+            CALL DTSHAM(ICHAML(IE1))
+          ENDDO
+      ENDIF
+      SEGSUP,MCHELM
+      IPCHCO=0
+      IRET=0
+C
+      DO IE1=1,NSOUS
+        IMODEL=KMODEL(IE1)
+        IPMAIL=IMAMOD
+        SEGDES,IPMAIL,IMODEL
+      ENDDO
+      SEGDES,MMODEL
+      RETURN
+C      
+      END
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 

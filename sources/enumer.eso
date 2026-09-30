@@ -1,0 +1,110 @@
+C ENUMER    SOURCE    SP204843  23/02/16    21:15:03     11599          
+      SUBROUTINE ENUMER
+*---------------------------------------------------------------------
+*
+*              OPERATEUR ENUMERER
+*
+*     SYNTAXE : voir notice ENUM
+*
+*--------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      PARAMETER   (NCLE = 2)
+      CHARACTER*8 CTYP
+      CHARACTER*4 MOCLE(NCLE)
+
+C     TYPES EXCLUS DE LA LISTE
+
+      DATA MOCLE  /'TABL','*   '/
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLOBJE
+
+C---------------------------------
+C     Option TABLE ET '*'
+C---------------------------------
+      ICLE = 0
+      CALL LIRMOT(MOCLE,NCLE,ICLE,0)
+C     write(6,*) 'ICLE=',ICLE
+      IF (ICLE.EQ.1) THEN
+        CALL ENUTAB
+        RETURN
+      ELSE IF (ICLE.EQ.2) THEN
+        CALL ENUFOI
+        RETURN
+      ENDIF
+
+C---------------------------------
+C     INITIALISATION RESULTAT
+C---------------------------------
+      NOBJ = 10000
+      SEGINI,MLOBJE
+      NOBLU = 0
+
+
+C---------------------------------
+C     BOUCLE DE LECTURE DES OBJETS
+C---------------------------------
+1     CONTINUE
+
+
+C---- LECTURE DES ARGUMENTS
+      CALL QUETYP(CTYP,0,IRETOU)
+      IF (IRETOU.EQ.0) THEN
+         GOTO 999
+      ENDIF
+
+
+C---- VERIFICATION DU TYPE DE L'OBJET
+      IF (NOBLU.EQ.0) THEN
+C       TYPE ACCEPTE ?
+        CALL PLACE(LTYPOB,NTYPOB,IPLAC,CTYP)
+C       write(6,*) 'IPLAC=',IPLAC
+        IF (IPLAC.EQ.0) THEN
+          MOTERR(1:8) = CTYP
+          CALL ERREUR(39)
+          RETURN
+        ENDIF
+        TYPOBJ(1:8) = CTYP
+      ELSE
+C       MEME TYPE QUE 1ER ?
+        IF (CTYP.NE.TYPOBJ) THEN
+          MOTERR(1:8) = CTYP
+          CALL ERREUR(39)
+        ENDIF
+      ENDIF
+
+
+C---- LECTURE DE L'OBJET ET AJOUT A LA LISTE
+      CALL LIROBJ(TYPOBJ(1:8),IOBJ,1,IRET)
+      IF (IERR.NE.0) RETURN
+      NOBLU = NOBLU + 1
+      IF (NOBLU.GT.NOBJ) THEN
+        NOBJ = NOBJ + 10000
+        SEGADJ, MLOBJE
+      ENDIF
+      LISOBJ(NOBLU) = IOBJ
+
+
+C---------------------------------
+C     FIN DE BOUCLE
+C---------------------------------
+      GOTO 1
+
+
+C---------------------------------
+C     SORTIE
+C---------------------------------
+999   CONTINUE
+      NOBJ = NOBLU
+      SEGADJ, MLOBJE
+      CALL ECROBJ('LISTOBJE',MLOBJE)
+
+      RETURN
+      END
+
+ 
+ 
+ 

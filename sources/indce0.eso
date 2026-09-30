@@ -1,0 +1,25 @@
+C INDCE0    SOURCE    PV090527  23/01/27    21:15:42     11574          
+c**************************************************************************************
+      subroutine indce0(i,k,l)
+c     correspondance entre les  indices en representation pseudo-vecteur (i) et tenseur (k,l)
+      integer i,k,l
+      if(i.le.3)then
+       k=i
+       l=i
+      end if
+      if (i.eq.4)then
+       k=1
+       l=2
+      end if
+      if (i.eq.5)then
+       k=1
+       l=3
+      end if
+      if (i.eq.6)then
+       k=2
+       l=3
+      end if
+      return
+      end
+      
+ 

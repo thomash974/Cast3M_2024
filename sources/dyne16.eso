@@ -1,0 +1,70 @@
+C DYNE16    SOURCE    BP208322  20/09/18    21:16:22     10718          
+      SUBROUTINE DYNE16(Q1,Q2,Q3,NA1,FTOTA,XPTB,NPLB,IDIMB,FINERT)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE : algorithme de Fu - de Vogelaere               *
+*     ________________________________________________               *
+*                                                                    *
+*     Decalage ou mise a zero dans les tableaux pour le pas suivant. *
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+* es  Q1( , )    Vecteur des deplacements generalises                *
+* es  Q2( , )    Vecteur des vitesses generalisees                   *
+* es  Q3( , )    Vecteur des accelerations generalisees              *
+* e   NA1        Nombre total d'inconnues sur la base A              *
+* es  FTOTA      Forces exterieures totalisees, sur la base A        *
+* es  XPTB       Tableau des deplacements des points de liaisons     *
+* e   NPLB       Nombre maxi de points de liaisons                   *
+* e   IDIMB      Nombre maxi de ddl par liaisons                     *
+*                                                                    *
+*--------------------------------------------------------------------*
+      REAL*8 Q1(NA1,*),Q2(NA1,*),Q3(NA1,*),FTOTA(NA1,*)
+      REAL*8 XPTB(NPLB,2,*),FINERT(NA1,*)
+*
+      PARAMETER ( ZERO=0.D0 )
+*
+*     Boucle sur les inconnues de la base A
+*
+      DO 10 I=1,NA1
+         Q1(I,3) = Q1(I,1)
+         Q1(I,4) = Q1(I,2)
+         Q1(I,1) = ZERO
+         Q1(I,2) = ZERO
+*
+         Q2(I,3) = Q2(I,1)
+         Q2(I,4) = Q2(I,2)
+         Q2(I,1) = ZERO
+         Q2(I,2) = ZERO
+*
+         Q3(I,3) = Q3(I,1)
+         Q3(I,4) = Q3(I,2)
+         Q3(I,1) = ZERO
+         Q3(I,2) = ZERO
+*
+         FTOTA(I,3) = FTOTA(I,1)
+         FTOTA(I,4) = FTOTA(I,2)
+         FTOTA(I,1) = ZERO
+         FTOTA(I,2) = ZERO
+*
+         FINERT(I,3) = FINERT(I,1)
+         FINERT(I,4) = FINERT(I,2)
+         FINERT(I,1) = ZERO
+         FINERT(I,2) = ZERO
+ 10   CONTINUE
+cbp2020-09 : ci dessous devenu inutile (cf devrco) 
+cbp2020-09      DO 20 IP = 1,NPLB
+cbp2020-09         DO 22 ID = 1,IDIMB
+cbp2020-09            XPTB(IP,3,ID) = XPTB(IP,1,ID)
+cbp2020-09            XPTB(IP,4,ID) = XPTB(IP,2,ID)
+cbp2020-09            XPTB(IP,1,ID) = ZERO
+cbp2020-09            XPTB(IP,2,ID) = ZERO
+cbp2020-09 22      CONTINUE
+cbp2020-09 20   CONTINUE
+*
+      END
+
+ 
+ 

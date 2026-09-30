@@ -1,0 +1,95 @@
+C NOMOPT    SOURCE    PASCAL    22/04/21    21:15:07     11352          
+      SUBROUTINE NOMOPT(CTYP,MLNOMS,COPT,MLNOM1)
+      IMPLICIT INTEGER(I-N)
+      implicit real*8(a-h,o-z)
+
+-INC CCNOYAU
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMELEME
+-INC TMLNOMS
+      POINTEUR MLNOM1.MLNOMS
+
+      PARAMETER (NTYPE=1, NOPT=4, NTYP1=2, NTYP2=5, NTYP3=8)
+
+      LOGICAL           LVAL
+      CHARACTER*(4)     COPT,MOTOP(NOPT)
+      CHARACTER*(4)     MTYP1(NTYP1),MTYP2(NTYP2),MTYP3(NTYP3)
+      CHARACTER*(8)     CTYP,MOTYP(NTYPE),CVAL
+      CHARACTER*(LONOM) CNOM
+      EXTERNAL          LONG
+
+      DATA MOTYP /'MAILLAGE'/
+      DATA MOTOP /'POIN','LIGN','SURF','VOLU'/
+
+C     VERIFICATION DU TYPE DE L'OBJET
+      CALL PLACE(MOTYP,NTYPE,ITYPO,CTYP)
+      IF (IERR.NE.0) RETURN
+
+C     SI TYPE NON IMPLEMENTE
+      IF (ITYPO.EQ.0) THEN
+        CALL ERREUR(19)
+        RETURN
+      ENDIF
+
+C     VERIFICATION DE L'OPTION
+      CALL PLACE(MOTOP,NOPT,IOPTI,COPT)
+      IF (IERR.NE.0) RETURN
+
+C     SI OPTION NON IMPLEMENTEE
+      IF (IOPTI.EQ.0) THEN
+        CALL ERREUR(19)
+        RETURN
+      ENDIF
+
+C     BRANCHEMENT SELON TYPE
+      GOTO (10),ITYPO
+
+      CALL ERREUR(5)
+      RETURN
+
+C---- TYPE MAILLAGE ----
+ 10   CONTINUE
+
+      SEGACT MLNOMS
+      NNOMS = LINOMS(/2)
+      M     = NNOMS
+      SEGINI, MLNOM1
+      NNOM1 = 0
+      DO 101 IN=1,NNOMS
+
+C        Lecture d'un maillage
+         CNOM = LINOMS(IN)
+         CALL CQUOI(CNOM,CTYP,IVAL,RVAL,CVAL,LVAL,IPGEO1)
+C     write(6,*) 'CNOM, IOBJ=',CNOM(1:10),IPGEO1
+         CALL ACTOBJ(CTYP,IPGEO1,1)
+         IF (IERR.NE.0) RETURN
+
+C        Analyse du type d'element
+         MELEME = IPGEO1
+         NBS = MAX(1,LISOUS(/1))
+         IPT1 = IPGEO1
+         DO 102 IS=1,NBS
+           IF (LISOUS(/1).NE.0) THEN
+             IPT1 = LISOUS(IS)
+           ENDIF
+           IOK   = 0
+           KTYP1 = IPT1.ITYPEL
+C     write(6,*) 'IOPTI, KTYP1, NOMS(KTYP1)=',IOPTI, KTYP1, NOMS(KTYP1)
+           IF (LDLR(KTYP1).EQ.(IOPTI-1)) THEN
+             NNOM1 = NNOM1+1 
+             MLNOM1.LINOMS(NNOM1) = CNOM
+           ENDIF
+ 102     CONTINUE
+ 101  CONTINUE
+      M = NNOM1
+      SEGADJ,MLNOM1
+
+      RETURN
+      END
+
+ 
+ 
+ 
+ 

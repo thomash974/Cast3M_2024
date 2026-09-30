@@ -1,0 +1,25 @@
+C COPYMAT   SOURCE    BP208322  20/09/18    21:15:10     10718          
+
+        SUBROUTINE COPYMAT(NT,A,B)
+        
+*=======================================================================
+* copie de la matrice carree A de dim NTxNT vers B de meme dimension
+* 2d-array copy (simpler than dlacpy)
+*=======================================================================
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+        INTEGER I,J,NT
+c         REAL*8 A(NT,NT),B(NT,NT)
+        REAL*8 A(NT,*),B(NT,*)
+        
+c         DO I = 1,NT
+        DO J = 1,NT
+        DO I = 1,NT
+            B(I,J) = A(I,J)
+        ENDDO
+        ENDDO
+          
+        END
+        
+ 
+ 

@@ -1,0 +1,75 @@
+C EXISCO    SOURCE    CB215821  20/11/25    13:28:36     10792          
+      SUBROUTINE EXISCO(MOTYP,IVAL,MACOMP,IRET)
+C----------------------------------------------------------------------
+C    EXISTENCE D'UNE COMPOSANTE DANS UN CHPOINT OU UN MCHAML
+C----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMCHAML
+
+      CHARACTER*8 MOTYP
+      CHARACTER*(*) MACOMP
+      LOGICAL IRET
+
+      IF     (MOTYP.EQ.'MCHAML  ') THEN
+      ICHAM=1
+      GOTO 1
+      ELSE IF(MOTYP.EQ.'CHPOINT ') THEN
+      ICHAM=2
+      GOTO 1
+      ENDIF
+      CALL ERREUR(21)
+      RETURN
+ 1    CONTINUE
+C
+      GOTO (600,700),ICHAM
+C----------------------------
+C     CAS DU MCHAML
+C----------------------------
+ 600  CONTINUE
+      MCHELM=IVAL
+      NSOUS=IMACHE(/1)
+C
+C     BOUCLE SUR LES SOUS PAQUETS DE MCHELM
+C
+      DO 100 IA=1,NSOUS
+        MCHAML =ICHAML(IA)
+        NCP    =NOMCHE(/2)
+        DO 110 IB=1,NCP
+          IF(MACOMP.NE.NOMCHE(IB))GOTO 110
+          IRET=.TRUE.
+          GO TO 120
+  110   CONTINUE
+ 100  CONTINUE
+      IRET=.FALSE.
+ 120  CONTINUE
+      GO TO 800
+
+C-------------------------
+C     CAS DU CHPOINT
+C-------------------------
+ 700  CONTINUE
+      MCHPOI=IVAL
+        NBSOUS=IPCHP(/1)
+C
+C    BOUCLE SUR LES SOUS-ZONES DU CHPOINT
+C
+        DO 11 I =1,NBSOUS
+        MSOUPO  =IPCHP(I)
+        DO 12 IC=1,NOCOMP(/2)
+           IF(MACOMP.NE.NOCOMP(IC)) GO TO 12
+           IRET=.TRUE.
+           GO TO 15
+12      CONTINUE
+11      CONTINUE
+        IRET=.FALSE.
+15    CONTINUE
+C
+ 800  RETURN
+      END
+ 
+ 

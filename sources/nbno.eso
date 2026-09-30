@@ -1,0 +1,43 @@
+C NBNO      SOURCE    PV        20/03/30    21:21:31     10567          
+C   RAMENE LE NOMBRE DE NOEUDS D'UN OBJET (ELEMENT)
+C
+      SUBROUTINE NBNO
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCOORD
+      SEGMENT ICPR(nbpts)
+      CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+      CALL ACTOBJ('MAILLAGE',MELEME,1)
+      IF (IERR.NE.0) RETURN
+      
+      SEGINI ICPR
+      DO 1 I=1,ICPR(/1)
+      ICPR(I)=0
+   1  CONTINUE
+      IPT1=MELEME
+      DO 3 I=1,MAX(1,LISOUS(/1))
+        IF (LISOUS(/1).NE.0) IPT1=LISOUS(I)
+
+        NBNN  =IPT1.NUM(/1)
+        NBELEM=IPT1.NUM(/2)
+        DO 5 K=1,NBELEM
+          DO 4 J=1,NBNN
+            L=IPT1.NUM(J,K)
+            ICPR(L)=1
+   4      CONTINUE
+   5    CONTINUE
+   3  CONTINUE
+      NBN=0
+      DO 6 I=1,ICPR(/1)
+        NBN=NBN+ICPR(I)
+   6  CONTINUE
+      SEGSUP ICPR
+
+      CALL ECRENT(NBN)
+      END
+
+ 
+ 

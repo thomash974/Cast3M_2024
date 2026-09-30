@@ -1,0 +1,336 @@
+C VETOPI    SOURCE    GOUNAND   21/04/06    21:15:43     10940          
+      SUBROUTINE VETOPI(TRAVJ,MMOT)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : VETOPI
+C DESCRIPTION : Vérifie la consistance entre une topologie et son
+C     inverse, les deux étant stockés dans un segment TRAVJ
+C      
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C***********************************************************************
+C SYNTAXE GIBIANE    : 
+C ENTREES            : MELEME (Activé), NEL
+C ENTREES/SORTIES    : TOPINV (Activé *MOD)
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 02/10/2017, version initiale
+C HISTORIQUE : v1, 02/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+      POINTEUR JCOORD.MCOORD
+-INC SMELEME
+      POINTEUR JTOPO.MELEME
+-INC TMATOP1
+*-INC STOPINV
+      POINTEUR TOPI2.TOPINV
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+-INC SMLENTI
+      POINTEUR JNBL.MLENTI
+      POINTEUR JNNO.MLENTI
+-INC TMATOP2
+*-INC STRAVJ
+      POINTEUR JVERI.TRAVJ
+-INC SMLMOTS
+      POINTEUR JNMETR.MLMOTS
+      logical lident
+      CHARACTER*(*) MMOT
+*
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans vetopi.eso'
+      IDIMP=IDIM+1
+      jpvirt=travj.pvirt
+      jcoord=travj.coord
+      jnmetr=travj.nmetr
+      jcmetr=travj.cmetr
+      jtopo=travj.topo
+      topinv=travj.topi
+      jnbl=travj.nbl
+      jnno=travj.nno
+*            write(ioimp,*) '5 travj,jnno=',travj,jnno
+*      write(ioimp,*) 'jg(jnno)=',jnno.lect(/1)
+
+*     Petite vérification de consistance de dimension des objets
+*     (NVMAX,NPMAX)
+      if (jcoord.ne.0) then
+         nbpts=jcoord.xcoor(/1)/idimp
+         if (nbpts.ne.npmax) then
+            write(ioimp,185) 'jcoor : nbpts,npmax=',nbpts,npmax
+            goto 9999
+         endif
+      endif
+      if (jcmetr.ne.0) then
+         nnin=jcmetr.xin(/1)
+         nnnoe=jcmetr.xin(/2)
+         if (nnnoe.ne.npmax) then
+            write(ioimp,185) 'jcmetr : nnnoe,npmax=',nnnoe,npmax
+            goto 9999
+         endif
+         if (jnmetr.ne.0) then
+            nnin2=jnmetr.mots(/2)
+            if (nnin2.ne.nnin) then
+               write(ioimp,185) 'jnmetr : nnin2,nnin=',nnin2,nnin
+               goto 9999
+            endif
+         endif
+      endif
+      if (jtopo.ne.0) then
+         nbelem=jtopo.num(/2)
+         if (nbelem.ne.nvmax) then
+            write(ioimp,185) 'jtopo : nbelem,nvmax=',nbelem,nvmax
+            goto 9999
+         endif
+      endif
+      if (topinv.ne.0) then
+         if (ldgt.ne.nvcou*idimp) then
+            write(ioimp,185) 'topinv : ldgt,nvcou*idimp=',ldgt,nvcou
+     $           *idimp
+            goto 9999
+         endif
+         nbelem=tlc(/1)/idimp
+         if (nbelem.ne.nvmax) then
+            write(ioimp,185) 'topinv : nbelem,nvmax=',nbelem,nvmax
+            goto 9999
+         endif
+         nbpts=tic(/1)
+         if (nbpts.ne.npmax) then
+            write(ioimp,185) 'topinv : nbpts,npmax=',nbpts,npmax
+            goto 9999
+         endif
+         do i=1,nbpts
+            itic=tic(i)
+            if (itic.eq.0.or.itic.lt.-1.or.itic.gt.(tlc(/1))) then
+               write(ioimp,185) 'topinv : i,tic(i),tlc(/1)=',i,itic
+     $              ,tlc(/1)
+               goto 9999
+            endif
+            itdc=tdc(i)
+            if (itdc.lt.0.or.itdc.gt.(tlc(/1))) then
+               write(ioimp,185) 'topinv : i,tdc(i),tlc(/1)=',i,itdc
+     $              ,tlc(/1)
+               goto 9999
+            endif
+            if ((tic(i).eq.-1.and.tdc(i).ne.0).or.(tdc(i).eq.
+     $           0.and.tic(i).ne.-1)) then
+               write(ioimp,185) 'topinv : i,tic(i),tdc(i)=',i,itic
+     $              ,itdc
+               goto 9999
+            endif
+         enddo
+      endif
+      if (jnbl.ne.0) then
+         jg=jnbl.lect(/1)
+         if (jg.ne.nvmax) then
+            write(ioimp,185) 'jnbl : jg,nvmax=',jg,nvmax
+            goto 9999
+         endif
+         do i=1,nvmax
+            ijnbl=jnbl.lect(i)
+            if (ijnbl.ne.0) then
+               write(ioimp,185) 'jnbl : i,jnbl(i)=',i,ijnbl
+               goto 9999
+            endif
+         enddo
+      endif
+      
+      if (jnno.ne.0) then
+         jg=jnno.lect(/1)
+         if (jg.ne.npmax-npini) then
+            write(ioimp,*) 'jg=',jg
+            write(ioimp,185) 'jnno : jg,npmax,npini=',jg,npmax,npini
+            goto 9999
+         endif
+         do i=1,npmax-npini
+            ijnno=jnno.lect(i)
+            if (ijnno.ne.0) then
+               write(ioimp,185) 'jnno : i,jnno(i)=',i,ijnno
+               goto 9999
+            endif
+         enddo
+      endif
+*
+* Vérification de la topologie (numéros de noeud)
+*
+      if (jtopo.ne.0) then
+         do iel=1,nvmax
+            do ino=1,idimp
+               nnod=jtopo.num(ino,iel)
+               if (nnod.lt.0.or.nnod.gt.npcou) then
+                  write(ioimp,185) 'jtopo : ino,iel,nnod,npcou=',ino,iel
+     $                 ,nnod,npcou
+                  goto 9999
+               endif
+            enddo
+         enddo
+      endif
+*      
+*     Petite vérification de nvcou et de npcou
+*      
+      if (jcoord.ne.0) then
+         npco2=0
+         do icoo=npmax*idimp,1,-1
+            if (jcoord.xcoor(icoo).ne.0.d0) then
+               npco2=((icoo-1)/IDIMP)+1
+               goto 33
+            endif
+         enddo
+ 33      continue
+*     le dernier noeud peut avoir comme coordonnées 0. 0.
+*     mais on considère qu'il n'y a pas plusieurs noeuds localisés en 0. 0.
+*     if (npcou.ne.npco2) then
+         if (npcou.ne.npco2.and.npcou.ne.npco2+1) then
+*         if (npcou.lt.npco2) then
+            write(ioimp,185) 'jcoord : npcou,npco2=',npcou,npco2
+            goto 9999
+         endif
+      endif
+*      
+      if (jcmetr.ne.0) then
+         npco3=0
+         do innoe=npmax,1,-1
+*            if (innoe.ne.jpvirt) then
+               do inin=1,jcmetr.xin(/1)
+                  if (jcmetr.xin(inin,innoe).ne.0.d0) then
+                     npco3=innoe
+                     goto 43
+                  endif
+               enddo
+*            endif
+         enddo
+ 43      continue
+* if..endif suivant un peu inutile mais plus lisible ?        
+         if (jpvirt.ne.0) then
+            if (jpvirt.eq.npco3+1) npco3=npco3+1
+         endif
+*     le dernier noeud peut avoir comme coordonnées 0. 0.
+*     mais on considère qu'il n'y a pas plusieurs noeuds localisés en 0. 0.
+         if (npcou.ne.npco3) then
+*         if (npcou.ne.npco3.and.npcou.ne.npco3+1) then
+*         if (npcou.lt.npco3) then
+            write(ioimp,185) 'jcmetr : npcou,npco3=',npcou,npco3
+            goto 9999
+         endif
+      endif
+      if (jtopo.ne.0) then
+         nvco2=0
+         do iel=nvmax,1,-1
+            do ino=1,idimp
+               if (jtopo.num(ino,iel).ne.0) then
+                  nvco2=iel
+                  goto 44
+               endif
+            enddo
+         enddo
+ 44      continue
+*         if (nvcou.ne.nvco2) then
+         if (nvcou.lt.nvco2) then
+            write(ioimp,185) 'jtopo : nvcou,nvco2=',nvcou,nvco2
+            goto 9999
+         endif
+      endif         
+      if (topinv.ne.0) then
+         do ilc=nvmax*idimp,1,-1
+            if (tlc(ilc).ne.0) then
+               nvco2=((ilc-1)/IDIMP)+1
+               goto 55
+            endif
+         enddo
+ 55      continue
+*         if (nvcou.ne.nvco2) then
+         if (nvcou.lt.nvco2) then
+            write(ioimp,185) 'topinv : nvcou,nvco2=',nvcou,nvco2
+            goto 9999
+         endif
+      endif         
+*
+      if (topinv.ne.0) then
+         segini,jveri=travj
+         jveri.topi=-4
+         jveri.nbl=-4
+         call intop2(jveri,impr)
+         IF (IERR.NE.0) RETURN
+         call retop2(jveri,impr)
+         IF (IERR.NE.0) RETURN
+* Comparaison
+         topi2 =jveri.topi
+         lident=.true.
+         if (topi2.ldgt.ne.ldgt) lident=.false.
+         if (topi2.tlc(/1).eq.tlc(/1)) then
+            do i=1,tlc(/1)
+               if (topi2.tlc(i).ne.tlc(i)) lident=.false.
+            enddo
+         else
+            lident=.false.
+         endif
+         if (topi2.tic(/1).eq.tic(/1)) then
+            do i=1,tic(/1)
+               if (topi2.tic(i).ne.tic(i)) lident=.false.
+            enddo
+         else
+            lident=.false.
+         endif
+         if (topi2.tdc(/1).eq.tdc(/1)) then
+            do i=1,tdc(/1)
+               if (topi2.tdc(i).ne.tdc(i)) lident=.false.
+            enddo
+         else
+            lident=.false.
+         endif
+         if (.not.lident) then
+            write(ioimp,*)
+     $           'vetopi : Anomalie détectée',
+     $           ' dans les topologies inverses '
+            write(ioimp,*) 'JTOPO'
+            call ecmai1(jtopo,0)
+            write(ioimp,*) 'TOPINV'
+            call ectopi(TOPINV,1)
+            call ectopi(TOPINV,2)
+            write(ioimp,*) 'TOPI2'
+            call ectopi(TOPI2,1)
+            call ectopi(TOPI2,2)
+            goto 9999
+         endif
+         segsup,topi2
+         segsup,jveri
+      endif         
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      write(ioimp,*) MMOT
+      MOTERR(1:8)='VETOPI  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine VETOPI
+*
+      END
+
+ 

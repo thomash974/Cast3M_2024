@@ -1,0 +1,48 @@
+C VERCHA    SOURCE    KICH      21/11/17    21:15:13     11191          
+      subroutine vercha(mchelm,resul)
+      implicit real*8 (a-h,o-z)
+      logical resul
+ 
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCHAML
+*
+      resul = .true.
+ 
+      DO III=1,ICHAML(/1)
+        MCHAML=ICHAML(III)
+        DO JJJ=1,IELVAL(/1)
+ 
+         if(typche(JJJ).eq.'REAL*8') then
+          MELVAL=IELVAL(JJJ)
+          n1ptel = velche(/1)
+          n1el = velche(/2)
+            do k1 = 1,n1ptel
+              do k2 = 1,n1el
+                xval = velche(k1,k2)
+         if (.not.(xval.le.xgrand.and.xval.ge.-xgrand))
+     >      resul = .false.
+         if (.not.resul) return
+              enddo
+            enddo
+         else
+          n2ptel = ielche(/1)
+          n2el = ielche(/2)
+            do k1 = 1,n2ptel
+              do k2 = 1,n2el
+                jval = ielche(k1,k2)
+         if (.not.(jval.le.igrand.and.jval.ge.-igrand))
+     >      resul = .false.
+         if (.not.resul) return
+              enddo
+            enddo
+         endif 
+
+        ENDDO
+      ENDDO
+
+
+      return
+      end
+ 

@@ -1,0 +1,333 @@
+C QUALI7    SOURCE    GOUNAND   21/04/01    21:15:08     10933          
+      SUBROUTINE QUALI7(ITOPO,IPVIRT,IMET,IMOMET,XDENS,ICMETR,XVTOL,
+     $     MLREEL,IMPR,IVERI)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : QUALI7
+C DESCRIPTION : Interface à QUALI6 pour calculer les qualités des
+C     éléments 
+C
+C
+C     La programmation est reprise de optt1.eso
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 01/12/2017, version initiale
+C HISTORIQUE : v1, 01/12/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+*-INC TMATOP2
+-INC SMELEME      
+* Numerotation globale
+      POINTEUR ITOPO.MELEME
+*     Numerotation locale
+-INC TMATOP1      
+*-INC SMELEMX
+      POINTEUR KTOPO.MELEMX
+-INC SMCHPOI
+      POINTEUR ICMETR.MCHPOI
+*-INC SMETRIQ
+      POINTEUR KCMETR.METRIQ
+-INC SMCOORD
+* Numerotation globale
+      POINTEUR ICOORD.MCOORD
+** Numerotation locale
+      POINTEUR KCOORD.MCOORD
+*-INC TMTRAV      
+      SEGMENT MISDEF
+      INTEGER ISDEF(NNIN,NNNOE)
+      ENDSEGMENT
+*-INC STRAVJ
+-INC SMLMOTS
+      POINTEUR KNMETR.MLMOTS
+-INC SMLREEL      
+*      
+* Passage de numerotation globale -> locale
+*   et locale -> globale    
+      SEGMENT ICPR(XCOOR(/1)/(IDIM+1))
+      SEGMENT IDCP(NPTINI)
+      integer oooval
+      CHARACTER*4 MOT
+      INTEGER IMPR,IRET
+* Noms de composantes pour la métrique
+      
+*     
+* Executable statements
+*
+      IF (IMPR.GE.5) WRITE(IOIMP,*) 'Entrée dans quali7.eso'
+      IDIMP=IDIM+1
+      ICOORD=MCOORD
+      SEGACT MCOORD
+*      write(ioimp,*) 'quali7 debut : nbpts, xcoor,idim=',
+*     $     nbpts,xcoor(/1)/(idim+1),idim
+      IBPTS=NBPTS
+*     On se simplifie la vie en ne considérant que des maillages simples
+*      call ecmai1(itopo,0)
+      SEGACT ITOPO
+      NBSOUS=ITOPO.LISOUS(/1)
+      NBNN=ITOPO.NUM(/1)
+      IF (NBSOUS.NE.0.OR.NBNN.NE.IDIMP) THEN
+         WRITE(IOIMP,*)
+     $        'Topologie : pas un maillage de simplex volumiques'
+         GOTO 9999
+      ENDIF
+* Correspondances de numérotation
+      SEGINI ICPR
+      IK=0
+      DO 23 IEL=1,ITOPO.NUM(/2)
+         DO 230 INO=1,ITOPO.NUM(/1)
+            IP=ITOPO.NUM(INO,IEL)
+            IF (ICPR(IP).EQ.0) THEN
+               IK=IK+1
+               ICPR(IP)=IK
+            ENDIF
+ 230     CONTINUE
+ 23   CONTINUE
+*      NBLINI=ITOPO.NUM(/2)
+      NPTINI=IK
+      SEGINI IDCP
+      NPTBAS=XCOOR(/1)/IDIMP
+      DO 500 I=1,NPTBAS
+         if (icpr(i).ne.0) IDCP(ICPR(I))=I
+ 500  CONTINUE
+      if (IMPR.GE.6) then 
+         write(ioimp,*) 'Nb noeud globaux,locaux=',NPTBAS,IK
+*         write(ioimp,*) 'ICPR'
+*         write(ioimp,187) (ICPR(I),I=1,ICPR(/1))
+         write(ioimp,*) 'IDCP'
+         write(ioimp,187) (IDCP(I),I=1,IDCP(/1))
+      endif
+      IF (IMPR.GE.3) THEN
+         write(ioimp,*) 'quali7.eso : topologie en coord globales : '
+         call ecmai1(itopo,0)
+         segact itopo*mod
+      ENDIF
+*      
+* Melemes en coordonnées locales
+*     Topologie
+      NLMAX=ITOPO.NUM(/2)
+      NNMAX=IDIMP
+      SEGINI,KTOPO
+      KTOPO.NLCOU=NLMAX
+      KTOPO.NNCOU=NNMAX
+*      
+      DO 33 IEL=1,KTOPO.NLCOU
+         DO 330 INO=1,IDIMP
+            IP=ITOPO.NUM(INO,IEL)
+            KP=ICPR(IP)
+            IF (KP.NE.0) THEN
+               KTOPO.NUMX(INO,IEL)=KP
+            ELSE
+               WRITE(IOIMP,*) 'Erreur de programmation'
+               GOTO 9999
+            ENDIF
+ 330     CONTINUE
+ 33   CONTINUE
+* Eventuellement, IELEM=ITOP donc à désactiver ici      
+      SEGDES ITOPO
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*) 'quali7.eso : topologie en coord locales : '
+         call ecmelx(ktopo,0)
+      ENDIF
+      
+*     Noeud virtuel en coordonnées locales
+      IF (IPVIRT.NE.0) THEN
+         KPVIRT=ICPR(IPVIRT)
+* Ici, c'est normal de ne pas être inclus         
+*         IF (KPVIRT.EQ.0) THEN
+*            write(ioimp,*)
+*     $           'Noeud virtuel non inclus dans la topologie ?'
+*            goto 9999
+*         ENDIF
+      ELSE
+         KPVIRT=0
+      ENDIF
+      IF (IMPR.GE.4) THEN
+         write(ioimp,*) 'quali7.eso : noeud virtuel en coord locales : '
+     $        ,KPVIRT
+      ENDIF         
+* Passage des coordonnées en locale
+      NBPTS=NPTINI
+      SEGINI,KCOORD
+      DO 53 IPL=1,NBPTS
+         IREFL=IDIMP*(IPL-1)
+         IP=IDCP(IPL)
+         IREF=IDIMP*(IP-1)
+         DO 530 IC=1,IDIMP
+            KCOORD.XCOOR(IREFL+IC)=XCOOR(IREF+IC)
+ 530     CONTINUE
+ 53   CONTINUE
+* Passage de la métrique en local
+*
+      IF (ICMETR.NE.0) THEN
+*     Définition des noms de composantes
+         JGN=4
+         JGM=0
+         IF (IMET.EQ.3) JGM=1
+* On a enlevé le cas orthotrope         
+*         IF (IMET.EQ.4) JGM=IDIM
+         IF (IMET.EQ.4) JGM=IDIM*(IDIM+1)/2
+         SEGINI KNMETR
+         DO I=1,JGM
+            KNMETR.MOTS(I)='G    '
+         ENDDO
+* On a enlevé le cas orthotrope         
+*         IF (IMET.EQ.4) THEN
+*            DO I=1,IDIM
+*               WRITE(KNMETR.MOTS(I)(2:2),FMT='(I1)') I
+*            ENDDO
+*         ELSEIF (IMET.EQ.5) THEN            
+         IF (IMET.EQ.4) THEN
+            idx=0
+            DO I=1,IDIM
+               DO J=1,I
+                  idx=idx+1
+                  WRITE(KNMETR.MOTS(idx)(2:2),FMT='(I1)') I
+                  WRITE(KNMETR.MOTS(idx)(3:3),FMT='(I1)') J
+               ENDDO
+            ENDDO
+         ENDIF
+*dbg         WRITE (IOIMP,2019) (KNMETR.MOTS(I),I=1,KNMETR.MOTS(/2))
+*dbg 2019    FORMAT (20(2X,A4) )
+         NNIN=KNMETR.MOTS(/2)
+         NNNOE=NBPTS
+         if (iveri.ge.1) SEGINI MISDEF
+         NNNOE=NBPTS
+         SEGINI KCMETR
+         MCHPOI=ICMETR
+         SEGACT MCHPOI
+         NSOUPO=IPCHP(/1)
+         DO ISOUPO=1,NSOUPO
+            MSOUPO=IPCHP(ISOUPO)
+            SEGACT MSOUPO
+            NC=NOCOMP(/2)
+            MELEME=IGEOC
+            MPOVAL=IPOVAL
+            SEGACT MELEME
+            SEGACT MPOVAL
+            N=VPOCHA(/1)
+            DO IC=1,NC
+               ININ=0
+               DO JNIN=1,NNIN
+                  IF (NOCOMP(IC).EQ.KNMETR.MOTS(JNIN)) THEN
+                     ININ=JNIN
+                     GOTO 11
+                  ENDIF
+               ENDDO
+ 11            CONTINUE
+               IF (ININ.NE.0) THEN
+                  DO I=1,N
+                     INNOE=ICPR(NUM(1,I))
+                     IF (INNOE.NE.0) THEN
+                        if (iveri.ge.1) ISDEF(ININ,INNOE)=1
+                        KCMETR.XIN(ININ,INNOE)=VPOCHA(I,IC)
+                     ENDIF
+                  ENDDO
+               ENDIF
+            ENDDO
+            SEGDES MPOVAL
+            SEGDES MELEME
+            SEGDES MSOUPO
+         ENDDO
+         SEGDES MCHPOI
+         if (iveri.ge.1) then
+*     Vérification que la métrique a été définie sur tous les noeuds et
+*     toutes les composantes
+            DO J=1,ISDEF(/2)
+               IF (J.NE.IPVIRT) THEN
+                  DO I=1,ISDEF(/1)
+                     IF (ISDEF(I,J).NE.1) THEN
+                        MOT=KNMETR.MOTS(I)
+                        INOD=IDCP(J)
+*                        write(ioimp,*) 'iveri=',iveri
+                        write(ioimp,*)
+     $                       'Metrique non definie pour la composante '
+     $                       ,MOT,' au noeud ',INOD
+                        GOTO 9999
+                     ENDIF
+                  ENDDO
+               ENDIF
+            ENDDO
+            SEGSUP MISDEF
+         endif
+*dbg         write(ioimp,*) 'Inimetr ok'
+      ELSE
+         KNMETR=0
+         KCMETR=0
+      ENDIF
+* La numérotation globale devient la locale dans ce bloc  !!!
+      MCOORD=KCOORD
+      IELDEB=1
+      IELFIN=KTOPO.NUMX(/2)
+      JG=IELFIN
+      SEGINI,MLREEL
+      CALL QUALI6(KTOPO,IELDEB,IELFIN,IMET,IMOMET,XDENS,KCMETR,KPVIRT
+     $     ,XVTOL,MLREEL,NQDC)
+* Point de branchement si erreur pendant le bloc en numérotation locale
+ 555  CONTINUE
+*     On rétablit la numérotation globale originelle
+*     ! Attention, il faut aussi rétablir le NBPTS suite aux changements
+*     !  de Pierre dans SMCOORD
+      NBPTS=IBPTS
+      MCOORD=ICOORD
+*      write(ioimp,*) 'quali7 fin : nbpts, xcoor,idim=',
+*     $     nbpts,xcoor(/1)/(idim+1),idim
+      SEGDES,MCOORD
+*     On part en erreur après le rétablissement du MCOORD global
+      IF (IERR.NE.0) RETURN
+      JG=NQDC
+      SEGADJ,MLREEL
+      SEGDES,MLREEL
+      SEGSUP KCMETR
+      SEGSUP KNMETR
+      SEGSUP KCOORD
+      SEGSUP KTOPO
+      SEGSUP IDCP
+      SEGSUP ICPR
+*      write(ioimp,*) ' quali7  : apres segsup=',OOOVAL(2,1)
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 184  FORMAT (2X,'noeud ip=',i4,' relie aux elements')
+ 185  FORMAT (/2X,10(A16,'=',I8,2X)/)
+ 186  FORMAT (2X,10(A6,'=',I6,2X))
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT (5X,10(1X,1PG12.5))
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='QUALI7  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine QUALI7
+*
+      END
+
+ 

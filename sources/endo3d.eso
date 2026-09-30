@@ -1,0 +1,1548 @@
+C ENDO3D    SOURCE    FD218221  24/02/07    21:15:10     11834          
+      subroutine endo3d(XMAT,NMAT,sig0,sigf,deps,nstrs,
+     # VAR0,VARF,NVARI,nbelas3d,teta1,teta2,dt,ierr1,iso,mfr,ifou,
+     # istep,epst0,epstf,NBRFLU3D,NBSUPP3D,
+c     #NBRENF3D,NBPARR3D,
+     # NMAT1,NMAT2,NVARFLU3D,NVARSUP3D,NBVSCAL,NBVTENS,NBVPTENS,
+c     NVARENF3D,
+     # NBNMAX3D,NBNB3D,IDIMB3D,XE3D,tetaref)    
+C      # NBNLOC3D,INLVIA3D,NBVIA3D,NBNLISO,NBNLUNI,NBPARISO,
+C      # NBPARUNI,NBVARNL3D,NBVARISO,NBVARUNI,METHODNL,DHI,DHU,VU,
+C      # IVALMAT3D)
+
+
+c     tables de dimension fixe pour resolution des sytemes lineaires 
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     *** declaration complementaires si renforts **********************
+      
+c     nombre maxi de renforts==NBRENF3D
+c      integer NBRENF
+c     nombre de parametres materiaux par renfort==NBPARR3D      
+c      integer NBPARR
+c     nombre de variables internes par renfort NVARENF==NVARENF3D
+c      integer  NVARENF
+c     dimension compatibles avec cfluendo et idvar4      
+c      parameter (NBRENF=0,NBPARR=25,NVARENF=25)
+c     si NBRENF >0 inclure le fichier de declare_rnfr3d.h      
+
+c     *** declaration pour le non local ********************************
+C      include './declare_non_local3d.h'
+
+c     precision
+      real*8 precision3d
+      parameter(precision3d=1.0d-8)
+c     nombre maxi de sous iterations
+      integer itermax,iprint
+      parameter(itermax=50000,iprint=itermax-100)
+c     endommagement maxi
+      real*8 dmaxi
+      parameter (dmaxi=1.d0-precision3d)
+c     methode de prise en compte de l endo post pic de cisaillement
+      logical orthodp
+      parameter (orthodp=.false.)      
+            
+c     variable logique pour matrice init isotrope
+      logical iso
+       
+c     decalage Gauss pour la plasticite en cas de fluage  nf0
+c     et decalage de la taille nmat1, ifou numero de la formulation    
+      integer nf0,nmat1,nmat2,ifou,istep
+      
+c     *** nombre de parametres materiaux *******************************
+      integer NBRFLU3D,NBSUPP3D,NBRENF3D
+c     nombre de parametres materiau par renfort      
+c      integer NBPARR3D
+c     *** nombre de vari scalaire et pseudovecteur *********************
+      integer NBVSCAL,NBVTENS,NBVPTENS         
+c     compteur associees
+      integer iscal,itens,icomp3d      
+      
+c     *** nombre de variables internes ********************************* 
+c     nombre de variables internes
+      integer NVARFLU3D,NVARSUP3D     
+c     nombre de variables internes par renfort
+c      integer NVARENF3D      
+     
+c     **** tableau des coordonnees des neouds de l element ************* 
+      integer NBNMAX3D,NBNB3D,IDIMB3D
+      real*8 xe3d(3,NBNMAX3D)
+c     methode de calcul de la taille des elements
+      logical Mjacob,Mnoeuds
+      parameter (Mjacob=.false.,Mnoeuds=.true.)       
+      
+c     *** declaration des variables externes ***************************
+      integer nmat,nstrs,NVARI,nbelas3d,ierr1,mfr
+      real*8 xmat(nmat),sig0(nstrs),sigf(nstrs),deps(nstrs)
+      integer IVALMAT3D(nmat)
+      real*8 epst0(nstrs),epstf(nstrs)
+      real*8 var0(NVARI),varf(NVARI)
+      real*8 dt,teta1,teta2,tetaref      
+
+c     *** tableau pour la resolution des systemes lineaires ************
+c     taille maxi du systeme lineaire
+      integer ngf
+      parameter (ngf=65)
+      real*8 XN(ngf),BN(ngf),ANN(ngf,(ngf+1))
+      integer ipzero(ngf)
+c     variable de controle d erreur dans methode de gauss
+      integer errgauss
+
+c     **** variables locales a plastendo3d *****************************
+c     criteres
+      integer ncr
+      parameter (ncr=5)
+      logical actif(ncr)
+      real*8 fcr(ncr)
+c     parametres materiaux donnes      
+      real*8 young,nu,rt,ept,gft,ref,gfr,rc,epc,delta,beta,dcpp,dcpk
+      real*8 ekdc,poro,pcc,mcc,ppcc,pfcc
+c     coeff elastique
+      real*8 MK,MG      
+c     variables generales      
+      integer i,j,k,l
+c     indicateur premier passage
+      logical ppas
+c     coeff pour theta methode
+      real*8 theta
+      parameter (theta=0.5d0) 
+C     cohesions de DP
+      real*8 Cdp_min,Cdp_max,Rcmin
+c     pression de consolidation de CC
+      real*8 Ptmax,Pt,Pcmin,Pc
+c     indicateur d endommagement prepic
+      logical logdtpp,logdcpp
+c     resistance effective et endommagement prepic
+      real*8 dtppmax,dcppmax,rteff,rceff 
+c     invariant de la deformation plastique de DP
+      real*8 EPLDPV,EPLDPD 
+c     invariant de la deformation plastique de CC
+      real*8 EPLCCV,EPCCD       
+c     deformations elastique et plastique de compression
+      real*8 EEPC,EPLPIC,EDPPIC
+c     module d ecrouissage
+      real*8 Hcc,Hdp
+c     vecteur de deformations mecaniques
+      real*8 deps6(6),epst06(6),epstf6(6)
+c     matrice deps
+      real*8 deps33(3,3),deps3(3),vdeps33(3,3),vdeps33t(3,3)
+c     contraintes effectives
+      real*8 dsig3(3),dsig6(6),sigef33(3,3),sigef3(3),vsigef33(3,3)
+c     contraintes bornées utilisees dans DP et CC      
+      real*8 sigdp3(3)
+c     tenseurs variables internes DP et CC debut de pas
+      real*8 EPLDP6(6),EPLCC6(6)
+c     fin de passage
+      real*8 epldp6f(6),eplcc6f(6)
+c     plasticite de traction
+      real*8 eplr60(6),eplr6f(6),eplr33(3,3),eplr3(3)
+c     gestion des ouvertures de fissures
+      real*8 wplt06(6),wplt6(6),wpltx06(6)
+      real*8 wpltx6(6),wpl3(3),vwpl33(3,3),vwpl33t(3,3)
+      real*8 wplx3(3),vwplx33(3,3),vwplx33t(3,3)
+c     contraintes finales
+      real*8 sigef6(6),sigf6d(6),sigf6(6),sigt6(6),sigt6d(6)
+c     pseudo tenseur auxiliaire
+      real*8 xp6(6),xp33(3,3),vxp33(3,3),vxp33t(3,3),xp3(3)
+      real*8 aux3(3) 
+c     logique pour reduire l increment
+      logical log_reduc,ecoul 
+      real*8 reduc
+      integer iter
+c     endommagement
+      real*8 umdt
+c     contrainte hydrique
+      real*8 sigp 
+c     base ouverture des fissures
+      real*8 depr3(3),vdepr33(3,3),vdepr33t(3,3),dir3(3),long3(3)
+c     increment def plastique traction 
+      real*8 deplr3(3),deplr6(6)     
+c     increment def plastique dp
+      real*8 depldp3(3),depldp6(6) 
+c     increment def plastique cc
+      real*8 deplcc3(3),deplcc6(6)
+c     increment de def elastique pour retour radial
+      real*8 depse3(3),depse6(6)
+c     multiplicateurs plastiques
+      real*8 lr1,lr2,lr3,ldp,lcc 
+c     parametre de la loi de reduction thermique pour rc,rt,e 
+c     ordre defini dans idvic et idvar4
+      real*8 tt0(3),tt1(3),mtt(3),ptt(3),red(3)
+      integer ntt
+      parameter (ntt=4) 
+c     prise en compte variation module due a theta
+      real*8 dx,dMK,dMG 
+c     compte sur la boucle de reduction d increment plastique
+      integer jter
+c     exposant endommagement prepic
+      real*8 m1,dcpp0,dpic,spic,smin,s 
+c     endommagements de traction-refermeture      
+      real*8 dt3(3),ref3(3),wkt
+c     calcul de la matrice d endo orthotrope      
+      real*8 sn3(3),dt66(6,6)
+c     partition des contraintes effectives
+      real*8 sigf3(3),vsigf33(3,3),vsigf33t(3,3)
+      real*8 sigft6(6),sigfc6(6),sigfc3(3),sigft3(3)
+      real*8 sigft6p(6),sigft6d(6),sigft6dp(6)
+c     refermeture des fissures
+      real*8 dr66(6,6)
+      real*8 sigfc6p(6),sigfc6dp(6),sigfc6d(6)
+      real*8 sigf61(6),sigft61(6)
+      real*8 sigf62(6),sigft62(6)
+c     flambage des bielttes comprimees
+      real*8 dct3(3)
+c     coeff de couplage endo traction/flambage bielettes de compression
+      real*8 altc,dctmax
+c     endo ortho de DP
+      real*8 dcc3(3),dcdp,dcom,pentendo,nendo  
+c     indicateur de mise a zero du reducteur de retour plastique
+      logical log_reduc_zero,log_err      
+      
+c     ***** declaration parametres materiaux des renforts repartis *****
+c     include './declare_rnfr3d.h'
+c     ! ne rien déclarer apres cet include qui contient des commandes !
+      
+c***********************************************************************
+c     initialisation des parametres 
+
+c     ** indicateur de premier passage 
+      if (var0(1).ne.1.) then
+         ppas=.true.
+      else
+         ppas=.false.
+      end if 
+
+c     initialisation de la variable de controle d erreur
+      ierr1=0
+
+
+c     *********** chargement des parametres materiaux depuis xmat ******
+
+c     Module d young                            
+      young=xmat(1)  
+c     coefficient de Poisson      
+      nu=xmat(2)
+c     calcul des autres coeffs elastiques
+      MK=young/(3.d0*(1.d0-2.0d0*nu))
+      MG=young/(2.d0*(1.d0+nu))      
+c     resistance a la traction      
+      rt=xmat(nbelas3d+1)
+c     deformation au pic de traction      
+      ept=xmat(nbelas3d+2)
+      if (ept.eq.0.) then
+           ept=rt/young 
+      end if 
+c     energie de fissuration en traction directe
+      gft=xmat(nbelas3d+3)
+      if (gft.eq.0.) then
+         print*,'Il manque l energie de fissuration GFT ds plasendo3d '
+         ierr1=1
+      end if       
+c     seuil pour la refermeture des fissures
+      ref=xmat(nbelas3d+4)
+      if(ref.lt.(precision3d*rt)) then
+         ref=rt*precision3d
+      end if
+c     energie de fissuration pour l endo de traction
+      gfr=xmat(nbelas3d+5)  
+      if(gfr.eq.0.) then
+         print*,'Il manque l energie de refermeture GFR ds plastendo3d'
+         ierr1=1
+      end if 
+c     resistance en compression-par cisaillement
+      rc=xmat(nbelas3d+6)
+c     deformation au pic de compression
+      epc=xmat(nbelas3d+7)
+c     endommagement au pic de compression
+      dcpk=xmat(nbelas3d+8)      
+c     coeff drucker prager
+      delta=xmat(nbelas3d+9)         
+c     coeff dilatance de cisaillement
+      beta=xmat(nbelas3d+10)          
+c     deformation caracteristique endo de compression
+      ekdc=xmat(nbelas3d+11)
+      if(ekdc.eq.0.) then
+         print*,'il manque EKDC dans plastendo3d'
+         ierr1=1
+      end if
+c     porosite initiale     
+      poro=xmat(nbelas3d+12)       
+c     Module d ecrouissage initial pour Cam Clay
+      mcc=xmat(nbelas3d+13) 
+   
+c     recup des caracteristiques pour la reduc thermique
+      do i=1,3
+        tt0(i)=xmat(nbelas3d+14+(i-1)*ntt+1)      
+        tt1(i)=xmat(nbelas3d+14+(i-1)*ntt+2)
+        mtt(i)=xmat(nbelas3d+14+(i-1)*ntt+3) 
+        ptt(i)=xmat(nbelas3d+14+(i-1)*ntt+4)
+c       print*,tt0(i),tt1(i),mtt(i),ptt(i)          
+      end do
+c     coeff de couplage endo traction/endo compression     
+      altc=xmat(nbelas3d+27)
+c     pression de préconsolidation (initiale) pour camclay
+      ppcc=xmat(nbelas3d+28) 
+c     pour eviter une singulariute sur le gradient de CC iso avec pt=pc
+c     il faut PPCC>RT
+      if(ppcc.lt.rt*(1.d0+precision3d)) then
+        print*,'Dans endo3d il faut PPCC>Rt'
+        ierr1=1
+      endif
+c     pression de fin de consolidation pour CamClay 
+      pfcc=xmat(nbelas3d+14)        
+
+c***********************************************************************
+c     initialisation des variables internes finales 
+c***********************************************************************
+
+      do iscal=1,NBVSCAL
+         varf(iscal)=var0(iscal)
+      end do
+      do itens=1,NBVTENS
+        do ICOMP3D=1,NBVPTENS
+             nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D
+             varf(nv3d)=var0(nv3d)
+        end do
+      end do
+      
+c***********************************************************************
+c      prise en compte de la temperature 
+c***********************************************************************
+
+
+c     *** reduction des proprietes mecaniquess ************************* 
+
+c     actualisation de la temperature maximale atteinte
+      varf(15)=max(var0(15),teta2)
+
+c     calcul de la reduction fin de pas  
+      do i=1,3  
+        call thed3d(teta2,tt0(i),tt1(i),mtt(i),ptt(i),red(i))
+c       print*,'red(',i,')=',red(i)
+c       le coeff de reductin thermique ne peut pas reaugmenter 
+        if(.not.ppas) then       
+           red(i)=min(red(i),var0(11+i))
+        end if
+        varf(11+i)=red(i)
+      end do      
+c     ppt meca effectees par la temperature
+c     compression et parametres associes    
+      rc=rc*red(1)
+c     epc=epc/red(1)
+c     traction et parametres associes      
+      rt=rt*red(2)
+      gft=gft*red(2)      
+      ref=ref*red(2)
+      gfr=gfr*red(2)
+c     module d young et deformations associees      
+      young=young*red(3) 
+     
+
+c     ** prise en compte de la variation du module *********************
+
+c      variation du coeff de reduction du module
+       dx=varf(14)-var0(14)
+c      rajout de dE*epse sir le module varie       
+       if((abs(dx).gt.precision3d).and.(.not.ppas)) then
+c         le module d Young a varie
+c         recup def elastique pas precedent
+          ITENS=2        
+          do ICOMP3D=1,6
+            nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+            xp6(ICOMP3D)=var0(nv3d)
+          end do
+c         modification de la contrainte du a la variation du module
+          dMK=dx*MK
+          dMG=dx*MG         
+c         diagonalisation du vecteur des deformations elastiques
+          call x6x33(xp6,xp33)
+          call b3_v33(xp33,xp3,vxp33)
+c         increment de contrainte associees          
+          call DSDE3D(dsig3,xp3,dMK,dMG)
+c         passage en base fixe
+          call CHRE36(dsig3,dsig6,vxp33)
+c         mise a jour des contraintes
+          ITENS=1 
+          do ICOMP3D=1,6
+             nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+             varf(nv3d)=varf(nv3d)+dsig6(ICOMP3D)
+             sigef6(ICOMP3D)=varf(nv3d)
+c            print*,'dans endo3d A sigef(',icomp3d,')=',sigef6(icomp3d)
+          end do 
+c          read*          
+       end if    
+   
+c      actualisation des coeffs elastiques
+       MK=young/(3.d0*(1.d0-2.0d0*nu))
+       MG=young/(2.d0*(1.d0+nu))  
+      
+c     ***********test de coherence des donnees pour la matrice *********
+
+c     ** existance d un endommagement pre pic en traction **************
+
+      if (ept.gt.((rt/young)*(1.d0+precision3d)))then
+c       il existe un endommagement pre pic en traction      
+        logdtpp=.true.
+c       endo pre pic maxi
+        dtppmax=1.d0-rt/(young*ept)        
+        rteff=rt/(1.d0-dtppmax)
+      else
+        logdtpp=.false.
+        dtppmax=0.d0
+        ept=rt/young
+        rteff=rt
+      end if
+c     on continue avec rteff      
+      rt=rteff
+c     deformation elastique au pic de traction
+      EEPT=rt/young 
+c     pas de plasticite pre pic en traction
+      EPPT=0.d0
+c     deformation au pic de traction
+      EPT=EEPT      
+      
+c     ** existance d un endommagement pre pic en compression ***********
+
+c     ** verif validite de la dilatance
+      if(beta.gt.(sqrt(3.d0)*(1.d0-precision3d))) then
+        print*,'Dilatance beta excessive dans plastendo3d'
+        ierr1=1
+      end if
+      
+c     ** verif validite de l angle de frottement
+      if(delta.gt.(sqrt(3.d0)*(1.d0-precision3d))) then
+        print*,'Coeff de confinement excessif dans plastendo3d'
+        ierr1=1
+      end if  
+
+      if(dcpk.gt.precision3d) then
+c       on veut un endo de compression pre pic      
+        if(epc.gt.((rc/young)*(1.d0+precision3d))) then
+c         endo pre pic compression possible
+          logdcpp=.true.        
+          if(dcpk.le.(1.d0-rc/(young*epc)))then
+c           l endommagement prepic de compression est conserve
+            dcppmax=dcpk            
+          else
+c           l endommagement pre pic est trop grand , on le limite
+            dcppmax=1.d0-rc/(young*epc) 
+          end if
+          rceff=rc/(1.d0-dcppmax)
+        else
+c         endo compression impossible
+c          print*,'dcpp,Rc, et EPC sont incompatibles'
+c          ierr1=1
+          logdcpp=.false.
+          dcppmax=0.d0
+          rceff=rc        
+        end if
+      else
+c       pas d endo de compression
+        logdcpp=.false.
+        dcppmax=0.d0
+        rceff=rc
+      end if 
+c     deformation elastique au pic de compression
+      EEPC=rceff/young
+c     deformation plastique au pic de compression
+      EPLPIC=EPC-EEPC 
+c     deformation plastique equivalente au pic de compression
+      EDPPIC= 0.3D1 * eplpic / (sqrt(0.3D1) - beta)
+c     on continue avec rceff
+      rc=rceff      
+                 
+c     *** initialisation des parametres calculees a partir des donnees *
+
+c     cohesion finale de drucker prager pour atteindre Rc
+      Cdp_max=rc*(1.d0/sqrt(3.d0)-delta/3.d0)
+c     cohesion initiale de Drucker prager pour activer Rankine en 
+c     avant d'activer DP    
+      Cdp_min = Rt * delta     
+c     Cdp_minmanuel=0.8*rc*(1.d0/sqrt(3.d0)-delta/3.d0)
+c     Cdp_min = min(max(Rt * delta, Rt*(1.d0/sqrt(3.d0)
+c     # +(2.d0*delta/3.d0)),Cdp_minmanuel),0.9*Cdp_max*(1.0-dcppmax))   
+      Cdp_min = min(max(Rt * delta, Rt*(1.d0/sqrt(3.d0)
+     # +(2.d0*delta/3.d0))),0.9*Cdp_max*(1.0-dcppmax))  
+c     coherence Rt, Rc pour que les Rankine et DP puissent etres actifs     
+      if((Cdp_min*(1.d0+precision3d)).gt.Cdp_max) then
+        print*,'Rt/Rc trop grand dans plastendo3d pour activer DP'
+        print*,'il faut:  Rt/Rc< (sqrt(3)-delta)/(sqrt(3)+2*delta):'        
+        ierr1=1
+      end if 
+
+c     *** initialisation des pressions de consolidation ****************
+
+      if(ppcc.lt.precision3d*rt) then
+        print*,'dans ENDO3D'
+        print*,'La pression de preconsolidation ne peut pas etre nulle'
+        print*,'il faut PPCC=',PPCC,'>> ',precision3d*rt
+        ierr1=1
+        return
+      else if (pfcc.lt.ppcc*(1.d0+precision3d)) then
+        print*,'dans ENDO3D'
+        print*,'La pression de fin de consolidation ne peut pas '
+        print*,'etre inferieure a la pression de preconsolidation'
+        print*,'il faut PFCC=',PFCC,'>> ',PPCC
+        ierr1=1
+        return       
+      end if
+    
+
+c     ********** parametres pour le non local **************************
+
+C      include './initialise_non_local3d.h'      
+      
+c     *** bilan analyse des donnees ************************************
+      if(ierr1.eq.1) then
+         print*,'Incoherence dans les donnees de plastendo3d '
+         return
+      end if 
+  
+c***********************************************************************
+c     chargement increment de deformation imposee et deformation finale
+c***********************************************************************
+      if(nstrs.lt.6) then
+         do i=1,nstrs
+             deps6(i)=deps(i)
+             epstf6(i)=epstf(i)
+             epst06(i)=epst0(i)             
+         end do
+         do i=nstrs+1,6
+             deps6(i)=0.d0
+             epstf6(i)=0.d0
+             epst06(i)=0.d0
+         end do
+      else
+         do i=1,6
+             deps6(i)=deps(i)
+             epstf6(i)=epstf(i)
+             epst06(i)=epst0(i)
+         end do      
+      end if
+c     passage en epsilon
+      do i=4,6
+         deps6(i)=0.5d0*deps6(i)
+         epstf6(i)=0.5d0*epstf6(i)
+         epst06(i)=0.5d0*epst06(i)         
+      end do
+c     mise a jour deformation elastique dans les varf
+      ITENS=2
+      do ICOMP3D=1,6
+          nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+          varf(nv3d)=varf(nv3d)+deps6(ICOMP3D)
+      end do    
+
+       
+c***********************************************************************
+c      tir elastique
+c***********************************************************************
+
+c      ** directions principales de l increment de deformation *********
+c      diagonalisation du vecteur des d eps 
+       call x6x33(deps6,deps33)       
+       call b3_v33(deps33,deps3,vdeps33)     
+c      loi elastique 
+       call DSDE3D(dsig3,deps3,MK,MG)
+       if(dsig3(1).ne.dsig3(1)) then
+          print*,'Pb2-1 lors du tir elastique dans endo3d'
+          ierr1=1
+          return
+       end if          
+c      passage en base fixe
+       call CHRE36(dsig3,dsig6,vdeps33)
+c      mise a jour des contraintes
+       ITENS=1 
+       do ICOMP3D=1,6
+          nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+          varf(nv3d)=varf(nv3d)+dsig6(ICOMP3D)
+          sigef6(ICOMP3D)=varf(nv3d)
+c         print*,'dans endo3d A sigef(',icomp3d,')=',sigef6(icomp3d)
+       end do               
+c***********************************************************************
+c      criteres de plasticité et ecoulements 
+c***********************************************************************
+
+      
+c     ******************************************************************
+c     recuperation deformation plastique debut et fin de de pas pour
+c     controle de refermeture 
+      itens=3 
+      do ICOMP3D=1,6
+         nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+         eplr60(ICOMP3D)=var0(nv3d)
+         eplr6f(ICOMP3D)=eplr60(ICOMP3D)
+      end do 
+c     recuperation des deformation debut et fin de pas pour dp
+      itens=4 
+      do ICOMP3D=1,6
+         nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+         epldp6(ICOMP3D)=var0(nv3d)
+         epldp6f(ICOMP3D)=epldp6(ICOMP3D)
+      end do       
+
+c      **********debut des sous iterations locales *********************
+       iter=0
+c      mise a jour num iteration plastique       
+10     iter=iter+1
+c      reinitialisation du compteur sur la boucle de reduction de la
+c      taille de l increment plastique
+       jter=0
+      
+c     ******************************************************************
+c     actualisation des parametres ecrouissables des criteres
+c     ****************************************************************** 
+
+c     ***** cohesion de DP (norme du deviateur) ************************
+
+c     deformation plastique equivalente de DP debut de sous iteration     
+      EPLDPD=varf(9)
+c     actualisation de la cohesion de DP
+      if(EDPPIC.gt.precision3d) then
+c       il existe un ecrouissage pre pic en compression
+        call ecrp3d(epldpd,edppic,Cdp_min,Cdp_max,Cdp,Hdp)
+      else
+c       cohesion max directement      
+        Cdp=Cdp_max        
+c       ecrouissage pre pic neglige            
+        Hdp=0.d0
+      endif     
+c     stockage de la nouvelle cohesion
+      varf(2)=Cdp
+c     actualisation de la resistance a la compression pour DP
+      Rc=Cdp/(1.d0/sqrt(3.d0)-delta/3.d0)
+c      if(ppas) then
+c         print*,'EPLDPD',EPLDPD
+c         print*,'rcmin',Cdp_min/(1.d0/sqrt(3.d0)-delta/3.d0)       
+c         print*,'rcmax',Cdp_max/(1.d0/sqrt(3.d0)-delta/3.d0)
+c         print*,'Hdp',hdp
+c         read*
+c      end if  
+       
+c     **** pressions limites pour camclay ******************************
+
+c     prise en compte de la deformation volumique de CamClay
+      EPLCCV=0.d0
+      ITENS=5
+      do ICOMP3D=1,6
+         nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D
+         EPLCC6(ICOMP3D)=varf(nv3d)
+         if(ICOMP3D.le.3) then
+            EPLCCV=EPLCCV+EPLCC6(ICOMP3D)
+         end if
+      end do 
+c      print*,'endo3d pbcc', eplccv,iter      
+c     actualisation pc et pt  en fonction de de la variation de volume
+      call PCCD3D(precision3d,poro,EPLCCV,ppcc,pfcc,pc,rt,pt)
+      if(pc.ne.pc.or.pt.ne.pt) then
+         print*,'Pb4 dans endo3: calcul de pc et pt de CamClay'
+         print*,'precision3d,poro,EPLCCV,ppcc,pfcc,pc,rt,pt'
+         print*,precision3d,poro,EPLCCV,ppcc,pfcc,pc,rt,pt
+         ierr1=1
+         return
+      else
+        varf(3)=pc
+        varf(4)=pt
+      end if
+c     actualisation du module tangent de CamClay
+c     (si EPLCCV mis a zero : on garde un ecrouissage constant) 
+      call HCCD3D(pfcc,ppcc,poro,EPLCCV,Hcc)
+c     **** tir elastique ***********************************************
+       
+c      diagonalisation du vecteur des contraintes effectives
+       call x6x33(sigef6,sigef33)
+       if(sigef33(1,1).ne.sigef33(1,1)) then
+            print*,'Pb3 dans endo3d sigef6',sigef6
+            print*,'iter',iter,' jter',jter
+            do i=1,ncr        
+                write(*,100) 'critere:',i,'activite:',
+     #          actif(i),'fcr(',i,'):',fcr(i)   
+            end do
+            do itens=1,7
+                do ICOMP3D=1,6
+                  nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+                  print*,'Itenseur',itens,'v(',icomp3d,')=',varf(nv3d)
+                end do  
+            end do
+            ierr1=1
+            return
+       end if 
+       call b3_v33(sigef33,sigef3,vsigef33)
+c      deformation plastique normale de Rankine dans la base principales
+       call chrep6(eplr6f,vsigef33,.false.,xp6) 
+       do i=1,3
+         eplr3(i)=xp6(i)
+       end do
+c      ***** test activite des criteres ********************************
+       
+       call CREN3D(sigef3,precision3d,Rt,Rc,Ref,eplr3,
+     # sigdp3,Cdp,delta,Mcc,pt,pc,ncr,actif,fcr,ppcc,pfcc,poro,eplccv)
+       if(ierr1.eq.1) return
+c      affichage des causes de sous iterations    
+100    format (a9,i2,1x,a9,l1,1x,a4,i1,a2,e10.3) 
+       if(iter.ge.iprint) then       
+         print*,'Endo3d sous iteration locale:',iter
+         do i=1,ncr
+             write(*,100) 'critere:',i,'activite:',
+     #       actif(i),'fcr(',i,'):',fcr(i)
+         end do      
+         if (iter.eq.(itermax+1)) then
+             print*,'Nbr maxi de sous iterations locales'
+             print*,'atteint dans endo3d: ', iter-1
+             ierr1=1
+             return
+         end if
+       end if     
+c      test necessite de l ecoulement     
+20     ecoul=.false.
+       do i=1,ncr
+            ecoul=ecoul.or.actif(i)
+       end do
+       if ((jter.ge.iprint).and.ecoul) then
+            print*,'Criteres residuels pour iteration ',iter             
+            do i=1,ncr
+                if ((iter.ge.iprint).or.(jter.ge.iprint)) then
+                    print*,'dans endo3d actif(',i,')=',actif(i)            
+                    write(*,100) 'critere:',i,'activite:',
+     #              actif(i),'fcr(',i,'):',fcr(i)               
+                end if
+            end do
+       end if
+c      print*,'dans endo3d ecoul:',ecoul
+c      reinitialisation du log_reduc
+       log_reduc=.false.
+c      retour le cas echeant
+       if(ecoul) then  
+c           initialisation des increments
+            do i=1,3
+                deplr3(i)=0.d0
+                depldp3(i)=0.d0
+                deplcc3(i)=0.d0 
+            end do                
+c           choix de l ecoulement en fonction des criteres actifs
+            if(actif(1).and.actif(2).and.actif(3)) then 
+c               tri-traction-refermeture
+                call EPLR3D(MG,MK,sigef3(1),sigef3(2),sigef3(3),
+     #          fcr(1),fcr(2),fcr(3),deplr3,3)
+c                print*,'endo3d: R1 R2 R3', deplr3(1),deplr3(2),deplr3(2)           
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0
+            else if (actif(1).and.actif(2).and.actif(4)) then
+c               2 Rankine et et un DP
+c               choix des contraintes limite pour DP
+                if(fcr(1).gt.0.d0) then
+                   R1=Rt
+                else
+                   R1=-Ref
+                end if
+                if(fcr(2).gt.0.d0) then
+                   R2=Rt
+                else
+                   R2=-Ref
+                end if                
+c               calcul des multiplicateurs
+                call LR12LDP3D(MK,MG,beta,delta,sigef3(1),sigef3(2),
+     #          sigef3(3),Hdp,fcr(1),R1,fcr(2),R2,fcr(4),lr1,lr2,ldp,
+     #          precision3d,log_err)   
+                if(log_err) then
+c                   on resoud par familles de criteres
+                    if(0.5d0*(abs(fcr(1))+abs(fcr(2))).gt.fcr(4)) then
+                        actif(1)=.true.
+                        actif(2)=.true.
+                        actif(4)=.false.
+                    else
+                        actif(1)=.false.
+                        actif(2)=.false.                 
+                        actif(4)=.true.
+                    end if
+c                   on recommence                 
+                    goto 20                 
+                end if                 
+c               print*,'endo3d: R1 R2 et DP ',lr1, lr2 ,ldp      
+c               calcul de l ecoulement de DP                   
+                call EPLD3D(R1,R2,sigef3(3),beta,ldp,depldp3)
+c               ecoulement R1 et R2                
+                deplr3(1)=lr1
+                deplr3(2)=lr2
+                deplr3(3)=0.d0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc) 
+c               pas  cc
+                lr3=0.d0
+                lcc=0.d0
+            else if (actif(2).and.actif(3).and.actif(4)) then
+c               2 Rankine et  un DP
+c               choix des contraintes limite pour DP
+                if(fcr(2).gt.0.) then
+                   R2=Rt
+                else
+                   R2=-Ref
+                end if
+                if(fcr(3).gt.0.) then
+                   R3=Rt
+                else
+                   R3=-Ref
+                end if                
+c               calcul des multiplicateurs
+                call LR12LDP3D(MK,MG,beta,delta,sigef3(2),sigef3(3),
+     #          sigef3(1),Hdp,fcr(2),R2,fcr(3),R3,fcr(4),lr2,lr3,ldp,
+     #          precision3d,log_err)
+                if(log_err) then
+c                   on resoud par familles de criteres
+                    if(0.5d0*(abs(fcr(2))+abs(fcr(3))).GT.fcr(4)) then
+                        actif(2)=.true.
+                        actif(3)=.true.
+                        actif(4)=.false.
+                    else
+                        actif(2)=.false.
+                        actif(3)=.false.                 
+                        actif(4)=.true.
+                    end if
+c                   on recommence                 
+                    goto 20
+                end if      
+c                print*,'endo3d: R2 R3 et DP ',lr2, lr3 ,ldp     
+c               calcul de l ecoulement de DP
+                call EPLD3D(R2,R3,sigef3(1),beta,ldp,aux3)
+                depldp3(1)=aux3(3)
+                depldp3(2)=aux3(1)
+                depldp3(3)=aux3(2)
+c               ecoulement R1 et R2                
+                deplr3(1)=0.d0
+                deplr3(2)=lr2
+                deplr3(3)=lr3                                
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc) 
+c               pas  cc
+                lcc=0.d0
+                lr1=0.d0                   
+            else if (actif(1).and.actif(3).and.actif(4)) then
+c               2 Rankine et et un DP
+c               choix des contraintes limite pour DP
+                if(fcr(1).gt.0.) then
+                   R1=Rt
+                else
+                   R1=-Ref
+                end if
+                if(fcr(3).gt.0.) then
+                   R3=Rt
+                else
+                   R3=-Ref
+                end if                
+c               calcul des multiplicateurs
+                call LR12LDP3D(MK,MG,beta,delta,sigef3(1),sigef3(3),
+     #          sigef3(2),Hdp,fcr(1),R1,fcr(3),R3,fcr(4),lr1,lr3,ldp,
+     #          precision3d,log_err)
+                if(log_err) then
+c                   on resoud par familles de criteres
+                    if(0.5d0*(abs(fcr(1))+abs(fcr(3))).GT.fcr(4)) then
+                        actif(1)=.true.
+                        actif(3)=.true.
+                        actif(4)=.false.
+                    else
+                        actif(1)=.false.
+                        actif(3)=.false.                 
+                        actif(4)=.true.
+                    end if
+c                   on recommance                 
+                    goto 20                 
+                end if     
+c                print*,'endo3d: R1 R3 et DP ',lr1, lr3 ,ldp       
+c               calcul de l ecoulement de DP
+                call EPLD3D(R1,R3,sigef3(2),beta,ldp,aux3)
+                depldp3(1)=aux3(1)
+                depldp3(2)=aux3(3)
+                depldp3(3)=aux3(2)
+c               ecoulement R1 et R3                
+                deplr3(1)=lr1
+                deplr3(2)=0.d0
+                deplr3(3)=lr3                
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc
+                lcc=0.d0
+                lr2=0.d0                 
+            else if (actif(1).and.actif(2)) then
+c               bi-traction-refermeture       
+                call EPLR3D(MG,MK,sigef3(1),sigef3(2),sigef3(3),
+     #          fcr(1),fcr(2),fcr(3),deplr3,2)
+c                print*,'endo3d: R1 et R2  ', deplr3(1),deplr3(2)      
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0     
+            else if (actif(1).and.actif(3)) then
+c               bi-traction-refermeture       
+                call EPLR3D(MG,MK,sigef3(1),sigef3(3),sigef3(2),
+     #          fcr(1),fcr(3),fcr(2),aux3,2)
+c                print*,'endo3d: R1 et R3  ', aux3(1),aux3(2) 
+                deplr3(1)=aux3(1)     
+                deplr3(2)=aux3(3)            
+                deplr3(3)=aux3(2)
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0     
+            else if (actif(2).and.actif(3)) then
+c               bi-traction-refermeture       
+                call EPLR3D(MG,MK,sigef3(2),sigef3(3),sigef3(1),
+     #          fcr(2),fcr(3),fcr(1),aux3,2)
+c                print*,'endo3d: R2 et R3  ', aux3(1),aux3(2)      
+                deplr3(1)=aux3(3)
+                deplr3(2)=aux3(1)        
+                deplr3(3)=aux3(2)
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0    
+            else if (actif(1).and.actif(4)) then 
+c               1 rankine et dp actifs
+c               choix de la contrainte limite pour DP
+                if(fcr(1).gt.0.) then
+                   R1=Rt
+                else
+                   R1=-Ref
+                end if
+c               multiplicateurs plastiques                
+                call LR1LDP3D(MK,MG,beta,delta,sigef3(1),sigef3(2),
+     #          sigef3(3),Hdp,fcr(1),R1,fcr(4),lr1,ldp,precision3d,
+     #          log_err)
+                if(log_err) then
+                    if(abs(fcr(1)).gt.fcr(4)) then
+                        actif(1)=.true.
+                        actif(4)=.false.
+                    else
+                        actif(1)=.false.
+                        actif(4)=.true.
+                    end if
+                    goto 20
+                end if     
+c                print*,'endo3d: R1 et DP ',lr1 ,ldp
+c               calcul de l ecoulement de DP
+                call EPLD3D(R1,sigef3(2),sigef3(3),beta,ldp,aux3)
+                depldp3(1)=aux3(1)
+                depldp3(2)=aux3(2)
+                depldp3(3)=aux3(3)
+c               ecoulement R1 et R2                
+                deplr3(1)=lr1
+                deplr3(2)=0.d0
+                deplr3(3)=0.d0                 
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc) 
+c               pas  cc
+                lcc=0.d0     
+            else if (actif(2).and.actif(4)) then
+c               1 rankine et dp actifs
+c               choix de la contrainte limite pour DP
+                if(fcr(2).gt.0.) then
+                   R2=Rt
+                else
+                   R2=-Ref
+                end if
+c               multiplicateurs plastiques                
+                call LR1LDP3D(MK,MG,beta,delta,sigef3(2),sigef3(1),
+     #          sigef3(3),Hdp,fcr(2),R2,fcr(4),lr2,ldp,precision3d,
+     #          log_err)
+                if(log_err) then
+                    if(abs(fcr(2)).gt.fcr(4)) then
+                        actif(2)=.true.
+                        actif(4)=.false.
+                    else
+                        actif(2)=.false.
+                        actif(4)=.true.
+                    end if
+                    goto 20
+                end if
+c               print*,'endo3d: R4 et DP ',lr2 ,ldp
+c               calcul de l ecoulement de DP
+                call EPLD3D(R2,sigef3(1),sigef3(3),beta,ldp,aux3)
+                depldp3(1)=aux3(2)
+                depldp3(2)=aux3(1)                
+                depldp3(3)=aux3(3)
+c               ecoulement R1 et R2                
+                deplr3(1)=0.d0
+                deplr3(2)=lr2
+                deplr3(3)=0.d0                 
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc
+                lcc=0.d0    
+            else if (actif(3).and.actif(4)) then
+c               1 rankine et dp actifs
+c               choix de la contrainte limite pour DP
+                if(fcr(3).gt.0.) then
+                   R3=Rt
+                else
+                   R3=-Ref
+                end if
+c               multiplicateurs plastiques                
+                call LR1LDP3D(MK,MG,beta,delta,sigef3(3),sigef3(2),
+     #          sigef3(1),Hdp,fcr(3),R3,fcr(4),lr3,ldp,precision3d,
+     #          log_err)
+                if(log_err) then
+                    if(abs(fcr(3)).gt.fcr(4)) then
+                        actif(3)=.true.
+                        actif(4)=.false.
+                    else
+                        actif(3)=.false.
+                        actif(4)=.true.
+                    end if
+                    goto 20
+                end if
+c               print*,'endo3d: R3 et DP ',lr3 ,ldp
+c               calcul de l ecoulement de DP
+                call EPLD3D(R3,sigef3(2),sigef3(1),beta,ldp,aux3)
+                depldp3(1)=aux3(3) 
+                depldp3(2)=aux3(2)                
+                depldp3(3)=aux3(1)
+c               ecoulement R1 et R2                
+                deplr3(1)=0.d0
+                deplr3(2)=0.d0
+                deplr3(3)=lr3               
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc
+                lcc=0.d0      
+            else if (actif(4).and.actif(5)) then
+c               DP et CC actifs 
+c               calcul de derivee de dcc=d(fcc) / d(lcc)
+                call DCCD3D(pt,pc,Mcc,Hcc,sigef3(1),sigef3(2),
+     #          sigef3(3),dcc)
+c               calcul des multiplicateurs   
+                call LCCL3D(Mcc,MK,MG,beta,delta,pt,pc,sigef3(1),
+     #          sigef3(2),sigef3(3),dcc,Hdp,lcc,ldp,fcr(5),fcr(4),
+     #          precision3d,log_err)
+                if(log_err) then
+                   if(fcr(5).gt.fcr(4)) then
+                      actif(5)=.true.
+                      actif(4)=.false.
+                   else
+                      actif(5)=.false.
+                      actif(4)=.true.
+                   end if
+                   goto 20
+                end if
+c               ecoulement de DP
+                call EPLD3D(sigef3(1),sigef3(2),sigef3(3),beta,
+     #          ldp,depldp3) 
+c               ecoulement de CC
+                call EPLC3D(pt,pc,Mcc,sigef3(1),sigef3(2),sigef3(3),
+     #          lcc,deplcc3)
+                print*,'endo3d: DP et CC actifs ',ldp ,lcc
+c               test de proprosité non negative                   
+                call TSTC3D(poro,EPLCCV,deplcc3,precision3d,
+     #          log_reduc,reduc)  
+                if(reduc.lt.precision3d) then
+                    actif(5)=.false.
+                    fcr(5)=0.d0
+                    lcc=0.d0
+                    log_reduc=.true.
+                    do i=1,3
+                       deplcc3(i)=0.d0
+                    end do
+                end if      
+            else if (actif(1)) then
+                call EPLR3D(MG,MK,sigef3(1),sigef3(2),sigef3(3),
+     #          fcr(1),fcr(2),fcr(3),aux3,1)
+c                print*,'endo3d: R1 seul ', aux3(1)      
+                deplr3(1)=aux3(1)
+                deplr3(2)=aux3(2)        
+                deplr3(3)=aux3(3)
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0     
+            else if (actif(2)) then
+                call EPLR3D(MG,MK,sigef3(2),sigef3(1),sigef3(3),
+     #          fcr(2),fcr(1),fcr(3),aux3,1)
+c                print*,'endo3d: R2 seul ', aux3(1)  
+                deplr3(1)=aux3(2)
+                deplr3(2)=aux3(1)        
+                deplr3(3)=aux3(3)
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0
+            else if (actif(3)) then
+                call EPLR3D(MG,MK,sigef3(3),sigef3(1),sigef3(2),
+     #          fcr(3),fcr(1),fcr(2),aux3,1)
+c                print*,'endo3d: R3 seul ', aux3(1)  
+                deplr3(1)=aux3(2)
+                deplr3(2)=aux3(3)        
+                deplr3(3)=aux3(1)
+c               verif eplr3 final > 0
+                call TSTD3D(fcr,eplr3,deplr3,actif,ncr,
+     #          precision3d,log_reduc,reduc)
+c               pas  cc ni dp
+                lcc=0.d0
+                ldp=0.d0                
+            else if (actif(4)) then
+c               Drucker Prager seul
+                call LDPD3D(fcr(4),MK,MG,beta,delta,Hdp,ldp)
+c                print*,'endo3d: DP seul ',ldp                
+c               ecoulement de DP
+                call EPLD3D(sigef3(1),sigef3(2),sigef3(3),beta,
+     #          ldp,depldp3)
+c               pas de rankine ni de cc
+200             format(a8,i1,a2,e10.3)
+                lcc=0.d0    
+            else if (actif(5)) then
+c               CamClay seul
+c               calcul de derivee de dcc=d(fcc) / d(lcc)
+                call DCCD3D(pt,pc,Mcc,Hcc,sigef3(1),sigef3(2),
+     #          sigef3(3),dcc)
+c               multiplicateur plastique     
+                call LCCD3D(pt,pc,Mcc,sigef3(1),sigef3(2),sigef3(3),MK,
+     #           MG,dcc,fcr(5),lcc,precision3d)     
+c                print*,'endo3d: CC seul lcc=',lcc 
+c                print*,pt,pc,Mcc,sigef3(1),sigef3(2),sigef3(3),MK,
+c     #           MG,dcc,fcr(5),lcc
+c               ecoulement cc                
+                call EPLC3D(pt,pc,Mcc,sigef3(1),sigef3(2),sigef3(3),
+     #          lcc,deplcc3)
+c                do i=1,3
+c                  print*,'deplcc3(',i,')=',deplcc3(i)
+c                end do                
+c                test de porosité non negative                   
+                 call TSTC3D(poro,EPLCCV,deplcc3,precision3d,
+     #           log_reduc,reduc)
+                 if(reduc.lt.precision3d) then
+                    actif(5)=.false.
+                    fcr(5)=0.d0
+                    lcc=0.d0
+                    log_reduc=.true.
+                    do i=1,3
+                       deplcc3(i)=0.d0
+                    end do
+                 end if                  
+            else
+                print*,'configuration imprevue dans endo3d'
+                do i=1,5
+                   print*,'critere:',i,actif(i),' fcr(',i,')=',fcr(i)
+                end do
+                ierr1=1
+                return                
+            end if
+c           read*
+c           test de dissipation sur les criteres CC et DP
+            if(reduc.lt.precision3d) then
+                log_reduc_zero=.true.                
+            else
+                log_reduc_zero=.false.
+            end if
+            if(((ldp.lt.-precision3d).and.actif(4)) .or.
+     #         ((lcc.lt.-precision3d).and.actif(5))) then
+c                print*,' Endo3d multiplicateurs  negatif',ldp,lcc
+c               on indique qu il ne faut pas garder ce retour
+                log_reduc=.true.
+c               on met le retour a zero
+                reduc=0.d0 
+c               indicateur associe                
+                log_reduc_zero=.true.                               
+c               on desactive les critere fautifs
+                if ((ldp.lt.-precision3d).and.actif(4)) then   
+c                  print*,'ldp',ldp
+                   actif(4)=.false.                 
+                else if ((lcc.lt.-precision3d).and.actif(5)) then                      
+c                  print*,'lcc',lcc
+                   actif(5)=.false.
+                else
+                   print*,'pb6 dans endo3d'
+                   ierr1=1
+                   return                   
+                end if                                   
+            end if                 
+c           modification de l ecoulement en cas de reduction de la refermeture
+            if(log_reduc) then 
+c              print*,'Cas log_reduc: reduc=',reduc
+              do i=1,3
+c                 print*,'avant reduc deplr3(',i,')=',deplr3(i)
+                 deplr3(i)=reduc*deplr3(i)
+                 depldp3(i)=reduc*depldp3(i)                     
+                 deplcc3(i)=reduc*deplcc3(i)                  
+              end do
+c             reduction des multiplicaterus possiblement utilises apres              
+              lcc=lcc*reduc              
+              ldp=ldp*reduc 
+c             traitement suivant la reduction                         
+c             on recommance l ecoulement sans les criteres desactives
+c             dans testref3d
+              jter=jter+1
+              if(jter.ge.iprint) then
+                    print*,'sous iteration Endo3d'
+                    print*,'reduction a la refermeture:',jter  
+              end if                
+              if(jter.eq.itermax) then
+                    print*,'Itermax Reduction a la refartmeture atteint'
+                    print*,'Criteres residuels pour itertation ',iter
+                    do i=1,ncr                
+                        write(*,100) 'critere:',i,'activite:',
+     #                  actif(i),'fcr(',i,'):',fcr(i)
+                    end do                     
+                    ierr1=1
+                    return
+              else                  
+c                   nouvelle iteration 
+c                    print*,'log_reduc_zero=',log_reduc_zero
+                    if(log_reduc_zero) then 
+c                     pas de plasticité, on recommence en eliminant les
+c                     criteres non dissipatifs  sans modifier la contrainte 
+                      goto 20
+                    end if
+              end if
+            end if                
+c           mise a jour des deformations plastiques de traction
+            call CHRE36(deplr3,deplr6,vsigef33)
+            itens=3 
+            do ICOMP3D=1,6
+                nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+                varf(nv3d)=varf(nv3d)+deplr6(ICOMP3D)
+                eplr6f(ICOMP3D)=varf(nv3d)
+            end do             
+c           mise a jour des deformations plastiques de dp
+            call CHRE36(depldp3,depldp6,vsigef33)
+            itens=4 
+            do ICOMP3D=1,6
+                nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+                varf(nv3d)=varf(nv3d)+depldp6(ICOMP3D)
+                epldp6f(ICOMP3D)=varf(nv3d)
+            end do 
+c           deformation equivalente de dp
+            epldpd=epldpd+ldp
+            varf(9)=epldpd           
+c           mise a jour des deformations plastiques de cc
+            call CHRE36(deplcc3,deplcc6,vsigef33)
+            itens=5 
+            do ICOMP3D=1,6
+                nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+                varf(nv3d)=varf(nv3d)+deplcc6(ICOMP3D)
+                eplcc6f(ICOMP3D)=varf(nv3d)
+            end do             
+c           mise a jour def elastique dans les varf
+            log_err=.false.
+            do i=1,3
+                depse3(i)=-(deplr3(i)+depldp3(i)+deplcc3(i))
+                if(depse3(i).ne.depse3(i)) then
+                  log_err=.true.
+                  print*,'Dans endo3d pb5-0'
+                  print*,'deplr3(i),depldp3(i),deplcc3(i)'
+                  print*, deplr3(i),depldp3(i),deplcc3(i)
+                end if
+            end do
+            if (log_err) then
+                print*,'Endo3d Pb5 a l iter:',iter
+                do i=1,ncr
+                    write(*,100) 'critere:',i,'activite:',
+     #              actif(i),'fcr(',i,'):',fcr(i)
+                end do
+                ierr1=1
+                return
+            end if                     
+            call chre36(depse3,depse6,vsigef33)
+            ITENS=2
+            do ICOMP3D=1,6
+                nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+                varf(nv3d)=varf(nv3d)+depse6(ICOMP3D)
+            end do            
+c           mise a jour des contraintes
+            call DSDE3D(dsig3,depse3,MK,MG) 
+c           retour en base fixe
+            call CHRE36(dsig3,dsig6,vsigef33)
+c           mise a jour des contraintes
+            ITENS=1 
+            do ICOMP3D=1,6
+                nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+                varf(nv3d)=varf(nv3d)+dsig6(ICOMP3D)
+                sigef6(ICOMP3D)=varf(nv3d)
+c               print*,'dans endo3d B sigef(',icomp3d,')=',sigef6(icomp3d)                
+            end do            
+c           on teste a nouveau les criteres       
+            goto 10
+       else
+c           aucun des criteres n est actif
+            continue
+       end if
+c      recuperation des contraintes effectives convergees
+30     ITENS=1 
+       do ICOMP3D=1,6
+            nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+            sigef6(ICOMP3D)=varf(nv3d)
+c           print*,'dans endo3d B sigef(',icomp3d,')=',sigef6(icomp3d)                
+       end do              
+c      fin des procedures elasto-plastiques                 
+c***********************************************************************
+        
+
+c***********************************************************************
+c       ouvertures de fissure debut de pas 
+c***********************************************************************
+
+        itens=6
+        do ICOMP3D=1,6
+          nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+          wplt06(ICOMP3D)=var0(nv3d)
+        end do
+c       ouvertures de fissure maxi debut de pas
+        itens=7
+        do ICOMP3D=1,6
+          nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+          wpltx06(ICOMP3D)=var0(nv3d)
+        end do 
+c       base principale des ouvertures de fissures
+        call bsfs3d(eplr6f,eplr60,depr3,vdepr33,vdepr33t)
+c       longueurs de l element dans cette base
+        do i=1,3
+           do l=1,3
+            dir3(l)=vdepr33(l,i)
+           end do
+           call LNUD3D(long3(i),xe3d,NBNMAX3D,NBNB3D,dir3)
+        end do           
+c       mise a jour des ouvertures de fissures
+        call wfis3d(depr3,long3,vdepr33t,wplt06,wplt6,
+     #  vwpl33,vwpl33t,wpl3,wpltx06,wpltx6,vwplx33,vwplx33t,wplx3)
+        itens=6
+        do ICOMP3D=1,6
+          nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+          varf(nv3d)=wplt6(ICOMP3D)
+        end do
+c       ouvertures maxi de fissure fin de pas
+        itens=7
+        do ICOMP3D=1,6
+          nv3d=NBVSCAL+(ITENS-1)*NBVPTENS+ICOMP3D      
+          varf(nv3d)=wpltx6(ICOMP3D)
+        end do      
+c       ouverture maxi actuelle
+        varf(5)=max(wpl3(1),wpl3(2),wpl3(3)) 
+
+
+c***********************************************************************
+c       endommagements
+c***********************************************************************
+
+c       **** partition du tenseur des contraintes **********************
+
+        call prtt3d(sigef6,sigf3,vsigf33,vsigf33t,
+     #  sigft6,sigfc6,sigfc3,sigft3) 
+
+c       *** endommagement prepic de compression ************************
+
+        if(logdcpp) then
+c           endo pre pic de compression possible
+            dcpp0=var0(8)      
+            dpic=dcppmax
+            spic=Cdp_max
+            smin=Cdp_min        
+c           contrainte equivalente de DP        
+c            s=fcr(4)+Cdp 
+            s=Cdp
+            if((epldpd.lt.edppic).and.(edppic.ge.precision3d)) then
+c              endommagement pre pic lineaire
+c               dcpp=dpic * ((s - smin) / (spic - smin)) 
+               if (s.gt.smin) then
+                   pentendo=(Cdp_max*(1.d0-dpic)-Cdp_min)
+     #             /sqrt(Cdp_max-Cdp_min)
+                   if (Cdp.eq.0.) then
+                       ierr1=1
+                       print*,'il faut dcp_min>0 dans endo3d'
+                   end if
+                   dcpp=1.d0-(Cdp_min+pentendo*sqrt(Cdp-Cdp_min))/Cdp                 
+c                   print*,dcpp
+               else
+                   dcpp=0.d0
+               end if
+            else
+c              pas de plasticite pre pic, on utilise le critere DP en 
+c              contrainte effective pour l endo pre pic
+c              exposant de la loi d endommagement
+               m1=(-0.1D1 + dpic) / spic / dpic * (-spic + smin)
+               dcpp=dpic * ((s - smin) / (spic - smin)) ** m1
+            end if
+            dcpp=max(dcpp,dcpp0)
+         else
+            dcpp=0.d0
+            dcpp0=0.d0            
+         end if
+         varf(8)=dcpp
+        
+c       *** endommagement prepic de traction  **************************
+
+        if(logdtpp) then
+c           endo pre pic de compression possible
+            dtpp0=var0(7)      
+            dpic=dtppmax
+            spic=rteff
+            smin=0.d0        
+c           contrainte equivalente de DP        
+            s=max(sigef3(1),sigef3(2),sigef3(3),0.d0)
+c           exposant de la loi d endommagement
+            m1=(-0.1D1 + dpic) / spic / dpic * (-spic + smin)
+c           endommagement pre pic tension            
+            dtpp=dpic * ((s - smin) / (spic - smin)) ** m1
+            dtpp=max(dtpp,dtpp0)
+         else
+            dtpp=0.d0  
+         end if
+         varf(7)=dtpp  
+
+c       *** endommagement complet de traction **************************
+
+c       ouverture caracteristique pour l' endommagement de traction
+        wkt=gft/rt
+        dtra=0.d0
+        do i=1,3
+c           endo localise base principale de fissuration       
+            dt3(i)=wplx3(i)*(wplx3(i)+2.d0*wkt)/(wkt+wplx3(i))**2
+c           borne de dt a dmaxi
+            dt3(i)=min(dmaxi,dt3(i))
+c           endommagement global de traction pour affichage             
+            dtra=max(dtra,dt3(i))
+c           indice de fissure
+            sn3(i)=1.d0/(1.d0-dt3(i))            
+        end do
+c       matrice d endommagement de traction incluant l endo pre pic
+        call b3_d66(nu,sn3,dt66,.false.,.false.)
+c       passage  des contraintes effectives dans la base prin des endo
+        call chrep6(sigft6,vwplx33,.false.,sigft6p)  
+c       application du tenseur d endommagement 
+        do i=1,6
+          sigft6dp(i)=sigft6p(i)
+          do j=1,6
+             sigft6dp(i)=sigft6dp(i)-dt66(i,j)*sigft6p(j)
+          end do          
+        end do
+c       retour des contraintes positives en base fixe
+        call chrep6(sigft6dp,vwplx33t,.false.,sigft6d)
+c       reconstruction du tenseur des contraintes endommage 
+        do i=1,6
+c           prise en compte de l endo iso prepic de traction        
+            sigf61(i)=sigfc6(i)+sigft6d(i)*(1.d0-dtpp)
+        end do
+        varf(11)=1.d0-(1.d0-dtra)*(1.d0-dtpp)        
+c       Nouvelle partition du tenseur des contraintes endommagés 
+        call prtt3d(sigf61,sigf3,vsigf33,vsigf33t,
+     #  sigft61,sigfc6,sigfc3,sigft3)        
+
+c       *** fonction de refermeture ************************************
+
+c       ouverture caracteristique pour l' endommagement de traction
+        wkr=gfr/ref
+        do i=1,3
+c           endo localise base principale de fissuration       
+            ref3(i)=1.d0-wpl3(i)*(wpl3(i)+2.d0*wkr)/(wkr+wpl3(i))**2
+c           ajustement borne  mini            
+            ref3(i)=max(ref3(i),0.d0)
+c           ajustement borne maxi            
+            ref3(i)=min(ref3(i),1.d0)
+c           indice de refermeture
+            sn3(i)=1.d0/ref3(i)            
+        end do         
+c       matrice des fonctions de refermeture
+        call b3_d66(nu,sn3,dr66,.false.,.false.)
+c       passage  des contraintes effectives dans la base prin des endo
+        call chrep6(sigfc6,vwplx33,.false.,sigfc6p)  
+c       application du tenseur de refermeture aux contraintes negatives
+        do i=1,6
+          sigfc6dp(i)=sigfc6p(i)
+          do j=1,6
+             sigfc6dp(i)=sigfc6dp(i)-dr66(i,j)*sigfc6p(j)
+          end do          
+        end do
+c       retour des contraintes positives en base fixe
+        call chrep6(sigfc6dp,vwplx33t,.false.,sigfc6d)
+c       reconstruction du tenseur des contraintes avec refermetures
+        do i=1,6
+            sigf62(i)=sigfc6d(i)+sigft61(i)
+        end do
+c       Nouvelle partition du tenseur des contraintes endommagés 
+        call prtt3d(sigf62,sigf3,vsigf33,vsigf33t,
+     #  sigft62,sigfc6,sigfc3,sigft3)         
+
+c       *** endommagement de flambage des bielettes comprimees *********
+
+        call buck3d(altc,dt3,dct3,vwplx33,vwplx33t,sigfc6)
+        dctmax=max(dct3(1),dct3(2),dct3(3))
+
+        
+c       *** endommagement de cisaillement ******************************
+
+c       dilatance transverse au pic de l essai uniaxial
+        if(orthodp) then
+            dvtp = eplpic *(0.2D1*beta+sqrt(0.3D1))/(sqrt(0.3D1)-beta)
+        else
+            dvtp = 0.3D1 * beta * eplpic / (sqrt(0.3D1) - beta)
+        end if
+c       endo de cisaillement initial
+        dcdp=1.d0-(1.d0-var0(10))/(1.d0-dcpp0)
+c       actualisation endo de cisaillement        
+        call damdp3d(precision3d,ekdc,dvtp,epldp6f,dcc3,sigfc6,
+     #  sigft62,dcdp,orthodp)
+        if(orthodp) then
+            dccmax=max(dct3(1),dct3(2),dct3(3))       
+        else
+            dccmax=dcdp
+        end if
+c       prise en compte endommagement isotrope prepic de compression 
+        do i=1,6
+c             sigf6(i)=(sigft62(i)+sigfc6(i))*(1.d0-dcpp)
+             sigf6(i)=sigft62(i)+sigfc6(i)*(1.d0-dcpp)
+        end do
+c       actualisation endo de cisaillement complet        
+        dcom=1.d0-(1.d0-dccmax)*(1.d0-dcpp)
+        varf(10)=dcom
+        
+        
+c***********************************************************************        
+c       traitement des erreurs         
+        if(ierr1.eq.1) then
+             print*,'pb lors du calcul des endommagements dans endo3d'
+             return
+        end if
+          
+   
+c***********************************************************************        
+c       affectation dans le tableau de sortie des contraintes
+c       et prise  encompte des contribution des renforts
+        do i=1,nstrs
+             sigf(i)=sigf6(i)
+c            print*,'sigf(',i,')=',sigf(i)
+        end do 
+        
+c       indicateur de fin de 1er pas 
+        if(ppas.and.((istep.eq.2).or.(istep.eq.0))) then     
+             varf(1)=1.d0
+        else
+            if(ppas) then
+                 varf(1)=0.d0
+            else
+                 varf(1)=var0(1)
+            end if
+        end if
+
+c ******traitement erreur residuelle************************************
+        if(ierr1.eq.1) then        
+             return 
+        end if 
+        
+        return
+
+       end
+c***********************************************************************      
+      
+ 
+ 
+ 
+ 

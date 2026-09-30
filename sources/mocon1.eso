@@ -1,0 +1,200 @@
+C MOCON1    SOURCE    PV        21/07/08    21:15:01     11068          
+C  Mise en forme du maillage de contact:
+C conversion du deuxieme maillage en points + mult lagrange contact + mult lagrange frottement
+
+      SUBROUTINE MOCON1(MELEME,laprop,itct)
+*
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+-INC CCGEOME
+      segment icpr(nbpts)                 
+
+*  itct = 0: frocable on fait 2 mults    par noeud cable
+
+
+
+      segact meleme
+      if (lisous(/1).ne.0) call erreur(16)
+      if (ierr.ne.0) return
+**    write(6,*) ' laprop dans mocon1 ',laprop
+      nbsous=0
+      nbref=0
+      nbelem=num(/2)
+      nbnn=num(/1)
+*  nombre de lx par noeud
+       nbl=1
+       if(laprop.eq.3) then
+         if(idim.eq.2) nbl=2
+         if(idim.eq.3) nbl=3
+       endif
+*
+*  formulation forte
+      if (itct.eq.2) goto 1000
+*  remplissage icpr pour avoir le nombre de noeuds
+       segini icpr
+       icp=0
+       do j=1,nbelem
+       do i=1,nbnn
+         ip=num(i,j)
+         if(icpr(ip).eq.0) then
+           icp=icp+1
+           icpr(ip)=icp
+         endif
+       enddo
+       enddo
+       nbnn=nbl+1
+       nbelem=icp
+       nbsous=0
+       nbref=0
+*  on transforme le maillage en point. Dans le maillage cree,
+*  en 1 le multiplicateur de lagrange associe au contact
+*  en 2 le (ou les dans le cas faible) points physique
+*  en nbnn-1 et nbnn les multiplicateur associe au frottement
+       segini ipt1
+       ipt1.itypel=22
+       do i=1,nbpts
+       if(icpr(i).ne.0) then
+        ip=icpr(i)
+        ipt1.num(2,ip)=i
+        nbpts=nbpts+1
+        ipt1.num(1,ip)=nbpts
+        if(nbl.ge.2) then
+           nbpts=nbpts+1
+           ipt1.num(3,ip)=nbpts
+        endif
+        if(nbl.ge.3) then
+           nbpts=nbpts+1
+           ipt1.num(4,ip)=nbpts
+        endif
+       endif
+       enddo
+*  dedoublement (ou trimplement)  des elements dans le cas frocable
+       if (itct.eq.0) then
+         nbelem=nbelem*idim
+**         write(6,*) ' nouveau nbelem ',nbelem
+         segadj ipt1
+         do j=nbelem/idim,1,-1
+          ipt1.num(1,(j-1)*idim+1)=ipt1.num(1,j)
+          ipt1.num(2,(j-1)*idim+1)=ipt1.num(2,j)
+          if(nbl.ge.2) ipt1.num(3,(j-1)*idim+1)=ipt1.num(3,j)
+          if(nbl.ge.3) ipt1.num(4,(j-1)*idim+1)=ipt1.num(4,j)
+          nbpts=nbpts+1
+          ipt1.num(1,(j-1)*idim+2)=nbpts
+          ipt1.num(2,(j-1)*idim+2)=ipt1.num(2,j)
+          if(nbl.ge.2) then
+           nbpts=nbpts+1
+           ipt1.num(3,(j-1)*idim+2)=nbpts
+          endif
+          if(nbl.ge.3) then
+           nbpts=nbpts+1
+           ipt1.num(4,(j-1)*idim+2)=nbpts
+          endif
+
+          if(idim.eq.3) then
+          nbpts=nbpts+1
+          ipt1.num(1,(j-1)*idim+3)=nbpts
+          ipt1.num(2,(j-1)*idim+3)=ipt1.num(2,j)
+          if(nbl.ge.2) then
+           nbpts=nbpts+1
+           ipt1.num(3,(j-1)*idim+3)=nbpts
+          endif
+          if(nbl.ge.3) then
+           nbpts=nbpts+1
+           ipt1.num(4,(j-1)*idim+3)=nbpts
+          endif
+          endif
+         enddo
+       endif
+
+*  maintenant remplir les coordonnees
+       segadj mcoord
+       il1=0
+       il2=0
+       do j=1,ipt1.num(/2)
+        ip=ipt1.num(2,j)
+        il=ipt1.num(1,j)
+        if(nbl.ge.2) il1=ipt1.num(3,j)
+        if(nbl.ge.3) il2=ipt1.num(4,j)
+        do id=1,idim+1
+         xc=xcoor((ip-1)*(idim+1)+id)
+         xcoor((il-1)*(idim+1)+id)=xc
+         if(il1.ne.0)
+     >       xcoor((il1-1)*(idim+1)+id)=xc
+         if(il2.ne.0)
+     >       xcoor((il2-1)*(idim+1)+id)=xc
+        enddo
+       enddo
+       segsup icpr
+       segdes meleme
+       meleme=ipt1
+       return
+*  formulation faible
+ 1000 continue
+*
+*  on garde le deuxieme maillage en rajoutant les multiplicateurs de lagrange aux elements
+       nbnno=nbnn
+       nbnn=nbnn+nbl
+**     write(6,*) 'nbnno nbnn ',nbnno,nbnn
+       segini ipt1
+       ipt1.itypel=22
+       nbptso=nbpts
+       nbpts=nbpts+nbelem*nbl
+       segadj mcoord
+       do j=1,nbelem
+        xc=0.d0
+        yc=0.d0
+        zc=0.d0
+        dc=0.d0
+        do i=1,nbnno
+         ipt1.num(i+1,j)=num(i,j)
+         ip=num(i,j)
+         xc=xc+xcoor((idim+1)*(ip-1)+1)
+         yc=yc+xcoor((idim+1)*(ip-1)+2)
+         zc=zc+xcoor((idim+1)*(ip-1)+3)
+         dc=dc+xcoor((idim+1)*(ip-1)+4)
+        enddo
+        xc=xc/nbnno
+        yc=yc/nbnno
+        zc=zc/nbnno
+        dc=dc/nbnno
+        nbptso=nbptso+1
+        ipt1.num(1,j)=nbptso
+         xcoor((idim+1)*(nbptso-1)+1)=xc
+         xcoor((idim+1)*(nbptso-1)+2)=yc
+         xcoor((idim+1)*(nbptso-1)+3)=zc
+         if(idim.eq.3) xcoor((idim+1)*(nbptso-1)+4)=dc
+        if(nbl.ge.2) then
+        nbptso=nbptso+1
+        ipt1.num(nbnno+2,j)=nbptso
+         xcoor((idim+1)*(nbptso-1)+1)=xc
+         xcoor((idim+1)*(nbptso-1)+2)=yc
+         xcoor((idim+1)*(nbptso-1)+3)=zc
+         if(idim.eq.3) xcoor((idim+1)*(nbptso-1)+4)=dc
+        endif
+        if(nbl.ge.3) then
+        nbptso=nbptso+1
+        ipt1.num(nbnno+3,j)=nbptso
+         xcoor((idim+1)*(nbptso-1)+1)=xc
+         xcoor((idim+1)*(nbptso-1)+2)=yc
+         xcoor((idim+1)*(nbptso-1)+3)=zc
+         if(idim.eq.3) xcoor((idim+1)*(nbptso-1)+4)=dc
+        endif
+       enddo
+       segdes meleme
+       meleme=ipt1
+       return
+
+
+
+
+      end
+ 
+ 
+ 

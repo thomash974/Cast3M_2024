@@ -1,0 +1,117 @@
+C CHOLI1    SOURCE    PV090527  24/01/12    21:15:03     11821          
+      FUNCTION CHOLI1(ILIGF,LIGN,VALF,DAAG,IPKNO,IPPVF,KHG,IVPOF,
+     # KIDEP,KI1,KQ,imasql,idep,prec,icle,nbo)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+-INC SMMATRI
+-INC CCHOLE
+      DIMENSION ILIGF(*),VALF(*),DAAG(*),IPKNO(*),IPPVF(*),IVPOF(*)
+      dimension imasql(*)
+      nbnnma=nbnnmc
+      IPPKHG=IPPVF(KHG)
+      KBAS=IPKNO(KIDEP)
+      KHAU=IPKNO(KI1)
+      KDIAG=KI1+1
+      DNORM=ABS(VALF(KDIAG))*PREC
+      KPREM=IVPOF(KHG)-IPPKHG
+      IECAR=KQ-IPREL+1
+      DO 30 NNJ=MAX(1,KIDEP+IECAR),KI1+IECAR
+       KK=NNJ-IECAR
+       NNJJ=IPPVV(NNJ+1)
+       NJ=NNJJ-IPPVV(NNJ)
+       LLOL=MIN(NJ,KK)-1
+       LLON=MIN(LLOL-KK+KPREM+1,LLOL-NNJJ+IVPO(NNJ)+1)
+C 3 lignes ajoutees
+       IF (LLON.GT.0.and.kk.ge.1) THEN
+        IEC1=KK-LLOL-1
+        IEC2=NNJJ-llol -1
+        if (llon.gt.masdim) then
+        ideq=1+idep-1
+        p=ddotpw(llon,VALF(1+iec1),VAL(1+iec2),
+     >     imasql(1),ideq,nbo)
+        else
+        p=ddotpv(llon,VALF(1+iec1),VAL(1+iec2))
+        if (llon.gt.0) nbo=nbo+llon
+        endif
+        VALF(KK)=VALF(KK)-P
+       ENDIF
+       IF (ABS(VALF(KK)).GT.DNORM) then
+         KPREM=KK
+         imasql((kk+idep-1)/masdim+1) =1
+         imasql((kk)/masdim+1) =1
+       else
+         valf(kk)=0.d0
+       ENDIF
+  30  CONTINUE
+      AUX1=0.D0
+      if(ICLE.EQ.2) THEN
+      iecar = KQ-IPREL+1
+      nnj= ki1+IECAR+1
+      kk = nnj-iecar
+      nnjj=IPPVV(NNJ+1)
+      NJ=NNJJ-IPPVV(NNJ)
+      LLOL=MIN(NJ,KK)-1
+      LLON=MIN(LLOL-KK+KPREM+1,LLOL-NNJJ+IVPO(NNJ)+1)
+      IEC1=KK-LLOL-1
+      IEC2=NNJJ-llol -1
+        if (llon.gt.masdim) then
+        ideq=1+idep-1
+        p=ddotpw(llon,VALF(1+iec1),VAL(1+iec2),
+     >     imasql(1),ideq,nbo)
+        else
+        p=ddotpv(llon,VALF(1+iec1),VAL(1+iec2))
+        if (llon.gt.0) nbo=nbo+llon
+        endif
+        aux1 = p
+      endif
+      kdeb=1
+  43  continue
+      kdebi=kdeb
+  44  continue
+      do 100 im=kdeb/masdim+1,kprem/masdim+1
+         jm=imasql(im)
+         if (jm.gt.0) goto 105
+         if (jm.eq.0) goto 100
+         jinio=-jm/masdim+1
+        if (jinio.gt.im+jacc) then
+*         write (6,*) 'saut kdeb jm ',kdeb,jm
+          kdeb=-jm
+          goto 44
+        endif
+ 100  continue
+ 105  continue
+      ideb=max((im-1)*masdim,kdebi)
+      kdeb=ideb
+ 111  continue
+      do 110 im=kdeb/masdim+1,kprem/masdim+1
+         jm=imasql(im)
+         if (jm.le.0) goto 115
+         if (jm.eq.1) goto 110
+         jfineo=jm/masdim+1
+         if(jfineo.gt.im+jacc) then
+           kdeb=jm
+           goto 111        
+         endif
+ 110  continue
+ 115  continue
+      im=im-1
+      ifin=min(im*masdim-1,kprem)
+**    write (6,*) ' chole1 kdeb kprem ideb ifin ',kdeb,kprem,ideb,ifin
+      DO 9 K=ideb,min(ifin,nbnnma-kq)
+       AUX=VALF(K)
+       if (aux.eq.0.d0) goto 9
+       nbo=nbo+1
+       VALFK=AUX*DAAG(K)
+       VALF(K)=VALFK
+   9  CONTINUE
+      if (ifin.lt.kprem) then
+       kdeb=ifin+1
+       goto 43
+      endif
+      ivpof(khg)=kprem+ippkhg
+      CHOLi1=-AUX1
+      RETURN
+      END
+ 
+ 
+ 

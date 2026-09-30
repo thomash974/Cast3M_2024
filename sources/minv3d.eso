@@ -1,0 +1,70 @@
+C MINV3D    SOURCE    PV090527  23/01/27    21:15:52     11574          
+        SUBROUTINE MINV3D(ngf,A,AI,B,X,IPZERO,n,err1,affiche)
+        
+c       inverse d une matrice carree
+c   ************************************************************************
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+       
+       integer ngf,n,err1
+       real*8 a(ngf,ngf+1),b(ngf),x(ngf),ai(ngf,ngf+1)
+       integer ipzero(ngf)
+       logical affiche
+
+       integer i,j
+       real*8 test
+       logical verif,affiche_local
+       
+       affiche_local=affiche
+       
+       if (affiche_local) then
+            print*,'On est dans minv3d'
+            verif=.true.
+       else
+            verif=.false.
+       end if            
+       
+       
+       do i=1,n
+c           second membre        
+            do j=1,n
+                if(j.eq.i) then
+                    b(j)=1.d0
+                else
+                    b(j)=0.d0
+                end if
+            end do
+            
+c           calcul colonne i            
+            call gaus3d(n,a,x,b,ngf,err1,ipzero)
+
+c           placement colonne i dans ai            
+            if(err1.ne.1) then
+                do j=1,n
+                    ai(j,i)=x(j)
+                end do
+            else
+                print*,'Pb d inversion de A dans Matinv3d'
+                return
+            end if
+            
+       end do
+        
+c      verif
+       if(verif.or.affiche) then
+            do i=1,n
+                do j=1,n
+                    test=0.d0
+                    do k=1,n
+                        test=test+a(i,k)*ai(k,j)
+                    end do
+                    write(*,'(1x,e10.3)',advance='no') test 
+                end do
+                write(*,'(1X,A9,I3)') 'fin ligne',i  
+            end do
+       end if
+        
+       RETURN
+       END
+C **********************************************************************
+ 

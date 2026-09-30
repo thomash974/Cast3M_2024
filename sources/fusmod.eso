@@ -1,0 +1,333 @@
+C FUSMOD    SOURCE    PASCAL    20/04/01    21:15:32     10568          
+
+      SUBROUTINE FUSMOD(MODL1,MODL2,MODL)
+
+*--------------------------------------------------------------------*
+*                                                                    *
+*     REUNION DE DEUX OBJETS MODELE                                  *
+*                                                                    *
+*     ENTREES/SORTIE:                                                *
+*                                                                    *
+*       MODL1      POINTEUR SUR LE PREMIER OBJET MODELE              *
+*       MODL2      POINTEUR SUR LE SECOND OBJET MODELE               *
+*       MODL       POINTEUR SUR L'OBJET MODELE RESULTAT              *
+*                  = 0 SINON                                         *
+*                                                                    *
+*    AM   22/6/93   ON EXCLUT LA POSSIBILITE DE ZONE COMMUNE         *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+*     - UNE ZONE ELEMENTAIRE EST DITE COMMUNE AUX DEUX "MODELE" SI:
+*          LES GEOMETRIES ELEMENTAIRES
+*          LES NOMS DE CONSTITUANTS
+*          LES NUMEROS DES TYPES D'ELEMENTS-FINIS
+*          LES INFMOD
+*          LES FORMULATIONS
+*          LES TYPES DE MATERIAUX
+*       SONT LES MEMES.
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+C     Segment ICOPIE : indique les sous-zones (IMODEL) dupliquees
+      SEGMENT ICOPIE(NCP1)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC SMELEME
+*
+      CHARACTER*(LCONMO) CONM1,CONM2
+      LOGICAL bXFEM, loHHO
+*
+*     INITIALISATION
+*
+      MODL=0
+      MMODE1=MODL1
+      MMODE2=MODL2
+      SEGACT,MMODE1,MMODE2
+      NMOD1=MMODE1.KMODEL(/1)
+      NMOD2=MMODE2.KMODEL(/1)
+*
+      IF (IIMPI.EQ.666) THEN
+      WRITE(IOIMP,*)'***  SOUS-PROGRAMME FUSMOD  ***'
+      WRITE(IOIMP,*)'NOMBRE DE ZONES ELEMENTAIRES : ',NMOD1
+      WRITE(IOIMP,*)'NOMBRE DE ZONES ELEMENTAIRES : ',NMOD2
+      ENDIF
+*
+      DO 10 I10=1,NMOD1
+*
+*      BOUCLE SUR LES ZONES ELEMENTAIRES DU 1ER "MODELE"
+*
+       IMODE1=MMODE1.KMODEL(I10)
+       SEGACT,IMODE1
+       nefm1=IMODE1.NEFMOD
+       ipma1=IMODE1.IMAMOD
+       conm1=IMODE1.CONMOD
+*
+       DO 20 I20=1,NMOD2
+*
+*       BOUCLE SUR LES ZONES ELEMENTAIRES DU 2ND "MODELE"
+*
+        IMODE2=MMODE2.KMODEL(I20)
+        SEGACT,IMODE2
+        nefm2=IMODE2.NEFMOD
+        ipma2=IMODE2.IMAMOD
+        conm2=IMODE2.CONMOD
+ckich quand la phase est identique et le type d element identique
+c c est tout ou rien
+        IF (nefm1.EQ.nefm2 .AND. conm1.EQ.conm2 .AND.
+     &      imode1.formod(1).EQ.imode2.formod(1)) THEN
+          iret = 0
+          call interb(ipma1,ipma2,iret,iob1)
+          if (iret.GT.0) goto 16
+          ipt2 = ipma1
+          ipt3 = ipma2
+          ipt4 = iob1
+          segact ipt2,ipt3,ipt4
+          if (ipt2.num(/2).ne.ipt3.num(/2).or.
+     &        ipt2.num(/2).ne.ipt4.num(/2)) then
+             call erreur(618)
+          write(6,*) ' maillages non disjoints mais phase commune '
+              goto 999
+          endif
+        ENDIF
+ 16     IF (ipma1.NE.ipma2) GOTO 20
+*
+* ----   AM  22/6/93
+*        ON VERIFIE QU'IL N'Y A PAS DE ZONE COMMUNE, C'EST A DIRE
+*        QUE SI LES MAILLAGES SONT IDENTIQUES, LES CONSTITUANTS EUX
+*        SONT DIFFERENTS
+*
+        IF (conm1.EQ.conm2) THEN
+          IF (nefm1.NE.nefm2) THEN
+            CALL ERREUR(618)
+          ELSE
+            CALL ERREUR(617)
+          ENDIF
+          GO TO 999
+        ENDIF
+* ----
+ 20     CONTINUE
+*      END DO
+ 10    CONTINUE
+*     END DO
+*
+      N1=NMOD1+NMOD2
+      SEGINI,MMODEL
+      MODL=MMODEL
+
+c     write(6,*) ' ***** Dans FUSMOD !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
+      NCP1 = N1
+      SEGINI, ICOPIE
+*
+*     BOUCLE SUR LES ZONES GEOMETRIQUES DU 1ER "MODELE"
+*
+      IF (IIMPI.EQ.666) THEN
+        WRITE(IOIMP,*)'***  SOUS-PROGRAMME FUSMOD  ***'
+        WRITE(IOIMP,*)'BOUCLE SUR LES ZONES DU 1ER MODELE'
+      ENDIF
+      DO 50 IA=1,NMOD1
+       IMODE1=MMODE1.KMODEL(IA)
+C      SEGINI,IMODEL=imode1
+       KMODEL(IA)=IMODE1
+C   CAS DARCY OU NAVIER ON OUBLIE LA TABLE DE PRECONDITIONNEMENT
+        nfor = IMODE1.formod(/2)
+c       write(6,*) ' ***** nfor =',nfor
+         
+        CALL PLACE (imode1.FORMOD,NFOR,IDARC,'DARCY')
+        CALL PLACE (imode1.FORMOD,NFOR,IEULE,'EULER')
+        CALL PLACE (imode1.FORMOD,NFOR,INAVI,'NAVIER_STOKES')
+        IF ((IDARC.NE.0).OR.(INAVI.NE.0).OR.(IEULE.NE.0)) THEN
+c       write(6,*) ' ***** FUSMOD : je copie imode1' 
+          SEGINI,IMODEL=imode1
+          KMODEL(IA)=IMODEL
+          ICOPIE(IA) = 1
+          IMODEL.INFMOD(2)=0
+        ENDIF
+ 50   CONTINUE
+*     END DO
+*
+*     BOUCLE SUR LES ZONES GEOMETRIQUES DU 2ND "MODELE"
+*
+      IF (IIMPI.EQ.666) THEN
+        WRITE(IOIMP,*)'***  SOUS-PROGRAMME FUSMOD  ***'
+        WRITE(IOIMP,*)'BOUCLE SUR LES ZONES DU 2ND MODELE'
+      ENDIF
+      DO 80 IB=1,NMOD2
+        IMODE2=MMODE2.KMODEL(IB)
+C       SEGINI,IMODEL=imode2
+        KMODEL(IB+NMOD1)=IMODE2
+
+C   CAS DARCY OU NAVIER ON OUBLIE LA TABLE DE PRECONDITIONNEMENT
+C   et on duplique le segment IMODE1
+        nfor = IMODE2.formod(/2)
+        CALL PLACE (imode2.FORMOD,NFOR,IDARC,'DARCY')
+        CALL PLACE (imode2.FORMOD,NFOR,IEULE,'EULER')
+        CALL PLACE (imode2.FORMOD,NFOR,INAVI,'NAVIER_STOKES')
+        IF ((IDARC.NE.0).OR.(INAVI.NE.0).OR.(IEULE.NE.0)) THEN
+c       write(6,*) ' ***** FUSMOD : je copie imode2' 
+          SEGINI,IMODEL=imode2
+          KMODEL(IB+NMOD1)=IMODEL
+          ICOPIE(IB+NMOD1) = 1
+          IMODEL.INFMOD(2)=0
+        ENDIF
+ 80   CONTINUE
+*     END DO
+*
+999   CONTINUE
+      IF (MODL.EQ.0) RETURN
+*
+*  on va maintenant fusionner les zones geometriques de memes caracteristiques
+*
+      do 100 i=1,kmodel(/1)
+       imode1=kmodel(i)
+c*     segact imode1
+       if (imode1.eq.0) goto 100
+       ipt1=imode1.imamod
+       if (ipt1.eq.0) goto 100
+       nefm1=imode1.nefmod
+       conm1=imode1.conmod
+       segact ipt1
+       ityp1=ipt1.itypel
+       bXFEM = NUMMFR(nefm1).EQ.63
+c*     bXFEM = imode1.infele(13).EQ.63
+       nbnn1=ipt1.num(/1)
+       CALL HHONOB(imode1,nobhh1,iret)
+       if (nobhh1.LT.0) CALL ERREUR(iret)
+       loHHO = nobhh1.GT.0
+c* test equivalent :       loHHO = nefm1.EQ.HHO_NUM_ELEMENT (include CHHOPA)
+c* test equivalent :       loHHO = nummfr(nefm1).EQ.HHO_MFR_ELEMENT (include CHHOPA)
+       do 110 j=i+1,kmodel(/1)
+        imode2=kmodel(j)
+        if (imode2.eq.0) goto 110
+c*      segact imode2
+        if (imode2.nefmod.ne.nefm1) goto 110
+        if (imode2.conmod.ne.conm1) goto 110
+        ipt2=imode2.imamod
+        segact ipt2
+        if (ipt2.itypel.ne.ityp1) goto 110
+c* En cas de polygones, le itypel est le meme (32) c'est le nombre de sommets(=faces) qui va les distinguer.
+        if (ipt2.num(/1).ne.nbnn1) goto 110
+        if (imode2.cmatee.ne.imode1.cmatee) goto 110
+**      if (imode2.infmod(/1).ne.imode1.infmod(/1)) goto 110
+**      do k=1,imode1.infmod(/1)
+**       if (imode2.infmod(k).ne.imode1.infmod(k)) goto 110
+**      enddo
+        if (imode2.formod(/2).ne.imode1.formod(/2)) goto 110
+        do k=1,imode1.formod(/2)
+         if (imode2.formod(k).ne.imode1.formod(k)) goto 110
+        enddo
+        if (imode2.matmod(/2).ne.imode1.matmod(/2)) goto 110
+        do k=1,imode1.matmod(/2)
+         if (imode2.matmod(k).ne.imode1.matmod(k)) goto 110
+        enddo
+        ipdpg1 = imode1.ipdpge
+        ipdpg2 = imode2.ipdpge
+        if (ipdpg2.ne.ipdpg1) then
+          if (iptpoi(ipdpg2).ne.iptpoi(ipdpg1)) goto 110
+        endif
+        if (imode2.inatuu.ne.imode1.inatuu) goto 110
+        if (imode2.lnomid(/1).ne.imode1.lnomid(/1)) goto 110
+*       BP, 2016-03-25 : ajout test car en sortie de RAFF
+*       on a 2 ou 3 sous modeles identiques aux noms de composantes pres
+        
+        IF (nefm1.eq.22) THEN
+          do k=1,imode1.lnomid(/1)
+           if (imode2.lnomid(k).ne.imode1.lnomid(k)) goto 110
+          enddo
+        ENDIF
+*       GG : si deux sure de couleurs differentes pas de fusion
+        IF (nefm1.eq.259) THEN
+          if (ipt1.ICOLOR(1).ne.ipt2.ICOLOR(1)) goto 110
+        ENDIF
+        if (imode2.infele(/1).ne.imode1.infele(/1)) goto 110
+        do k=1,imode1.infele(/1)
+         if (imode2.infele(k).ne.imode1.infele(k)) goto 110
+        enddo
+       if (loHHO) then
+          CALL HHONOB(imode2,nobhh2,iret)
+          IF (nobhh2.LE.0) THEN
+            CALL ERREUR(iret)
+            RETURN
+          ENDIF
+          if (imode2.ivamod(nobhh2).ne.imode1.ivamod(nobhh1)) goto 110
+c-dbg on pourrait verifier que contenus listenti(nobhh1+1)=listenti(nobhh2+1) sinon incoherence !
+        end if
+         if (.NOT. bXFEM .and. .not.loHHO) then
+c         if (.NOT. bXFEM) then
+        if (imode2.tymode(/2).ne.imode1.tymode(/2)) goto 110
+        do k=1,imode1.tymode(/2)
+         if (imode2.tymode(k).ne.imode1.tymode(k)) goto 110
+        enddo
+        if (imode2.ivamod(/1).ne.imode1.ivamod(/1)) goto 110
+        do k=1,imode1.ivamod(/1)
+         if (imode2.ivamod(k).ne.imode1.ivamod(k)) goto 110
+        enddo
+         endif
+
+*  fusion des meleme : on duplique le segment IMODE1
+        IF (ICOPIE(i).EQ.0) THEN
+c       write(6,*) ' ***** FUSMOD : je copie car fusion meleme ' 
+          SEGINI, IMODEL = IMODE1
+          KMODEL(i) = IMODEL
+          IMODE1 = IMODEL
+        ENDIF
+        nbnn =ipt1.num(/1)
+        nbel1=ipt1.num(/2)
+        nbel2=ipt2.num(/2)
+        nbelem=nbel1+nbel2
+        nbref=0
+        nbsous=0
+        segini meleme
+        itypel=ityp1
+        do iel= 1,nbel1
+          do ino=1,nbnn
+            num(ino,iel)=ipt1.num(ino,iel)
+          enddo
+          icolor(iel)=ipt1.icolor(iel)
+        enddo
+        do iel =1,nbel2
+          jel = iel+nbel1
+          do ino =1,nbnn
+            num(ino,jel)=ipt2.num(ino,iel)
+          enddo
+          icolor(jel)=ipt2.icolor(iel)
+        enddo
+        ipt1=meleme
+c*      segact imode1*mod,imode2*mod
+        imode1.imamod=ipt1
+        IF (bXFEM) CALL FUCHXR(imode1,imode2,0)
+c*      imode2.imamod=0
+c*      segsup,imode2
+        kmodel(j)=0
+ 110  continue
+      IF (bXFEM) CALL PARTXR(0,ipt1,imode1)
+      IF (loHHO) THEN
+        CALL HHOPAR(imode1,iret)
+        if (iret.ne.0) return
+      END IF
+ 100  continue
+*  desactivation & compactage du modele
+      idec=0
+      do 130 i=1,kmodel(/1)
+        imode1=kmodel(i)
+        if (imode1.eq.0) then
+          idec=idec+1
+        else
+          kmodel(i-idec)=imode1
+        endif
+ 130  continue
+      if (idec.gt.0) then
+        n1=kmodel(/1)-idec
+        segadj mmodel
+      endif
+
+      SEGSUP,ICOPIE
+
+      END
+
+ 
+ 

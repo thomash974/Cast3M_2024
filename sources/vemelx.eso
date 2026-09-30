@@ -1,0 +1,116 @@
+C VEMELX    SOURCE    GOUNAND   21/04/06    21:15:42     10940          
+      SUBROUTINE VEMELX(MELEMX,MMOT)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : VEMELX
+C DESCRIPTION : Vérifie la consistance d'un segment MELEMX
+C               Inspiré de vetopi.eso
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C***********************************************************************
+C SYNTAXE GIBIANE    : 
+C ENTREES            : MELEME (Activé), NEL
+C ENTREES/SORTIES    : TOPINV (Activé *MOD)
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 30/10/2017, version initiale
+C HISTORIQUE : v1, 30/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP1      
+*-INC SMELEMX
+      logical lident
+      CHARACTER*(*) MMOT
+*
+*     
+* Executable statements
+*
+*      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans vemelx.eso'
+
+*     Petite vérification de consistance de dimension des objets
+*     (NVMAX,NPMAX)
+      NNMAX=MELEMX.NUMX(/1)
+      NLMAX=MELEMX.NUMX(/2)
+      if (melemx.nlini.gt.nlmax.or.melemx.nlcou.gt.nlmax) then
+         write(ioimp,185) 'melemx : nlini,nlcou,nlmax=',nlini,nlcou
+     $        ,nlmax 
+         goto 9999
+      endif   
+      if (melemx.nnini.gt.nnmax.or.melemx.nncou.gt.nnmax) then
+         write(ioimp,185) 'melemx : nnini,nncou,nnmax=',nnini,nncou
+     $        ,nnmax 
+         goto 9999
+      endif
+* Pas terrible mais bon      
+      ityp=MELEMX.ITYPEX
+      if (ityp.eq.0) then
+         write(ioimp,185) 'melemx : itypex=',ityp
+     $        ,nnmax 
+         goto 9999
+      endif
+         
+*
+      nlco2=0
+      do iel=nlmax,1,-1
+         do ino=1,nncou
+            if (melemx.numx(ino,iel).ne.0) then
+               nlco2=iel
+               goto 44
+            endif
+         enddo
+      enddo
+ 44   continue
+*      if (nlcou.ne.nlco2) then
+      if (nlcou.lt.nlco2) then
+         write(ioimp,185) 'melemx : nlcou,nlco2=',nlcou,nlco2
+         goto 9999
+      endif
+*
+      do iel=1,nlmax
+         do ino=nncou+1,nnmax
+            if (melemx.numx(ino,iel).ne.0) then
+               write(ioimp,185)
+     $              'ino,nncou,nnmax,iel,nlcou,nlmax,melemx.numx='
+     $              ,ino,nncou,nnmax,iel,nlcou,nlmax,melemx.numx(ino
+     $              ,iel)
+               goto 9999
+            endif
+         enddo
+      enddo
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      write(ioimp,*) MMOT
+      MOTERR(1:8)='VEMELX  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine VEMELX
+*
+      END
+
+ 

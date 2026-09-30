@@ -1,0 +1,207 @@
+C PROIET    SOURCE    JK148537  23/11/20    21:15:12     11790          
+
+      SUBROUTINE PROIET
+
+C--------------------------------------------------------------------
+C
+C                         OPERATEUR PROIET
+C--------------------------------------------------------------------
+C
+C
+C       PROJECTION  D'UN CHAMELEM AUX NOEUDS DUN MAILLAGE
+C       PROJECTION ET VALEUR D'UN CHAMELEM AUX NOEUDS OU AUX
+C    POINTS D INTEGRATION  D UN MODELE POUVANT COMPORTER DES COQUES
+C    INTEGREES (LA COMPOSANTE T  SI PRESENTE SERA  DECOMPOSEE
+C    EN T TINF TSUP SI NECESSAIRE SUIVANT LA FORMULATION DE LA COQUE
+C       PROJECTION  D'UN CHAMELEM PAR MINIMISATION DE L INTEGRALE
+C
+C            INT (U1i - U2i)**2  SUR LES ELEMENT RECEPTEURS
+C
+C
+C
+C     - 'POLY' :
+C            PROJECTION SUR GEO2 DES COMPOSANTES D'UN CHPOINT CHP1
+C            DEFINI SUR GEO1 PAR UNE METHODE DE LISSAGE ( adaptee
+C            pour des champs magnetostatique)
+C
+C SYNTAXE :
+C
+C      CHPO1    = PROIET    MAIL2   CHEL1
+C
+C      MCHEL1    = PROIET    MOD1   (CARA )   CHEL1 (MOD2)
+C
+C      MCHEL1    = PROIET    MOD1   CHEL1  (MOD2)  (MINI  (NB ))
+C
+C      OBJ1    = "POLY" GEO1 GEO2 CHP1 ENT1 MOT1 ("POIDS" X1 X2)
+C
+C      CHPO2  = PROIET MOD2 CHPO3 
+C
+C
+C ENTREE :
+C   SANS OPTION :
+C                 MAIL2 = OBJET DE TYPE MAILLAGE.
+C
+C                 CHEL1 = OBJET DE TYPE  MCHAML.
+C
+C                 MOD1 = MODELE
+C                 CARA = CARACTERISTIQUE DE LA COQUE (MCHAML) si il y a des
+C       des sous zones coques dans le modele
+C
+C                 MOD2 = MODELE NAVIER-STOKES NLIN
+C
+C                 CHPO3 = OBJET CHPOINT solution KRES
+C
+C   POLY :
+C                 GEO1 = OBJET DE TYPE MAILLAGE
+C                 GEO2 = OBJET DE TYPE MAILLAGE
+C                 CHP1 = OBJET DE TYPE MCHAML
+C                 ENT1 = ENTIER (PRECISE LE TYPE DE SYMETRIE)
+C                 MOT1 = MOT 'PLAN' OU 'AXIS'
+C                 POIDS = MOT FACULTATIF
+C
+C SORTIE   :
+C
+C
+C
+C     NORA DAVIDOVICH- 15/2/89
+C     NOUVEAUX CHAMELEMS P DOWLATYARI OCT. 91
+C     MODIFICATION FLEURET 01/96 - OPTION 'ARMA'
+C     MODIFICATION VIGAN   03/97 - OPTION 'COQU'
+C--------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMMODEL
+-INC SMCOORD
+
+      PARAMETER (NCLE = 7)
+      CHARACTER*4 MOTCLE(NCLE)
+
+      DATA  MOTCLE /'POLY','NOEU','GRAV','RIGI','MASS','STRE','MINI'/
+
+*
+      segact mcoord
+*
+C-----LECTURE DE L'OPTION
+      IVAL = 0
+      CALL LIRMOT(MOTCLE,NCLE,IVAL,0)
+C
+C-----OPTION POLY
+      IF (IVAL.EQ.1)  THEN
+        CALL LISSAG
+        RETURN
+      ENDIF
+
+C- Par defaut, le support est aux noeuds
+      IF (IVAL.EQ.0) IVAL = 2
+
+      IPGEA = 0
+      CALL LIROBJ('MAILLAGE',IPGEA,0,iretou)
+      IF (IERR.NE.0) RETURN
+
+C- Projection d'un champ par element defini aux noeuds sur un maillage
+      IF (IPGEA.GT.0) THEN
+
+        CALL LIROBJ('MCHAML  ',IPCHEL,1,iretou)
+        CALL ACTOBJ('MCHAML  ',IPCHEL,1)
+        IF (IERR.NE.0) RETURN
+C Verification du support aux noeuds
+        CALL QUESUP(0,IPCHEL,0,1,iretou,iret2)
+        IF (iretou.GT.1) THEN
+          CALL ERREUR(903)
+          RETURN
+        ENDIF
+
+        CALL PRO2(IPGEA,IPCHEL,1, IPOUT,-1)
+
+        IF (IERR.EQ.0) THEN
+          CALL ACTOBJ('CHPOINT ',IPOUT,1)
+          CALL ECROBJ('CHPOINT ',IPOUT)
+        ENDIF
+
+        RETURN
+
+C- Projection d'un champ par element aux noeuds sur le support d'un modele
+c*      ELSE IF (IPGEA.EQ.0) THEN
+      ELSE
+        CALL LIROBJ('MMODEL  ',ipmod1,1,iretou)
+        CALL ACTOBJ('MMODEL  ',ipmod1,1)
+        IF (IERR.NE.0) RETURN
+        
+        CALL LIROBJ('CHPOINT ',IPCHP1,0,iretou)
+        IF (IPCHP1.gt.0) then
+          call actobj('CHPOINT ',ipchp1,1)
+          if (ierr.ne.0) return
+          call pronli(ipmod1,ipchp1,ipout)
+          if (ierr.ne.0) return
+          call ecrobj('CHPOINT ',ipout)
+          return
+        ENDIF
+        
+        CALL LIROBJ('MCHAML  ',IPCHE1,1,iretou)
+        CALL ACTOBJ('MCHAML  ',IPCHE1,1)
+        IF (IERR.NE.0) RETURN
+        CALL LIROBJ('MCHAML  ',IPCHE2,0,iretou)
+        IF (IERR.NE.0) RETURN
+
+        IF (IPCHE2.NE.0) THEN
+          CALL ACTOBJ('MCHAML  ',IPCHE2,1)
+          IPCHEL = IPCHE2
+          IPCARA = IPCHE1
+        ELSE
+          IPCHEL = IPCHE1
+          IPCARA = 0
+        ENDIF
+C Cas particulier de la presence d'un champ de CARACTERISTIQUES
+C On permute eventuellement l'ordre mais normalement il faut respecter
+C l'ordre de la notice "IPCARA IPCHEL"
+        IF (IPCARA.NE.0) THEN
+          mchelm = IPCARA
+          SEGACT,mchelm
+          IF (titche(1:16).NE.'CARACTERISTIQUES') THEN
+c le champ de caracteristiques a peut etre ete donne en deuxieme, on
+c teste en inversant les deux champs par elements fournis
+             IPCHEL = IPCHE1
+             IPCARA = IPCHE2
+
+             mchelm = IPCARA
+             SEGACT,mchelm
+             IF (titche(1:16).NE.'CARACTERISTIQUES') THEN
+               MOTERR(1:16) = 'CARACTERISTIQUES'
+               CALL ERREUR(565)
+             ENDIF
+          ENDIF
+          IF (IERR.NE.0) RETURN
+        ENDIF
+C Verification du support aux noeuds
+        CALL QUESUP(0,IPCHEL,0,1,iretou,iret2)
+        IF (iretou.GT.1) THEN
+          CALL ERREUR(903)
+          RETURN
+        ENDIF
+
+C       Extension du MMODEL en cas de modele de MELANGE
+        CALL MODETE(ipmod1,MMODEL,IMELAN)
+C
+        ISUP = 1
+C- Option 'MINI'
+        IF (IVAL.EQ.7) THEN
+          CALL PROM(MMODEL,IPCARA,IPCHEL,ISUP, IPOUT)
+C- Projection sur support ISUP
+        ELSE
+          IF (IVAL.GT.1.AND.IVAL.LT.7) ISUP = IVAL-1
+          CALL PRON(MMODEL,IPCARA,IPCHEL,ISUP, IPOUT)
+        ENDIF
+        IF (IERR.NE.0) RETURN
+        
+        CALL ACTOBJ('MCHAML  ',IPOUT,1)
+        CALL ECROBJ('MCHAML  ',IPOUT)
+      ENDIF
+
+      END
+ 
+ 
+ 

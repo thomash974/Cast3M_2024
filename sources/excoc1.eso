@@ -1,0 +1,108 @@
+C EXCOC1    SOURCE    OF166741  23/07/05    21:15:04     11699          
+
+*-----------------------------------------------------------------------
+*     EXTRACTION D UNE COMPOSANTE D UN NOUVEAU CHAMELEM
+*             ROUTINE APPELLEE PAR L OPERATEUR EXCOMP
+* ENTREE
+*     IPCH1= POINTEUR SUR UN MCHAML (ACTIF)
+*     MOT1 = NOM DE LA COMPOSANTE A EXTRAIRE
+*     MOT2 = NOM DE LA COMPOSANTE A CREER
+*     IVID = 1 SI ON A LU LE MOT 'NOID', 0 SINON
+* SORTIE
+*     IPCH2= POINTEUR SUR LE MCHAML CONTENANT UNIQUEMENT LA
+*            COMPOSANTE MOT2
+*-----------------------------------------------------------------------
+      SUBROUTINE EXCOC1(IPCH1,MOT1,IPCH2,MOT2,IVID)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCHAML
+
+      CHARACTER*(*) MOT1,MOT2
+
+      SEGMENT MTRI
+        INTEGER IPOI(n1l)
+        INTEGER LRAN(n1l)
+        CHARACTER*16 TYPT(n1l)
+      ENDSEGMENT
+
+      IPCH2 = 0
+*
+*     INITIALISATION DU SEGMENT DE TRAVAIL
+*
+      n1l=500
+      SEGINI,MTRI
+*
+*     BOUCLE SUR LES ZONES
+*
+      MCHEL1 = IPCH1
+
+      L1   =MCHEL1.TITCHE(/1)
+      N3   =MCHEL1.INFCHE(/2)
+      NZON1=MCHEL1.ICHAML(/1)
+
+      N1=0
+      DO IA = 1, NZON1
+        MCHAM1=MCHEL1.ICHAML(IA)
+        NCP=MCHAM1.NOMCHE(/2)
+        CALL PLACE(MCHAM1.NOMCHE(1),NCP,IBCOM,MOT1)
+        IF (IBCOM.NE.0) THEN
+          N1=N1+1
+          if (N1.gt.n1l) then
+            n1l=n1l+500
+            segadj mtri
+          endif
+** On ne duplique pas le melval
+**          melva1=MCHAM1.IELVAL(IBCOM)
+**          segini,melval=melva1
+**          IPOI(N1)=melval
+          IPOI(N1)=MCHAM1.IELVAL(IBCOM)
+          LRAN(N1)=IA
+          TYPT(N1)=MCHAM1.TYPCHE(IBCOM)
+        ENDIF
+      ENDDO
+
+      IF (N1.EQ.0 .AND. IVID.NE.1) THEN
+        MOTERR(1:8)=MOT1
+        CALL ERREUR(236)
+        GOTO 666
+      ENDIF
+*
+*     CREATION DU CHAPEAU DU MCHELM A 1 COMPOSANTE
+*
+      SEGINI,MCHELM
+      TITCHE=MCHEL1.TITCHE
+      IFOCHE=MCHEL1.IFOCHE
+      IPCH2 = MCHELM
+
+      N2=1
+
+*     ON REMPLIT LE MCHELM - BOUCLE SUR LES ZONES
+*
+      DO IA = 1, N1
+        SEGINI,MCHAML
+        NOMCHE(1)=MOT2
+        TYPCHE(1)=TYPT(IA)
+        IELVAL(1)=IPOI(IA)
+        IACON=LRAN(IA)
+        DO IB = 1, N3
+          INFCHE(IA,IB)=MCHEL1.INFCHE(IACON,IB)
+        ENDDO
+        IMACHE(IA)=MCHEL1.IMACHE(IACON)
+        CONCHE(IA)=MCHEL1.CONCHE(IACON)
+        ICHAML(IA)=MCHAML
+      ENDDO
+
+*     SUPPRESSION DES SEGMENTS DE TRAVAIL
+*
+ 666  CONTINUE
+      SEGSUP MTRI
+
+c      RETURN
+      END
+
+ 

@@ -1,0 +1,94 @@
+C VIRECO    SOURCE    PB245956  20/12/21    21:15:21     10747          
+C RESOUR    SOURCE    CB215821  19/07/30    21:17:58     10273          
+      SUBROUTINE VIRECO(LVIBC,IPSOLU,
+     &                        IPRIGI,IPMASS,IPAMOR,NELIM,IDEME0,IDEME1)
+
+***********************************************************************
+*
+*                             V I R E C O
+*                             -----------
+*
+*            SOUS-PROGRAMME ASSOCIE A L'OPERATEUR "VIBRation"
+*
+* FONCTION:
+* ---------
+*
+*     RECONSTRUCTION DES MODES APRES OPERATIONS SUR MATRICES CONDENSEES
+*
+*
+* CREATION et MODIFICATION:
+* ------------------------
+
+*     PASCAL BOUDA, 17 DECEMBRE 2020
+*
+************************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCHPOI
+-INC SMRIGID
+
+-INC SMSOLUT
+-INC CCREEL
+
+      LOGICAL LVIBC
+      REAL*8 FRQR,FRQI
+      
+
+      FRQR=0D0
+      FRQI=0D0
+
+      MSOLUT=IPSOLU
+      SEGACT MSOLUT  
+            
+      MSOLE1=MSOLIS(4)
+      MSOLE2=MSOLIS(5)
+      SEGACT MSOLE1,MSOLE2*MOD
+
+      
+*Nombre de modes (= nbchpoints si sym 2*nbchpoints si non sym)
+      NBMOD1=MSOLE1.ISOLEN(/1)
+      IF (LVIBC) NBMOD1=NBMOD1/2
+            
+      DO I=1,NBMOD1
+         
+** si modes complexes on travaille par paire         
+         IF (LVIBC) THEN 
+            IMOD1=2*I-1
+         ELSE
+            IMOD1=I
+         ENDIF
+         
+** modes reels         
+         IMODR=MSOLE2.ISOLEN(IMOD1)
+         MMODE=MSOLE1.ISOLEN(IMOD1)
+         SEGACT MMODE
+         FRQR=FMMODD(1)
+         WR=2*XPI*FRQR 
+** modes complexes
+         IF (LVIBC) THEN         
+            IMODI=MSOLE2.ISOLEN(IMOD1+1)
+            MMODE=MSOLE1.ISOLEN(IMOD1+1)
+            SEGACT MMODE
+            FRQI=FMMODD(1)
+            WI=2*XPI*FRQI
+         ENDIF
+
+         CALL VIREC1(LVIBC,ideme0,ideme1,
+     &               IPRIGI,IPMASS,IPAMOR,IMODR,IMODI,WR,WI,NELIM)         
+            
+         MSOLE2.ISOLEN(IMOD1)=IMODR
+         IF (LVIBC) MSOLE2.ISOLEN(IMOD1+1)=IMODI
+
+      ENDDO
+
+
+      END
+
+ 
+
+ 

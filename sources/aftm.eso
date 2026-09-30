@@ -1,0 +1,70 @@
+C AFTM      SOURCE    BP208322  20/09/18    21:15:03     10718          
+        SUBROUTINE AFTM(NFFT,NHBM,GAM,IGAM,DL) 
+c
+C=======================================================================
+* AFTM: Construction des operateurs fréquentiels
+* GAM  : Transformée de Fourier Directe
+*
+* GAM = [ 1 , COS(th1) , SIN(th1) , ... , , COS(H*th1) , SIN(H*th1) ]
+*       [                           ...                             ] 
+*       [ 1 , COS(thN) , SIN(thN) , ... , , COS(H*thN) , SIN(H*thN) ]
+*
+* IGAM : Transformée de Fourier Inverse
+*
+* IGAM = (1/N) [     2      , ... ,       2    ]
+*              [  COS(th1)  , ... ,   COS(thN) ] 
+*              [  SIN(th1)  , ... ,   SIN(thN) ] 
+*              [              ...              ] 
+*              [ COS(H*th1) , ... , COS(H*thN) ] 
+*              [ SIN(H*th1) , ... , SIN(H*thN) ]
+*
+* DL : Dérivée
+*
+* DL = diag(0,DL1,...,DLH)
+*      pour tout j=1,...,H  DLj = j[ 0  1 ]
+*                                  [-1  0 ] 
+C=======================================================================
+c        
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+       
+        INTEGER NFFT,NHBM
+        REAL*8 PI,XNFFT
+        REAL*8 GAM(NFFT,2*NHBM+1), IGAM(2*NHBM+1,NFFT), DL(2*NHBM+1) 
+        PARAMETER(PI=3.141592653589793D0)
+        
+*======= GAM ===========================================================
+*        Boucle sur les harmoniques
+         DO I = 1,NFFT   
+                GAM(I,1) = 1.
+         ENDDO
+*        Boucle sur les harmoniques
+         DO J = 2,2*NHBM,2
+*           Boucle sur le temps 
+            DO I = 1,NFFT
+                GAM(I,J)   = COS(J*PI*(I-1)/NFFT)
+                GAM(I,J+1) = SIN(J*PI*(I-1)/NFFT)
+            ENDDO
+         ENDDO
+         
+*======= IGAM ==========================================================
+         XNFFT = 1.D0/NFFT
+*        Boucle sur le temps 
+         DO J = 1,NFFT
+            IGAM(1,J) = XNFFT
+*           Boucle sur les harmoniques
+            DO I = 2,2*NHBM,2
+                IGAM(I,J)   = 2.*COS(I*PI*(J-1)/NFFT)/NFFT
+                IGAM(I+1,J) = 2.*SIN(I*PI*(J-1)/NFFT)/NFFT
+            ENDDO
+         ENDDO
+         
+*====== DL =============================================================
+        DL(1)=0.
+        DO J = 2,2*NHBM,2
+                DL(J) = (J/2)
+                DL(J+1) = -(J/2)
+        ENDDO
+        END
+ 
+ 

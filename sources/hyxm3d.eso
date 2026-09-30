@@ -1,0 +1,53 @@
+C HYXM3D    SOURCE    PV090527  23/01/27    21:15:39     11574          
+c***********************************************************************
+      subroutine hyxm3d(xmat0,xmat00,xmat1,hydra1,hydras,hydrar,
+     # non_lin,erreur)
+c     effet de l hydratation sur les caracteristiques materiau
+c     declaration externe
+      real*8 xmat0,xmat1,hydra1,hydras,hydrar,xmat00,non_lin
+      integer erreur
+c     declaration locale      
+      real*8 yy,zz,zzmin,hydra
+c     avant le seuil d hydratation on a 1e-3 des caracteristiques       
+      parameter (zzmin=0.d0)
+c     initialisation controle d erreur      
+c      erreur=0
+      if((hydras.lt.0.d0).or.(hydras.gt.1.d0).
+     #       or.(hydrar.le.hydras)) then
+             print*,'------->Donnees incoherentes dans hyxm3d'
+             print*,'0<HYDR<1  0<HYDS<1 HREF>HYDS cf. hydra3d.eso'
+             print*,xmat0,xmat00,xmat1,hydra1,hydras,hydrar,non_lin
+c             read*
+             xmat1=xmat0
+             erreur=1
+             return
+      end if      
+      hydra=min(hydra1,1.d0)
+      hydra=max(hydra,0.d0)
+      if(hydra.ne.hydrar)then
+         if (hydra.gt.hydras) then
+c            intrpoation de DeSchutter 
+             if(hydrar-hydras.le.0.) then
+                 print*,'Pb dans hydrxamt3d de fluendo3'
+                 print*,'HREF=HYDS impossible'
+                 erreur=1
+                 return
+             end if                 
+             yy=(hydra-hydras)/(hydrar-hydras)
+             xmat1=(xmat00-xmat0)*(yy**non_lin)+xmat0
+         else
+c            valeur constante tant que hydra1<hydras         
+             xmat1=xmat0
+         end if
+      else
+c        on adopte directement la velaur de reference      
+         xmat1=xmat00
+      end if
+      
+c      print*,'ds hydrxmat'
+c      print*,xmat0,xmat1,hydra1,hydras,non_lin,erreur
+      
+      return
+      end
+      
+ 

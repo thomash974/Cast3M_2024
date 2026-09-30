@@ -1,0 +1,78 @@
+C LR1L3D    SOURCE    PV090527  23/02/13    21:15:10     11592          
+      SUBROUTINE LR1LDP3D(K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,lr1,ldp,
+     # precision3d,log_err)
+c      Multiplicateur plastique Rankine1 et Drucker Prager couples
+c     (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,lr1,ldp,precision3d
+      real*8 CC(2,2),denom
+      logical log_err
+      log_err=.false.
+      
+      t3 = R1 ** 2
+      t5 = -s2 - s3
+      t7 = s2 ** 2
+      t8 = 0.3D1 * t7
+      t10 = 0.3D1 * s2 * s3
+      t11 = s3 ** 2
+      t12 = 0.3D1 * t11
+      t14 = (0.3D1 * R1 * t5 - t10 + t12 + 0.3D1 * t3 + t8)
+      if(t14.ge.0.) then
+        t14=sqrt(t14)
+      else
+        print*,'Pb dans lr1ldp3d t14<0'
+        log_err=.true. 
+        goto 10        
+      end if         
+      t15 = 0.1D1 / t14
+      t16 = b * K
+      t19 = s2 / 0.2D1
+      t20 = s3 / 0.2D1
+      t27 = s1 ** 2
+      t31 = (0.3D1 * s1 * t5 - t10 + t12 + 0.3D1 * t27 + t8)
+      if(t31.gt.0.d0) then
+        t31=sqrt(t31)
+      else
+c        print*,'Pb dans lr1ldp3d t14<0'
+        log_err=.true. 
+        goto 10        
+      end if      
+      t32 = 0.1D1 / t31
+      CC(1,1) = -0.4D1 / 0.3D1 * G - K
+      CC(1,2) = -0.4D1 / 0.3D1 * (0.3D1 / 0.4D1 * t14 * t16 + 0.3D1 / 
+     # 0.2D1 * (R1 - t19 - t20) * G) * t15
+      CC(2,1) = -0.3D1 * (t31 * d * K / 0.3D1 + 0.2D1 / 0.3D1 * (s1 - 
+     # t19 - t20) * G) * t32
+      CC(2,2) = -0.3D1 * t15 * (t14 * t31 * (d * t16 + Hdp) / 0.3D1 + G 
+     # * (t7 + (-R1 / 0.2D1 - s1 / 0.2D1 - s3) * s2 + t11 + s3 * (-R1 - 
+     # s1) / 0.2D1 + R1 * s1)) * t32
+
+      denom=CC(1,1) * CC(2,2) - CC(1,2) * CC(2,1)
+      
+      if(abs(denom).lt.precision3d) then
+          log_err=.true.
+          goto 10
+      else
+          lr1 = (CC(1,2) * f2 - CC(2,2) * f1) / denom
+          ldp = -(CC(1,1) * f2 - CC(2,1) * f1) / denom      
+      end if
+      
+10    if(log_err.or.lr1.ne.lr1.or.ldp.ne.ldp) then
+c        print*,'Pb1 dans lr1l3d'
+c        print*,'K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,lr1,ldp'
+c        print*,K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,lr1,ldp
+        lr1=0.d0
+        ldp=0.d0
+        log_err=.true.
+      end if
+      
+c     attention remplcer s1=R1  dans le gradient de DP( Vdep )    
+
+      return
+      end
+      
+
+ 
+ 

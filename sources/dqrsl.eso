@@ -1,0 +1,340 @@
+C DQRSL     SOURCE    PV090527  23/02/07    11:58:38     11592          
+      subroutine dqrsl ( a, lda, n, k,qraux,y,qy,qty,b,rsd,ab,job,info)
+      
+c*****************************************************************************80
+c
+c! DQRSL computes transformations, projections, and least squares solutions.
+c
+c  Discussion:
+c
+c    DQRSL requires the output of DQRDC.
+c
+c    For K .le. min(N,P), let AK be the matrix
+c
+c      AK = ( A(JPVT(1)), A(JPVT(2)), ..., A(JPVT(K)) )
+c
+c    formed from columns JPVT(1), ..., JPVT(K) of the original
+c    N by P matrix A that was input to DQRDC.  If no pivoting was
+c    done, AK consists of the first K columns of A in their
+c    original order.  DQRDC produces a factored orthogonal matrix Q
+c    and an upper triangular matrix R such that
+c
+c      AK = Q * (R)
+c               (0)
+c
+c    This information is contained in coded form in the arrays
+c    A and QRAUX.
+c
+c    The parameters QY, QTY, B, RSD, and AB are not referenced
+c    if their computation is not requested and in this case
+c    can be replaced by dummy variables in the calling program.
+c    To save storage, the user may in some cases use the same
+c    array for different parameters in the calling sequence.  A
+c    frequently occuring example is when one wishes to compute
+c    any of B, RSD, or AB and does not need Y or QTY.  In this
+c    case one may identify Y, QTY, and one of B, RSD, or AB, while
+c    providing separate arrays for anything else that is to be
+c    computed.
+c
+c    Thus the calling sequence
+c
+c      call dqrsl ( a, lda, n, k, qraux, y, dum, y, b, y, dum, 110, info )
+c
+c    will result in the computation of B and RSD, with RSD
+c    overwriting Y.  More generally, each item in the following
+c    list contains groups of permissible identifications for
+c    a single calling sequence.
+c
+c      1. (Y,QTY,B) (RSD) (AB) (QY)
+c
+c      2. (Y,QTY,RSD) (B) (AB) (QY)
+c
+c      3. (Y,QTY,AB) (B) (RSD) (QY)
+c
+c      4. (Y,QY) (QTY,B) (RSD) (AB)
+c
+c      5. (Y,QY) (QTY,RSD) (B) (AB)
+c
+c      6. (Y,QY) (QTY,AB) (B) (RSD)
+c
+c    In any group the value returned in the array allocated to
+c    the group corresponds to the last member of the group.
+c
+c  Modified:
+c
+c    15 April 2012
+c
+c  Author:
+c
+c    Jack Dongarra, Cleve Moler, Jim Bunch, Pete Stewart
+c
+c  Reference:
+c
+c    Jack Dongarra, Cleve Moler, Jim Bunch, Pete Stewart,
+c    LINPACK User's Guide,
+c    SIAM, 1979,
+c    ISBN13: 978-0-898711-72-1,
+c    LC: QA214.L56.
+c
+c  Parameters:
+c
+c    Input, real*8 A(LDA,P), contains the output of DQRDC.
+c
+c    Input, integer LDA, the leading dimension of the array A.
+c
+c    Input, integer N, the number of rows of the matrix AK.  It 
+c    must have the same value as N in DQRDC.
+c
+c    Input, integer K, the number of columns of the matrix AK.  K
+c    must not be greater than min(N,P), where P is the same as in the
+c    calling sequence to DQRDC.
+c
+c    Input, real*8 QRAUX(P), the auxiliary output from DQRDC.
+c
+c    Input, real*8 Y(N), a vector to be manipulated by DQRSL.
+c
+c    Output, real*8 QY(N), contains Q * Y, if requested.
+c
+c    Output, real*8 QTY(N), contains Q' * Y, if requested.
+c
+c    Output, real*8 B(K), the solution of the least squares problem
+c      minimize norm2 ( Y - AK * B),
+c    if its computation has been requested.  Note that if pivoting was
+c    requested in DQRDC, the J-th component of B will be associated with
+c    column JPVT(J) of the original matrix A that was input into DQRDC.
+c
+c    Output, real*8 RSD(N), the least squares residual Y - AK * B,
+c    if its computation has been requested.  RSD is also the orthogonal
+c    projection of Y onto the orthogonal complement of the column space
+c    of AK.
+c
+c    Output, real*8 AB(N), the least squares approximation Ak * B,
+c    if its computation has been requested.  AB is also the orthogonal
+c    projection of Y onto the column space of A.
+c
+c    Input, integer JOB, specifies what is to be computed.  JOB has
+c    the decimal expansion ABCDE, with the following meaning:
+c
+c      if A /= 0, compute QY.
+c      if B /= 0, compute QTY.
+c      if C /= 0, compute QTY and B.
+c      if D /= 0, compute QTY and RSD.
+c      if E /= 0, compute QTY and AB.
+c
+c    Note that a request to compute B, RSD, or AB automatically triggers
+c    the computation of QTY, for which an array must be provided in the
+c    calling sequence.
+c
+c    Output, integer INFO, is zero unless the computation of B has
+c    been requested and R is exactly singular.  In this case, INFO is the
+c    index of the first zero diagonal element of R, and B is left unaltered.
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+        integer k
+        integer lda
+        integer n
+      
+        real*8 a(lda,*)
+        real*8 ab(n)
+        real*8 b(k)
+        logical cab
+        logical cb
+        logical cqty
+        logical cqy
+        logical cr
+        integer info
+        integer j
+        integer jj
+        integer job
+        integer ju
+        integer kp1
+        real*8 qraux(*)
+        real*8 qty(n)
+        real*8 qy(n)
+        real*8 rsd(n)
+        real*8 ddot
+        real*8 t
+        real*8 temp
+        real*8 y(n)
+
+c  set info flag.
+
+        info = 0
+
+c  Determine what is to be computed.
+
+        cqy =        job / 10000         /= 0
+        cqty = mod ( job,  10000 )       /= 0
+        cb =   mod ( job,   1000 ) / 100 /= 0
+        cr =   mod ( job,    100 ) /  10 /= 0
+        cab =  mod ( job,     10 )       /= 0
+      
+        ju = min ( k, n-1 )
+
+c  Special action when N = 1.
+
+        if ( ju .eq. 0 ) then
+      
+          if ( cqy ) then
+            qy(1) = y(1)
+          end if
+      
+          if ( cqty ) then
+            qty(1) = y(1)
+          end if
+      
+          if ( cab ) then
+            ab(1) = y(1)
+           end if
+      
+          if ( cb ) then
+      
+            if ( a(1,1) .eq. 0.0D+00 ) then
+              info = 1
+            else
+              b(1) = y(1) / a(1,1)
+            end if
+      
+          end if
+      
+          if ( cr ) then
+            rsd(1) = 0.0D+00
+          end if
+      
+          return
+      
+        end if
+
+c  Set up to compute QY or QTY.
+
+        if ( cqy ) then
+          qy(1:n) = y(1:n)
+        end if
+      
+        if ( cqty ) then
+          qty(1:n) = y(1:n)
+        end if
+
+c  Compute QY.
+
+        if ( cqy ) then
+      
+          do jj = 1, ju
+      
+            j = ju - jj + 1
+      
+            if ( qraux(j) /= 0.0D+00 ) then
+              temp = a(j,j)
+              a(j,j) = qraux(j)
+              t = - ddot ( n-j+1, a(j,j), 1, qy(j), 1 ) / a(j,j)
+              call daxpy ( n-j+1, t, a(j,j), 1, qy(j), 1 )
+              a(j,j) = temp
+            end if
+      
+          end do
+      
+        end if
+
+c  Compute Q'*Y.
+
+           if ( cqty ) then
+      
+              do j = 1, ju
+                 if ( qraux(j) /= 0.0D+00 ) then
+                    temp = a(j,j)
+                    a(j,j) = qraux(j)
+                    t = - ddot ( n-j+1, a(j,j), 1, qty(j), 1 ) / a(j,j)
+                    call daxpy ( n-j+1, t, a(j,j), 1, qty(j), 1 )
+                    a(j,j) = temp
+                 end if
+              end do
+      
+           end if
+
+c  Set up to compute B, RSD, or AB.
+
+           if ( cb ) then
+             b(1:k) = qty(1:k)
+           end if
+      
+           kp1 = k + 1
+      
+           if ( cab ) then
+             ab(1:k) = qty(1:k)
+           end if
+      
+           if ( cr .and. (k .lt. n) ) then
+             rsd(k+1:n) = qty(k+1:n)
+           end if
+      
+           if ( cab .and. (k+1 .le. n) ) then
+              ab(k+1:n) = 0.0D+00
+           end if
+      
+           if ( cr ) then
+              rsd(1:k) = 0.0D+00
+           end if
+
+c  Compute B.
+
+           if ( cb ) then
+      
+              do jj = 1, k
+      
+                 j = k - jj + 1
+      
+                 if ( a(j,j) .eq. 0.0D+00 ) then
+                    info = j
+c                    exit
+                 go to 10
+                 end if
+      
+                 b(j) = b(j)/a(j,j)
+      
+                 if ( j /= 1 ) then
+                    t = -b(j)
+                    call daxpy ( j-1, t, a(1,j), 1, b, 1 )
+                 end if
+      
+              end do
+   10      continue   
+           end if
+      
+           if ( cr .or. cab ) then
+
+c  Compute RSD or AB as required.
+
+              do jj = 1, ju
+      
+                 j = ju - jj + 1
+      
+                 if ( qraux(j) /= 0.0D+00 ) then
+      
+                    temp = a(j,j)
+                    a(j,j) = qraux(j)
+      
+                    if ( cr ) then
+                     t = - ddot ( n-j+1, a(j,j), 1, rsd(j), 1 ) / a(j,j)
+                     call daxpy ( n-j+1, t, a(j,j), 1, rsd(j), 1 )
+                    end if
+      
+                    if ( cab ) then
+                      t = - ddot ( n-j+1, a(j,j), 1, ab(j), 1 ) / a(j,j)
+                       call daxpy ( n-j+1, t, a(j,j), 1, ab(j), 1 )
+                    end if
+      
+                    a(j,j) = temp
+      
+                 end if
+      
+              end do
+      
+        end if
+      
+        return
+      end
+      
+ 
+ 

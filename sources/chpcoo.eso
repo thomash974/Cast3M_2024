@@ -1,0 +1,183 @@
+C CHPCOO    SOURCE    PV        22/01/18    21:15:02     11267          
+C  CREE UN (DES) CHAMP(S) POINT TYPE SCAL A PARTIR DES COORDONNEES.
+C
+      SUBROUTINE CHPCOO (IVAL,MELEME)
+C
+C       IVAL VAUT 1  ON VEUT CREER UN SEUL CHPOINT CONTENANT LA
+C                    1 ERE COORDONNES DES NOEUDS DE L'OBJET IMELE
+C                 2 IDEM POUR LA 2 EME COORDONNEES
+C                 3 IDEM POUR LA 3 EME COORDONNEES
+C                 0 ON CREE AUTANT DE CHPOINT QUE IDIM
+C       IMELE EST LE POINTEUR SUR L'OBJET GEOMETRIQUE
+C
+      IMPLICIT INTEGER(I-N)
+C
+      CHARACTER*4  MOCURV(1)
+C
+      DATA MOCURV/ 'CURV' /
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCHPOI
+-INC SMCOORD
+
+      SEGACT MELEME
+
+C---- CAS DU MAILLAGE VIDE
+C
+      ISOU1=LISOUS(/1)
+      IF (ITYPEL.EQ.0.AND.ISOU1.EQ.0) THEN
+        NAT=1
+        NSOUPO=0
+        SEGINI,MCHPOI
+        MCHPOI.IFOPOI=IFOUR
+        MCHPOI.JATTRI(1)=1
+        CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+        CALL ECROBJ('CHPOINT ',MCHPOI)
+        IF (IVAL.EQ.0) THEN
+          IF (IDIM.EQ.2) THEN
+            SEGINI,MCHPO1
+            MCHPO1.IFOPOI=IFOUR
+            MCHPO1.JATTRI(1)=1
+            CALL ACTOBJ('CHPOINT ',MCHPO1,1)
+            CALL ECROBJ('CHPOINT ',MCHPO1)
+          ELSEIF (IDIM.EQ.3) THEN
+            SEGINI,MCHPO1
+            MCHPO1.IFOPOI=IFOUR
+            MCHPO1.JATTRI(1)=1
+            CALL ACTOBJ('CHPOINT ',MCHPO1,1)
+            CALL ECROBJ('CHPOINT ',MCHPO1)
+            SEGINI,MCHPO2
+            MCHPO2.IFOPOI=IFOUR
+            MCHPO2.JATTRI(1)=1
+            CALL ACTOBJ('CHPOINT ',MCHPO2,1)
+            CALL ECROBJ('CHPOINT ',MCHPO2)
+          ENDIF
+        ENDIF
+        RETURN
+      ENDIF
+C
+C
+C
+C---- CAS DE L'OPTION "CURV"
+C
+      CALL LIRMOT(MOCURV,1,IPLAC,0)
+      IF (IERR.NE.0) RETURN
+      IF (IPLAC.EQ.1) THEN
+C
+        IF (ISOU1.NE.0) THEN
+C         write(6,*) ' ITYPEL,ISOU1',ITYPEL,ISOU1
+          CALL ERREUR(853)
+          RETURN
+        ENDIF
+C
+        IF (ITYPEL.EQ.2) THEN
+          IPT2 = MELEME
+          CALL CHANGE(IPT2,1)
+
+          IPT1 = MELEME
+          NBEL1 = IPT1.NUM(/2)
+          SEGACT MCOORD
+C
+          NAT    = 1 
+          NSOUPO = 1 
+          SEGINI, MCHPOI
+          MTYPOI = '        '
+          MOCHDE = ' CHPOINT de coordonnee curviligne '
+          JATTRI(1) = 1
+          IFOPOI = IFOUR
+C
+          NC = 1
+          SEGINI, MSOUPO
+          IPCHP(1) = MSOUPO
+          NOCOMP(1) = 'SCAL'
+          IGEOC = IPT2
+C
+          N = IPT2.NUM(/2)
+          SEGINI, MPOVAL
+          IPOVAL = MPOVAL
+C
+          VPOCHA(1,1) = 0.D0
+          XS1 = 0.D0
+          ID1 = IDIM + 1
+          IPP = IPT1.NUM(1,1) - 1
+          DO 20 K=1,NBEL1
+            IP1 = IPT1.NUM(1,K) - 1
+            IP2 = IPT1.NUM(2,K) - 1
+            IF (IP1.NE.IPP) THEN
+              CALL ERREUR(942)
+              RETURN
+            ENDIF
+C
+            XSI1 = 0.D0
+            DO 2 I=1,IDIM
+              XI1 = XCOOR(IP1*ID1+I)
+              XI2 = XCOOR(IP2*ID1+I)
+              XSI1 = XSI1 + (XI2 - XI1)**2
+ 2          CONTINUE
+            XS1 = XS1 + SQRT(XSI1)
+            VPOCHA(K+1,1) = XS1
+            IPP = IP2
+ 20       CONTINUE 
+        ELSE
+C         write(6,*) ' ITYPEL,ISOU1',ITYPEL,ISOU1
+          CALL ERREUR(853)
+          RETURN
+        ENDIF
+C
+        CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+        CALL ECROBJ('CHPOINT ',MCHPOI)
+C
+        RETURN
+      ENDIF  
+C    
+C    
+C
+C---- AUTRES CAS
+C
+      IF( ITYPEL.NE.1) CALL CHANGE (MELEME,1)
+      NBPOIN=NUM(/2)
+      SEGACT MCOORD
+      NDE=1
+      NFI=IDIM+1
+      IF(IVAL.NE.0) THEN
+         NDE=IVAL
+         NFI=IVAL+1
+      ENDIF
+      NSOUPO=1
+      NC=1
+      N=NBPOIN
+      IA=NFI-NDE
+      DO 10 IAA=1,IA
+      IRR= NFI-IAA
+      NAT=1
+      SEGINI MCHPOI
+      MOCHDE='                  chpoint de coordonnees '
+      MTYPOI='        '
+      JATTRI(1) = 1
+      IPPOI=MCHPOI
+      SEGINI MSOUPO
+      SEGINI MPOVAL
+      IPCHP(1)=MSOUPO
+      IFOPOI = IFOUR
+      NOCOMP(1)='SCAL'
+      NOHARM(1)=NIFOUR
+      IGEOC=MELEME
+      IPOVAL=MPOVAL
+      DO 1 I= 1 ,N
+      I1=NUM(1,I)
+      I2=(I1-1)*(IDIM+1)
+      VPOCHA(I,1)=XCOOR(I2+IRR)
+    1 CONTINUE
+      CALL ACTOBJ('CHPOINT ',IPPOI,1)
+      CALL ECROBJ('CHPOINT ',IPPOI)
+  10  CONTINUE
+      END
+
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,78 @@
+C ECANNO    SOURCE    CB215821  23/07/11    21:15:09     11703          
+      SUBROUTINE ECANNO(IANNO)
+C***********************************************************************
+C NOM         : ECANNO
+C DESCRIPTION : Affiche le contenu d'un objet ANNOTATI a l'ecran
+C               (appele par prlist)
+C***********************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMANNOT
+*
+      CHARACTER*(LOCHAI) TXTE
+      LOGICAL BOOL
+*
+      PARAMETER (NCLE=2)
+      CHARACTER*4 MCLE(NCLE)
+      DATA MCLE/'CATE','ETIQ'/
+*
+      PARAMETER (NPOS=9)
+      CHARACTER*4 MPOS(NPOS)
+      DATA MPOS/'SO','S','SE','O','C','E','NO','N','NE'/
+*
+      MANNO1 = IANNO
+      SEGACT,MANNO1
+      NBANNO = MANNO1.ICLAS(/1)
+*
+      INTERR(1) = IANNO
+      INTERR(2) = NBANNO
+      CALL ERREUR(-367)
+*
+      DO K=1,NBANNO
+          ICLAS1 = MANNO1.ICLAS(K)
+          IF (ICLAS1.GT.NCLE) CALL ERREUR(5)
+          ISEGT1 = MANNO1.ISEGT(K)
+          INTERR(1) = K
+          INTERR(2) = ISEGT1
+
+          IF (ICLAS1.EQ.1) THEN
+              MCATE1 = ISEGT1
+              SEGACT,MCATE1
+              ICOL         = MCATE1.ICLRC
+              TXTE         = MCATE1.TXCAT
+              MOTERR       = NCOUL(ICOL)
+              MOTERR(5:44) = TXTE(1:40)
+              CALL ERREUR(-368)
+*
+          ELSEIF (ICLAS1.EQ.2) THEN
+              METIQ1 = ISEGT1
+              SEGACT,METIQ1
+              MELEME = METIQ1.INUPT
+              ICOL   = METIQ1.ICLRE
+              IPOS   = METIQ1.KPOSI
+              DIST   = METIQ1.DEPOR
+              BOOL   = METIQ1.BLIEN
+              TXTE   = METIQ1.TXETI
+              INTERR(3)        = MELEME
+              MOTERR           = NCOUL(ICOL)
+              MOTERR(5:6)      = MPOS(IPOS)
+              MOTERR(7:LOCHAI) = TXTE(1:LOCHAI-6)
+              REAERR(1)        = DIST
+              BOOERR(1)        = BOOL
+              CALL ERREUR(-369)
+*
+          ELSE
+              CALL ERREUR(5)
+          ENDIF
+      ENDDO
+*
+      END
+
+ 
+ 

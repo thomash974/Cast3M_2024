@@ -1,0 +1,269 @@
+C VIBRAC    SOURCE    BP208322  22/09/16    21:15:13     11454          
+      SUBROUTINE VIBRAC
+*
+************************************************************************
+*      CALCUL DES MODES PROPRES DE PETITES MATRICES PLEINES            *
+*      MODES REELS OU COMPLEXES                                        *
+*      resp. PAR L'ALGORITHME DU QR ou QZ de Lapack                    *
+* _____________________________________________________________________*
+*                                                                      *
+*      AUTEUR :-VIBC calcul des modes Nicolas BENECH  le 24/02/95      *
+*              -option 'BALOU' Jerome CHARPENTIER le 29/11/96          *
+*              -amelioration rapidit� VIBC 'MODES' BP208322 16/12/2008 *
+*              -chercher des valeurs propres de la matrice monodromie  *
+*               LX236206   09/07/2014                                  *
+*              -suppression de l'option 'BALOU' BP, 09/09/2015         *
+*              -ajout nombre de modes souhaites BP, 13/01/2016         *
+*              -ajout calcul des vp reelles d'1 rigidite, BP, 2022-09  *
+* _____________________________________________________________________*
+*                                                                      *
+* APERCU DES SYNTAXES (details --> voir notice) :                      *
+*                                                                      *
+* SYNTAXE 1 :                                                          *
+*     BAS2 = VIBC  MASS1 RIG1 (AMOR1) (BAS1) (ENT1);                   *
+*                                                                      *
+*     RESOLUTION DE [K + (i*2*pi*w)*C - (2*pi*w)**2 M] X = 0           *
+*                                                                      *
+*     EN METTANT LE PB SOUS LA FORME D'ETAT :                          *
+*            [ A -  \lambda B ] . Y = 0                                *
+*                                                                      *
+*     OU     A = [ -K   0  ]      et    B = [ C   M ]                  *
+*                [  0   M  ]                [ M   0 ]                  *
+*                                                                      *
+* _____________________________________________________________________*
+*                                                                      *
+*  SYNTAXE 2 :                                                         *
+*      BAS2 = VIBC  RIG1 (RIG2 RIG3 RIG4) ;                            *
+*                                                                      *
+*      RESOLUTION DE [ A - \lambda I ] . X = 0                         *
+*                                                                      *
+*      OU   A = |   RIG1            si seul RIG1 est fourni            *
+*               |                                                      *
+*               | [ RIG1  RIG2 ]    si 4 rigidites sont fournies       *
+*               | [ RIG3  RIG4 ]                                       *
+*                                                                      *
+************************************************************************
+*
+************************************************************************
+*     DECLARATIONS
+************************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+      DATA ZERO / 0.0D0 /      
+      INTEGER ERR, NUMAFF
+      LOGICAL getVEC, doRECO, AFFICH
+      REAL*8 XPREC1
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMRIGID
+      POINTEUR MAT1.MRIGID, MAT2.MRIGID
+      POINTEUR CHPO1.MCHPOI, CHPO2.MCHPOI, CHPO4.MCHPOI
+      POINTEUR MATA.XMATRI, MATB.XMATRI, MATZ.XMATRI
+*     tableaux pour Lapack
+      SEGMENT MWORK
+        REAL*8 LAMBDA(NWORK),WORK(LWORK)
+      ENDSEGMENT
+
+
+************************************************************************
+*     INITIALISATIONS
+************************************************************************
+
+*     indique si l'on calcule ou non les vecteurs propres
+      getVEC = .TRUE.
+*     indique si l'on recombine ou non les vecteurs propres
+      doRECO = .FALSE.
+*     indique si l'on affiche ou non des messages de deroulement
+c       AFFICH = .FALSE.
+      AFFICH = (IIMPI.GE.1)
+*     indique la syntaxe 
+*     =0 : erreur
+*     =1 : syntaxe 1      [K + (i*2*pi*w)*C - (2*pi*w)**2 M] X = 0
+*     =21 : syntaxe 2.1   [K - lambda I] X = 0
+*     =22 : syntaxe 2.2   [[K1 K2 ; K3 K4] - lambda [I 0 ; 0 I]] X = 0 (matrice de monodromie par ex.)
+      ISYNT=0
+      IMONO=0
+      MWORK=0
+
+
+************************************************************************
+*     LECTURE DES ARGUMENTS
+************************************************************************
+
+*     RIGIDITES : la syntaxe dépend du nombre de rigidités lues
+      CALL LIROBJ('RIGIDITE',IPMAS,1,IRET)
+      IF (IERR.NE.0) RETURN
+      CALL LIROBJ('RIGIDITE',IPRIG,0,IRET)
+      IF (IERR.NE.0) RETURN
+*   - n=1 matrice lue
+      IF(IRET.eq.0) THEN
+         IF (AFFICH) write(ioimp,*) 'syntaxe : [A - lambda*I] X = 0'
+         ISYNT=21
+         GOTO 1000
+*   - n>1 matrices lues
+      ELSE
+*   - n=2 ou 3 matrices lues (syntaxe par defaut)
+        ISYNT=1
+        CALL LIROBJ('RIGIDITE',IPAMO,0,IRET)
+        IF (IERR.NE.0) RETURN
+        IF (IRET.ne.0) then
+          CALL LIROBJ('RIGIDITE',IPMON,0,IMONO)
+          IF (IERR.NE.0) RETURN
+*   - n=4 matrices lues
+          IF (IMONO.eq.1) THEN
+            IF (AFFICH) write(ioimp,*) 'syntaxe : monodromie'
+            ISYNT=22
+            GOTO 1000
+          ENDIF
+        ENDIF
+      ENDIF    
+
+*     ici, seulement synatxe 1 :
+      IF (AFFICH) write(ioimp,*) 'syntaxe : [K +iwC -w^2M] X = 0'
+
+*     TABLE DE BASE MODALE
+      CALL LIROBJ('TABLE   ',IBASR,0,IRET)
+      IF (IERR.NE.0) RETURN
+      doRECO = (IRET.EQ.1)
+
+*     NOMBRE DE MODES SOUHAITES
+      NWANTED=0
+      CALL LIRENT(NWANTED,0,IRET)
+      IF (IERR.NE.0) RETURN
+
+*     TRI DES 3 (OU 2) RIGIDITES 
+      CALL QZTRIR(IPMAS, IPRIG, IPAMO)
+      GOTO 1000
+
+
+ 1000 CONTINUE
+************************************************************************
+*     ASEMBLAGE DES MATRICES A (ET B) 
+*     en fonction des syntaxes
+************************************************************************
+      if (ISYNT.EQ.1) then   
+        CALL QZCONS(IPMAS,IPRIG,IPAMO,MATA,MATB,IPT1,MCOMP,.false.)
+        GOTO 3000
+      elseif (ISYNT.EQ.22) then
+        CALL QZCON3(IPMAS,IPRIG,IPAMO,IPMON,MATA,MATB,IPT1,MCOMP,.true.)
+        GOTO 3000
+      elseif (ISYNT.EQ.21) then
+        CALL QZCON1(IPMAS,MATA,MATB,IPT1,MCOMP)
+        GOTO 2000
+      else
+        CALL ERREUR(5)
+      endif
+      IF (IERR.NE.0) RETURN
+
+
+ 2000 CONTINUE
+************************************************************************
+*     ALGORITHME DU QR de LAPACK 
+*    (pourrait etre dans une subroutine nommée vibc1)
+************************************************************************
+
+*     CREATION SEGMENT DE TRAVAIL
+      NDDL=MATA.RE(/1)
+*     on dimensionne nb identiquement a DSYTRD
+      NB=ILAENV(1,'DSYTRD','U', NDDL, -1, -1, -1 )
+      NWORK=NDDL
+      LWORK=(NB+2)*NDDL
+      SEGINI,MWORK      
+
+*     APPEL A DSYEV( JOBZ, UPLO, N, A, LDA, W, WORK, LWORK, INFO )
+      CALL DSYEV('V','U',NDDL,MATA.RE(1,1,1),NDDL,
+     &           LAMBDA,WORK,LWORK,IRET)
+
+*     gestion erreur Lapack -> erreur Cast3M
+      IF (IRET.GT.0) THEN
+        CALL ERREUR(26)
+        RETURN
+      ELSEIF(IRET.LT.0) THEN
+        MOTERR(1:8)='VIBC    '
+        CALL ERREUR(997)
+        RETURN
+      ENDIF
+
+*      write(*,*) 'eigenvalues =',(LAMBDA(iou),iou=1,NDDL)
+*      write(*,*) 'Vector #',(j,j=1,NDDL) 
+*      do i=1,NDDL
+*      write(*,*) (MATA.RE(i,j,1),j=1,NDDL)
+*      enddo
+
+*     CREATION D'UNE BASE DE MODES PROPRES COMPLEXES POUR VIBC
+      CALL QRBASR (MWORK,MATA,IPT1,MCOMP,IBASC,NDDL)
+      IF (IERR.NE.0) RETURN
+
+*     MENAGE
+      SEGSUP,MATA,MATB,MWORK
+
+*     FIN NORMALE      
+      GOTO 9000
+
+
+ 3000 CONTINUE
+************************************************************************
+*     ALGORITHME DU QZ 
+*    (pourrait etre dans une subroutine nommée vibc2)
+************************************************************************
+
+* -------------------------------------------------------------------
+*     MISE SOUS FORME DE HESSENBERG SUPERIEURE DE MATA
+*     ET TRIANGULARISATION SUPERIEURE SIMULATANEE DE MATB
+*premier pas
+      CALL QZHESS(MATA,MATB,getVEC,IPRI3)
+      IF (IERR.NE.0) RETURN
+      XPREC1 = ZERO
+      CALL LIRREE(XPREC1,0,IRETOU)
+*deuxieme pas
+      CALL QZREDU(MATA,MATB,XPREC1,getVEC,IPRI3,ERR)
+      IF (IERR.NE.0) RETURN
+      IF (ERR.NE.0)  WRITE (*,*) 'Mode ',ERR,' : trop d iterations !'
+     &,' L execution continu ...'
+
+
+
+* -------------------------------------------------------------------
+*     EXTRACTION DES VALEURS PROPRES
+*troisieme pas
+      CALL QZVALP(MATA,MATB,IPAR,IPAI,IPBE,getVEC,IPRI3)
+      IF (IERR.NE.0) RETURN
+
+* -------------------------------------------------------------------
+*     CALCUL DES VECTEURS PROPRES COMPLEXES
+*quatrieme pas
+      CALL QZVECP(MATA,MATB,IPAR,IPAI,IPBE,IPRI3)
+      IF (IERR.NE.0) RETURN
+
+* -------------------------------------------------------------------
+*     CREATION D'UNE BASE DE MODES PROPRES COMPLEXES POUR VIBC
+      CALL QZBASC(IPAR,IPAI,IPBE,IPRI3,IPT1,MCOMP,IBASC,ERR,NWANTED)
+      IF (IERR.NE.0) RETURN
+
+* -------------------------------------------------------------------
+*     RECOMBINAISON D'UNE BASE DE MODES COMPLEXES A PARTIR
+*     D'UNE BASE DE MODES REELS (= RECOMBINAISON MODALE)
+      IF (doRECO) THEN
+        CALL QZREST(IBASR, IBASC)
+      ENDIF
+
+
+
+ 9000 CONTINUE
+************************************************************************
+*     ECRITURE DU RESULTAT
+************************************************************************
+
+      IF (AFFICH) write(ioimp,*) 'ecriture de la table #',IBASC
+      CALL ECROBJ('TABLE   ',IBASC)
+      RETURN
+
+
+      RETURN
+      END
+
+
+ 

@@ -1,0 +1,562 @@
+C COML2     SOURCE    JK148537  23/08/21    21:15:08     11723          
+
+       SUBROUTINE COML2(IPMODL,IPMEL,INDESO,IRETOU)
+
+*---------------------------------------------------------------------
+* coml2 : trie et boucle sur les modeles elementaires
+*         selectionne les composantes de meme support
+*         passe a coml6
+*         complete les deche resultats
+*----------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCHAMP
+-INC SMCHAML
+-INC SMELEME
+-INC SMCOORD
+-INC SMMODEL
+      POINTEUR IMOSTA.IMODEL
+-INC SMINTE
+-INC SMLENTI
+* segment deroulant le mcheml
+-INC DECHE
+C
+      SEGMENT INFO
+        INTEGER INFELL(16)
+      ENDSEGMENT
+** pile des deche contruits pour changer de support
+      segment lichan(iichan)
+** pile des deche pour construire le champ de caracteristiques geometriques
+      segment licarb(iicarb)
+** pile des noms de composantes a proteger
+      segment linomp(iinomp)
+** pile modeles elementaires
+      segment limode(NSM)
+** segment sous-structures dynamiques
+      segment struli
+        integer itlia,itbmod,momoda, mostat,itmail,molia
+        integer ldefo(np1),lcgra(np1),lsstru(np1)
+        integer nsstru,nndefo,nliab,nsb,na2,idimb
+        integer ktliab,ktphi,ktq,ktres,kpref,ktkam,kcpr,ktpas
+        INTEGER NIPALB,NXPALB,NPLBB,NPLB,NIP,jliaib
+* ichain segment MLENTI initialise dans dyne12 (tjs actif si > 0)
+        INTEGER ICHAIN
+      endsegment
+c
+      LOGICAL LOME1,LOME2
+*
+*     Liste des formulations
+      PARAMETER (MFORMU=19)
+      CHARACTER*16 LISFOR(MFORMU)
+      DATA LISFOR /
+     &       'THERMIQUE       ','MECANIQUE       ','LIQUIDE         ',
+     &       'CONVECTION      ','POREUX          ','DARCY           ',
+     &       'FROTTEMENT      ','RAYONNEMENT     ','MAGNETODYNAMIQUE',
+     &       'NAVIER_STOKES   ','MELANGE         ','EULER           ',
+     &       'FISSURE         ','LIAISON         ','THERMOHYDRIQUE  ',
+     &       'ELECTROSTATIQUE ','DIFFUSION       ','METALLURGIE     ',
+     &       'MECANIQUE+LIQUID'/
+C
+c      call  gibtem (xkt)
+c      write(ioimp,*) ' entree coml2 '
+C
+      MMODEL = IPMODL
+      NSOUS = KMODEL(/1)
+      NSM = NSOUS
+      SEGINI,LIMODE
+C     -----------------------------------------------------------------
+C     Traitement particulier pour la formulation LIAISON
+C     -----------------------------------------------------------------
+      itruli = 0
+      struli = 0
+      iplia  = 0
+*     Test sur la presence de la formulation LIAISON
+      N1 = 0
+      DO im = 1, NSOUS
+        imodel = kmodel(im)
+        if (formod(1)(1:8).EQ.'LIAISON ') then
+          N1 = N1 + 1
+          limode(N1) = imodel
+        ENDIF
+      ENDDO
+*     Definition du modele (iplia) associe a la seule formulation LIAISON
+      if (N1.ne.0) then
+        segini,mmode1
+        DO im = 1, N1
+          mmode1.kmodel(im) = limode(im)
+        ENDDO
+        iplia = mmode1
+*       Initialisation du segment struli
+        np1 = 0
+        segini struli
+        itruli = struli
+        itlia = iplia
+*       Remplissage avec les donnees dependant des sous-modeles MODAL / STATIQUE
+        call comalo(ipmodl,itruli,ipmel)
+      ENDIF
+C     -----------------------------------------------------------------
+      SEGSUP,LIMODE
+*
+      lilmel = ipmel
+      iimel  = lilmel(/1)
+c
+C     En cas de changement de support, appel a chasup qui travaille sur
+C     un mmodel et un mchelm. ces structures sont creees ici puis
+C     completees si besoin dans la boucle 1000
+      N1 = 1
+      SEGINI,mmode1
+      IPMOD1 = mmode1
+C
+      N1 = 1
+      L1 = 1
+      N3 = 6
+      SEGINI,mchelm
+      titche = ' '
+      conche(1) = '        '
+c*      ifoche = 0
+c*      imache(1) = 0
+c*      DO i = 1, N3
+c*        infche(1,i) = 0
+c*      ENDDO
+      n2 = 1
+      SEGINI,mchaml
+      ichaml(1) = mchaml
+      nomche(1) = ' '
+      typche(1) = ' '
+c*      ielval(1) = 0
+      IPOI1 = mchelm
+C
+C     ----------------------------------------
+C     Boucle (1000) sur les modeles elementaires
+C     ----------------------------------------
+      DO 1000 isous = 1, NSOUS
+*
+        imodel = kmodel(isous)
+        iqmod = imodel
+
+        mmode1 = IPMOD1
+        mmode1.kmodel(1) = iqmod
+*       write(*,*) 'INPLAS = ',inatuu
+*
+*       write(ioimp,*) 'coml2 modele elementaire numero ',isous
+*       write(6,*) 'coml2 formulation ',formod(1),' cons ',conmod
+*       moterr(1:6) = 'COML2  '
+*       moterr(7:15) = 'IMODEL  '
+*       interr(1) = im
+*       call erreur(-329)
+C
+C       ===============================================================
+C       DETERMINATION DE LA FORMULATION DU MODELE
+C       ===============================================================
+        NFORMU = FORMOD(/2)
+        iform1 = 0
+        CALL PLACE(LISFOR,MFORMU,iform1,FORMOD(1))
+        lformu = iform1
+        IF (nformu.EQ.2) THEN
+          iform2 = 0
+          CALL PLACE(LISFOR,MFORMU,iform2,FORMOD(2))
+          lformu = 0
+          IF ( (iform1.eq.2 .and. iform2.eq.3) .or.
+     &         (iform1.eq.3 .and. iform2.eq.2) )  lformu = 19
+        ENDIF
+C
+C       Normalement coml a fait le tri
+        IF (lformu.EQ.0) THEN
+          WRITE(IOIMP,*) 'COML2 : FORMULATION NON PREVUE ICI'
+          GOTO 1000
+        ENDIF
+C
+C       NE TRAITER QUE LES FORMULATIONS CONCERNEES PAR L'INTEGRATION
+        IF ((lformu.NE. 2).AND.(lformu.NE. 3).AND.(lformu.NE. 5).AND.
+     &      (lformu.NE.11).AND.(lformu.NE.14).AND.(lformu.NE.17).AND.
+     &      (lformu.NE.18).AND.(lformu.NE.19)) GOTO 1000
+C
+C       ===============================================================
+C       DETERMINATION DU SUPPORT DES CHAMPS (PAR DEFAUT A 5)
+C       ===============================================================
+cof : a stocker dans un segment de travail pour la suite ?
+        lesupp = 5
+        jtruli = 0
+C       Formulation METALLURGIE
+        if (lformu.EQ.18) then 
+          lesupp = 6
+C       Formulation MELANGE
+        else if (lformu.eq.11) then
+          lesupp = 3
+          if (ivamod(/1).gt.0) then
+            lesupp = 5
+          endif
+C       Formulation LIAISON
+        else if (lformu.EQ.14) then
+          lesupp = 1
+          jtruli = itruli
+        endif
+C
+C       ===============================================================
+C       INFORMATION SUR L'ELEMENT FINI
+C       ===============================================================
+        info = 0
+        ipinf = 0
+        MELE1 =NEFMOD
+        MELEME=IMAMOD
+        if (infmod(/1).lt.2+lesupp) then
+          CALL ELQUOI(MELE1,0,lesupp,IPINF,IMODEL)
+          IF (IERR.NE.0) THEN
+            SEGDES IMODEL*NOMOD,MMODEL*NOMOD
+            RETURN
+          ENDIF
+          INFO = IPINF
+          MFR2 = INFELL(13)
+        ELSE
+          MFR2 = INFELE(13)
+        ENDIF
+        
+C
+C stationnaire
+        imosta = 0
+           do im = 1,ivamod(/1)
+             if (tymode(im).eq.'STATIO  ') imosta = ivamod(im)
+           enddo
+        
+C
+C       ===============================================================
+C       CHAMPS QUI CONCERNENT LE MODELE ELEMENTAIRE
+C       ===============================================================
+C       REDUAF a mis en correspondance les maillages supports des
+C       modeles elementaires et ceux du mchaml. Il suffit de tester
+C       l'egalite des pointeurs .
+        iinomp=iimel
+        ijnomp=0
+        segini linomp
+        DO 90 ICHMP = 1, IIMEL
+          DECHE = LILMEL(ICHMP)
+c          if (nomdec.eq.'T') then
+c            write(6,*) 'c2-90',deche,nomdec,indec,condec
+c          endif
+          IF (IMAMOD.EQ.IMADEC) THEN
+*jk148537 : très laxiste, ça laisse tout le travail a faire ... 
+            ijnomp = ijnomp + 1
+            linomp(ijnomp) = DECHE
+          ENDIF
+          if (imosta.gt.0) then
+           if (imosta.imamod.eq.imadec.and.indec.eq.3.and.
+     &imosta.conmod.eq.condec) then
+* on initialise avec les resultats
+            segini,dec1=deche
+            dec1.condec = conmod
+            dec1.indec = 1 
+**            dec1.imadec = imamod
+            ijnomp = ijnomp + 1
+            linomp(ijnomp) = dec1
+           endif
+          endif
+  90    CONTINUE
+        IF (IJNOMP.NE.IINOMP) THEN
+          IINOMP=IJNOMP
+          SEGADJ LINOMP
+        ENDIF
+C
+C       Segment pour changer les supports d integration
+        iichan=iinomp
+        ijchan=0
+        segini lichan
+C
+C       Segment contenant les deche sur les bons supports
+        iilcon=iinomp
+        ijlcon=0
+        segini lilcon
+        ipcon = lilcon
+c
+c pour gagner du temps
+c --- on vise les etudes d ingenierie donc la selection est faite sur
+c la formulation ---  on ne passe dans coml6 que les deche qui correspondent
+c au support. ce n est pas bien parce que la philosophie de COMP
+c est justement de faire descendre le maximum d info. o tristesse.kich (05/01)
+c
+        if (((mfr2.ge.11.or.mfr2.eq.7).and.mfr2.ne.33) .or.
+     &      lformu.eq.14) then
+          do ldn=1,iinomp
+            lilcon(ldn) = linomp(ldn)
+          enddo
+          ijlcon=iinomp
+          goto 201
+        endif
+c
+c tri sommaire des deche : support geometrique
+c
+       if(lformu.eq.11.and.cmatee.eq.'PARALLEL') then
+*
+        if (ivamod(/1).le.0) then
+          call erreur(21)
+          return
+        endif
+c
+c rassemble les deche lies aux phases
+        do 910 ide = 1,lilmel(/1)
+         deche = lilmel(ide)
+         if (.false.) then
+         if (indec.eq.indeso.and.imadec.eq.imamod) then
+          if (condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+                 ijlcon = ijlcon + 1
+                 lilcon(ijlcon) = deche
+          else
+           do im = 1,ivamod(/1)
+             if (tymode(im).eq.'IMODEL  ') then
+               imode1 = ivamod(im)
+               if ((condec(1:LCONMO).eq.imode1.conmod(1:LCONMO)).or.
+     &(nomdec(1:4).eq.imode1.conmod(17:20))) then
+                 ijlcon = ijlcon + 1
+                 lilcon(ijlcon) = deche
+               endif
+             endif
+           enddo
+          endif
+         elseif (indec.eq.2.and.imadec.eq.imamod.and.
+     &           condec(1:LCONMO).ne.conmod(1:LCONMO)) then
+           do im = 1,ivamod(/1)
+             if (tymode(im).eq.'IMODEL  ') then
+               imode1 = ivamod(im)
+               if ((condec(1:LCONMO).eq.imode1.conmod(1:LCONMO)).or.
+     &(nomdec(1:4).eq.imode1.conmod(17:20))) then
+                 ijlcon = ijlcon + 1
+                 lilcon(ijlcon) = deche
+               endif
+             endif
+           enddo
+         endif
+         endif
+         if (indec.ge.2.and.imadec.eq.imamod) then
+                 ijlcon = ijlcon + 1
+                 lilcon(ijlcon) = deche
+         endif
+ 910    continue
+        iilcon = ijlcon
+        segadj lilcon
+        iilcon0 = iilcon
+       
+       else
+c cas general
+C       write(6,*) ' passage a la cloche mfr2 ', mfr2,lilmel(/1)
+        do 200 iol=1,iinomp
+          deche = linomp(iol)
+*
+* on change eventuellement sur les points d integration
+* convenables ... ce qui suppose en fait que l information
+* fournie a COMP n est pas redondante
+* en mecanique on utilise directement les champs fournis aux pgauss rigidite
+          lome1 = infdec(6).eq.3.and.lesupp.eq.5
+          lome2 = nomdec(1:4).eq.'TEMP'.or.
+     &            nomdec(1:4).eq.'LX  '.or.
+     &            nomdec(1:4).eq.'FLX '
+          if (infdec(6).ne.lesupp.and..not.lome1.and..not.lome2) then
+c             write(6,*) 'change ', deche, nomdec
+            iem = indec
+* cree un mchaml
+            mchelm = IPOI1
+            ifoche=ifodec
+            conche(1) = condec
+            imache(1) = imadec
+            do j = 1,infdec(/1)
+              infche(1,j) = infdec(j)
+            enddo
+            mchaml = ichaml(1)
+            nomche(1) = nomdec
+            typche(1) = typdec
+            ielval(1) =ABS(ieldec)
+*           write(6,*) ' changement de support  nomdec ',nomdec
+            call CHASUP(IPMOD1,IPOI1,IPOI2,IRET,lesupp)
+            if (IRET.NE.0) then
+              CALL ERREUR(IRET)
+              return
+            endif
+            if (ierr.ne.0) return
+            mchelm = ipoi2
+            n1 = ichaml(/1)
+            if (n1.ne.1) then
+* bizarre , contacter support
+              moterr(17:24) = 'COML2'
+              interr(1) = 1
+              call erreur(943)
+              return
+            endif
+            mchaml = ichaml(1)
+            n2 = ielval(/1)
+            if (n2.ne.1) then
+* bizarre , contacter support
+              moterr(17:24) = 'COML2'
+              interr(1) = 2
+              call erreur(943)
+              return
+            endif
+* creer un deche
+            n3 = infche(/2)
+            segini deche
+            indec = iem
+            ieldec = ielval(1)
+            typdec = typche(1)
+            typree = typdec(1:6).eq.'REAL*8'
+            nomdec = nomche(1)
+            imadec = imache(1)
+            condec = conche(1)
+            ifodec = ifoche
+            do in3 = 1, n3
+              infdec(in3) = infche(1,in3)
+            enddo
+            segsup mchaml,mchelm
+* mettre dans une pile
+            ijchan=ijchan+1
+            if(ijchan.gt.iichan) then
+              iichan=iichan+100
+              segadj lichan
+            endif
+            lichan(ijchan) = deche
+          endif
+C
+C         write(6,*) 'lilcon ',deche,nomdec,typdec,condec,imadec,indec
+          ijlcon=ijlcon+1
+          if(ijlcon.gt.iilcon) then
+            iilcon=iilcon+100
+            segadj lilcon
+          endif
+          lilcon(ijlcon) = deche
+  200   CONTINUE
+       endif
+C
+  201   CONTINUE
+C
+        imodel = iqmod
+        if (ijchan.ne.iichan) then
+          iichan = ijchan
+          segadj lichan
+        endif
+C
+        if (ijlcon.ne.iilcon) then
+          iilcon=ijlcon
+          segadj lilcon
+        endif
+C
+C       ===============================================================
+C       INTEGRATION DE LA LOI DE COMPORTEMENT
+C       ===============================================================
+        if (lilcon(/1).ge.1) then
+*         call gibtem(xkt)
+*         write(6,*) ' coml2 : appel a coml6 ', xkt
+*         do ioup=1,lilcon(/1)
+*           deche=lilcon(ioup)
+*           write(6,*)deche,' ',nomdec,' ',imadec,' ',indec,' ',condec
+*         enddo
+*         WRITE(*,*) 'APPEL A COML6 ',conmod,cmatee,inatuu
+       call coml6(iqmod,ipmel,ipcon,ipinf,indeso,lesupp,jtruli,lformu,
+     &IRETOU)
+
+*         call gibtem(xkt)
+*         write(6,*) ' coml2 : retour de coml6 ',xkt
+        else
+c         write(6,*) 'pas de composante pour le sous-model ',imodel
+        endif
+*       write(6,*) 'coml2 : ierr ', ierr , 'iretou ', iretou
+        if (ierr.gt.1) return
+C
+C       ===============================================================
+* complete la pile des deche en sortie / desactive les DECHE et les MELVAL
+        lilcon = ipcon
+        ijmel=lilmel(/1)
+        do 800 ioc =iilcon+1,lilcon(/1)
+          deche = lilcon(ioc)
+          if (indec.lt.indeso) then
+          else if (indec.eq.indeso.and.
+     &            condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+* si on a ete coherent on ne peut creer 2 fois le meme deche
+* on ne rajoute que les deche crees sur le constituant
+* on ne met pas dans lilmel les deches intermediaires
+c        if (cmatee.eq.'PARALLEL') 
+c     &write(6,*) 'c2lilcon',ioc,deche,nomdec       
+            if (ijchan.gt.0) then
+              do iyf = 1,ijchan
+                if (lichan(iyf).eq.deche) goto 800
+              enddo
+            endif
+            ijmel=ijmel+1
+            if(ijmel.gt.iimel) then
+              iimel=iimel+100
+              segadj lilmel
+            endif
+            lilmel(ijmel) = deche
+          else
+          endif
+  800   continue
+        iimel=ijmel
+        segadj lilmel
+        segsup lilcon,linomp
+
+* supprime melval intermediaire
+        if (ijchan.gt.0) then
+        do iop = 1,ijchan
+          deche = lichan(iop)
+c         write(6,*) 'deche ', nomdec , indec, ieldec
+          do il = 1,lilmel(/1)
+            dec1 = lilmel(il)
+c           write(6,*) 'de1 ', dec1.nomdec , dec1.indec, dec1.ieldec
+            if (dec1.indec.eq.indeso.and.dec1.ieldec.eq.ieldec) goto 810
+          enddo
+          melval =ABS(ieldec)
+c         write(6,*) 'supprime deche ',nomdec,melval,deche
+          segsup melval
+ 810      continue
+          segsup deche
+        enddo
+        endif
+        segsup lichan
+C
+        if (ierr.ne.0) return
+        if (iretou.ne.0) return
+C
+        if (info.ne.0) then
+          segsup info
+          info=0
+        endif
+
+ 1000 CONTINUE
+C     ----------------------------------------------
+C     Fin de boucle (1000) sur les modeles elementaires
+C     ----------------------------------------------
+C
+C     Destruction du segment struli (si utilise)
+      if (itruli.ne.0) then
+        if (momoda.gt.0) then
+          mmode2 = momoda
+          segsup mmode2
+        endif
+        if (mostat.gt.0) then
+          mmode2 = mostat
+          segsup mmode2
+        endif
+        if (itbmod.gt.0) then
+          mmode2 = itbmod
+          segsup mmode2
+        endif
+        if (itlia.gt.0) then
+          mmode2 = itlia
+          segsup mmode2
+        endif
+        if (ichain.gt.0) then
+          mlent3 = ichain
+          segsup mlent3
+        endif
+        segsup struli
+      endif
+C
+C     Destruction autres segments
+      mmode1 = IPMOD1
+      segsup mmode1
+      mchelm = IPOI1
+      mchaml = ichaml(1)
+      segsup,mchaml,mchelm
+*     write(ioimp,*) ' sortie coml2 ' , xkt
+      END
+ 
+ 

@@ -1,0 +1,23 @@
+C MATMUI    SOURCE    BP208322  22/09/20    21:15:05     11462          
+
+*******************************************************************
+*       PRODUIT MATRICE X MATRICE PARALLELISE (THREAD) 
+*       POUR CERTAINES OPERATIONS DANS DYNE
+*       creation : BP, 2022-09-20
+*******************************************************************
+
+      SUBROUTINE MATMUi(ith)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+C     Declaration du COMMON pour le travail en parallele
+      COMMON/dyneco/IPARAL
+ 
+C     Recuperation du segment dans le COMMON
+      IPOINT=IPARAL
+      CALL MATMU0(ith,IPOINT)
+ 
+      RETURN
+      END
+  

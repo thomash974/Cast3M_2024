@@ -1,0 +1,346 @@
+C CV2CML    SOURCE    GOUNAND   21/07/06    21:15:04     11061          
+      SUBROUTINE CV2CML(MYDISC,MYLMOT,MYMCHA,
+     $     MYFALS,
+     $     MCHELM,
+     $     IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : CV2CML
+C DESCRIPTION : Transforme un MCHAEL en MCHAML pour peu que
+C               MYDISC = QUAF ou QUAI ou LINE => MCHAML AUX noeuds
+C               MYDISC = CSTE => MCHAML AUX noeuds du QUAF constant par
+C               éléments
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DES/ISAS/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          :
+C APPELE PAR       : PRLIN2
+C***********************************************************************
+C ENTREES            : * CGEOME (type MELEME) : maillage de QUAFs
+C                        partitionné.
+C                      * MYDISC (type CH*(4)) : nom d'espace de
+C                        discrétisation (cf. NOMFA dans l'include
+C                        SFALRF)
+C                      * MYFALS (type FALRFS) : segment de description
+C                        des familles d'éléments de références.
+C SORTIES            : * MYMCHA (type MCHAEL) : champ par éléments de
+C                        la grandeur tensorielle (degrés de liberté de
+C                        la grandeur).
+C ENTREES/SORTIES    : -
+C TRAVAIL            :
+C                        (1, nb. ddl, NCOMPD, NCOMPP, 1, nb. élément)
+C
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 21/05/21, version initiale basée sue CV2CP9
+C HISTORIQUE : v1, 21/05/21, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMCHAML      
+-INC SMELEME
+      POINTEUR SOUMAI.MELEME
+-INC SMLENTI
+      POINTEUR MPQUAF.MLENTI
+      POINTEUR IORDO.MLENTI
+-INC SMLMOTS
+      POINTEUR MYLMOT.MLMOTS
+*
+* Includes persos
+*
+-INC TNLIN      
+*-INC SMCHAEL
+      POINTEUR MYMCHA.MCHAEL
+      POINTEUR MZMCHA.MCHEVA
+*-INC SFALRF
+      POINTEUR MYFALS.FALRFS
+*-INC SELREF
+      POINTEUR MYLRF.ELREF
+*
+      CHARACTER*(4) MYDISC
+      CHARACTER*(4) NMELEM,NMELEQ
+      PARAMETER (NDISC=4)
+      CHARACTER*(4) DISCS(NDISC)
+      PARAMETER (NQUAF=7)
+      CHARACTER*4 NMQUAF(NQUAF)
+      CHARACTER*4 NMQUAI(NQUAF)
+      CHARACTER*4 NMLINE(NQUAF)
+      LOGICAL LCROI
+      INTEGER IMPR,IRET
+*
+      DATA DISCS/'CSTE','LINE','QUAI','QUAF'/
+      DATA NMQUAF/'SEG3','TRI7','QUA9','CU27','PR21','TE15','PY19'/
+      DATA NMQUAI/'SEG3','TRI6','QUA8','CU20','PR15','TE10','PY13'/
+      DATA NMLINE/'SEG2','TRI3','QUA4','CUB8','PRI6','TET4','PYR5'/
+*
+* Executable statements
+*
+      IF (IMPR.GT.1) WRITE(IOIMP,*) 'Entrée dans cv2cml'
+*
+      CALL PLACE5(DISCS,NDISC,IDISC,MYDISC)
+* Cas particulier MYDISC='CSTE'
+      IF (IDISC.EQ.1) THEN
+         SEGACT MYMCHA
+         NSOUS=MYMCHA.JMACHE(/1)
+*
+         L1=8
+         N1=NSOUS
+         N3=6
+         SEGINI MCHELM
+         TITCHE='NLIN    '
+         IFOCHE=IFOUR
+         SEGACT MYLMOT
+         NNCOMP=MYLMOT.MOTS(/2)
+         IF (NNCOMP.NE.1) THEN
+            WRITE(IOIMP,*) 'Programming Error 1'
+            GOTO 9999
+         ENDIF
+         DO ISOUS=1,NSOUS
+            SOUMAI=MYMCHA.JMACHE(ISOUS)
+            SEGACT SOUMAI
+            MZMCHA=MYMCHA.ICHEVA(ISOUS)
+            SEGACT,MZMCHA
+            NBEL=SOUMAI.NUM(/2)
+* Petits tests
+            NDLIG=MZMCHA.WELCHE(/1)
+            NDCOL=MZMCHA.WELCHE(/2)
+            N2DLIG=MZMCHA.WELCHE(/3)
+            N2DCOL=MZMCHA.WELCHE(/4)
+            NDNOEU=MZMCHA.WELCHE(/5)
+            NDELM=MZMCHA.WELCHE(/6)
+            IF (.NOT.(NDLIG.EQ.1
+     $           .AND.NDCOL.EQ.1
+     $           .AND.N2DLIG.EQ.1
+     $           .AND.N2DCOL.EQ.1.AND.NDNOEU.EQ.1
+     $           .AND.(NDELM.EQ.1.OR.NDELM.EQ.NBEL))) THEN
+               WRITE(IOIMP,*) 'Erreur dims MZMCHA'
+               write(ioimp,*) 'NDLIG,NDCOL=',NDLIG,NDCOL
+               write(ioimp,*) 'N2DLIG,N2DCOL=',N2DLIG,N2DCOL
+               write(ioimp,*) 'NDNOEU,NDELM,NBEL=',NDNOEU,NDELM,NBEL
+               GOTO 9999
+            ENDIF
+            N2=1
+            SEGINI MCHAML
+            NOMCHE(1)=MYLMOT.MOTS(1)
+            TYPCHE(1)='REAL*8          '
+            N1PTEL=1
+            N1EL=NDELM
+            N2PTEL=0
+            N2EL=0
+            SEGINI MELVAL
+            DO IDELM=1,NDELM
+               VELCHE(1,IDELM)=MZMCHA.WELCHE(1,1,1,1,1,IDELM)
+            ENDDO
+            IELVAL(1)=MELVAL
+            CONCHE(ISOUS)=' '
+            ICHAML(ISOUS)=MCHAML
+* SOUMAI est supprime par ailleurs a cause de regma2               
+            SEGINI,MELEME=SOUMAI
+            IMACHE(ISOUS)=MELEME
+            INFCHE(ISOUS,1)=0
+            INFCHE(ISOUS,2)=0
+            INFCHE(ISOUS,3)=NIFOUR
+            INFCHE(ISOUS,4)=0
+            INFCHE(ISOUS,5)=0
+            INFCHE(ISOUS,6)=0
+         ENDDO
+* Cas MYDISC='LINE','QUAI','QUAF'
+      ELSEIF (IDISC.GT.1.AND.IDISC.LE.NDISC) THEN
+         SEGACT MYMCHA
+         NSOUS=MYMCHA.JMACHE(/1)
+         L1=8
+         N1=NSOUS
+         N3=6
+         SEGINI MCHELM
+         TITCHE='NLIN    '
+         IFOCHE=IFOUR
+         SEGACT MYLMOT
+         NNCOMP=MYLMOT.MOTS(/2)
+         IF (NNCOMP.NE.1) THEN
+            WRITE(IOIMP,*) 'Programming Error 2'
+            GOTO 9999
+         ENDIF
+         DO ISOUS=1,NSOUS
+            SOUMAI=MYMCHA.JMACHE(ISOUS)
+            SEGACT SOUMAI
+            MZMCHA=MYMCHA.ICHEVA(ISOUS)
+            SEGACT,MZMCHA
+            NBNN=SOUMAI.NUM(/1)
+            NBEL=SOUMAI.NUM(/2)
+            ITQUAF=SOUMAI.ITYPEL
+* Faut-il faire un maillage différent de SOUMAI ?
+            NMELEQ=NOMS(ITQUAF)
+            CALL PLACE5(NMQUAF,NQUAF,IQUAF,NMELEQ)
+            IF (IQUAF.EQ.0) THEN
+               WRITE(IOIMP,*) NOMS(ITQUAF),'n''est pas un QUAF ??'
+               GOTO 9999
+            ENDIF
+            IF (IDISC.EQ.2) THEN
+               NMELEM=NMLINE(IQUAF)
+            ELSEIF (IDISC.EQ.3) THEN
+               NMELEM=NMQUAI(IQUAF)
+            ELSEIF (IDISC.EQ.4) THEN
+               NMELEM=NMQUAF(IQUAF)
+            ENDIF
+            CALL PLACE5(NOMS,NOMBR,ITELEM,NMELEM)
+            IF (ITELEM.NE.ITQUAF) THEN
+               NBNN=NBNNE(ITELEM)
+               NBELEM=NBEL
+               NBSOUS=0
+               NBREF=0
+               SEGINI MELEME
+               ITYPEL=ITELEM
+            ELSE
+               MELEME=0
+            ENDIF               
+* On cherche l'élément fini correspondant au QUAF
+            CALL KEEF(ITQUAF,MYDISC,
+     $           MYFALS,
+     $           MYLRF,
+     $           IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+            SEGACT MYLRF
+            NDDL=MYLRF.NPQUAF(/1)
+            IF (NDDL.NE.NBNN) THEN
+               WRITE(IOIMP,*) 'Programming error 3'
+               write(ioimp,*) 'NMELEM,NMELEQ,MYDISC=',NMELEM,NMELEQ
+     $              ,MYDISC 
+               write(ioimp,*) 'NBNN,NDDL=',NBNN,NDDL
+               GOTO 9999
+            ENDIF
+* Petits tests
+            NDLIG=MZMCHA.WELCHE(/1)
+            NDCOL=MZMCHA.WELCHE(/2)
+            N2DLIG=MZMCHA.WELCHE(/3)
+            N2DCOL=MZMCHA.WELCHE(/4)
+            NDNOEU=MZMCHA.WELCHE(/5)
+            NDELM=MZMCHA.WELCHE(/6)
+            IF (.NOT.( (NDLIG.EQ.1.AND.NDCOL.EQ.NDDL)
+     $           .OR. (NDLIG.EQ.NDDL.AND.NDCOL.EQ.1))
+     $           .AND.N2DLIG.NE.1
+     $           .AND.N2DCOL.NE.1.AND.NDNOEU.NE.1
+     $           .AND.(NDELM.NE.1.OR.NDELM.NE.NBEL)) THEN
+               WRITE(IOIMP,*) 'Erreur dims MZMCHA'
+               GOTO 9999
+            ENDIF
+            N2=1
+            SEGINI MCHAML
+            NOMCHE(1)=MYLMOT.MOTS(1)
+            TYPCHE(1)='REAL*8          '
+            N1PTEL=NDDL
+            N1EL=NDELM
+            N2PTEL=0
+            N2EL=0
+            SEGINI MELVAL
+*     Construisons le segment qui permet de parcourir les ddl dans
+*     l'ordre croissant des points du quaf
+*     Implicitement, on utilise le fait que les maillages LINE et QUAD
+*     parcourent les points du QUAF en croissant aussi.             
+*     On utilise le tri par insertion car les listes sont petites
+            JG=NDDL
+            SEGINI MPQUAF
+            SEGINI IORDO
+            DO IG=1,JG
+               MPQUAF.LECT(IG)=MYLRF.NPQUAF(IG)
+               IORDO.LECT(IG)=IG
+            ENDDO
+            LCROI=.TRUE.
+            CALL ORDO04(MPQUAF.LECT(1),NDDL,LCROI,IORDO.LECT(1))
+*            
+            DO IDELM=1,NDELM
+               DO IDDL=1,NDDL
+                  JDDL=IORDO.LECT(IDDL)
+                  IF (NDLIG.EQ.1) THEN
+                     ILIG=1
+                     ICOL=JDDL
+                  ELSE
+                     ILIG=JDDL
+                     ICOL=1
+                  ENDIF
+                  VELCHE(IDDL,IDELM)=MZMCHA.WELCHE(ILIG,ICOL,1,1,1
+     $                 ,IDELM)
+               ENDDO
+            ENDDO
+            IF (MELEME.NE.0) THEN 
+               DO IBEL=1,NBEL
+                  DO IDDL=1,NDDL
+                     JDDL=IORDO.LECT(IDDL)
+                     IF (NDLIG.EQ.1) THEN
+                        ILIG=1
+                        ICOL=JDDL
+                     ELSE
+                        ILIG=JDDL
+                        ICOL=1
+                     ENDIF
+                     NNQUA=MYLRF.NPQUAF(JDDL)
+                     NNGLO=SOUMAI.NUM(NNQUA,IBEL)
+                     NUM(IDDL,IBEL)=NNGLO
+                  ENDDO                  
+               ENDDO
+            ENDIF
+            SEGSUP IORDO
+            SEGSUP MPQUAF
+            IELVAL(1)=MELVAL
+            CONCHE(ISOUS)=' '
+            ICHAML(ISOUS)=MCHAML
+            IF (MELEME.EQ.0) THEN
+* SOUMAI est supprime par ailleurs a cause de regma2               
+               SEGINI,MELEME=SOUMAI
+            ENDIF
+            IMACHE(ISOUS)=MELEME
+            INFCHE(ISOUS,1)=0
+            INFCHE(ISOUS,2)=0
+            INFCHE(ISOUS,3)=NIFOUR
+            INFCHE(ISOUS,4)=0
+            INFCHE(ISOUS,5)=0
+            INFCHE(ISOUS,6)=0
+         ENDDO
+      ELSE
+         WRITE(IOIMP,*) 'CHAM keyword incompatible with discretization '
+     $        ,MYDISC
+         GOTO 9999
+      ENDIF
+*      IMPR=6
+      IF (IMPR.GT.3) THEN
+         CALL ECROBJ('MCHAML  ',MCHELM)
+         CALL PRLIST
+      ENDIF
+*      IMPR=0
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine cv2cml'
+      RETURN
+*
+* End of subroutine CV2CML
+*
+      END
+
+
+
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,569 @@
+C CHAME1    SOURCE    OF166741  23/12/04    21:15:05     11800          
+      SUBROUTINE CHAME1(IPMAIL,IPMODL,IPCHPO,CHA,IPCHEL,ISUP)
+C____________________________________________________________________*
+C                                                                    *
+C     transformation de CHPOINT en MCHAML                            *
+C                                                                    *
+C     entrees:                                                       *
+C     ________                                                       *
+C                                                                    *
+C     ipmail       pointeur sur un maillage                          *
+C ou  ipmodl       pointeur sur un mmodel                            *
+C     ipchpo       pointeur sur le chpoint                           *
+C     cha          chaine de caractere contenant un sous type eventuel
+C     isup         indique le type de support demande :              *
+C                  1 le mchaml est laisse aux noeuds                 *
+C                  2 au centre de gravite                            *
+C                  3 aux points de gauss de la raideur               *
+C                  4 aux points de gauss de la masse                 *
+C                  5 aux points de gauss des contraintes             *
+C                  6 aux point de gauss de la thermique & diffusion  *
+C                    & metallurgie                                   *
+C                                                                    *
+C     sorties:                                                       *
+C     ________                                                       *
+C                                                                    *
+C     ipchel       pointeur sur le mchaml resultat                   *
+C                                                                    *
+C     Remarque : le passage du mchaml sur un autre support que les   *
+C     --------   noeuds n'est possible que si l'on a donne un mmodel *
+C                                                                    *
+C                le traitement d'harmoniques de fourier n'est pas    *
+C                implemente                                          *
+C                                                                    *
+C____________________________________________________________________*
+C                                                                    *
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCASSIS
+-INC CCPRECO
+C==DEB= FORMULATION HHO == Include specifique ==========================
+-INC CCHHOPA
+C==FIN= FORMULATION HHO ================================================
+
+-INC SMCHAML
+-INC SMCHPOI
+-INC SMINTE
+-INC SMMODEL
+-INC SMELEME
+-INC SMCOORD
+
+      COMMON/cham1c/IPARA1,IPARA2
+      EXTERNAL CHAM1I
+      LOGICAL  BTHRD
+
+      SEGMENT SPARA1
+        INTEGER NBTHR1
+        INTEGER IPCH1
+        INTEGER IPTP1
+        INTEGER IPTR1
+      ENDSEGMENT
+
+      SEGMENT SPARA2
+        INTEGER NBTHRD
+        INTEGER IISUP
+        INTEGER IPSAU
+        INTEGER IPMOD
+        INTEGER IPCHE
+        INTEGER IPTPR
+        INTEGER IPTRA
+      ENDSEGMENT
+
+      SEGMENT INFO
+         INTEGER INFELL(JG)
+      ENDSEGMENT
+
+      SEGMENT ISAUT(IVAL,NSOUS)
+      SEGMENT ICPR(nbpts)
+
+      SEGMENT MTRA2
+C      Copie du CHPOINT dans MTRA2 pour aller plus vite ensuite
+       CHARACTER*(LOCOMP) INCO(N2)
+       REAL*8      BB(NX,N2)
+C        INCO  : Nom des INCONNUES du CHPOINT
+C        BB    : Valeurs au noeuds du MMODEL (associees au ICPR)
+C                NX : Nombre de noeuds differents dans le MODELE
+C                N2 : Nombre de composantes dans le CHPOINT
+      ENDSEGMENT
+
+      CHARACTER*(*) CHA
+      CHARACTER*(LOCOMP) MOCOMP
+      CHARACTER*1 MO1,VID1
+
+C     soutyp = sous-type du champ par element resultat
+C     lsouty = longueur utile de la chaine "soutyp"
+C
+      INTEGER LSOUTY
+      CHARACTER*72 SOUTYP
+C
+      LOGICAL ICOQ
+C
+*     write(6,*) 'chame1 ',ipmAIL,IPMODL,IPCHPO,CHA,ISUP
+*  preconditionnement on regarde si on a sauve le resultat
+*  on ne fait l'horodatage que pour le chp par mesure d'economie
+      ith=oothrd
+      call oooho1(ipmail,ihomai)
+      call oooho1(ipmodl,ihomod)
+      call oooho1(ipchpo,ihochp)
+      do 100 iprec=1,nprcha
+       if (iprma(iprec,ith).ne.ipmail) goto 100
+       if (iprhoa(iprec,ith).ne.ihomai) goto 100
+       if (iprmo(iprec,ith).ne.ipmodl) goto 100
+       if (iprhom(iprec,ith).ne.ihomod) goto 100
+       if (iprchp(iprec,ith).ne.ipchpo) goto 100
+       if (iprhoc(iprec,ith).ne.ihochp) goto 100
+       if (iprsu(iprec,ith).ne.isup  ) goto 100
+       if (iprcha(iprec,ith).ne.cha  ) goto 100
+*  preconditionnement trouve
+       ipchel=iprchl(iprec,ith)
+**     if(ith.eq.1)
+**   > write(6,*) ' preconditionnement trouve ',iprec,ith,ipchel
+       call actobj('MCHAML',ipchel,1)
+       return
+ 100  continue
+
+      IPARA1= 0
+      IPARA2= 0
+      
+      NT1   = 1
+      NT2   = 1
+      IOPTIM= 100
+
+      INFO  = 0
+      ISUP1 = ISUP
+      IPCHEL= 0
+      NPINT = 0
+      VID1  =' '
+
+      ither = 0
+      idiff = 0
+      imeta = 0
+C
+C     on cree l'objet maillage contenant tous les points du chpoint
+C
+      MCHPOI=IPCHPO
+      NSOUPO=IPCHP(/1)
+C
+      IF (IPMAIL.NE.0) THEN
+         IPT1=IPMAIL
+         NSOUS=IPT1.LISOUS(/1)
+         IF (NSOUS.EQ.0) THEN
+            NSOUS=1
+         ENDIF
+         ISUP1=1
+      ELSE IF (IPMODL.NE.0) THEN
+         MMODEL = IPMODL
+         NSOUS  = KMODEL(/1)
+      ENDIF
+C
+C     initialisation du segment descripteur du champ par element
+C
+      N1=NSOUS
+      N3=6
+      MO1 = CHA(1:1)
+      IF (MO1.EQ.VID1) THEN
+         L1=8
+         SOUTYP=MTYPOI
+      ELSE
+         L1=LEN(CHA)
+         SOUTYP=CHA
+      ENDIF
+
+C     Renvoi le nombre de composantes
+      CALL NBCOMP(MCHPOI,'CHPOINT ',N2)
+
+      NX    =0
+      N2PTEL=0
+      N2EL  =0
+      ISOUSs=0
+      
+C     Dimensionnement de ISAUT
+      IF(IPMODL .NE. 0)THEN
+        IVAL=6
+      ELSE
+        IVAL=3
+      ENDIF
+C
+      ICOQ=.FALSE.
+      DO ISOUPO=1,NSOUPO
+        MSOUPO=IPCHP(ISOUPO)
+        NCOMPO=NOCOMP(/2)
+        DO ICO=1,NCOMPO
+          MOCOMP=MSOUPO.NOCOMP(ICO)
+          IF (MOCOMP(1:4).EQ.'TINF'.OR.MOCOMP(1:4).EQ.'TSUP') THEN
+            ICOQ=.TRUE.
+            IVAL = IVAL + 2
+            GOTO 1
+          ENDIF
+        ENDDO
+      ENDDO
+ 1    CONTINUE
+
+      IF(OOTHRD .NE.0) call oooprl(1)
+      SEGINI,ICPR,ISAUT
+      IF(OOTHRD .NE.0) call oooprl(0)
+
+      DO 19 ISOUS=1,NSOUS
+         ISUP1 =ISUP
+         IPMINT=0
+         IF (IPMAIL.NE.0) THEN
+            IF (NSOUS.GT.1) THEN
+               IPT2=IPT1.LISOUS(ISOUS)
+            ELSE
+               IPT2=IPMAIL
+            ENDIF
+
+         ELSEIF (IPMODL.NE.0) THEN
+            IMODEL = KMODEL(ISOUS)
+c           pour les elements MULT, on autorise que les MCHAML aux noeuds
+            if(ISUP1.ne.1) then
+              itest=nefmod
+              if(itest.eq.22.OR.itest.eq.259) goto 19
+            endif
+            MELE=NEFMOD
+            IPT2 = IMAMOD
+
+C==DEB= FORMULATION HHO ================================================
+C= On ne fait pas de MCHAML pour les HHO (a voir par la suite...)
+            IF (MELE.EQ.HHO_NUM_ELEMENT) THEN
+              GOTO 19
+            END IF
+C==FIN= FORMULATION HHO ================================================
+            if (formod(1)(1:8).eq.'LIAISON ') then
+C             ne fait rien si le maillage de LIAISON n'appartient pas au CHPOINT
+
+              IVAL1 = IPT2.num(1,1)
+              DO I=1,NSOUPO
+                MSOUPO=IPCHP(I)
+                MELEME=IGEOC
+                do jno = 1, num(/2)
+                  if (num(1,jno).eq.IVAL1) goto 191
+                enddo
+                goto 19
+              ENDDO
+            endif
+ 191        CONTINUE
+
+            IMODEL = KMODEL(ISOUS)
+            IF(INFMOD(/1).NE.0) NPINT=INFMOD(1)
+C
+C           Changement de support si besoin selon la formulation ?
+            IF (ISUP1 .NE. 1) THEN
+              NFOR = FORMOD(/2)
+              CALL PLACE(FORMOD,NFOR,icont,'CONTACT         ')
+              CALL PLACE(FORMOD,NFOR,ichph,'CHANGEMENT_PHASE')
+              IF (icont.NE.0 .OR. ichph.NE.0) THEN
+                ISUP1 = 1
+              ELSE
+                CALL PLACE(FORMOD,NFOR,ither,'THERMIQUE')
+                CALL PLACE(FORMOD,NFOR,idiff,'DIFFUSION')
+                CALL PLACE(FORMOD,NFOR,imeta,'METALLURGIE')
+                IF (ither.NE.0 .OR. idiff.NE.0 .OR. imeta.NE.0) THEN
+                  nmat = matmod(/2)
+                  CALL PLACE(matmod,nmat,iray,'RAYONNEMENT')
+C                 Support 6 SAUF pour le RAYONNEMENT...
+C                 Les cas-tests de RAYONNEMENT sont en erreur sans ca...
+                  IF (iray.EQ.0) THEN
+                    IF (ISUP1.GT.2) ISUP1 = 6
+                  ENDIF
+                ENDIF
+              ENDIF
+            ENDIF
+C
+C           on recupere le pointeur sur le minte correspondant a isup1
+C
+            IF (ISUP1.GT.1) THEN
+               MELE=NEFMOD
+C              cas de la THERMIQUE(sauf RAYONNEMENT) OU DIFFUSION OU METALLURGIE
+               IF (ither.NE.0 .OR. idiff.NE.0 .OR. imeta.NE.0) THEN
+                 IF ( ISUP1 .EQ. 2) THEN
+                   CALL TSHAPE(MELE,'GRAVITE',IPMINT)
+cc                 ELSE IF ( ISUP1 .EQ. 6) THEN
+                 ELSE
+                   CALL TSHAPE(MELE,'GAUSS  ',IPMINT)
+                 ENDIF
+                 IF (IERR.NE.0) RETURN
+                 IELE = NUMGEO(MELE)
+                 NBNN = NBNNE(IELE)
+               ELSE
+                 if(2+isup1.gt.infmod(/1)) then
+                   CALL ELQUOI(MELE,0,ISUP1,INFO,IMODEL)
+                   IF (IERR.NE.0) RETURN
+                   IPMINT=INFELL(11)
+                 else
+                   IPMINT=infmod(2+isup1)
+                   IELE  =INFELE(14)
+                   NBNN  =NBNNE(IELE)
+                 endif
+               ENDIF
+C
+C              initialisation de ipore pour milieu poreux
+C
+               IPORE=0
+               IF(MELE.GE.79 .AND.MELE.LE.83 ) IPORE=NBNN
+               IF(MELE.GE.173.AND.MELE.LE.177) IPORE=NBNN
+               IF(MELE.GE.178.AND.MELE.LE.182) IPORE=NBNN
+C              cas XFEM il faut seulement les 4 premier noeuds (support geometrique)
+               IF(MELE.GE.263) IPORE=NBNN
+
+               ISAUT(4,ISOUS)=IPMINT
+               IF(IPORE .EQ. 0)THEN
+                 MINTE         =IPMINT
+                 ISAUT(5,ISOUS)=SHPTOT(/2)
+               ELSE
+                 ISAUT(5,ISOUS)=IPORE
+               ENDIF
+            ENDIF
+
+            ISAUT(6,ISOUS)= ISUP1
+C
+C           Quels sont les modeles concernes par TINF et TSUP
+            IF (ICOQ) THEN
+              ISAUT(IVAL-1,ISOUS)=0
+              IPNOMC = 0
+              CALL PLACE(FORMOD,NFOR,ITHER,'THERMIQUE')
+              IF (ITHER.NE.0) THEN
+                IPNOMC = LNOMID(1)
+              ENDIF
+              CALL PLACE(FORMOD,NFOR,IMECA,'MECANIQUE')
+              IF (IMECA.NE.0) THEN
+                IPNOMC = LNOMID(8)
+              ENDIF
+              IF (IPNOMC.EQ.0) GOTO 192
+              NOMID = IPNOMC
+              NCOBL = LESOBL(/2)
+              DO IJC = 1,NCOBL
+                MOCOMP = LESOBL(IJC) 
+                IF (MOCOMP(1:4).EQ.'TINF'.OR.MOCOMP(1:4).EQ.'TSUP') THEN 
+                  ISAUT(IVAL-1,ISOUS)=1
+                  GOTO 192
+                ENDIF 
+              ENDDO
+ 192          CONTINUE
+            ENDIF
+C
+         ELSE
+           CALL ERREUR(5)
+           RETURN
+         ENDIF
+
+         ISOUSs=ISOUSs+1
+
+         ISAUT(1,ISOUS) = IPT2
+
+         NBNO = IPT2.NUM(/1)
+         N1EL = IPT2.NUM(/2)
+
+C        Remplissage de l'ICPR a partir des noeuds du MMODEL
+C          L'utilisation d'un ICPR par MMODEL limite l'utilisation de
+C          memoire en parallele des les ASSISTANTS
+         DO IEL=1,N1EL
+           DO INO=1,NBNO
+              INOEU=IPT2.NUM(INO,IEL)
+              IF(ICPR(INOEU) .EQ. 0)THEN
+                NX=NX+1
+                ICPR(INOEU)=NX
+              ENDIF
+           ENDDO
+         ENDDO
+
+         IF(IPMINT .EQ. 0)THEN
+           N1PTEL=NBNO
+         ELSE
+           MINTE =IPMINT
+           N1PTEL=SHPTOT(/3)
+         ENDIF
+         
+         ISAUT(2,ISOUSs) = N1EL
+         ISAUT(3,ISOUSs) = N1PTEL
+         
+         NT2 = MAX(NT2,N1EL*N1PTEL)
+ 19   CONTINUE
+
+C     Creation d'un MAXIMUM de SEGMENTS dans un LOCK
+      N1=ISOUSs
+      IF(OOTHRD .NE.0) call oooprl(1)
+      SEGINI,MCHELM
+      DO ISOUSs=1,N1
+        SEGINI,MCHAML
+        ICHAML(ISOUSs)=MCHAML
+        N1EL  =ISAUT(2,ISOUSs)
+        N1PTEL=ISAUT(3,ISOUSs)
+        DO ICOMP=1,N2
+          SEGINI,MELVAL
+          IELVAL(ICOMP)=MELVAL
+        ENDDO
+        IF (ISAUT(IVAL-1,ISOUSs).EQ.1) THEN
+          SEGINI,MELVAL
+          ISAUT(IVAL,ISOUSs)=MELVAL
+        ENDIF
+      ENDDO
+      SEGINI,MTRA2
+      IF(OOTHRD .NE.0) call oooprl(0)
+
+      TITCHE=SOUTYP
+      IFOCHE=IFOUR
+
+      NCO = 0
+      DO ISOUPO=1,NSOUPO
+        MSOUPO=IPCHP(ISOUPO)
+        MELEME=IGEOC
+        NT1   =MAX(NT1,NUM(/2))
+        NC    =MSOUPO.NOHARM(/1)
+        DO 101 ICO=1,NC
+          MOCOMP=MSOUPO.NOCOMP(ICO)
+          DO K=1,NCO
+            IF(MOCOMP .EQ. MTRA2.INCO(K))GOTO 101
+          ENDDO
+          NCO = NCO + 1
+          K   = NCO
+          MTRA2.INCO(NCO)=MOCOMP
+ 101    CONTINUE
+      ENDDO
+
+C----------------------------------------------------------------------C
+C  Remplissage du MTRA2
+C----------------------------------------------------------------------C
+      NBTHR=MIN(MAX(NT1/IOPTIM,1),NBTHRS)
+      IF ((NBTHR .EQ. 1) .OR. (NBTHRS .EQ. 1) .OR. (OOTHRD .GT. 0)) THEN
+C       CB215821 : DESACTIVE LA PARALLELISATION PTHREAD LORSQUE ON EST
+C                  DEJA DANS LES ASSISTANTS
+        NBTHR = 1
+        BTHRD = .FALSE.
+      ELSE
+        BTHRD = .TRUE.
+        CALL THREADII
+      ENDIF
+
+      IF (BTHRD) THEN
+C       Remplissage du 'COMMON/cham1c'
+        SEGINI,SPARA1
+        IPARA1=SPARA1
+        IPARA2=0
+
+        SPARA1.NBTHR1=NBTHR
+        SPARA1.IPCH1 =MCHPOI
+        SPARA1.IPTP1 =ICPR
+        SPARA1.IPTR1 =MTRA2
+
+        DO ith=2,NBTHR
+          CALL THREADID(ith,CHAM1i)
+        ENDDO
+        CALL CHAM1i(1)
+
+C       Attente de la fin de tous les threads en cours de travail
+        DO ith=2,NBTHR
+          CALL THREADIF(ith)
+        ENDDO
+
+C       On libère les Threads
+        CALL THREADIS
+        SEGSUP,SPARA1
+
+      ELSE
+C       Appel de la SUBROUTINE qui fait le travail
+        ith=1
+        CALL CHAM11(NBTHR,ith,MCHPOI,ICPR,MTRA2)
+      ENDIF
+      
+C----------------------------------------------------------------------C
+C  Remplissage du MCHAML
+C----------------------------------------------------------------------C
+
+
+      NBTHR=MIN(MAX(NT2/IOPTIM,1),NBTHRS)
+      IF ((NBTHR .EQ. 1) .OR. (NBTHRS .EQ. 1) .OR. (OOTHRD .GT. 0)) THEN
+C       CB215821 : DESACTIVE LA PARALLELISATION PTHREAD LORSQUE ON EST
+C                  DEJA DANS LES ASSISTANTS
+        NBTHR = 1
+        BTHRD = .FALSE.
+      ELSE
+        BTHRD = .TRUE.
+        CALL THREADII
+      ENDIF
+
+      IF (BTHRD) THEN
+C       Remplissage du 'COMMON/cham1c'
+        SEGINI,SPARA2
+        IPARA1=0
+        IPARA2=SPARA2
+
+        SPARA2.NBTHRD=NBTHR
+        SPARA2.IISUP =ISUP
+        SPARA2.IPSAU =ISAUT
+        SPARA2.IPMOD =IPMODL
+        SPARA2.IPCHE =MCHELM
+        SPARA2.IPTPR =ICPR
+        SPARA2.IPTRA =MTRA2
+
+        DO ith=2,NBTHR
+          CALL THREADID(ith,CHAM1i)
+        ENDDO
+        CALL CHAM1i(1)
+
+C       Attente de la fin de tous les threads en cours de travail
+        DO ith=2,NBTHR
+          CALL THREADIF(ith)
+        ENDDO
+
+C       On libere les Threads
+        CALL THREADIS
+        SEGSUP,SPARA2
+
+      ELSE
+C       Appel de la SUBROUTINE qui fait le travail
+        ith=1
+        CALL CHAM12(NBTHR,ith,ISUP,ISAUT,IPMODL,MCHELM,ICPR,MTRA2)
+      ENDIF
+C
+C     Modification pour les modeles avec TINF ou TSUP
+      IF (ICOQ.AND.IPMODL.NE.0) THEN
+        DO IJM = 1,NSOUS
+          IF (ISAUT(IVAL-1,IJM).EQ.2) THEN
+            MCHAM1=ICHAML(IJM)
+            DO IJC = 1,N2
+              MOCOMP=MCHAM1.NOMCHE(IJC)
+              IF (MOCOMP.EQ.'T       ') GOTO 25
+            ENDDO
+ 25         CONTINUE
+            MCHAM1.IELVAL(IJC)=ISAUT(IVAL,IJM)
+          ENDIF
+        ENDDO
+      ENDIF
+C
+      SEGSUP,MTRA2,ISAUT,ICPR
+      IF(INFO  .NE. 0)SEGSUP,INFO
+      
+      IPCHEL=MCHELM
+*  preconditionnement on garde l'operation en memoire
+      ith=oothrd
+      do iprec=nprcha,2,-1
+      iprma(iprec,ith) =iprma(iprec-1,ith)
+      iprhoa(iprec,ith)=iprhoa(iprec-1,ith)
+      iprmo(iprec,ith) =iprmo(iprec-1,ith)
+      iprhom(iprec,ith)=iprhom(iprec-1,ith)
+      iprchp(iprec,ith)=iprchp(iprec-1,ith)
+      iprhoc(iprec,ith)=iprhoc(iprec-1,ith)
+      iprsu(iprec,ith) =iprsu(iprec-1,ith)
+      iprcha(iprec,ith)=iprcha(iprec-1,ith)
+      iprchl(iprec,ith)=iprchl(iprec-1,ith)
+      enddo
+      iprma(1,ith) =ipmail
+      iprhoa(1,ith)=ihomai
+      iprmo(1,ith) =ipmodl
+      iprhom(1,ith)=ihomod
+      iprchp(1,ith)=ipchpo
+      iprhoc(1,ith)=ihochp
+      iprsu(1,ith) =isup
+      iprcha(1,ith)=cha
+      iprchl(1,ith)=ipchel
+**    write(6,*) ' preconditionnement de ',ipchel
+
+      END
+
+ 

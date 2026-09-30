@@ -1,0 +1,174 @@
+C MATPMV    SOURCE    CB215821  23/11/02    21:15:06     11779          
+      SUBROUTINE MATPMV(IMAIL1,ILREE1,NBELEM,NBNN,XEPAIS)
+
+* ---------------------------------------------------------------------
+*
+*                               ROUTINE MATPMV
+*
+* ---------------------------------------------------------------------
+* Auteur : Nikola JERANCE
+*
+* Historique :
+*
+*       20/09/2022 - Première écriture (N. Jerance)
+*       16/02/2023   on prend en compte l'épaisseur (N. Jerance)
+*
+* Descriptif :
+*
+* Calcul de la matrice  qui exprime le potentiel vecteur magnétique
+* à partir de la densité de courant J. En entrée on a un maillage 2D
+* et en sortie on a une liste de rééls (qui est en fait une matrice M).
+* Pour calculer le potentiel vecteur par la suite, il faut multiplier M
+*   par la densité de courant J. J(x,y) donne A(x,y) mais en 3D.
+*
+*
+*
+* Arguments :
+*
+*       (E)     IMAIL1 = Pointeur sur un MAILLAGE; actif en entrée et en sortie
+**      (S)     ILREE1 = Pointeur sur la liste de réels (résultat); actif en sortie
+*       (E)     NBELEM = nombre d'éléments du maillage
+*       (E)     NBNN = nombre de noeuds par élément
+*       (E)     XEPAIS = épaisseur
+* ---------------------------------------------------------------------
+
+* ----------------------------------------------------------------------
+*
+*                         0 - DECLARATIONS ET IMPORTS
+*
+* ----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+-INC SMLREEL
+
+      POINTEUR  ILREE1.MLREEL
+      POINTEUR  IMAIL1.MELEME
+      INTEGER   NBELEM,NBNN,NG
+      DIMENSION XE(3,NBNN),A1(NBELEM,NBELEM),XCTR1(NBELEM),YCTR1(NBELEM)
+      DIMENSION S(NBELEM),XP(NBNN),YP(NBNN),ALPHA1(NBNN)
+      REAL*8    CG1(6), WG1(6)
+      REAL*8    ZG1(36),ZG2(36),WG(36),R1(36)
+
+      NG     = 6
+      ZMIN   =-0.5*XEPAIS
+      ZMAX   = 0.5*XEPAIS
+      CG1(1) = 0.0338
+      CG1(2) = 0.1694
+      CG1(3) = 0.3807
+      CG1(4) = 0.6193
+      CG1(5) = 0.8306
+      CG1(6) = 0.9662
+
+      WG1(1) = 0.0856
+      WG1(2) = 0.1804
+      WG1(3) = 0.234
+      WG1(4) = 0.234
+      WG1(5) = 0.1804
+      WG1(6) = 0.0856
+      DO I=1,NG
+        ZG2(I) = CG1(I)*ZMIN + CG1(7-I)*ZMAX
+      END DO
+
+      NBNN1 = NBNN - 1
+*      WRITE(IOIMP,*) '    PARTIE 2 : CALCUL DE LA MATRICE'
+
+      SEGACT,MCOORD
+      DO I = 1,NBELEM
+
+        CALL DOXE(XCOOR,IDIM,NBNN,IMAIL1.NUM,I,XE)
+        XCTR1(I) = 0.0
+        YCTR1(I) = 0.0
+        S(I) = 0.0
+        DO L=1,NBNN
+          X1 = XE(1,L)
+          Y1 = XE(2,L)
+
+          XCTR1(I) = XCTR1(I) + X1/NBNN
+          YCTR1(I) = YCTR1(I) + Y1/NBNN
+        END DO
+        DO L=1,NBNN
+          X1 = XE(1,L) - XCTR1(I)
+          Y1 = XE(2,L) - YCTR1(I)
+          ALPHA1(L) = ATAN2(X1,Y1)
+          XP(L) = X1
+          YP(L) = Y1
+        END DO
+
+        DO L=1,NBNN1
+           DO L1=L,NBNN
+
+             IF (ALPHA1(L).GT.ALPHA1(L1)) THEN
+               ALPH1 = ALPHA1(L1)
+               ALPHA1(L1)=ALPHA1(L)
+               ALPHA1(L)=ALPH1
+               X1 = XP(L1)
+               Y1 = YP(L1)
+               XP(L1) = XP(L)
+               YP(L1) = YP(L)
+               XP(L) = X1
+               YP(L) = Y1
+
+
+             END IF
+
+           END DO
+        END DO
+* calculer la surface par l'algorithme "shoelace"
+        DO L=1,NBNN
+           L1 = L + 1
+          IF (L1.GT.NBNN) THEN
+            L1=1
+          ENDIF
+          S(I)=S(I) + (YP(L1) + YP(L))*(XP(L)-XP(L1))*0.5D0
+        END DO
+
+
+        S(I) = ABS(S(I))
+* sommme(1/R*S*epaissseur)
+        DO K = 1,NBELEM
+                A1(I,K) = 0.0
+                CALL DOXE(XCOOR,IDIM,NBNN,IMAIL1.NUM,K,XE)
+                  DO L=1,NBNN
+                      X1 = XE(1,L)
+                      Y1 = XE(2,L)
+                      RDIST = 0.0
+                      DO IG=1,6
+               XDIST1 = ABS(SQRT((X1-XCTR1(I))**2 + (Y1-YCTR1(I))**2
+     &+ (ZMAX-ZG2(IG))**2)+ZMAX-ZG2(IG))
+               XDIST2 = ABS(SQRT((X1-XCTR1(I))**2 + (Y1-YCTR1(I))**2
+     &+ (ZMIN-ZG2(IG))**2)+ZMIN-ZG2(IG))
+                       RDIST = RDIST + WG1(IG)*LOG(XDIST1/XDIST2)
+                      END DO
+                  A1(I,K) = A1(I,K) + (RDIST*1.E-7)/NBNN*S(I)
+                  END DO
+         ENDDO
+      ENDDO
+      SEGDES,MCOORD
+
+
+* On construit la liste des valeurs réelles
+*      WRITE(IOIMP,*) '    PARTIE 3 : CREATION DE LA LISTE'
+
+      JG = NBELEM*NBELEM
+
+      SEGINI,ILREE1
+
+      MCOMPT = 0
+      DO I = 1,NBELEM
+        DO J = 1,NBELEM
+          MCOMPT = MCOMPT + 1
+          ILREE1.PROG(MCOMPT) = A1(J,I)
+        ENDDO
+      ENDDO
+
+      RETURN
+      END
+ 

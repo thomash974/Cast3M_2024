@@ -1,0 +1,329 @@
+C COMOUW    SOURCE    JK148537  24/04/11    21:15:02     11896          
+      SUBROUTINE COMOUW(iqmod,ipcon,INDESO,ipil,iwrk52,iwrk53,
+     &iretou,iwr522)
+*-------------------------------------------------
+* identifie les melval de la pile
+*  - recherche d abord ceux lies au modele
+*  - puis tous les autres rang
+* les active
+* !!!!! 2023 : tous les deche ayant le bon support a trier 
+* points delicats : evite de passer certaines composantes de
+* constituants differents de celui du modele :
+* dans tous les cas, caracteristiques materiau et geometrique,
+* de plus pour la mecanique, contraintes,
+* variables internes et deformations inelastiques.
+* cependant pour les autres on croise les doigts en esperant que les noms
+* de composantes correspondent a un seul constituant
+* pas de garde fou
+* puis suivant les formulations cree les deche associes
+* aux noms de composantes des mchaml attendus en sortie
+* (le rang est INDESO)
+*-------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC SMCHAML
+-INC DECHE
+      logical nouvid
+c
+      nouvid = .true.
+      lilcon = ipcon
+      wrk53 = iwrk53
+c
+      imodel = iqmod
+
+*-------------------------------------------------
+      CALL oooprl(1)
+      call comou2(iqmod,INDESO,ipil,iwrk52,iwrk53,iwr522)
+      CALL oooprl(0)
+
+      liluc = ipil
+      iiluc= liluc(/1)
+      ijluc = iiluc
+      wrk52  = iwrk52
+      wrk522 = iwr522
+      nexo = exova0(/1)
+c
+      do icon = 1,lilcon(/1)
+        deche = lilcon(icon)
+
+C* Cas du test pouvant arriver ?
+        if (deche.LE.0) GOTO 40
+
+* recherche du nom de composante parmi celles qui existent
+*
+       do juc = 1,ijluc
+
+C composantes inutiles formulation MELANGE
+         if (juc.ne.23.and.(cmate.eq.'PARALLEL'.or.
+     &cmate.eq.'SERIE')) goto 35
+         if ((.not.((juc.ge.13.and.juc.le.15).or.juc.eq.23.or.juc.eq.1
+     &.or.juc.eq.2)).and.
+     &formod(1)(1:8).eq.'MELANGE') goto 35 
+
+         nomid  = liluc(juc,1)
+C Cas du test ci-dessous puvant arriver ?
+         if (nomid.le.0) goto 35
+         nobl = lesobl(/2)
+         nfac = lesfac(/2)
+         pilnec = liluc(juc,2)
+         if (nobl.gt.0) then
+          do 30 jm =1,nobl
+            if (nomdec.ne.lesobl(jm)) goto 30
+            if (juc.eq.13.or.juc.eq.14) then
+              if (condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+                if (pilobl(jm,indec).gt.0) then
+                  dec1 = pilobl(jm,indec)
+                  if (dec1.imadec.eq.imamod) then
+                    if (imadec.ne.imamod) then
+c surcharge stationnaire
+                      pilobl(jm,indec) = deche
+                    else
+*       write(6,*) 'comredondonnees ',nomdec,conmod,imamod,indec,imadec
+*          write(6,*) jm, dec1.imadec,dec1.indec
+                     call erreur(21)
+                     return
+                    endif
+                  else  
+                    if (imadec.ne.imamod) then
+*       write(6,*) 'comredondon2 ',nomdec,conmod,imamod,indec,imadec
+*          write(6,*) jm, dec1.imadec,dec1.indec
+                     call erreur(21)
+                     return
+                    endif               
+                  endif  
+                endif
+                pilobl(jm,indec)=deche
+                goto 40
+              endif
+            elseif ((FORMOD(1)(1:10).EQ.'MECANIQUE '.OR.
+     &FORMOD(1)(1:10).EQ.'POREUX    ').and.
+     & (juc.ge.11.and.juc.le.24.and.juc.ne.15)) then
+              if (pilobl(jm,indec).eq.0) pilobl(jm,indec)=deche
+              if (condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+                pilobl(jm,indec)=deche
+              endif
+              goto 40
+            elseif (juc.eq.23.and.cmate.ne.'PARALLEL'.and.
+     &cmate.ne.'SERIE') then
+              if (condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+            if (pilobl(jm,indec).gt.0) then
+*         write(6,*) 'comouw redondance donnees',nomdec,conmod,imamod
+               call erreur(21)
+               return
+            endif
+                pilobl(jm,indec)=deche
+                goto 40
+              endif
+            else
+                pilobl(jm,indec)=deche
+                goto 40
+            endif
+  30      continue
+         endif
+         if (nfac.gt.0) then
+          do 31 jm =1,nfac
+            if (nomdec.ne.lesfac(jm)) goto 31
+             if (juc.eq.13.or.juc.eq.14) then
+              if (condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+                pilfac(jm,indec)=deche
+                goto 40
+              endif
+             elseif ((FORMOD(1)(1:10).EQ.'MECANIQUE '.OR.
+     &FORMOD(1)(1:10).EQ.'POREUX    ').and.
+     & (juc.ge.10.and.juc.le.24.and.juc.ne.15)) then
+              if (condec(1:LCONMO).eq.conmod(1:LCONMO)) then
+                pilfac(jm,indec)=deche
+                goto 40
+              endif
+             else
+                pilfac(jm,indec)=deche
+                goto 40
+             endif
+  31      continue
+         endif
+
+********          segdes nomid,pilnec
+  35    continue
+       enddo
+       
+       if (condec(1:LCONMO).ne.conmod(1:LCONMO)) goto 40
+
+* pas dans les listes : reajuster wrk52
+
+        nsca = scal0(/1)
+        ndep = depl0(/1)
+        nfor = forc0(/1)
+        ngra = grad0(/1)
+        nstrs = SIG0(/1)
+        ndefo = DEPST(/1)
+        ncara = XMAT(/1)
+        ncarb = XCARB(/1)
+        ntur = ture0(/1)
+        npri = prin0(/1)
+        nmah = maho0(/1)
+        nhot = hota0(/1)
+        nvari = VAR0(/1)
+        ngrf = graf0(/1)
+        nrhi = rhas0(/1)
+        ndein = DEFP(/1)
+        nparex=PAREX0(/1)
+*
+      if (nouvid) then
+        nouvid = .false.
+* creation d un nomid et du pilnec
+        nbrobl=1
+        nbrfac = 0
+        segini nomid
+        lesobl(1) = nomdec
+        ijluc=ijluc+1
+        if(ijluc.gt.iiluc) then
+           iiluc=iiluc+1
+            segadj liluc
+        endif
+        liluc(ijluc,1)=nomid
+        mobl = 1
+        mfac = 0
+        mran = INDESO
+        segini pilnec
+        liluc(ijluc,2)=pilnec
+        pilobl(1,indec) = deche
+        nexo = nexo + 1
+*
+        segadj wrk52,wrk522
+        typexo(nexo) = typdec
+        conexo(nexo) = condec
+        nomexo(nexo) = nomdec
+        goto 40
+
+      else
+        knmid = ijluc
+        nomid = liluc(knmid,1)
+        nbrobl = lesobl(/2) + 1
+        nbrfac = 0
+        segadj nomid
+        lesobl(nbrobl) = nomdec
+        pilnec = liluc(knmid,2)
+        mobl = nbrobl
+        mfac = 0
+        mran = indeso
+        segadj pilnec
+        pilobl(mobl,indec) = deche
+        nexo = nexo + 1
+        segadj wrk52,wrk522
+        typexo(nexo) = typdec
+        conexo(nexo) = condec
+        nomexo(nexo) = nomdec
+        goto 40
+      endif
+
+      moterr(1:16) = condec
+      moterr(17:24) = nomdec
+      interr(1) = 1
+      call erreur(943)
+      return
+
+  40   continue
+      enddo
+      
+* controle
+
+      do juc = 13,14
+        if ((juc.eq.14.and.imatee.eq.11.and.inatuu.eq.41).or.
+* jk148537 : materiau fluendo3D inextricable 
+     & (juc.eq.13.and.imatee.eq.1.and.inatuu.eq.187)) goto 50
+         nomid  = liluc(juc,1)
+         if (nomid.gt.0) then
+          nobl = lesobl(/2)
+          pilnec = liluc(juc,2)
+          do jm=1,nobl
+           if (pilobl(jm,1).eq.0.and.pilobl(jm,2).eq.0) then
+        moterr(1:45) = 'absence donnee materiau / caracteristique '
+        call erreur(-385)
+        interr(1) = imodel
+        moterr(1:16) = conmod
+        moterr(17:24) = lesobl(jm)
+        call erreur(-386)        
+             call erreur(21)
+             return
+           endif           
+          enddo       
+         endif
+      enddo
+      
+  50  continue    
+
+      if (FORMOD(1)(1:10).EQ.'MECANIQUE ') then
+         juc = 12
+         nomid  = liluc(juc,1)
+         nobl = lesobl(/2)
+         pilnec = liluc(juc,2)
+         do jm=1,nobl
+           if (pilobl(jm,1).eq.0.or.pilobl(jm,2).eq.0) then
+        moterr(1:50) = 'absence deformation initiale et/ou finale '
+        call erreur(-385)
+        interr(1) = imodel
+        moterr(1:16) = conmod
+        moterr(17:24) = lesobl(jm)
+        call erreur(-386)        
+             call erreur(21)
+             return
+           endif           
+         enddo       
+      endif
+
+      if (FORMOD(1)(1:8).EQ.'MELANGE ') then
+         juc = 23
+         nomid  = liluc(juc,1)
+         nobl = lesobl(/2)
+         pilnec = liluc(juc,2)
+         do jm=1,nobl
+          if (cmate.eq.'PARALLEL') then
+           if (pilobl(jm,2).eq.0.and.pilobl(jm,3).eq.0) then
+        moterr(1:50) = 'absence phase finale melange parallele'
+        call erreur(-385)
+        interr(1) = imodel
+        moterr(1:16) = conmod
+        moterr(17:24) = lesobl(jm)
+        call erreur(-386)        
+             call erreur(21)
+             return
+           endif
+          else
+            if (pilobl(jm,1).eq.0) then
+        moterr(1:50) = 'absence phase initiale melange'
+        call erreur(-385)
+        interr(1) = imodel
+        moterr(1:16) = conmod
+        moterr(17:24) = lesobl(jm)
+        call erreur(-386)        
+            endif 
+          endif 
+         enddo             
+      endif
+
+
+*
+      IF (INPLAS.EQ.-1) THEN
+        NSIGM0 = SIG0(/1)
+        NEPST0 = EPST0(/1)
+        IF (NSIGM0.GT.0.AND.NEPST0.GT.0.AND.NSIGM0.NE.NEPST0) THEN
+          CALL ERREUR(963)
+          RETURN
+        ENDIF
+      ENDIF
+*-------------------------------------------------
+c
+      ipil = liluc
+      iwrk52 = wrk52
+c
+      RETURN
+      END
+ 
+ 
+ 
+ 
+ 

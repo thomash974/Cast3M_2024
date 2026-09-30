@@ -1,0 +1,323 @@
+C OTTVAD    SOURCE    FD218221  21/06/10    21:15:47     11030          
+      SUBROUTINE OTTVAD(SIG,VAR1,XVAL,NDEF,VAR2,XCC,
+     &    TOL,QV1,QV2,QV3,KV0,KR1,MCN,IERUT)
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+-INC CCREEL
+      PARAMETER (XZER=0.D0,UNDEMI=0.5D0,UN=1.D0,DEUX=2.D0,TROIS=3.D0)
+      DIMENSION SIG(*),VAR1(*),XVAL(*),VAR2(*),XCC(*)
+      DIMENSION QV1(MCN,*),QV2(MCN,*),QV3(*),KR1(*),S(6)
+*         
+        IERUT=0
+        GO TO  (1,2,3,4,5,6,7,8,9,10),KV0
+*
+ 1      CONTINUE
+          RTRAC = XVAL(3)
+          GFTR  = XVAL(4)
+                  FIL = VAR2(13)
+                  IF(FIL.EQ.0.D0) THEN
+                    WO0 = 0.D0
+                  ELSE  
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+          ENDIF
+          QV1(KV0,1)= 1.D0
+          QV1(KV0,2)= 0.
+          QV1(KV0,3)= 0.
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          IF(KR1(1).NE.1) THEN
+            QV3(KV0) = -WO0 
+          ELSE
+            QV3(KV0) = 0.
+          ENDIF
+        GO TO 20
+*
+ 2      CONTINUE
+          QV1(KV0,1)= -1.D0
+          QV1(KV0,2)= 0.
+          QV1(KV0,3)= 0.
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          WO1 = VAR1(2)
+          IF(WO1.NE.0.) THEN
+            RTRAC  = XVAL(3)
+            GFTR   = XVAL(4)
+            BETA   = XVAL(5)                    
+                    FIL = VAR2(13)      
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+            WO2 = RTRAC - WO0 * WO1
+            WO2 = MAX (WO2,0.D0)
+            QV3(KV0) = WO2/WO1/(1.-BETA)
+          ELSE
+            QV3(KV0)=0.
+          ENDIF
+        GO TO 20
+*
+ 3      CONTINUE
+          QV1(KV0,1)= 1.D0
+          QV1(KV0,2)= 0.
+          QV1(KV0,3)= 0.
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          WO1 = VAR1(2)
+          IF(WO1.NE.0.) THEN
+            RTRAC  = XVAL(3)
+            GFTR   = XVAL(4)
+            BETA   = XVAL(5)                    
+                    FIL = VAR2(13)      
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+            WO2 = RTRAC - WO0 * WO1
+            WO2 = MAX (WO2,0.D0)                  
+            QV3(KV0) = WO2/WO1/(1.-BETA)
+          ELSE
+            QV3(KV0)=0.
+          ENDIF
+        GO TO 20
+*
+ 4      CONTINUE                                                                                                             
+          RTRAC = XVAL(3)
+          GFTR  = XVAL(4)
+                  FIL = VAR2(14)
+                  IF(FIL.EQ.0.D0) THEN
+                    WO0 = 0.D0
+                  ELSE  
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+          ENDIF
+          QV1(KV0,1)= 0.
+          QV1(KV0,2)= 1.D0
+          QV1(KV0,3)= 0.
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          IF(KR1(4).NE.1) THEN
+            QV3(KV0) = -WO0 
+          ELSE
+            QV3(KV0) = 0.
+          ENDIF
+        GO TO 20
+*
+ 5      CONTINUE
+          QV1(KV0,1)= 0.
+          QV1(KV0,2)= -1.D0
+          QV1(KV0,3)= 0.
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          WO1 = VAR1(4)
+          IF(WO1.NE.0.) THEN
+            RTRAC  = XVAL(3)
+            GFTR   = XVAL(4)
+            BETA   = XVAL(5)                    
+                    FIL  = VAR2(14)     
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+            WO2 = RTRAC - WO0 * WO1
+            WO2 = MAX (WO2,0.D0)                  
+            QV3(KV0) = WO2/WO1/(1.-BETA)
+          ELSE
+            QV3(KV0)=0.
+          ENDIF
+        GO TO 20
+*
+ 6      CONTINUE
+          QV1(KV0,1)= 0. 
+          QV1(KV0,2)= 1.D0
+          QV1(KV0,3)= 0.
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          WO1 = VAR1(4)
+          IF(WO1.NE.0.) THEN
+            RTRAC  = XVAL(3)
+            GFTR   = XVAL(4)
+            BETA   = XVAL(5)                    
+                    FIL = VAR2(14)      
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+            WO2 = RTRAC - WO0 * WO1
+            WO2 = MAX (WO2,0.D0)        
+            QV3(KV0) = WO2/WO1/(1.-BETA)
+          ELSE
+            QV3(KV0)=0.
+          ENDIF
+        GO TO 20
+*
+ 7      CONTINUE                                                                                                             
+          RTRAC = XVAL(3)
+          GFTR  = XVAL(4)
+                  FIL = VAR2(15)
+                  IF(FIL.EQ.0.D0) THEN
+                    WO0 = 0.D0
+                  ELSE  
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+          ENDIF
+          QV1(KV0,1)= 0. 
+          QV1(KV0,2)= 0.
+          QV1(KV0,3)= 1.D0
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          IF(KR1(7).NE.1) THEN
+            QV3(KV0) = -WO0 
+          ELSE
+            QV3(KV0) = 0.
+          ENDIF
+        GO TO 20
+*
+ 8      CONTINUE
+          QV1(KV0,1)= 0. 
+          QV1(KV0,2)= 0.
+          QV1(KV0,3)=-1.D0
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          WO1 = VAR1(6)
+          IF(WO1.NE.0.) THEN
+            RTRAC  = XVAL(3)
+            GFTR   = XVAL(4)
+            BETA   = XVAL(5)                    
+                    FIL  = VAR2(15)     
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+            WO2 = RTRAC - WO0 * WO1
+            WO2 = MAX (WO2,0.D0)                  
+            QV3(KV0) = WO2/WO1/(1.-BETA)
+          ELSE
+            QV3(KV0)=0.
+          ENDIF
+        GO TO 20
+*
+ 9      CONTINUE
+          QV1(KV0,1)= 0.
+          QV1(KV0,2)= 0.
+          QV1(KV0,3)= 1.D0
+          QV1(KV0,4)= 0.
+          IF(NDEF.GT.4) THEN
+            QV1(KV0,5)= 0.
+            QV1(KV0,6)= 0.
+          ENDIF
+          DO J=1,NDEF
+            QV2(KV0,J)=QV1(KV0,J)
+          ENDDO
+          WO1 = VAR1(6)
+          IF(WO1.NE.0.) THEN
+            RTRAC  = XVAL(3)
+            GFTR   = XVAL(4)
+            BETA   = XVAL(5)                    
+                    FIL = VAR2(15)      
+                    WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+            WO2 = RTRAC - WO0 * WO1
+            WO2 = MAX (WO2,0.D0)        
+            QV3(KV0) = WO2/WO1/(1.-BETA)
+          ELSE
+            QV3(KV0)=0.
+          ENDIF
+        GO TO 20
+*
+ 10     CONTINUE
+         XLC=VAR1(7)
+         RAC3=SQRT(TROIS)
+         EPCMAX=XCC(1)
+         EPCULT=XCC(2)
+         RCBI  =XCC(3)
+         XALFA =XCC(4)
+         XALFAG=XCC(5)
+         XDC   =XCC(6)
+         RCMAX =XCC(7)
+         XKC1  =XCC(8)
+         XBC   =XCC(9)
+         XFC0  =XCC(10)
+         XI1=TRACE(SIG)
+         PP=XI1/TROIS
+         S(5)=0.D0
+         S(6)=0.D0
+         DO I=1,3
+            S(I)=SIG(I)-PP
+         ENDDO
+         DO I=4,NDEF
+            S(I)=SIG(I)
+         ENDDO
+         XJ2=UNDEMI*(S(1)*S(1) + S(2)*S(2) + S(3)*S(3))
+     &            +  S(4)*S(4) + S(5)*S(5) + S(6)*S(6)
+         TAU=SQRT(XJ2)
+         IF(TAU.GT.0.D0) THEN
+           DEUTAU=DEUX*TAU
+           XFAC = RAC3/DEUTAU
+           DO I=1,3
+              TRA =XFAC*S(I)
+              QV1(KV0,I)=TRA + XALFA
+              QV2(KV0,I)=TRA + XALFAG
+           ENDDO
+           DO I=4,NDEF
+              TRA =XFAC*4.D0*S(I)
+              QV1(KV0,I)=TRA
+              QV2(KV0,I)=TRA
+           ENDDO
+         ELSE
+           DO I=1,3
+              QV1(KV0,I)= XALFA
+              QV2(KV0,I)= XALFAG
+           ENDDO
+           DO I=4,NDEF
+              QV1(KV0,I)=0. 
+              QV2(KV0,I)=0. 
+           ENDDO
+         ENDIF
+         IF(XLC.LE.XKC1) THEN
+           WO3= 2.*(RCMAX-XFC0)/XKC1/(1.+(XLC/XKC1)**2)
+     &       -(4.*(RCMAX-XFC0)*(XLC**2))/(XKC1**3)
+     &                             /((1.+(XLC/XKC1)**2)**2)
+         ELSE IF(XLC.GT.XKC1) THEN
+           WO3=RCMAX*(XBC**EXP(-XBC*(XLC-XKC1)))
+     &       -RCMAX*XBC*(1.+XBC*(XLC-XKC1))*EXP(-XBC*(XLC-XKC1))
+         ENDIF
+         QV3(KV0)=WO3*(1.D0-XALFA)
+  20  CONTINUE 
+      RETURN
+      END
+
+ 

@@ -1,0 +1,138 @@
+C VERIFI    SOURCE    KICH      21/11/17    21:15:14     11191          
+*  aiguilleur de VERI
+*
+      subroutine verifi
+      implicit real*8 (a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+      LOGICAL log1
+*
+      call lirree (xval,0,iretou)
+       if (iretou.eq.1) then
+          call verree(xval,log1)         
+          call ecrlog(log1)
+          return
+       endif
+      call lirobj ('CHPOINT  ',iret,0,iretou)
+       if (iretou.eq.1) then
+          call actobj ('CHPOINT  ',iret,1)
+          call verchp(iret,log1)          
+          call ecrlog(log1)
+          return
+       endif
+      call lirobj ('MCHAML   ',iret,0,iretou)
+       if (iretou.eq.1) then
+         call actobj ('MCHAML   ',iret,1)
+         call vercha(iret,log1)          
+          call ecrlog(log1)
+          return
+       endif
+      end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 

@@ -1,0 +1,21 @@
+C PMAT3D    SOURCE    FD218221  24/02/07    21:15:23     11834          
+      SUBROUTINE PMAT3D(A,B,C,N)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      
+c     produit matrices carrees
+      integer n
+      real*8 A(N,N),B(N,N),C(N,N)
+      integer i,j,k
+
+      do i=1,n
+        do j=1,n
+            c(i,j)=0.d0
+            do k=1,n
+                c(i,j)=c(i,j)+a(i,k)*b(k,j)
+            end do
+        end do
+      end do
+      return
+      end
+       

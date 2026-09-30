@@ -1,0 +1,77 @@
+C RESPRO    SOURCE    PV        20/12/02    21:15:12     10797          
+      SUBROUTINE RESPRO
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMBLOC
+-INC CCNOYAU
+-INC CCASSIS
+
+      CHARACTER*(8) MMM
+
+      IARGUM=MARGUM
+      IF(IARGUM.EQ.0) THEN
+        MOTERR=' '
+        CALL ERREUR (154)
+        RETURN
+      ENDIF
+C
+C  SAUVETAGE DES POINTEURS ET DES TYPES DES RESULTATS
+C
+      SEGACT,IARGUM
+      MTRESU=ITRESU
+      IF(MTRESU.EQ.0) THEN
+         NRES=10
+         SEGINI,MTRESU
+         MTRESU.NRESI=0
+         IF(IIMPI.EQ.1754) WRITE(6,*) ' DANS RESPRO MTRESU ..',MTRESU
+         SEGACT IARGUM*MOD
+         ITRESU=MTRESU
+      ELSE
+         IF(IIMPI.EQ.1754) WRITE(6,*) ' DANS RESPRO MTRESU ..',MTRESU
+         SEGACT,MTRESU*MOD
+         NRES=IVARES(/1)
+      ENDIF
+
+C     On passe en INTEGER FORTRAN plutot que ARGUMENT DE SEGMENT (vitesse)
+      MRESI  = MTRESU.NRESI
+
+  432 CONTINUE
+      MMM    =' '
+      LECTAB = 1
+      INTEXT = 1
+C     LODESL =.TRUE.
+      if (.not.lodesl) CALL SETASS(1)
+      CALL LIRABJ(MMM,IRET,0,IRETOU)
+C     LODESL = .FALSE.
+      CALL SETASS(0)
+C     write(6,*) ' respro mmmiret ', mmm   ,iret
+      IF (IRETOU .NE. 0) THEN
+         MRESI = MRESI + 1
+         IF(MRESI .GT. NRES)THEN
+           NRES = MRESI + MAX(INT(REAL(MRESI * 0.2)),10)
+           SEGADJ,MTRESU
+         ENDIF
+         MTYRES(MRESI) = MMM
+         IVARES(MRESI) = IRET
+         IF(MMM.EQ.'FLOTTANT') THEN
+           if(nbesc.ne.0) SEGACT,IPILOC
+           XFLRES(MRESI)=XIFLOT(IRET)
+           if(nbesc.ne.0) SEGDES,IPILOC
+         ENDIF
+         GOTO 432
+      ENDIF
+      
+      
+C     On repasse MRESI dans MTRESU.NRESI
+      MTRESU.NRESI = MRESI
+
+      LECTAB=0
+      INTEXT=0
+
+      END
+ 
+ 

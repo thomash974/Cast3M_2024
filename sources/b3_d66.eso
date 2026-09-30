@@ -1,0 +1,127 @@
+C B3_D66    SOURCE    FD218221  24/02/07    21:15:03     11834          
+      subroutine b3_d66(nu,sn3,d66,prog1,comp)
+c     calcul de la matrice d'endommagement 6*6 en base principale des endommagements
+c     hypothese du materiau orthotrope dans les directions principales de fissuration
+c     sn=1/(1-d Normal)
+c     sp=1/(1-d Poisson)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+c     declaration externe
+      real*8 d66(6,6),sn3(3)
+      real*8 nu
+      logical prog1,comp
+c     declarations locales      
+      integer i,j,k,l
+      real*8 s33(3,3)
+      real*8 d1,d2,d3,sdmax,smax,sdmin
+c     limitation l'endo si prog1=.true. (pas le cas actuellement)
+      if(prog1) then
+       smax=1.0d5
+       do i=1,3
+         sn3(i)=min(sn3(i),smax)
+       end do
+      end if     
+c     initialisation de la matrice d endommagement dt66
+10    do i=1,6
+       do j=1,6
+         d66(i,j)=0.d0
+       end do
+      end do     
+      if(comp) then
+c      endommagement simplifie  (pas de couplage directionnel)
+       do i=1,3
+        do j=1,3
+         if (i.eq.j)then
+           s33(i,j)=1.d0/sn3(i)
+         else
+           s33(i,j)=0.d0
+         end if
+        end do
+       end do 
+      else      
+c      endommagement complet (othotrope avec endo de E et Nu)
+c      permet d attenuer l'effet de Poisson orthogonal a la direction d'endo
+c      si comp est a .false. (cas actuel)
+ 
+C      A. Sellier, G. Casaux-Ginestet, L. Buffo-Lacarrière, X. Bourbon,
+C      Orthotropic damage coupled with localized crack reclosure processing. Part I: Constitutive laws,
+C      Engineering Fracture Mechanics,
+C      Volume 97,
+C      2013,
+C      Pages 148-167,
+C      ISSN 0013-7944,
+C      https://doi.org/10.1016/j.engfracmech.2012.10.012.
+
+20     d1=1.d0-1.d0/sn3(1)
+       d2=1.d0-1.d0/sn3(2)
+       d3=1.d0-1.d0/sn3(3)
+       t1 = nu ** 2
+       t2 = 2.d0 * nu
+       t4 = t1* d3* d2
+       t6 = nu - 1.d0
+       t8 = t1 * nu
+       t13 = t8 * d1
+       t15 = t1 * d1
+       t16 = t15 * d2
+       t21 = t15 * d3
+       t22 = -t8 +3.d0 * t1 -3.d0 * nu + 1.d0 + t8 * d3 * d2 - t4 + t13
+     # * d2 - t16 + 2.d0 * t13 * d2 * d3 + t13 * d3 - t21
+       t23 = 1.d0 / t22
+       t24 = -1.d0 + d1
+       t27 = nu * d2
+       t28 = nu * d3
+       t29 = nu - 1.d0 + t28
+       t31 = t6 * t23
+       t32 = t31 * t24
+       t34 = t27 + nu - 1.d0
+       t37 = nu * d1
+       t39 = -1.d0 + d2
+       t40 = t31 * t39
+       t46 = nu - 1.d0 + t37
+       t50 = -1.d0 + d3
+       t51 = t31 * t50
+       s33(1,1) = -(-t1 + t2 - 1.d0 + t4) * t6 * t23 * t24
+       s33(1,2) = t27 * t29 * t32
+       s33(1,3) = t28 * t34 * t32
+       s33(2,1) = t37 * t29 * t40
+       s33(2,2) = -(-t1 + t2 - 1.d0 + t21) * t6 * t23 * t39
+       s33(2,3) = t28 * t46 * t40
+       s33(3,1) = t37 * t34 * t51
+       s33(3,2) = t27 * t46 * t51
+       s33(3,3) = -(-t1 + t2 - 1.d0 + t16) * t6 * t23 * t50
+      end if
+c      print*,'1-dt33 ds b3_d66'
+c      call afic33(s33)
+c     read*
+      do i=1,3
+       do j=1,3
+        if(i.eq.j) then
+         d66(i,j)=1.d0-s33(i,j)
+        else
+         d66(i,j)=-s33(i,j)
+        end if
+       end do
+      end do
+c     calcul des termes de cisaillement 
+      do i=4,6
+       call indce0(i,k,l)
+c      endommagement effectif = max des deux facettes fissuree      
+c      sdmax=max(sn3(k),sn3(l)) 
+c      d66(i,i)=1.d0-1.d0/sdmax       
+c      endommagement effectif = min des deux facettes fissuree
+c      endommagement effectif de cisaillement (theorie du maillon faible)
+c      modif dec2022    
+c       sdmin=min(sn3(k),sn3(l)) 
+       sdmin=sn3(k)*sn3(l)     
+       d66(i,i)=1.d0-1.d0/sdmin  
+      end do
+c     affichage de la matrice d'endommagement en base principale de fissuration
+c      print*,'endo dt66 en base principale de fissuration ds b3_d66'
+c      call afic66(d66)
+c     read*      
+      return
+      end
+
+c********************************************************************************
+ 
+ 

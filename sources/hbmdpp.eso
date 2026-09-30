@@ -1,0 +1,76 @@
+C HBMDPP    SOURCE    FANDEUR   22/05/02    21:15:22     11359          
+       
+       SUBROUTINE HBMDPP(NT,NDDL,X,PHI,DPsiPsi)  
+        
+C=======================================================================
+* Calcule la derivee du terme DPsiPsi = (Psi*Psi')/(Psi'*Psi)
+* ou: Psi = (L(o)In)*X = Psix*X                        
+C=======================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+        REAL*8 X(NT),PHI(NT),PSI(NT),LV(NT),DPsiPsi(NT,NT)
+        REAL*8 PsiV,PsiPsi,BB
+        REAL*8 PSIX(NT,NT),PEXSI(NT,NT),PEXV(NT,NT),Ax(NT,NT),MUX(NT,NT)
+
+C Fonctions BLAS/LAPACK
+       REAL*8    DDOT, DNRM2
+       EXTERNAL  DDOT, DNRM2
+        
+c       Nombre d'harmoniques
+        NHBM = (NT/NDDL - 1)/2
+        
+c       Initialisation
+        DO I = 1,NT
+          DO J = 1,NT
+            DPsiPsi(I,J) = 0.D0
+            PSIX(I,J) = 0.D0
+          ENDDO
+        ENDDO
+        
+c       Calcul des vecteurs PSI,LV
+        CALL HBMDVEC(NT,NHBM,NDDL,X,1.D0,PSI)
+        CALL HBMDVEC(NT,NHBM,NDDL,PHI,1.D0,LV)
+        
+c       Produits scalaires
+        PsiV   = DDOT(NT,PSI,1,PHI,1)
+        PSiPsi = DDOT(NT,PSI,1,PSI,1)
+        
+c       Produits externes 
+        CALL PREXT(NT,PSI,PSI,PEXSI) 
+        CALL PREXT(NT,LV,PSI,PEXV)
+        
+c       Construction de Psix*psiv  
+        DO J=2,2*NHBM,2
+         DO I=1,NDDL
+            BB = PsiV*J/2.D0
+            PSIX(NDDL*(1+(J-2))+I,NDDL*(1+(J-1))+I) = BB
+            PSIX(NDDL*(1+(J-1))+I,NDDL*(1+(J-2))+I) = -BB
+          ENDDO 
+        ENDDO
+         
+*       Construction de Ax = I-(2/psipsi)*PEXSI
+        DO I = 1,NT 
+          DO J = 1,NT 
+            Ax(I,J) = (-2.D0/PsiPsi)*PEXSI(I,J)
+            IF (I.EQ.J) THEN 
+              AX(I,J) = AX(I,J) + 1.D0
+            ENDIF
+          ENDDO 
+        ENDDO
+        
+c       Produit MUX = Ax*Psix*psiv  
+        CALL PRMAT(NT,Ax,PSIX,MUX)
+        
+c       Construction de DPsiPsi 
+        DO I = 1,NT
+          DO J = 1,NT 
+            DPsiPsi(I,J) = (MUX(I,J)-PEXV(I,J))/PsiPsi 
+          ENDDO 
+        ENDDO
+
+c        return
+        END
+ 
+ 

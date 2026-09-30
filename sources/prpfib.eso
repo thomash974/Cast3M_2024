@@ -1,0 +1,1502 @@
+C PRPFIB    SOURCE    FD218221  24/02/07    21:15:23     11834          
+      subroutine prpfib(p,Lf,mu,
+     # Td,Tmax,Ef,Hf,Df,sk,F0,alphad,M0,Rt,fu,
+     # L0,d,e,fy,mwor,nligne,niter,nangl,nrt,nlongfi,
+     # nangredu,phit,phicrit)    
+     
+    
+c      implicit none
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)     
+
+
+c   ***************************************************************
+c   ************************ MODIFICATIONS ************************
+C   ***************************************************************
+c        variables pour la reduction de modele
+
+c   ***************************************************************
+c   ***************** NOMS DES VARIABLES/PARAMETRES ***************
+c   ***************************************************************
+
+c   i : boucle sur le nombre ligne
+c   j : boucle sur les angles
+c   k : boucle de sous-itération
+c   l : boucle sur les longueurs ancrées
+c   nligne : nombre de lignes pour 1 fibre
+c   niter : nombre d'itérations max sur k
+c   incremf : incrément de force élastique (MN) 
+c   incremld : incrément de longueur décollée (m)
+c   incremsp : incrément d'extraction de fibre (m)
+c   fel : force élastique imposée (MN)
+c   ld1 : longueur décollée coté 1 (m)
+c   ld2 : longueur décollée coté 2 (m)
+c   sp1 : extraction du coté le moins ancré de la fibre (m)
+c   fcrit1 : force de début de décollement coté moins ancré (MN)
+c   fcrit2 : force de début de décollement coté plus ancré (MN)
+c   L1 : longueur ancrée variable par ecaill jusqu'au pic de force coté le moins ancré (m)
+c   L2 : longueur ancrée variable par ecaill jusqu'au pic de force coté le plus ancré (m)
+c   dls1 : incrément d'écaillage coté le moins ancré  (m)
+c   dls2 : incrément d'écaillage coté le plus ancré  (m)
+c   ls1 : longueur d'écaillage coté le moins ancré (m)
+c   ls2 : longueur d'écaillage coté le plus ancré (m)  
+c   F : force pour une fibre droite (MN)
+c   w1 : glissement de décollement ou élastique lié au coté 1 (m) 
+c   w2 : glissement de décollement ou élastique lié au coté 2 (m) 
+c   Ef : module d'young de la fibre (MPa)
+c   Df : diamètre de la fibre (m)
+c   Af : section de la fibre (m^2)
+c   Hf : module de rigidité de l'interface (MPa/m)
+c   kc : coefficient de diffusion de l'equation differentielle des fibres (1/m)
+c   Lf : longueur totale de la fibre (m)
+c   Tmax : contrainte admissible maximale par l'interface fibre-matrice (MPa)
+c   Td : contrainte de frottement fibre-matrice après décohésion (MPa)
+c   sk : glissement caractéristique, pilote la pente de l'extraction (m)
+c   F0 : force d'about de fibre (MN)
+c   alpha : angle d'ouverture du tétraèdre d'écaillage et du cone de rupture du béton en rad
+c   Rt : résistance à la traction de la matrice (MPa)
+c   mu : coefficient de frottement fibre matrice pour fibres orientées
+c   phi : angle d'inclinaison des fibres // normale à la fissure en rad
+c   Fd1 : force de décollement côté le moins ancré (MN)
+c   sd1 : glissement de décollement côté le moins ancré (m)
+c   sd2 : glissement de décollement côté le plus ancré (m)
+c   La1 : ancrage initial côté le moins ancré (m)
+c   La2 : ancrage initial côté le plus ancré (m)
+c   lsf1 : longueur d'écaillage sauvegardé côté le moins ancré (m)
+c   lsf2 : longueur d'écaillage sauvegardé côté le plus ancré (m)
+c   sel1 : glissement élastique côté le moins ancré (m)
+c   sel2 : glissement élastique côté le plus ancré (m)
+c   ldind1 : sert à indiquer si un décollement s'est déjà produit sur le côté le moins ancré (m)
+c   ldind2 : sert à indiquer si un décollement s'est déjà produit sur le côté le plus ancré (m)
+c   phid : valeur angle inclinaison fibre // normale à la fissure en °
+c   alphad : valeur angle d'ouverture du tétraèdre d'écaillage et du cone de rupture du béton en °
+c   sdf1 : glissement de décollement sauvegardé côté le moins ancré (m)
+c   sdf2 : glissement de décollement sauvegardé côté le plus ancré (m)
+c   Ffo : force de la fibre orientée (MN)
+c   Lf1 : ancrage de la fibre sauvegardé côté le moins ancré (m)
+c   Lf2 : ancrage de la fibre sauvegardé côté le plus ancré (m)
+c   ldf1 : longueur décollée de la fibre sauvegardée côté le moins ancré (m)
+c   ldf2 : longueur décollée de la fibre sauvegardée côté le plus ancré (m)
+c   wf1 : ouverture de fissure totale sauvegardée (m)
+c   Ff : force sauvegardée avant orientation (MN)
+c   lsk1,lsk2 : paramètre servant à calculer la pente de la droite d'écaillage 
+c   Fco : force admissible sur la surface du cone de rupture final (MN)
+c   Fmax : force maximale admisssible par la fibre (MN)
+c   fy : limite élastique de la fibre (MPa)
+c   rupt : indicateur de rupture de la fibre ou du cone, ou d'extraction  totale passe à true si il y a rupture
+c   mi1,mi2 : positions des valeurs de la courbe f(w) d'une fibre encradrant la valeur de wlist lors du calcul de la force moy
+c   n : Numéro de ligne de la courbe force moyenne ouverture de fissure
+c   nangl +1 : nombre de discrétisation de l'angle
+c   nlongfi : nombre de discrétisation de la longueur ancrée des fibres
+c   nwlis : nombre d'ouvertures de fissures pour l'intrpoation pour calcul des forces moyennes
+c   nombre d'ouvertures de fissures lors du calul de Fmoy
+c   vark : valeurs de k lorsque l'on sort de la boucle d'équilibre d'écaillage
+c   nlign1 : valeur optimisée du nombre de lignes i pour le calcul des forces
+c   incremwlis : incrément d'ouverture de fissure pour le calcul des forces moyennes (m)
+c   precision1 : sert à ne pas avoir 0 là ou on veut pas
+c   npic : position de wlist pour laquelle on a la force moyenne au pic
+c   n0longfi : nombre de longueur de fibre pour calcul de la force moyenne ne prenant pas en compte les longueurs < 1mm
+c   M0 : module d'écrouissage liée à l'abrasion (MPa)
+c   L0 : longueur caractéristique prenant en compte l'influence de la longueur ancrée sur l'abrasion (m)
+c   somFL : somme des forces pour un angle et tous les ancrages pour calcul fmoy 
+c   ffo1 : tableau des forces orientées dépendant de i,phi,L (MN)
+c   ffo2 : tableau des forces orientées dépendant de n,phi,L (MN)
+c   FmoyL : Force moyenne pour une orientation (MN)
+c   wlist : liste d'ouverture de fissure de la force moyenne (m)
+c   Dwf : différence entre l'ouverture de wlist et de wf1 servant a intrpoer
+c   fu : contrainte ultime pour les fibres (MPa)
+c   wint0,wint1 : valeurs de wf1 qui encadrent la valeur de wlist pour intrpoation (m)
+c   fint0,fint1 : valeurs de ffo1 qui correspondent à wint0 et wint1 pour intrpoation (MN)
+c   fres : valeur intrpoée de la force pour calcul de la force moyenne (MN)
+c   k0 : rigidité initiale pour une fibre servant a calculer s0 (MN/m)
+c   fk0 : valeur de force au pas 2 servant a calculer k0 (MN)
+c   sk0 : glissement correspondant à fk0 (m)
+c   Fpic : force moyenne au pic pour chaque cas (MN)
+c   k0m : rigidité initiale moyenne au pic (MN/m) 
+c   fcrit0 : force de début de décollement pour la longueur ancrée initiale pour optimisation du nombre de pas phase élastique (MN)
+c   nloc : localisation de la force moyenne maximale
+c   Fmoylis : liste de force moyenne 1d servant à localiser le pic (MN)
+c   wpic : ouverture de fissure au pic de force moyenne (m)
+c   wfin : ouverture de fissure pour laquelle Fmoy vaut 0 pour la première fois après le 1er pas (m)
+c   spind : indicateur de mise en extraction
+c   rotule : mettre a false pour ne pas prendre en compte la rotule d'extraction des fibres orientées
+c   finf : indicateur marquant wfin
+c   p : numéro de la ligne des listes (Td,phid,point caractéristique des courbes)
+c   lisTd : Liste des Td pour lesquels les forces moyennes ont été calculées (MPa)
+c   lisphid : Liste des phid pour lesquels les forces moyennes ont été calculées (MPa)
+c   lisfp : Liste des forces moyennes au pic correspondant a Td phid (MN)
+c   lisk0m : Liste des rigidités initiales moyennes correspondant a Td phid (MN/m)
+c   liswf : Liste des ouvertures de fissures moyennes finales (Fmoy=0) correspondant a Td phid (m)
+c   lisw03 : Liste des ouvertures de fissures moyennes pour F=0,3*fpic correspondant a Td phid (m)
+c   f03 : 0.3*fpic (MN)
+
+
+c        parametres
+         integer i,j,k,l,t,mi1,mi2,n,nligne,niter,nangl,nlongfi,nwlis
+         integer vark,nlign1,npic,n0longfi,nrt,nangredu,iind
+         real*8 incremf,incremld,incremsp,Lf,incremwlis,pi,precision1 
+         real*8 phit,phicrit
+
+         parameter (incremwlis=5.0d-6)
+         parameter (PI=3.141592653589793D0,precision1=1.0d-10)
+
+           real*8 M0,L0
+           real*8 Ef,Df,Af,Hf,kc,Tmax,Td,sk,F0,alpha,Rt,mu,phi
+           real*8 La1,La2
+           real*8 phid,alphad
+           real*8 lsk1,lsk2
+           real*8 Fmax
+           real*8 somFL,fy,s0,nligner
+           real*8 Fr
+           real*8 fu,Fpasav
+           real*8 wint0,wint1,fint0,fint1,fres,k0,fk0,sk0,scrit
+           real*8 fcrit0,wpic       
+
+C cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+           logical rupt,spind,rotule,finf,ldind1,ldind2,ecail1  
+           parameter(rotule=.true.,ecail1=.false.)
+C c        variables pour la reduction de modele
+           real*8 f03,w03,Fpic,k0m,wfin
+           integer p,d,e
+*
+       SEGMENT MWOR
+           real*8 fel(mligne),ld1(mligne,miter),ld2(mligne,miter)
+           real*8 sp1(mligne),fcrit1(mligne,miter),fcrit2(mligne,miter)        
+           real*8 L1(mligne,miter),L2(mligne,miter),dls1(mligne,miter)
+           real*8 dls2(mligne,miter),ls1(mligne,miter),ls2(mligne,miter)
+           real*8 F(mligne,miter),w1(mligne,miter),w2(mligne,miter)
+           real*8 Fd1(mligne,miter),sd1(mligne,miter),lsf1(mligne)
+           real*8 sel1(mligne,miter),sdf1(mligne)
+           real*8 Fo(mligne,miter),ldf2(mligne),Ffo(mligne)
+           real*8 lsf2(mligne),Lf2(mligne),sdf2(mligne),Fco(mligne)
+           real*8 sd2(mligne,miter),sel2(mligne,miter)
+           real*8 Dwf(mligne),Ff(mligne),Lf1(mligne),ldf1(mligne)   
+           real*8 ffo2(mligne,mangl1,mlongfi)
+           real*8 Ffo1(mligne,mangl1,mlongfi)
+           real*8 FmoyL(mligne,mangl1),wf1(mligne,mangl1,mlongfi)
+           real*8 Fmoylis(mligne),wlist(mligne)                                 
+*                                       
+          real*8 lisRt(mrtang1),lisphid(mrtang1)
+          real*8 lisfp(mrtang1),lisk0m(mrtang1)
+          real*8 liswf(mrtang1)
+          real*8 lisw03(mrtang1)                
+*               
+          real*8 lisrt1(mangnrt),lisphid1(mangnrt)
+          real*8 lisrt2(mangnan)
+          real*8 lisphid2(mangnan)  
+          real*8 liswp1(mangnrt),liswp2(mangnan)     
+          real*8 lisk01(mangnrt),lisk02(mangnan)                
+       ENDSEGMENT
+*
+
+C          print*,Ef,"Ef"
+C          print*,Lf,"Lf"
+C          print*,Df,"df"
+C          print*,Hf,"hf"
+C          print*,Tmax,"tmax"
+C          print*,td,"td"
+C          print*,sk,"sk"
+C          print*,F0,"f0"
+C          print*,alphad,"alphad"
+C          print*,Rt,"Rt"
+C          print*,mu,"mu"
+C          print*,M0,"M0"
+C          print*,fu,"fu"
+C          print*,L0,"L0"
+C          print*,fy,"fy"
+         
+         nwlis=int(Lf/(incremwlis))      
+    
+c        initialisation de variables
+         ldf1(1)=0.d0
+         lsf1(1)=0.d0 
+         sp1(1)=0.d0
+         sdf1(1)=0.d0
+        
+
+         ldf2(1)=0.d0
+         lsf2(1)=0.d0 
+         sdf2(1)=0.d0                
+
+         ldind1=.false.
+         ldind2=.false.
+
+c parametres increments 
+          incremld=Lf/200.d0         
+          incremsp=Lf/1000.d0                
+
+
+c section de la fibre
+        Af=(PI*Df**2)/4
+c coefficient de l exponentielle        
+        kc=sqrt(4.d0*Hf/(Ef*Df))
+c conversion de l'angle du cone en radian
+        alpha=PI*alphad/180
+
+c     boucle sur les angles
+      do j=0,nangl
+      if(j.lt.nangredu) then
+      phid=phicrit*j/(nangredu-1)
+      else
+c      phid=phit*j/(nangl)
+      if(j.eq.nangredu) then
+      phid=phicrit
+      else
+      phid=phit*j/(nangl)
+      end if
+      end if
+      
+
+C       if(j.eq.0) then
+C       ffo2=0.d0
+C       wlist=0.d0
+C       FmoyL=0.d0
+C       Fmoylis=0.d0
+C       Ffo1=0.d0
+C       wf1=0.d0
+C       wlist=0.d0
+C       end if
+            
+
+c      print*,j,phid,nangredu
+c      read*
+      
+c      phid=15.d0*j
+      phi=PI*phid/180  
+      finf=.false.      
+c        longueurs des ancrages
+c       boucle sur les longueurs ancrées
+c on exclue les fibres d ancrage inf a x mm --> non
+c int(2.d0*x*nlongfi/Lf)+1
+c        n0longfi=int(2.d0*0.0d-3*nlongfi/Lf)+1
+        n0longfi=1        
+c        print*,n0longfi
+        do l=n0longfi,nlongfi
+        La1=(Lf/2.d0)*l/nlongfi
+        La2=Lf-La1
+        Lf1(1)=La1
+        Lf2(1)=La2                  
+        spind=.false.
+
+        lsk1=La1/5.d0        
+        lsk2=La2/5.d0        
+c     ici on va optimiser le nombre de lignes pour chaque longueur ancrée
+c         calcul de la force critique pour L
+          fcrit0=Tmax*PI*Df*(exp(2.d0*kc*La1)-1.d0)/
+     #    (kc*(exp(2.d0*kc*La1)+1.d0))
+          incremf=fcrit0/10.d0
+c glissement de debut de decollement
+          scrit=Tmax/Hf
+c         calcul du nombre ligne nécessaires
+          nligner=fcrit0/incremf+la1/incremld+la1/incremsp
+          nlign1=int(nligner)
+c          print*,nlign1
+
+          do i=1,nlign1
+          
+             if(i.eq.1) then
+             rupt=.false.
+             s0=0.d0
+             end if
+          
+             if(i.eq.1) then
+             fel(i)=0.d0
+             else
+             fel(i)=fel(i-1)+incremf
+             end if
+             
+             do k=1,niter
+c il suffit d'un seul ecaill plus grand que l'ancrage pour casser              
+c            longueur du coté le moins ancré             
+C                  if(i.eq.1) then
+C                      L1(i,k)=La1
+C                  else
+C                      if(k.eq.1) then
+C                      L1(i,k)=Lf1(i-1)
+C                      else
+C                        if ((Lf1(i-1).lt.dls1(i,k-1)).or.(Lf1(i-1) 
+C      #                 .eq.0.d0).or.(rupt)) then
+C                        L1(i,k)=0.d0
+C                        rupt=.true.
+C c                       exit
+C                        go to 10
+C                        else
+C                        L1(i,k)=Lf1(i-1)-dls1(i,k-1)
+C                        end if
+C                      end if
+C                  end if
+c            longueur du coté le mois ancré    
+
+
+c             print*,tmax ici ca marche          
+                 if(i.eq.1) then
+                     if(k.eq.1) then
+                     L1(i,k)=La1
+                     else
+                       if((La1.le.ls1(i,k-1)).or.(rupt)) then
+                       L1(i,k)=0.d0
+                       rupt=.true.
+                       vark=k
+c                       exit
+                       go to 10
+                       else
+                       L1(i,k)=La1-dls1(i,k-1)
+                       end if
+                     end if
+                 else
+                     if(k.eq.1) then
+                     L1(i,k)=Lf1(i-1)
+                     else
+                       if((Lf1(i-1).le.dls1(i,k-1)).or.(rupt)
+     #                 .or.(Lf1(i-1).eq.0.d0)) then
+                       L1(i,k)=0.d0
+                       rupt=.true.
+                       vark=k
+c                       exit
+                       go to 10
+                       else
+                       L1(i,k)=Lf1(i-1)-dls1(i,k-1)
+                       end if
+                     end if
+                 end if                 
+c            longueur du coté le plus ancré             
+                 if(i.eq.1) then
+                     if(k.eq.1) then
+                     L2(i,k)=La2
+                     else
+                       if((La2.le.ls2(i,k-1)).or.(rupt)) then
+                       L2(i,k)=0.d0
+                       rupt=.true.
+                       vark=k
+c                       exit
+                       go to 10
+                       else
+                       L2(i,k)=La2-dls2(i,k-1)
+                       end if
+                     end if
+                 else
+                     if(k.eq.1) then
+                     L2(i,k)=Lf2(i-1)
+                     else
+                       if((Lf2(i-1).le.dls2(i,k-1)).or.(rupt)
+     #                 .or.(Lf2(i-1).eq.0.d0)) then
+                       L2(i,k)=0.d0
+                       rupt=.true.
+                       vark=k
+c                       exit
+                       go to 10
+                       else
+                       L2(i,k)=Lf2(i-1)-dls2(i,k-1)
+                       end if
+                     end if
+                 end if
+
+c               print*,tmax
+                 
+c            calcul de la force critique coté moins ancré
+             fcrit1(i,k)=Tmax*PI*Df*(exp(2.d0*kc*L1(i,k))-1.d0)/
+     #       (kc*(exp(2.d0*kc*L1(i,k))+1.d0))
+
+
+
+                 
+c            calcul de la force critique coté plus ancré
+             fcrit2(i,k)=Tmax*PI*Df*(exp(2.d0*kc*L2(i,k))-1.d0)/
+     #       (kc*(exp(2.d0*kc*L2(i,k))+1.d0))
+     
+                 
+c********************************************                 
+c            coté le moins ancré
+c********************************************
+             if(i.eq.1) then
+             ldind1=.false.
+             ldind2=.false.
+             end if
+                 
+             if((fel(i).ge.fcrit1(i,k)).or.(ldind1)) then  
+             ldind1=.true.
+c            phase de décollement
+c            initialisation ld1
+                 if(i.eq.1) then 
+                 ld1(i,k)=0.d0
+                 else
+                     if(k.eq.1) then
+                     ld1(i,k)=ldf1(i-1)+incremld
+                     else
+                       if(ldf1(i-1)+incremld-dls1(i,k-1).le.0.d0) 
+     #                 then
+C                        print*,"decolllement  a 0",ldf1(i-1),dls1(i,k-1)
+C      #                  ,i,k
+                       ld1(i,k)=0.d0
+                       else
+                       ld1(i,k)=ldf1(i-1)+incremld-dls1(i,k-1)
+                       end if       
+                     end if                       
+                 end if
+c                 print*,ld1(i,k),i,k
+c            calcul de la force de decollement
+             Fd1(i,k)=PI*Df*Td*ld1(i,k)+Tmax*PI*Df*
+     #       (exp(2.d0*kc*L1(i,k))-exp(2.d0*kc*ld1(i,k)))/
+     #       (kc*(exp(2.d0*kc*L1(i,k))+exp(2.d0*kc*ld1(i,k))))
+
+c            calcul du glissement de decollement
+             sd1(i,k)=Tmax/Hf+((PI*Df*Td*ld1(i,k)**2)/(2.d0*Ef*Af))+
+     #       (Tmax*PI*Df*ld1(i,k)/(kc*Af*Ef))*((exp(2.d0*kc*L1(i,k))-
+     #       exp(2.d0*kc*ld1(i,k)))/(exp(2.d0*kc*L1(i,k))+
+     #       exp(2.d0*kc*ld1(i,k))))
+c                      print*,sdf1(i-1),sd1(i,k),l1(i,k),ld1(i,k)     
+                 sp1(i)=0.d0  
+c                force glissement sauvegardés  
+                 if(i.eq.1) then 
+                 F(i,k)=0.d0
+                 w1(i,k)=0.d0
+c                initialisation de variables
+                 sdf1(i)=0.d0
+                 sd1(1,k)=0.d0 
+                 sp1(i)=0.d0    
+                 else 
+c                    extraction du coté le moins ancré
+c                    seulement si le glissement de décollement reduit ET Ld augmente
+                     if((Ld1(i,k).ge.L1(i,k)).or.
+     #               ((sd1(i,k)-sdf1(i-1).le.0.d0)
+     #                 .and.(ld1(i,k).gt.ldf1(i-1))).or.spind) then
+                     s0=f0/k0
+                     ld1(i,k)=ldf1(i-1)                     
+                     
+                     if(.not.spind) then
+                     iind=i
+                     end if
+
+                     if((spind).and.(i.gt.iind)) then
+                     sp1(i)=sp1(i-1)+incremsp
+                     else
+                     sp1(i)=0.d0
+                     end if
+                     sd1(i,k)=sdf1(i-1)
+                     w1(i,k)=sdf1(i-1) 
+
+c                    si on commence a extraire une fois on extrait toujours apres                     
+                     spind=.true.
+                                                           
+                       if(sp1(i).gt.L1(i,k)) then 
+                       F(i,k)=0.d0
+                       sp1(i)=sp1(i-1)
+                       ld1(i,k)=ldf1(i-1)
+                       rupt=.true.
+                       else
+                       F(i,k)=(Td*(sk/(sk+sp1(i)))+M0*(sp1(i))                     
+     #                 *L1(i,k)/(L1(i,k)+L0)**2)*PI*Df*(L1(i,k)-
+     #                 sp1(i))+F0     
+c                       print*,f(i,k),s0,k0,sp1(i),ld1(i,k),sd1(i,k)
+                       ld1(i,k)=ldf1(i-1)
+                       end if
+                     else 
+c                    decollement  du coté le moins ancré   
+                     sp1(i)=0.d0               
+                     F(i,k)=Fd1(i,k)
+                     w1(i,k)=sd1(i,k)
+
+                     end if
+                 
+                 end if
+
+             else 
+c            glissement elastique 
+               if(L1(i,k).eq.0.d0) then
+               rupt=.true.
+               else
+               sel1(i,k)=fel(i)*kc*(exp(kc*2.d0*L1(i,k))+1.d0)/
+     #         (Hf*PI*Df*(exp(2.d0*kc*L1(i,k))-1.d0))
+               end if
+c            la longueur decollee vaut 0
+             Ld1(i,k)=0.d0
+            
+         
+c            force glissement sauvegardés 
+                if(i.eq.1) then
+                F(i,k)=0.d0
+                w1(i,k)=0.d0
+                else
+                F(i,k)=fel(i)
+                w1(i,k)=sel1(i,k)
+                end if
+c            initialisation de variables     
+                sdf1(i)=0.d0
+                sd1(i,k)=0.d0 
+                sp1(i)=0.d0  
+
+             
+             end if
+               
+c**********************************************                 
+c            coté le plus ancré
+c**********************************************
+             if((F(i,k).ge.fcrit2(i,k)).or.(ldind2)) then  
+             ldind2=.true.
+c            phase de décollement
+c            initialisation ld2
+                 if(i.eq.1) then 
+                 ld2(i,k)=0.d0
+                 else
+c                si la force décroit la longueur décollée ld2 stagne
+c                sauf si les deux longueurs sont égales
+c                si la force croit à la fin du décollement le décollement s arrete quand meme
+                  if(((F(i,k)-Ff(i-1).gt.0.d0).or.(l.eq.nlongfi))
+     #            .and.(sp1(i).eq.0.d0)) then
+                     if(k.eq.1) then
+                     ld2(i,k)=ldf2(i-1)+incremld
+                     else
+                       if(ldf2(i-1)+incremld-dls2(i,k-1).le.0.d0) 
+     #                 then
+                       ld2(i,k)=0.d0
+                       else
+                       ld2(i,k)=ldf2(i-1)+incremld-dls2(i,k-1)
+                       end if       
+                     end if  
+                  else
+                  ld2(i,k)=ldf2(i-1)  
+                  end if                  
+                 end if
+
+c            la force est toujours celle du coté 1
+c            calcul du glissement de decollement
+             sd2(i,k)=Tmax/Hf+((PI*Df*Td*ld2(i,k)**2.d0)/(2.d0*Ef*Af))+
+     #       (Tmax*PI*Df*ld2(i,k)/(kc*Af*Ef))*(exp(2.d0*kc*L2(i,k))-
+     #       exp(2.d0*kc*ld2(i,k)))/(exp(2.d0*kc*L2(i,k))+
+     #       exp(2.d0*kc*ld2(i,k)))
+
+c                glissement sauvegardés  
+                 if(i.eq.1) then 
+                 w2(i,k)=0.d0
+c                initialisation de variables
+                 sdf2(i)=0.d0
+                 sd2(i,k)=0.d0                 
+                 else 
+c                decollement  du coté le plus ancré         
+                   if(spind) then
+                   sd2(i,k)=sdf2(i-1)
+                   w2(i,k)=sdf2(i-1)
+                   else                  
+                   w2(i,k)=sd2(i,k)
+                   end if
+                 end if
+
+             else 
+
+c            glissement elastique 
+             sel2(i,k)=F(i,k)*kc*(exp(kc*2.d0*L2(i,k))+1.d0)/
+     #       (Hf*PI*Df*(exp(2.d0*kc*L2(i,k))-1.d0))
+c            la longueur decollee vaut 0
+             Ld2(i,k)=0.d0
+c            force glissement sauvegardés 
+                  if(i.eq.1) then
+                  w2(i,k)=0.d0
+                  else
+                  w2(i,k)=sel2(i,k)
+                  end if
+c            initialisation de variables     
+             sdf2(i)=0.d0
+             sd2(i,k)=0.d0
+
+             end if 
+             
+               
+ccccccccccccccccccccccccccccccccccccccccccccccc
+c rotule plastique pour les fibres orientées
+ccccccccccccccccccccccccccccccccccccccccccccc
+C             if(rotule.and.spind) then
+C               if(phi.gt.0.d0) then
+C             F(i,k)=F(i,k)+fy*Df**2/(6.d0*sin(phi))
+C               end if
+C             end if
+
+C        if(rotule.and.spind) then
+C          if(i.gt.1) then
+C            if(k.gt.1) then
+C c           Fp=2.d0*fy*Df**3/(6.d0*(ls1(i,k-1)+w1(i,k)
+C c     #     +sp1(i)))
+C c       Fo(i,k)=(F(i,k)*(1.d0+mu*sin(phi/2.d0))+Fp)      
+C c     #  /(1.d0-mu*sin(phi/2.d0))  
+C         Mp=fy*Df**3/6.d0
+C         Fo(i,k)=(F(i,k)*L1(i,k)-6*Mp*mu)/((-3*sin(phi)*mu+cos(phi))
+C      #  *L1(i,k))
+C            else
+C c           Fp=2.d0*fy*Df**3/(6.d0*(lsf1(i-1)+w1(i,k)  
+C c     #     +sp1(i)))    
+C c       Fo(i,k)=(F(i,k)*(1.d0+mu*sin(phi/2.d0))+Fp)      
+C c     #  /(1.d0-mu*sin(phi/2.d0))  
+C         Mp=fy*Df**3/6.d0
+C         Fo(i,k)=(F(i,k)*L1(i,k)-6*Mp*mu)/((-3*sin(phi)*mu+cos(phi))
+C      #  *L1(i,k))     
+C            end if
+C          else 
+C          fo(i,k)=0.d0
+C          endif
+C        else       
+C c       Fo(i,k)=F(i,k)*(1.d0+mu*sin(phi/2.d0))/(1.d0-mu*sin(phi/2.d0)) 
+C         Mp=fy*Df**3/6.d0
+C         Fo(i,k)=(F(i,k)*L1(i,k)-6*Mp*mu)/((-3*sin(phi)*mu+cos(phi))
+C      #  *L1(i,k))         
+C        end if
+c       Fr=sin(phi/2.d0)*(F(i,k)+Fo(i,k))
+
+            if(rotule) then
+              if(phid.gt.5.d0) then
+            if(w1(i,k).le.scrit) then
+            D1=w1(i,k)/scrit
+            else
+            D1=1.d0
+            end if
+            
+            if(l1(i,k).eq.0.d0) then 
+            F(i,k)=0.d0
+            else
+            F(i,k)=F(i,k)+D1*3.d0*fy*Df**3.d0/(6.d0*sin(phi)*l1(i,k))
+            end if
+              end if
+            end if
+
+
+         Fo(i,k)=F(i,k)/(1.d0-mu*sin(phi)) 
+         Fr=Fo(i,k)*sin(phi)
+ccccccccccccccccccccccccccccccccccccccccccccccc
+c ecaill ccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccc             
+c dans l ecaill on rentre la force radiale 
+c on ne fait pas de calcul d ecaill si ce n est pas necessaire
+
+c mise a zero de ff(i-1)       
+      if(i.eq.1) then
+      Fpasav=0.d0
+      else
+      Fpasav=Ff(i-1)
+      end if
+      
+      if((Fo(i,k)-Fpasav.gt.0.d0).and.(.not.rupt)) then
+
+      if((L1(i,k).eq.0.d0).and.(i.gt.1)) then     
+      ls1(i,k)=lsf1(i-1)
+      else
+        if(L1(i,k).eq.0.d0) then
+        ls1(i,k)=0.d0
+        else
+        call ecaill(i,k,phi,lsk1,alpha,L1(i,k),ls1(i,k),Df,nlign1,
+     #  Rt,Fr,j) 
+        end if     
+      end if
+      
+      if((L2(i,k).eq.0.d0).and.(i.gt.1)) then 
+      ls2(i,k)=lsf2(i-1)
+      else
+        if((L2(i,k).eq.0.d0).or.(ecail1)) then
+        ls2(i,k)=0.d0
+        else
+        call ecaill(i,k,phi,lsk2,alpha,L2(i,k),ls2(i,k),Df,nlign1,
+     #  Rt,Fr,j) 
+        end if     
+      end if
+      
+      else   
+      if(i.eq.1) then
+        ls1(i,k)=0.d0
+        ls2(i,k)=0.d0
+        else
+        ls1(i,k)=lsf1(i-1)
+        ls2(i,k)=lsf2(i-1)
+        end if
+      end if
+
+c        la matrice coté 1 ne s'écaille plus si la force décroit
+                 if(i.gt.1) then                 
+                   if((Fo(i,k)-Fpasav.lt.0.d0).or.(Fo(i,k).eq.0.d0)
+     #             .or.(ls1(i,k).lt.lsf1(i-1)).or.rupt)
+     #             then
+                   ls1(i,k)=lsf1(i-1)
+                   end if
+                 else
+                 ls1(i,k)=0.d0
+                 end if
+
+c        la matrice coté 2 ne s'écaille plus si la force décroit
+                 if(i.gt.1) then                 
+                   if((Fo(i,k)-Fpasav.lt.0.d0).or.(Fo(i,k).eq.0.d0)
+     #             .or.(ls2(i,k).lt.lsf2(i-1)).or.rupt)
+     #             then
+                   ls2(i,k)=lsf2(i-1)
+                   end if
+                 else
+                 ls2(i,k)=0.d0
+                 end if                 
+                 
+     
+c            coté le moins ancré
+             if(i.eq.1) then
+             dls1(i,k)=ls1(i,k)
+             else
+                 if(ls1(i,k)-lsf1(i-1).le.0.d0) then
+                 dls1(i,k)=0.d0
+                 else
+                 dls1(i,k)=ls1(i,k)-lsf1(i-1)
+                 end if
+             end if
+
+c            coté le plus ancré 
+             if(i.eq.1) then
+             dls2(i,k)=ls2(i,k)
+             else
+                 if(ls2(i,k)-lsf2(i-1).le.0.d0) then
+                 dls2(i,k)=0.d0
+                 else
+                 dls2(i,k)=ls2(i,k)-lsf2(i-1)
+                 end if
+             end if
+
+C                  if(i.gt.90) then
+C                  if((j.eq.7).and.(t.eq.5).and.(l.eq.50)) then
+C             print*,ls1(i,k),ls2(i,k),i,k,fo(i,k),Fpasav,fo(i,k)-Fpasav,
+C      #dls1(i,k),L1(i,k),Fr
+C                  read*
+C                  end if 
+C                  end if                 
+
+
+c         if(isnan(ld1(i,k))) then
+c         print*,"ld1",i,ldf1(i-1),ldind1,fel(i),L1(i,k)
+C          else if(isnan(ld2(i,k))) then
+C           print*,"ld2"        
+C          else if(isnan(fcrit1(i,k))) then
+C           print*,"fcrit1"          
+C          else if(isnan(fcrit2(i,k))) then
+C           print*,"fcrit2"          
+C          else if(isnan(L1(i,k))) then
+C           print*,"L1"  
+C          else if(isnan(L2(i,k))) then
+C           print*,"L2"  
+C          else if(isnan(dls1(i,k))) then
+C           print*,"dls1"  
+C          else if(isnan(dls2(i,k))) then
+C           print*,"dls2" 
+C          else if(isnan(ls1(i,k))) then
+C           print*,"ls1" 
+C          else if(isnan(ls2(i,k))) then
+C           print*,"ls2" 
+C          else if(isnan(F(i,k))) then
+C           print*,"F"
+C          else if(isnan(w1(i,k))) then
+C           print*,"w1"
+C          else if(isnan(w2(i,k))) then
+C           print*,"w2"          
+C          else if(isnan(Fd1(i,k))) then
+C           print*,"Fd1"  
+C          else if(isnan(sd1(i,k))) then
+C           print*,"sd1"  
+C          else if(isnan(sel1(i,k))) then
+C           print*,"sel1" 
+C          else if(isnan(Fo(i,k))) then
+C           print*,"Fo" 
+C          else if(isnan(sd2(i,k))) then
+C           print*,"sd2"          
+C          else if(isnan(sel2(i,k))) then
+C           print*,"sel2"
+c         end if          
+
+C           print*,fel(i),ld1(i,k),fcrit1(i,k),fcrit2(i,k),L1(i,k),L2(i,k)
+C      #,sp1(i),dls1(i,k),dls2(i,k),ls1(i,k),ls2(i,k),sd1(i,k)
+
+C           print*,fcrit1(i,k),L1(i,k),sp1(i),dls1(i,k),sd1(i,k),Ld1(i,k),
+C      # F(i,k),ldf1(i-1),i,k,rupt
+     
+c test iter k
+c posiibilité d enlever le if crit1=100?
+             if(k.gt.1) then
+             crit1=abs((dls1(i,k)-dls1(i,k-1)))/la1
+             else
+             crit1=100.d0
+             end if
+c             print*,dls1(i,k),i,k,j,l,crit1
+c             read*
+            if(((dls1(i,k).eq.0.d0).or.(crit1.lt.1.0d-6))
+     #       .and.(k.gt.1)) then   
+            vark=k            
+c            exit
+            go to 10
+            else
+            vark=niter
+            end if
+c fin boucle sur k        
+            end do 
+
+   10   continue
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c           sauvegarde des variables après itération sur k 
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c           force finale orientée
+            if(rupt) then
+             Ff(i)=0.d0
+            ffo(i)=0.d0
+            else            
+            Ff(i)=Fo(i,vark)
+            ffo(i)=fo(i,vark)
+            end if
+
+c ls est recalculé avec la force actuelle donc il faut prendre celui d'avant 
+c mais toutes les autres valeurs sont bonnes car elles sont actualisées avec 
+c la valeur de dls(i,k-1)     
+             if(((l1(i,vark).eq.0.d0).or.(Ffo(i).eq.0.d0)).and.(i.gt.1)) 
+     #       then
+             lsf1(i)=lsf1(i-1)
+             lsf2(i)=lsf2(i-1)
+             else
+             lsf1(i)=ls1(i,vark-1) 
+             lsf2(i)=ls2(i,vark-1)             
+             end if
+             
+             if(lsf1(i).gt.la1) then
+             lf1(i)=0.d0
+             rupt=.true.
+             else 
+             Lf1(i)=La1-lsf1(i)             
+             end if   
+             if(lsf2(i).gt.la2) then
+             lf2(i)=0.d0
+             rupt=.true.
+             else 
+             Lf2(i)=La2-lsf2(i)             
+             end if                
+             Lf2(i)=La2-lsf2(i)
+             ldf1(i)=ld1(i,vark)
+             ldf2(i)=ld2(i,vark)                                                                        
+             sdf1(i)=sd1(i,vark)
+             sdf2(i)=sd2(i,vark)
+C c            la matrice ne s'écaille plus si la force décroit (lsf est constant)
+
+c****************************************************
+c*********** Rupture du cone de matrice**************
+c****************************************************
+
+c    force admissible par le cone
+      alphaco=30.d0*pi/180.d0
+c on ne compte pas l ecaill dans le cone
+       Fco(i)=PI*(Lf1(i)+lsf1(i)-sp1(i))*tan(alphaco)*(Df+(Lf1(i)
+     #+lsf1(i)-sp1(i)))*Rt
+         if((Ffo(i).ge.Fco(i)).or.(rupt)) then
+c         print*,'cone'
+         Ffo(i)=0.d0
+         rupt=.true.
+         end if
+         
+c****************************************************
+c*********** Rupture de la fibre*********************
+c****************************************************
+
+c    force admissible par la fibre
+         Fmax=(PI*Df**2/4.d0)*fu
+         if((Ffo(i).ge.Fmax).or.(rupt)) then
+         Ffo(i)=0.d0
+         rupt=.true.
+         end if          
+                 
+c on ajoute la def des fibres sur la longueurs écaillée pour palier le fait que le glissement
+c de décollement diminue
+             if(i.gt.1) then
+               if(rupt) then
+               wf1(i,j+1,l)=wf1(i-1,j+1,l)+incremsp
+               else               
+             wf1(i,j+1,l)=w1(i,vark)+w2(i,vark)+(lsf1(i)+lsf2(i))*
+     #        (1.d0-cos(phi))+sp1(i)+s0
+     #       +ffo(i)*(lsf1(i)+lsf2(i))/(Af*Ef)
+               end if
+              if(wf1(i,j+1,l).lt.1.0d-10) then
+              wf1(i,j+1,l)=0.d0
+              end if
+             else 
+             wf1(i,j+1,l)=0.d0
+             end if
+             
+c sauvegarde de la rigidité initiale pour une fibre de longueur ancrée connue
+              if((i.eq.2).and.(wf1(i,j+1,l).gt.0.d0)) then
+              sk0=wf1(i,j+1,l)
+              fk0=fel(i)
+              k0=fk0/sk0
+     
+                if(sk0.eq.0.d0) then
+                print*,"rigidite initiale infinie",sk0,fk0  
+                read*        
+                end if              
+              end if
+    
+c           tau(i)= Ffo(i)/(PI*Df*(Lf1(i)-sp1(i)))              
+c          ici ffo et tau contiennent les valeurs pour un angle une longueur ancrée 
+c          et toutes les i ouvertures de fissures
+c          force unitaire pour chacun des parametres            
+           Ffo1(i,j+1,l)=ffo(i)
+   
+
+
+c         affichage des courbes pour 5 longueurs ancrée            
+C            if((j.eq.7).and.(t.eq.5)) then
+C           if(l.eq.15) then
+C           open(unit=1,file="ffol0.res")
+C           write(unit=1,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (l.eq.20) then
+C           open(unit=1,file="ffol1.res")
+C           write(unit=1,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (l.eq.30) then
+C           open(unit=1,file="ffol2.res")
+C           write(unit=1,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (l.eq.40) then
+C           open(unit=1,file="ffol3.res")
+C           write(unit=1,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))    
+C           else if (l.eq.50) then
+C           open(unit=1,file="ffol4.res")
+C           write(unit=1,fmt='(11g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l)),
+C      #w1(i,vark),w2(i,vark),lsf1(i),lsf2(i),sp1(i),s0,ffo(i),rupt
+C           end if
+C            endif
+
+c plot 'ffol0.res','ffol1.res','ffol2.res','ffol3.res','ffol4.res'
+
+c enregistrement des forces ouvertures de fissures pour plusieurs angles
+C           if(l.eq.nlongfi) then
+C           if(t.eq.nrt) then
+C           if((j.eq.0)) then
+C           open(unit=11,file="flee0.res")
+C           write(unit=11,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (j.eq.1) then
+C           open(unit=11,file="flee1.res")
+C           write(unit=11,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (j.eq.3) then
+C           open(unit=11,file="flee2.res")
+C           write(unit=11,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (j.eq.4) then
+C           open(unit=11,file="flee3.res")
+C           write(unit=11,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           else if (j.eq.6) then
+C           open(unit=11,file="flee4.res")
+C           write(unit=11,fmt='(2g13.5)') (wf1(i,j+1,l)),(ffo1(i,j+1,l))
+C           end if
+C           end if
+C           end if
+          
+c    plot 'flee0.res','flee1.res','flee2.res','flee3.res','flee4.res'
+c plot 'flee2.res','flee3.res'
+
+C          if(isnan(ffo1(i,j+1,l))) then
+C          print*,"ffo1"
+C          else if(isnan(sp1(i))) then
+C          print*,"sp1"
+C         else if(isnan(lsf1(i))) then
+C         print*,"lsf1"
+C         else if(isnan(sdf1(i))) then
+C         print*,"sdf1"        
+C         else if(isnan(ldf2(i))) then
+C         print*,"ldf2"            
+C         else if(isnan(Ffo(i))) then
+C         print*,"Ffo"   
+C C         else if(isnan(lsf2(i))) then
+C C         print*,"lsf2"           
+C C         else if(isnan(Lf2(i))) then
+C C         print*,"Lf2"            
+C C         else if(isnan(sdf2(i))) then
+C C         print*,"sdf2"        
+C C         else if(isnan(Fco(i))) then
+C C         print*,"Fco"          
+C C         else if(isnan(Ff(i))) then
+C C         print*,"Ff"
+C         else if(isnan(Lf1(i))) then
+C         print*,"Lf1"
+C C         else if(isnan(ldf1(i))) then
+C C         print*,"ldf1"
+C C         else if(isnan(ffo2(i,j+1,l))) then
+C C         print*,"ffo2"
+C C         else if(isnan(Ffo1(i,j+1,l))) then
+C C         print*,"Ffo1"
+C C         else if(isnan(wf1(i,j+1,l))) then
+C C         print*,"wf1" 
+C          end if
+
+
+        
+        
+        
+
+C c fin boucle sur i          
+           end do     
+      do n=1,nwlis 
+c      construit une liste d'ouverture de fissure     
+       if(n.eq.1) then
+       wlist(1)=0.d0
+       else 
+       wlist(n)=wlist(n-1)+incremwlis
+       end if   
+c calcule le minimum du carré de la diff entre les listes d ouverture de fissure
+c on localise la valeur la plus proche de wlist(n)      
+
+         do i=1,nlign1
+         Dwf(i)=wlist(n)-wf1(i,j+1,l)
+         if(dwf(i).lt.0.d0) then
+         mi2=i
+         mi1=i-1
+c         exit
+         go to 20
+         end if
+         end do
+   20   continue       
+c      les valeurs de wf1 qui encadrent wlis sont
+       wint0=wf1(mi1,j+1,l)
+       wint1=wf1(mi2,j+1,l)
+c      les valeurs de ffo1 qui correspondent a wint0 et wint1 sont 
+       fint0=ffo1(mi1,j+1,l) 
+       fint1=ffo1(mi2,j+1,l)   
+   
+       call intrpo(wint0,wint1,fint0,fint1,wlist(n),fres)    
+      
+
+    
+       if((wint0.eq.wint1).or.(fint0.eq.fint1).or.
+     #  (fres.lt.0.d0)) then
+       ffo2(n,j+1,l)=0.d0
+       else
+       ffo2(n,j+1,l)=fres
+       end if
+       
+C           if(t.eq.4) then
+C           if(j.eq.0) then
+C c          print*,n,fres,l,wint0,wint1,fint0,fint1
+C            print*,n,ffo2(n,j+1,l)
+C           read*
+C           end if
+C           end if   
+
+c affichage de la force orientée pour 10 angles
+C          if((l.eq.2).and.(t.eq.1)) then
+C           if(j.eq.0) then
+C           open(unit=22,file="fphi0.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.1) then
+C           open(unit=22,file="fphi1.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.2) then
+C           open(unit=22,file="fphi2.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.3) then
+C           open(unit=22,file="fphi3.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.4) then
+C           open(unit=22,file="fphi4.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.5) then
+C           open(unit=22,file="fphi5.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.6) then
+C           open(unit=22,file="fphi6.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.7) then
+C           open(unit=22,file="fphi7.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l)) 
+C           else if (j.eq.8) then
+C           open(unit=22,file="fphi8.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.9) then
+C           open(unit=22,file="fphi9.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (j.eq.10) then
+C           open(unit=22,file="fphi10.res")
+C           write(unit=22,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           end if
+C           end if
+
+c         plot 'fphi0.res','fphi1.res','fphi2.res','fphi3.res','fphi4.res','fphi5.res','fphi6.res','fphi7.res','fphi8.res','fphi9.res','fphi10.res'
+c plot 'fphi6.res'
+
+C            if((j.eq.0).and.(t.eq.3)) then
+C           if(l.eq.5) then
+C           open(unit=17,file="fmoyphi0.res")
+C           write(unit=17,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (l.eq.10) then
+C           open(unit=17,file="fmoyphi1.res")
+C           write(unit=17,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (l.eq.15) then
+C           open(unit=17,file="fmoyphi2.res")
+C           write(unit=17,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (l.eq.30) then
+C           open(unit=17,file="fmoyphi3.res")
+C           write(unit=17,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l))
+C           else if (l.eq.40) then
+C           open(unit=17,file="fmoyphi4.res")
+C           write(unit=17,fmt='(2g13.5)') (wlist(n)),(ffo2(n,j+1,l)) 
+C           end if        
+C            end if
+c   plot 'fmoyphi0.res','fmoyphi1.res','fmoyphi2.res','fmoyphi3.res','fmoyphi4.res'
+
+       end do 
+c       fin boucle n
+c va chercher la force correspondant a la valeur de wlist
+c  fin boucle sur l
+        end do 
+        
+C         if(j.eq.5) then
+C         print*,sum(test)/(nlongfi-n0longfi+1) ,phid,Lf/4*cos(phi)**2
+C         read*
+C         end if
+
+c       calcul de la force moyenne ancrage variable pour chaque angle
+          do n=1,nwlis
+             do l=n0longfi,nlongfi
+             if (l.eq.n0longfi) then
+             somFL=ffo2(n,j+1,n0longfi)
+             else 
+             somFL=ffo2(n,j+1,l)+somFL
+             endif
+             end do 
+c            fin de boucle sur l
+
+          if(n.eq.1) then            
+          FmoyL(1,j+1)=0.d0 
+          else
+          FmoyL(n,j+1)=somFL/(nlongfi-n0longfi+1) 
+          end if
+          Fmoylis(n)=FmoyL(n,j+1)
+          
+C           print*,Fmoylis(n),ffo2(n,j+1,l),wf1(n,j+1,l),n,l,t,nwlis,
+C      #wlist(n)
+
+c affichage de la force moyenne pour 10 angles
+C           if(t.eq.4) then
+C           if(j.eq.0) then
+C           open(unit=19,file="fmoyphii0.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))
+C           else if (j.eq.1) then
+C           open(unit=19,file="fmoyphii1.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))
+C           else if (j.eq.2) then
+C           open(unit=19,file="fmoyphii2.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           else if (j.eq.3) then
+C           open(unit=19,file="fmoyphii3.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))
+C           else if (j.eq.4) then
+C           open(unit=19,file="fmoyphii4.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           else if (j.eq.5) then
+C           open(unit=19,file="fmoyphii5.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           else if (j.eq.6) then
+C           open(unit=19,file="fmoyphii6.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           else if (j.eq.7) then
+C           open(unit=19,file="fmoyphii7.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           else if (j.eq.8) then
+C           open(unit=19,file="fmoyphii8.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))
+C           else if (j.eq.9) then
+C           open(unit=19,file="fmoyphii9.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           else if (j.eq.10) then
+C           open(unit=19,file="fmoyphii10.res")
+C           write(unit=19,fmt='(2g13.5)') (wlist(n)),(FmoyL(n,j+1))  
+C           end if
+C           end if
+
+c         plot 'fmoyphii0.res','fmoyphii1.res','fmoyphii2.res','fmoyphii3.res','fmoyphii4.res','fmoyphii5.res','fmoyphii6.res','fmoyphii7.res','fmoyphii8.res','fmoyphii9.res','fmoyphii10.res'
+
+
+c  forces moyennes pour 6 angles et 5 contraintes laterales
+C        if(t.eq.1) then
+C          if(j.eq.0) then 
+C          open(unit=19,file="fmoyt1j0.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.1) then
+C          open(unit=19,file="fmoyt1j1.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)          
+C          elseif (j.eq.2) then
+C          open(unit=19,file="fmoyt1j2.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)   
+C          elseif (j.eq.3) then
+C          open(unit=19,file="fmoyt1j3.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.4) then
+C          open(unit=19,file="fmoyt1j4.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.5) then
+C          open(unit=19,file="fmoyt1j5.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          end if
+C        elseif(t.eq.2) then
+C          if(j.eq.0) then 
+C          open(unit=19,file="fmoyt2j0.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.1) then
+C          open(unit=19,file="fmoyt2j1.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)       
+C          elseif (j.eq.2) then
+C          open(unit=19,file="fmoyt2j2.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.3) then
+C          open(unit=19,file="fmoyt2j3.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)  
+C          elseif (j.eq.4) then
+C          open(unit=19,file="fmoyt2j4.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.5) then
+C          open(unit=19,file="fmoyt2j5.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          end if
+C        elseif(t.eq.3) then
+C          if(j.eq.0) then 
+C          open(unit=19,file="fmoyt3j0.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.1) then
+C          open(unit=19,file="fmoyt3j1.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)         
+C          elseif (j.eq.2) then
+C          open(unit=19,file="fmoyt3j2.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)  
+C          elseif (j.eq.3) then
+C          open(unit=19,file="fmoyt3j3.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)  
+C          elseif (j.eq.4) then
+C          open(unit=19,file="fmoyt3j4.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.5) then
+C          open(unit=19,file="fmoyt3j5.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          end if
+C        elseif(t.eq.4) then
+C          if(j.eq.0) then 
+C          open(unit=19,file="fmoyt4j0.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.1) then
+C          open(unit=19,file="fmoyt4j1.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)         
+C          elseif (j.eq.2) then
+C          open(unit=19,file="fmoyt4j2.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)  
+C          elseif (j.eq.3) then
+C          open(unit=19,file="fmoyt4j3.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.4) then
+C          open(unit=19,file="fmoyt4j4.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.5) then
+C          open(unit=19,file="fmoyt4j5.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          end if
+C        elseif(t.eq.5) then
+C          if(j.eq.0) then 
+C          open(unit=19,file="fmoyt5j0.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.1) then
+C          open(unit=19,file="fmoyt5j1.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)          
+C          elseif (j.eq.2) then
+C          open(unit=19,file="fmoyt5j2.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1) 
+C          elseif (j.eq.3) then
+C          open(unit=19,file="fmoyt5j3.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.4) then
+C          open(unit=19,file="fmoyt5j4.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          elseif (j.eq.5) then
+C          open(unit=19,file="fmoyt5j5.res")
+C          write(unit=19,fmt='(11g13.5)') wlist(n),FmoyL(n,j+1)
+C          end if
+C          end if   
+
+
+
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc              
+c sauvergarde des paramètres pour la réduction du modèle
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+c Rigidité initiale
+       if(n.eq.2) then
+       k0m=(FmoyL(2,j+1)-FmoyL(1,j+1))/(wlist(2)-wlist(1))
+       end if
+ 
+c force et ouverture fissure fin d extraction       
+       if((FmoyL(n,j+1).eq.0.d0).and.(n.gt.1).and.(.not.finf)) then
+c       Ffin=FmoyL(n-1,j+1)
+       wfin=wlist(n-1)
+       finf=.true.
+       end if
+
+C        open(unit=13,file="fmoyphi3d.res")
+C        if(n.eq.1) then
+C        write(unit=13,fmt='(11g13.5)')
+C        end if
+C        write(unit=13,fmt='(11g13.5)') wlist(n),phid,FmoyL(n,j+1)
+
+        
+c fin boucle sur n   
+          end do
+          
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc              
+c sauvergarde des paramètres pour la réduction du modèle
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc   
+c force et ouverture de fissure au pic
+cc      picloc=maxloc(Fmoylis)      
+cc       npic=int(picloc(1))
+       call amxloc(Fmoylis,Fmoylis(/1),npic)
+       Fpic=FmoyL(npic,j+1) 
+       wpic=wlist(npic)
+       
+       F03=0.3d0*Fpic
+
+c recherche de l'ouverture de fissure correspondant a f03 et f06       
+       do n=npic,nwlis
+C         if((fmoylis(n)-F06.le.0.d0).and.
+C      #  (fmoylis(n-1)-F06.ge.0.d0)) then
+C         w06=wlist(n)
+C         end if
+        
+        if((fmoylis(n)-F03.le.0.d0).and.
+     #  (fmoylis(n-1)-F03.ge.0.d0)) then
+        w03=wlist(n)
+c        exit
+        go to 30
+        end if
+       end do
+   30  continue       
+       
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+cccccccccccccccccc Déplacement total cccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c on doit reconstruire la liste de déplacement après qu'on connaisse le pic de multifissuration
+c pour gérer la localisation qui se fait au pic de force en fait donc est ce qu on a besoin de faire ca ici?
+c et puis est ce qu on devrait pas faire la multifissuration qu a la fin?
+            
+
+c affichage de la force en 3d en fonction de w et angle
+c         splot 'fmoyphi3d.res' u 1:2:3
+C            open(unit=13,file="fmoyphi3d.res")
+C            if(n.eq.0) then
+C            write(unit=13,fmt='(11g13.5)')
+C            end if
+C            write(unit=13,fmt='(11g13.5)') wlist(n),phid,FmoyL(n,j+1)
+
+c          flis(n)=FmoyL(n,j+1)
+c          print*,flis            
+
+c    2eme fin de boucle sur n pour calcul deplacement            
+c            end do            
+
+C            open(unit=7,file="kmoyphiredu3d.res")
+C            if(j.eq.0) then
+C            write(unit=7,fmt='(11g13.5)')
+C            end if
+C            write(unit=7,fmt='(11g13.5)') Rt,phid,k0m 
+c liste de rigidité initiale
+                lisRt(p)=Rt 
+                lisphid(p)=phid 
+                lisk0m(p)=k0m               
+       
+C            open(unit=15,file="fpmoyphiredu3d.res")
+C            if(j.eq.0) then
+C            write(unit=15,fmt='(11g13.5)')
+C            end if
+C            write(unit=15,fmt='(11g13.5)') Rt,phid,Fpic 
+c liste de force au pic
+                lisFp(p)= Fpic 
+            
+C            open(unit=18,file="wpmoyphiredu3d.res")
+C            if(j.eq.0) then
+C            write(unit=18,fmt='(11g13.5)')
+C            end if
+C            write(unit=18,fmt='(11g13.5)') Rt,phid,wpic
+c liste d'ouverture au pic
+                if(j.lt.nangredu) then
+                lisRt1(d)=Rt 
+                lisphid1(d)=phid 
+                liswp1(d)= wpic 
+
+C            open(unit=181,file="wp1moyphiredu3d.res")
+C            if(j.eq.0) then
+C            write(unit=181,fmt='(11g13.5)')
+C            end if
+C          write(unit=181,fmt='(11g13.5)') lisrt1(d),lisphid1(d),liswp1(d)    
+                else
+c                listd2(1)=listd1(d-1)
+                lisRt2(e)=Rt 
+                lisphid2(e)=phid 
+c                lisphid2(1)=lisphid1(d-1)
+                liswp2(e)=wpic
+c                liswp2(1)=liswp1(d-1)
+
+C            open(unit=182,file="wp2moyphiredu3d.res")
+C            if(j.eq.nangredu) then
+C            write(unit=182,fmt='(11g13.5)')
+C            end if
+C          write(unit=182,fmt='(11g13.5)') lisrt2(e),lisphid2(e),liswp2(e)                
+                end if          
+
+               if(j.lt.nangredu) then
+               lisk01(d)= k0m
+               d=d+1 
+               else
+               lisk02(e)=k0m 
+                e=e+1                         
+               end if 
+
+C              print*, k0m,e,j,t,phid
+C              read*             
+             
+          
+C            open(unit=21,file="wfmoyphiredu3d.res")
+C            if(j.eq.0) then
+C            write(unit=21,fmt='(11g13.5)')
+C            end if
+C            write(unit=21,fmt='(11g13.5)') Rt,phid,wfin
+c liste d'ouverture finale
+                liswf(p)= wfin
+
+c liste d'ouverture a 30% de force 
+
+C            open(unit=24,file="w03moyphiredu3d.res")
+C            if(j.eq.0) then
+C            write(unit=24,fmt='(11g13.5)')
+C            end if
+C            write(unit=24,fmt='(11g13.5)') Rt,phid,w03           
+                lisw03(p)=w03    
+       
+           
+c p numéro de ligne pour la réduction   
+c            print*,"Force moyenne ",p,"effectuee"       
+            p=p+1            
+        
+c fin boucle sur j
+        end do
+        
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c fin partie prpfib      
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc            
+
+C C         print*,ld2
+C C         print*,ld1         
+          return
+
+
+       end 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 

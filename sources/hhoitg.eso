@@ -1,0 +1,209 @@
+
+C----------------------------------------------------------------------*
+C Elements FORMULATION 'HHO'
+C HHO    integration d'un champ par element (INTG)
+C----------------------------------------------------------------------*
+
+      SUBROUTINE HHOITG(imoHHO, IVCOMP,
+     &                  IVACAR, NCARR, IPMINT, NBPTEL,
+     &                  VALHHO, IVMELT, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+c* si besoin des coordonnees-INC SMCOORD
+-INC SMMODEL
+-INC SMCHAML
+-INC SMELEME
+-INC SMINTE
+-INC SMLENTI
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS)
+        INTEGER IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+c* si besoin des coordonnees      SEGMENT MWKHHO
+c* si besoin des coordonnees        INTEGER TABINT(NBINT)
+c* si besoin des coordonnees        REAL*8  TABFLO(NBFLO)
+c* si besoin des coordonnees      ENDSEGMENT
+
+      iret = 0
+
+      imodel = imoHHO
+c*      segact,imodel <- actif en entree/sortie
+
+C- Premieres verifications :
+      CALL HHONOB(imoHHO, nobHHO, iret)
+      IF (nobHHO.LE.0)THEN
+        write(ioimp,*) 'HHOITG: IMODEL incorrect (not HHO)'
+        iret = 5
+        RETURN
+      END IF
+
+C- Recuperation des donnees de infell en entree
+c*      MELE   = imodel.NEFMOD
+c*      MFR    = imodel.infele(13)
+      meleme = imodel.IMAMOD
+c*      segact,meleme <- actif en entree/sortie
+      NBNOE  = meleme.NUM(/1)
+      NBELT  = meleme.NUM(/2)
+
+      mlenti = imodel.IVAMOD(nobHHO+1)
+c*      segact,mlenti
+      mlent2 = imodel.IVAMOD(nobHHO+4)
+c*      segact,mlent2
+
+      NBPGAU = mlenti.lect(8)
+      nbel4 = mlent2.lect(/1) / 2
+
+      IF (NBNOE .NE. mlenti.lect(6)) THEN
+        write(ioimp,*) 'HHOITG: Bizarre nb_vertices'
+      END IF
+c NBPGAU =? (NBPTEL = imodel.INFELE(4))
+      IF (NBPGAU .NE. NBPTEL) then
+        write(ioimp,*) 'HHOITG: Bizarre nb.p.gau(1)'
+      END IF
+c NBPGAU =? minte.POIGAU(/1)
+      minte = IPMINT
+c*      SEGACT minte <- actif en E/S
+      if (NBPGAU .NE. minte.POIGAU(/1)) then
+        write(ioimp,*) 'HHOITG: Bizarre nb.p.gau (2)'
+      end if
+c-dbg      write(ioimp,*) 'HHOBSG nbpgau=',NBPGAU
+      if (nbel4.NE.NBELT) then
+        write(ioimp,*) 'HHOITG: Bizarre nbel4'
+      end if
+
+C- Composante a integrer :
+      melval = IVCOMP
+      IGCO = melval.VELCHE(/1)
+      IECO = melval.VELCHE(/2)
+c-dbg      write(ioimp,*) 'IVCOMP',melval,igco,ieco
+
+C- Verification des caracteristiques :
+      if (IVACAR.EQ.0) THEN
+        if (ncarr.ne.0) write(ioimp,*) 'HHOITG: ivacar=0 & ncarr!=0'
+        IVPIHO = 0
+        IVDIM3 = 0
+      ELSE
+        if (NCARR.lt.2) then
+          write(ioimp,*) 'HHOITG: NCARR incorrect'
+          iret = 5
+          return
+        endif
+        mptval = IVACAR
+        IVPIHO = mptval.IVAL(1)
+        IVDIM3 = mptval.IVAL(2)
+        if (IVPIHO.eq.0) then
+          write(ioimp,*) 'HHOITG: PIHO incorrect'
+          iret = 5
+          return
+        endif
+      ENDIF
+      IF (IVPIHO.NE.0) THEN
+        melval = IVPIHO
+        IGPI = melval.VELCHE(/1)
+        IEPI = melval.VELCHE(/2)
+c-dbg      write(ioimp,*) 'IVPIHO',melval,igpi,iepi,tyval(1)
+        IF (IGPI.NE.NBPGAU .AND. IGPI.NE.1) THEN
+          write(ioimp,*) 'HHOITG: PIHO vector size incorrect'
+          iret = 21
+          RETURN
+        END IF
+      ELSE
+        IGPI = 0
+        IEPI = 0
+      ENDIF
+
+      XDIM3 = 1.D0
+      IF (IVDIM3.NE.0) THEN
+        melval = IVDIM3
+        IGD3 = melval.VELCHE(/1)
+        IED3 = melval.VELCHE(/2)
+c-dbg      write(ioimp,*) 'IVDIM3',melval,igd3,ied3
+      ELSE
+        IGD3 = 0
+        IED3 = 0
+      END IF
+
+c* si besoin des coordonnees
+c* si besoin des coordonneesC- Indices et tableau de travail
+c* si besoin des coordonnees      ir_coo =          0
+c* si besoin des coordonnees      ir_fin = ir_coo + (IDIM*NBNOE)
+c* si besoin des coordonnees      NBINT = 0
+c* si besoin des coordonnees      NBFLO = ir_fin
+c* si besoin des coordonnees      SEGINI,MWKHHO
+c* si besoin des coordonnees      SEGACT,mcoord*nomod
+
+      VALHHO = XZERO
+
+C-------------------------
+C Boucle sur les elements
+C-------------------------
+      DO IEL = 1, NBELT
+
+c* si besoin des coordonneesC- Recuperation des coordonnees des noeuds de l element IEL
+c* si besoin des coordonnees        CALL HHOCOO(meleme.num,NBNOE, mcoord.xcoor, IEL,
+c* si besoin des coordonnees    &               TABFLO(ir_coo+1), iret)
+c* si besoin des coordonnees        IF (iret.NE.0) RETURN
+
+        JECO = MIN(IEL,IECO)
+        JEPI = MIN(IEL,IEPI)
+        JED3 = MIN(IEL,IED3)
+
+        VALELT = XZero
+C--  --  --  --  --  --  --  --  --
+C - Boucle sur les points de Gauss
+C--  --  --  --  --  --  --  --  --
+        DO IGAU = 1, NBPGAU
+
+C -- Recuperation de la composante a integrer
+          melval = IVCOMP
+          JGCO = MIN(IGAU,IGCO)
+          XCOM = melval.velche(JGCO,IECO)
+
+C -- Recuperation des "poids d'integration"
+          IF (IVPIHO.NE.0) THEN
+            melval = IVPIHO
+            JGPI = MIN(IGAU,IGPI)
+            XPGA = melval.VELCHE(JGPI,JEPI)
+          ELSE
+            XPGA = minte.POIGAU(IGAU)
+          END IF
+
+C -- Recuperation de l'epaisseur ("DIM3")
+          IF (IVDIM3.NE.0) THEN
+            melval = IVDIM3
+            JGD3 = MIN(IGAU,IGD3)
+            XDIM3 = melval.VELCHE(JGD3,JED3)
+          END IF
+
+          VALELT = VALELT + (XCOM * XPGA * XDIM3)
+C--  --  --  --  --  --  --  --  --
+        END DO
+C--  --  --  --  --  --  --  --  --
+
+        VALHHO = VALHHO + VALELT
+
+        IF (IVMELT.NE.0) THEN
+          melval = IVMELT
+          melval.VELCHE(1,IEL) = VALELT
+        END IF
+
+C-------------------------
+      END DO
+C-------------------------
+c* si besoin des coordonnees      SEGSUP,MWKHHO
+
+c*      RETURN
+      END
+

@@ -1,0 +1,325 @@
+C FATIG3    SOURCE    KICH      22/09/22    21:15:03     11465          
+      SUBROUTINE FATIG3(sig,p,raytau,nbrobl,nombre,icri,
+     &alpha,beta,ycrit,s,ib,igau)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 centre(5),stab(3,3),d(3),e(3),v(3),xnorm(3,3),u(5)
+      REAL*8 sig(nbrobl,nombre),p(nombre),raytau(nombre)
+      REAL*8 s(nbrobl-1,nombre)
+      
+      SQ2 = DSQRT(2.d0)
+      SQ6 = DSQRT(6.d0)
+C
+c     *********************************************************
+c     appel des critere
+c     *********************************************************
+c
+      if (icri.eq.3) then
+C PAPADOPOULOS
+c
+*      call dvpoly(s,centre,elmin,nbrobl,nombre,ib,igau)
+      call dvboul(s,centre,ray,nbrobl,nombre,ib,igau)
+c
+*      pmax = -1.0d10
+*      pmin =  1.0d10
+       pmax = p(1)
+c
+      ycri = -1.D10
+      rayon = 0.D0
+      do i=1,nombre
+        stab(1,2) = 0.d0
+        stab(2,1) = stab(1,2)
+        stab(1,3) = 0.d0
+        stab(3,1) = stab(1,3)
+        if (p(i).gt.pmax) pmax = p(i)
+*        if (p(i).lt.pmin) pmin = p(i)
+        stab(1,1) = (s(1,i) - centre(1))/SQ2
+     .             +(s(2,i) - centre(2))/SQ6
+        stab(2,2) =-(s(1,i) - centre(1))/SQ2
+     .             +(s(2,i) - centre(2))/SQ6
+        stab(3,3) = - stab(1,1) - stab(2,2)
+       if(nbrobl.gt.4) then
+        stab(1,2) = s(5,i) - centre(5)
+        stab(2,1) = s(5,i) - centre(5)
+        stab(1,3) = s(4,i) - centre(4)
+        stab(3,1) = s(4,i) - centre(4)
+       endif
+        stab(2,3) = s(3,i) - centre(3)
+        stab(3,2) = s(3,i) - centre(3)
+        raytau(i)  = dsqrt(stab(1,1)**2+stab(2,2)**2+stab(3,3)**2+
+     .   2.*(stab(1,2)**2+stab(2,3)**2+stab(1,3)**2))/SQ2
+
+       ycri0 = (raytau(i) + alpha*p(i) - beta)/(beta-alpha*p(i))
+*      write(6,*) 'PP',i,p(i),raytau(i),ycri
+       if (raytau(i).gt.rayon) rayon=raytau(i)
+       if (ycri0.gt.ycri) ycri=ycri0
+      enddo
+c      ycrit0 = (ray + alpha*pmax - beta)/(beta-alpha*pmax)
+      ycrit = (rayon + alpha*pmax - beta)/(beta-alpha*pmax)
+*      write(6,*) 'PPF',pmax,ray,rayon,ycrit,ycri
+c
+      return
+      endif
+c
+      if(icri.eq.2) then
+C DANG VAN
+c
+      critere = -1.d10
+c
+      call dvboul(s,centre,ray,nbrobl,nombre,ib,igau)
+*      if (ib.eq.1.and.igau.eq.1) then
+*      write(6,*) 'ct',((centre(jj)/1.e6),jj= 1,5)
+*      write(6,*) (ray/1.e6),nbrobl,nombre
+*      endif
+c
+      do i=1,nombre
+        stab(1,2) = 0.d0
+        stab(2,1) = stab(1,2)
+        stab(1,3) = 0.d0
+        stab(3,1) = stab(1,3)
+        stab(1,1) = (s(1,i) - centre(1))/SQ2
+     .             +(s(2,i) - centre(2))/SQ6
+        stab(2,2) =-(s(1,i) - centre(1))/SQ2
+     .             +(s(2,i) - centre(2))/SQ6
+        stab(3,3) = - stab(1,1) - stab(2,2)
+       if(nbrobl.gt.4) then
+        stab(1,2) = s(5,i) - centre(5)
+        stab(2,1) = s(5,i) - centre(5)
+        stab(1,3) = s(4,i) - centre(4)
+        stab(3,1) = s(4,i) - centre(4)
+       endif
+        stab(2,3) = s(3,i) - centre(3)
+        stab(3,2) = s(3,i) - centre(3)
+        call dvdiag(stab,d)
+c
+c       Classement des valeurs propres
+c
+        d3 = dabs(d(1)-d(2))
+        d2 = dabs(d(1)-d(3))
+        d1 = dabs(d(3)-d(2))
+        if (d1.lt.1.d-04) d(2) = d(3)
+        if (d2.lt.1.d-04) d(1) = d(3)
+        if (d3.lt.1.d-04) d(2) = d(1)
+c
+        n1 = 1
+        n2 = 2
+        n3 = 3
+        if (d(2).gt.d(1).and.d(3).gt.d(2)) then
+           n1 = 3
+           n2 = 2
+           n3 = 1
+        endif
+        if (d(2).gt.d(3).and.d(3).gt.d(1)) then
+           n1 = 2
+           n2 = 3
+           n3 = 1
+        endif
+        if (d(3).gt.d(1).and.d(1).gt.d(2)) then
+           n1 = 3
+           n2 = 1
+           n3 = 2
+        endif
+        if (d(1).gt.d(3).and.d(3).gt.d(2)) then
+           n1 = 1
+           n2 = 3
+           n3 = 2
+        endif
+        if (d(2).gt.d(1).and.d(1).gt.d(3)) then
+           n1 = 2
+           n2 = 1
+           n3 = 3
+        endif
+c
+        raytau(i) = dabs(d(n1)-d(n3))/2.
+        crit = raytau(i) + alpha*p(i) - beta
+        crit = crit / beta
+c
+c
+        if (crit.gt.critere) then
+           critere    = crit
+*           critere    = crit / (beta-alpha*p(i))
+           v(1)       = d(n1)
+           v(2)       = d(n2)
+           v(3)       = d(n3)
+           xnorm(1,1) = stab(1,n1)
+           xnorm(2,1) = stab(2,n1)
+           xnorm(3,1) = stab(3,n1)
+           xnorm(1,2) = stab(1,n2)
+           xnorm(2,2) = stab(2,n2)
+           xnorm(3,2) = stab(3,n2)
+           xnorm(1,3) = stab(1,n3)
+           xnorm(2,3) = stab(2,n3)
+           xnorm(3,3) = stab(3,n3)
+        endif
+      enddo
+c
+      ycrit = critere
+c
+      return
+      endif
+
+      if(icri.eq.4) then
+C SINES
+c
+      dmax = 0.d0
+      do i=1,nombre-1
+        do j=i+1,nombre
+          dist = (s(1,i)-s(1,j))**2+(s(2,i)-s(2,j))**2
+     .      +2.d0*((s(3,i)-s(3,j))**2)
+          if (nbrobl.gt.4) then
+           dist = dist + 2.d0*((s(4,i)-s(4,j))**2
+     .          +(s(5,i)-s(5,j))**2)
+          endif
+          dist = dsqrt(dist)
+          if (dist.gt.dmax) then
+           dmax=dist
+          endif
+        enddo
+      enddo
+      dmax = dmax/2.d0/SQ2
+c
+      pmoyenne = 0.d0
+      do i=1,nombre
+        pmoyenne = pmoyenne+p(i)
+      enddo
+      pmoyenne = pmoyenne/float(nombre)
+      raytau(1) = pmoyenne
+      raytau(2) = dmax
+      ycrit = (dmax+alpha*pmoyenne-beta)/(beta-alpha*pmoyenne)
+      return
+      endif
+
+      if(icri.eq.5) then
+C CROSS
+c
+      dmax = 0.d0
+      do i=1,nombre-1
+        do j=i+1,nombre
+          dist = (s(1,i)-s(1,j))**2+(s(2,i)-s(2,j))**2
+     .      +2.d0*((s(3,i)-s(3,j))**2)
+          if (nbrobl.gt.4) then
+           dist = dist + 2.d0*((s(4,i)-s(4,j))**2
+     .          +(s(5,i)-s(5,j))**2)
+          endif
+          dist = dsqrt(dist)
+          if (dist.gt.dmax) then
+            dmax=dist
+          endif
+        enddo
+      enddo
+      dmax = dmax/2.d0/SQ2
+c
+*      pmax = -1.0d10
+      pmax = p(1)
+      do i=1,nombre
+        if (p(i).gt.pmax) pmax=p(i)
+      enddo
+      raytau(1) = pmax
+      raytau(2) = dmax
+      ycrit = (dmax + alpha*pmax - beta)/(beta - alpha*pmax)
+      return
+      endif
+
+      if(icri.eq.6) then
+C DC
+c
+      dmax  = 0.d0
+      dmaxp = 0.d0
+c
+c     ***********************
+c     plus grand diametre ...
+c     ***********************
+      do i=1,nombre-1
+        do j=i+1,nombre
+          dist = (s(1,i)-s(1,j))**2+(s(2,i)-s(2,j))**2
+     .      +2.d0*((s(3,i)-s(3,j))**2)
+          if (nbrobl.gt.4) then
+           dist = dist + 2.d0*((s(4,i)-s(4,j))**2
+     .          +(s(5,i)-s(5,j))**2)
+          endif
+          dist = dsqrt(dist)
+          if (dist.gt.dmax) then
+            dmax=dist
+            ic = i
+            jc = j
+          endif
+        enddo
+      enddo
+      if(dmax.eq.0.) then
+        dmaxp = 0.
+      else
+c       ***********************
+c       deuxieme diametre ...
+c       ***********************
+        do k=1,nbrobl-1
+          u(k) = (s(k,ic)-s(k,jc))/dmax
+        enddo
+        do k=1,nombre
+         prod = u(1)*s(1,k)+u(2)*s(2,k)
+     .     +2.d0*u(3)*s(3,k)
+          if (nbrobl.gt.4) then
+           prod = prod + 2.d0*(u(4)*s(4,k)+u(5)*s(5,k))
+          endif         
+         do kj=1,nbrobl-1
+           s(kj,k) = s(kj,k)-prod*u(kj)
+         enddo
+        enddo
+        do i=1,nombre-1
+          do j=i+1,nombre
+            dist = (s(1,i)-s(1,j))**2+(s(2,i)-s(2,j))**2
+     .        +2.*((s(3,i)-s(3,j))**2)
+          if (nbrobl.gt.4) then
+           dist = dist + 2.d0*((s(4,i)-s(4,j))**2
+     .          +(s(5,i)-s(5,j))**2)
+          endif         
+            dist = dsqrt(dist)
+            if (dist.gt.dmaxp) dmaxp = dist
+          enddo
+        enddo
+      endif
+c
+*      pmax = -1.0d10
+      pmax = p(1)
+      do i=1,nombre
+        if (p(i).gt.pmax) pmax=p(i)
+      enddo
+c      write(6,*) 'dc',pmax,dmax,dmaxp
+      a = dsqrt((dmax/2.)**2+(dmaxp/2.)**2)/SQ2
+      raytau(1) = pmax
+      raytau(2) = a
+      ycrit = (a + alpha*pmax - beta)/(beta - alpha*pmax)
+      return
+      endif
+
+      if(ICRI.eq.7) then
+C VON MISES
+c
+      vonmax = 0.d0
+      do i=1,nombre
+          if (nbrobl.gt.4) then
+        von = dsqrt(s(1,i)**2+s(2,i)**2
+     .        +2.*(s(3,i)**2+s(4,i)**2+s(5,i)**2))/SQ2
+          else
+        von = dsqrt(s(1,i)**2+s(2,i)**2
+     .        +2.*(s(3,i)**2))/SQ2
+          endif
+        if (von.gt.vonmax) then
+         vonmax = von
+        endif
+      enddo
+c
+      ycrit = vonmax
+      return
+      endif
+
+c
+ 900  format(9x,'1 = dvk',/9x,'2 = papado',/9X,'3 = cross',
+     .   /9X,'4 = sines',/9X,'5 = dc',/9X,'6 = vm'/)
+c
+c
+c
+      end
+
+ 
+ 
+ 

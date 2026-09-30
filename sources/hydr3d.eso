@@ -1,0 +1,136 @@
+C HYDR3D    SOURCE    FD218221  24/02/07    21:15:14     11834          
+        subroutine hydr3d(xmat,nmat,vnmat,nstype,nbelas,var0,varf,
+     #  nvari,vnvari,ndtens,iso,sigm3,souplesse66)
+
+c       relaxation chimique
+
+c       declarations externes
+        implicit integer(i-n)
+        implicit real*8(a-h,o-z)
+
+        logical iso
+        integer nmat,vnmat,nstype,nbelas,nvari,ndtens
+        integer vnvari(nstype,2)
+        real*8 xmat(nmat),var0(nvari),varf(nvari)
+        real*8 sigm3(3),souplesse66(6,6)
+
+        real*8 E,nu,k1,mu1,k0,mu0
+        integer numk,numm,ne,nm,nk,nf
+        real*8 sigmd03(3),devi0,trac0,press0
+        real*8 sigmd13(3),devi1,trac1,press1
+        real*8 aux1,de3(3),vde33(3,3),vde33t(3,3)
+        real*8 de6(6),de6p(6),de33(3,3)
+        real*8 Ode333(3,3,3)
+        real*8 dm3(3),vdm33(3,3)
+        real*8 df3(3),vdf33(3,3)
+        real*8 dk3(3),vdk33(3,3)
+
+
+c       on procede par comparaison des coeff d elasticite K et MU
+c       si les coeff baissent on ne change pas la contrainte par
+c       contre s ils augmentent on diminue les contraintes initiales
+
+        if(iso) then
+             call xmat3d(E,xmat,nmat,vnmat,nstype,nbelas,0,1)
+             call xmat3d(nu,xmat,nmat,vnmat,nstype,nbelas,0,2)
+             k1=E/(3.d0*(1.d0-2.d0*nu))
+             mu1=E/(2.d0*(1.d0+nu))
+             call xvar3d(k0,numk,var0,nvari,vnvari,nstype,ndtens,1,7)
+             call xvar3d(mu0,numm,var0,nvari,vnvari,nstype,ndtens,1,8)
+c            maj valeur
+             varf(numk)=k1
+             varf(numm)=mu1
+        else
+             call xmat3d(E,xmat,nmat,vnmat,nstype,nbelas,0,1)
+             call xmat3d(nu,xmat,nmat,vnmat,nstype,nbelas,0,4)
+             k1=E/(3.d0*(1.d0-2.d0*nu))
+             mu1=E/(2.d0*(1.d0+nu))
+             call xvar3d(k0,numk,var0,nvari,vnvari,nstype,ndtens,1,7)
+             call xvar3d(mu0,numm,var0,nvari,vnvari,nstype,ndtens,1,8)
+c            maj valeur
+             varf(numk)=k1
+             varf(numm)=mu1
+        end if
+c       reduction des nouvelles contraintes principales si necessaire
+        if((k1.gt.k0).or.(mu1.gt.mu0)) then
+c         recuperation du tenseur de deformation elastique initial        
+          call tvar3d(de3,vde33,ne,var0,nvari,vnvari,nstype,ndtens,1,1)
+c         recuperation du tenseur de deformation Maxwell initial        
+          call tvar3d(dm3,vdm33,nm,var0,nvari,vnvari,nstype,ndtens,2,1)
+c         recuperation du tenseur de deformation Fluide transitoire       
+          call tvar3d(df3,vdf33,nf,var0,nvari,vnvari,nstype,ndtens,3,1)
+c         recuperation du tenseur de deformation Kelvin initial        
+          call tvar3d(dk3,vdk33,nk,var0,nvari,vnvari,nstype,ndtens,4,1)
+c         actualisation des deformations debut de pas par hydrtation 
+          call tp3d(sigm3,sigmd03,devi0,trac0,press0)
+          press1=press0*k0/k1
+          do i=1,3
+                sigmd13(i)=sigmd03(i)*mu0/mu1
+                sigm3(i)=sigmd13(i)-press1
+          end do
+c         actualisation des deformations elastiques principales en 
+c         fonction des nouvelles contraintes
+          do i=1,6
+            de6p(i)=0.d0
+            do j=1,3
+               de6p(i)=de6p(i)+souplesse66(i,j)*sigm3(j)
+            end do
+          end do
+c         retour en base fixe
+          call traps1(vde33t,vde33,3)
+          call chrep6(de6p,vde33t,.false.,de6)       
+c         directions principales des increments de deformations elastiques
+          call x6x33(de6,de33)
+          call b3_v33(de33,de3,vde33)
+          call orie3d(vde33,Ode333)
+c         actualisation des deformations elastiques
+          do i=1,3
+            varf(ne+i)=de3(i)
+            do j=1,3
+                varf(ne+3+(i-1)*3+j)=vde33(j,i)
+            end do
+          end do
+c         actualisation des deformations de Maxwell pas dilution
+          call tp3d(dm3,sigmd03,devi0,trac0,press0)
+          press1=press0*k0/k1
+          do i=1,3
+            sigmd13(i)=sigmd03(i)*mu0/mu1
+            dm3(i)=sigmd13(i)-press1
+            varf(nm+i)=dm3(i)
+c           les directions principales n'ont pas été changées
+            do j=1,3
+                varf(nm+3+(i-1)*3+j)=var0(nm+3+(i-1)*3+j)
+            end do
+          end do
+c         actualisation des deformations Fluides transitoires
+          call tp3d(df3,sigmd03,devi0,trac0,press0)
+          press1=press0*k0/k1
+          do i=1,3
+            sigmd13(i)=sigmd03(i)*mu0/mu1
+            df3(i)=sigmd13(i)-press1
+            varf(nf+i)=df3(i)
+c           les directions principales n'ont pas été changées
+            do j=1,3
+                varf(nf+3+(i-1)*3+j)=var0(nf+3+(i-1)*3+j)
+            end do
+          end do
+c         actualisation des deformations de Kelvin par dilution
+          call tp3d(dk3,sigmd03,devi0,trac0,press0)
+          press1=press0*k0/k1
+          do i=1,3
+            sigmd13(i)=sigmd03(i)*mu0/mu1
+            dk3(i)=sigmd13(i)-press1
+            varf(nk+i)=dk3(i)
+c           les directions principales n'ont pas été changées
+            do j=1,3
+                varf(nk+3+(i-1)*3+j)=var0(nk+3+(i-1)*3+j)
+            end do
+          end do
+        end if
+
+        return     
+        end
+
+
+          
+ 

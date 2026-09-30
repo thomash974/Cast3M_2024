@@ -1,0 +1,36 @@
+C HYDC3D    SOURCE    PV090527  23/01/27    21:15:37     11574          
+       subroutine hydc3d(souplesse66,sigke06,epsk06,psik,
+     # epse06,sigef06,fl3d,plast_seule)
+      
+c      compatibilites des deformations elastique et de kelvin
+c      avec le materiau ayant subi un increment d hydratation
+c      pour eviter la surevaluation de la deformation de fluage
+
+c      tables de dimension fixe pour resolution des sytemes lineaires 
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+
+
+c      declaration des variables externes
+       real*8 souplesse66(6,6),sigef06(6),epse06(6)
+       real*8 sigke06(6),epsk06(6),psik
+       logical fl3d,plast_seule
+      
+       do i=1,6
+        epse06(i)=0.d0
+        epsk06(i)=0.d0
+        do j=1,6
+c            deformation elastique actualisee pour rester
+c            coherente avec le niveau de contrainte de 
+c            l etage elastique   apres increment d hydratation         
+             epse06(i)=epse06(i)+souplesse66(i,j)*sigef06(j)
+c            idem pour l etage de Kelvin,pour la cohereance en decharge
+             if(fl3d.and.(.not.plast_seule)) then
+                  epsk06(i)=epsk06(i)+souplesse66(i,j)*sigke06(j)/psik
+             end if
+        end do               
+       end do 
+       return
+       end
+         
+ 

@@ -1,0 +1,11 @@
+C PFPRW4    SOURCE    OF166741  24/03/28    21:15:09     11811          
+
+      SUBROUTINE pfprw4
+
+      write(*,*) 'Subroutine PFPRW4 no longer used'
+      call erreur(5)
+
+c      return
+      END
+
+ 

@@ -1,0 +1,23 @@
+C IMP03D    SOURCE    PV090527  23/01/27    21:15:41     11574          
+        subroutine imp03d(numz,aa,bb,ngf,valz)
+        
+c      modification du systeme lineaire pour imposer une valeur        
+
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+       
+       integer ngf,numz
+       real*8 aa(ngf,ngf+1),bb(ngf)
+       real*8 valz
+       do idir=1,ndim_solve
+            aa(numz,idir)=0.d0
+            aa(idir,numz)=0.d0
+       end do
+       bb(numz)=valz
+       aa(numz,numz)=1.d0
+       return
+       end
+       
+
+       
+ 

@@ -1,0 +1,124 @@
+C NOMMER    SOURCE    OF166741  23/06/19    21:15:06     11679          
+
+      SUBROUTINE NOMMER
+C=======================================================================
+C DIRECTIVE NOMMER :
+C           Creation d'un objet nomme dont le nom est choisi par
+C           l'utilisateur
+C
+C SYNTAXE :
+C        'NOMMER' MOT1 OBJ1 ;
+C
+C         MOT1 : Nom de l'objet nomme qui sera cree dans Cast3M
+C         OBJ1 : Objet existant que l'on souhaite egalement nommer MOT1
+C
+C=======================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+
+      CHARACTER*(LOCHAI) CHAO
+      CHARACTER*(LONOM)  NOMO
+      CHARACTER*8        TYPO
+      LOGICAL            LOGO
+
+      CHAO   = '        '
+      NOMO   = '        '
+      TYPO   = '        '
+      IRETOU = 0
+
+c#dbg      IF (IIMPI.EQ.12345)
+c#dbg        CALL QUETYP(TYPO,0,IRETOU)
+c#dbg        IF (IERR.NE.0) RETURN
+c#dbg        write(ioimp,*) 'TYPE LU =>'//TYPO//'<='
+c#dbg      ENDIF
+
+C- On commence par lire le nouveau nom de l'objet :
+      ICOND = 1
+C- Avec LIRCHA on lit 1) directement une chaine,
+C-                 ou 2) le contenu d'un mot (converti en chaine).
+      CALL LIRCHA(CHAO,ICOND,IRETOU)
+      IF (IERR.NE.0) RETURN
+      IF (IRETOU.GT.0) THEN
+c#dbg        IF (IIMPI.EQ.12345)
+c#dbg          write(ioimp,*) 'Lecture CHAO=',CHAO(1:LONOM),'=',IRETOU,'='
+        IF (IRETOU.GT.LONOM) THEN
+          WRITE(ioimp,*) 'Nom = pas plus de ',LONOM,' caracteres'
+          CALL ERREUR(315)
+          RETURN
+        ENDIF
+        j = INDEX(CHAO(1:IRETOU),' ')
+        IF (j.NE.0) THEN
+          WRITE(ioimp,*) 'NOM sans aucun ESPACE / NAME without SPACE'
+          CALL ERREUR(315)
+          RETURN
+        ENDIF
+        NOMO(1:IRETOU) = CHAO(1:IRETOU)
+C- 
+        CALL MINMAJ(NOMO)
+c#dbg        IF (IIMPI.EQ.12345)
+c#dbg          write(ioimp,*) 'CHA='//NOMO//'='
+
+C- Cas d'un objet quelconque dont on prend le nom (cas non considere)
+*      ELSE
+* Il faudra mettre ICOND = 0 auparavant !
+*        CALL QUETYP(TYPO,1,IRETOU)
+*        IF (IERR.NE.0) RETURN
+*        CALL LIROBJ(TYPO,IPKO,1,IRETOU)
+*        IF (IERR.NE.0) RETURN
+*        CALL QUENOM(NOMO)
+*c#dbg        IF (IIMPI.EQ.12345) write(ioimp,*) 'OBJ='//NOMO//'='
+      ENDIF
+c#dbg      IF (IIMPI.EQ.12345) THEN
+        IF (NOMO(1:1).EQ.'#') write(ioimp,*) 'Objet temporaire'
+c#dbg      ENDIF
+
+C- Detection du TYPE de l'objet a nommer
+      TYPO   = '        '
+      IRETOU = 0
+      CALL QUETYP(TYPO,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+      IF (IRETOU.LE.0) THEN
+        write(ioimp,*) 'Objet a nommer non trouve'//' / '//
+     &                 'Object to be named not found'
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+c#dbg      IF (IIMPI.EQ.12345) write(ioimp,*) 'objet TYPE =>'//TYPO//'<='
+C- Lecture de l'objet a nommer PUIS Affectation du nom a l'objet
+      IF      (TYPO.EQ.'ENTIER  ') THEN
+        CALL LIRENT(INTO,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+        CALL NOMENT(NOMO,INTO)
+c#dbg        IF (IIMPI.EQ.12345) write(ioimp,*) 'objet ENTIER valeur =',INTO
+      ELSE IF (TYPO.EQ.'FLOTTANT') THEN
+        CALL LIRREE(REEO,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+        CALL NOMREE(NOMO,REEO)
+c#dbg        IF (IIMPI.EQ.12345) write(ioimp,*) 'objet FLOTTANT valeur =',REEO
+      ELSE IF (TYPO.EQ.'LOGIQUE ') THEN
+        CALL LIRLOG(LOGO,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+        CALL NOMLOG(NOMO,LOGO)
+c#dbg        IF (IIMPI.EQ.12345) write(ioimp,*) 'objet LOGIQUE valant ',LOGO
+      ELSE IF (TYPO.EQ.'MOT     ') THEN
+        CALL LIRCHA(CHAO,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+        CALL NOMCHA(NOMO,CHAO(1:IRETOU))
+c#dbg        IF (IIMPI.EQ.12345) write(ioimp,*) 'objet MOT =',CHAO(1:IRETOU)
+      ELSE
+        CALL LIROBJ(TYPO,IPKO,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+        IF (TYPO.EQ.'PROCEDUR') IPKO=IPIPR1(IPKO)
+        CALL NOMOBJ(TYPO,NOMO,IPKO)
+c#dbg       IF (IIMPI.EQ.12345)  write(ioimp,*) 'objet ',TYPO,' pointeur =',IPKO
+      ENDIF
+
+      RETURN
+      END
+
+ 

@@ -1,0 +1,35 @@
+C RECONF    SOURCE    FD218221  24/02/07    21:15:24     11834          
+      subroutine reconf(coeff,res,rt,phid,
+     # minv,maxv)
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)     
+      
+      real*8 x0,x1,y1,x2,y2,xy1,x2y,xy2,x3,y3,res,phid,rt
+      real*8 minv,maxv,coeff(10)
+
+      x0=coeff(1)
+      x1=coeff(2)
+      y1=coeff(3)
+      x2=coeff(4)
+      y2=coeff(5)
+      xy1=coeff(6)
+      x2y=coeff(7)
+      xy2=coeff(8)
+      x3=coeff(9)
+      y3=coeff(10)
+
+c      calcul de la valeur interpolée         
+       res=x0+x1*rt+y1*phid+x2*rt**2+y2*phid**2+
+     # xy1*rt*phid+x2y*rt**2*phid+xy2*rt*phid**2+
+     # x3*rt**3+y3*phid**3  
+       if(res.gt.maxv) then
+        res=maxv
+       else if (res.lt.minv) then
+        res=minv
+       end if
+         
+         return
+         end
+ 
+ 

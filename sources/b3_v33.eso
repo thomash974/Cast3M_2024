@@ -1,0 +1,329 @@
+C B3_V33    SOURCE    PV090527  23/02/15    21:15:03     11592          
+c**************************************************************************************
+      subroutine b3_v33(x33,x3,v33)
+c     A.Sellier jeu. 02 sept. 2010 18:13:24 CEST 
+c     diagonalisagion 33 a partir de jacobi + quelques controles
+c     declarations externes
+      implicit real*8(a-h,m-z)
+      implicit integer(i-l)
+      real*8 x33(3,3),x3(3),v33(3,3),y33(3,3)
+c     declarations locales      
+      real*8 epsv,xmax,depsv
+      integer i,j,k
+      real*8 un
+      real*8 eps3(3)
+c     une matrice est consideree comme deja diagonale si test 20 verifie
+c     fonction de la prescision relative epsv
+c     epsv est aussi utilise   dans jacob3 pour decider si deux valeurs
+c     propres petites par rapport a la troisieme peuvent etre consideree
+c     comme des doubles, ce qui evite de rechercher des vecteurs propres
+c     avec une matrice mal conditonnee
+c     enfin epsv est utilise en fin de programme pour tester si la matrice
+c     de passage fonctionne correctement, pour cela on verifie si la propriete
+c     vt*v est verifiee  a epsv pres hors diagonale si ce n est pas le cas
+c     on affiche un message non bloquant
+      parameter(un=1.d0,epsv=1.d-6)
+      real*8 v33t(3,3)
+      real*8 u33(3,3),u033(3,3),dif33(3,3)
+      real*8 xmax1      
+      logical vpmultiple,erreur,diago,ordre  
+      real*8 trace,z3(3),z33(3,3)
+      integer imax,imin,imed
+      real*8 zmax,zmin,zmed     
+c     epsv*d(1) valeur en dessous la quelle un terme hors diagonale est negligee
+c     lors du calcul des vecteurs propres
+      vpmultiple=.false.
+      diago=.false.
+      ordre=.true. 
+      erreur=.false.   
+   
+c     print*
+c     call afic33(x33)
+c-----------------------------------------------------------------------
+c     normalisation du tenseur avant digonalisation
+c      print*,'avant normalisation ds b3_v33'
+c      call afic33(x33)
+c      xmax1=1.0d-8
+c      do i=1,3
+c         do j=1,3
+c            xmax1=dmax1(xmax1,dabs(x33(i,j)))
+c         end do
+c      end do
+c      do i=1,3
+c          do j=1,3
+c            x33(i,j)=x33(i,j)/xmax1
+c          end do
+c      end do
+c      print*,'apres normalisation ds b3_v33'
+c      call afic33(x33)
+c----------------------------------------------------------------------- 
+
+C     STOCKAGE de x33 dans y33 pour diagonalisation par jacobi iterative
+c     car cette methode ecrit sur y33
+      do i=1,3
+         do j=1,3
+            y33(i,j)=x33(i,j)
+         end do
+      end do
+*     call b3_jac(y33,v33,x3)
+      call dsyevj3(y33,v33,x3)
+
+c***********************************************************************
+c     controle de l ordre des valeurs propres
+      if((x3(1).gt.x3(2)).and.
+     #   (x3(2).gt.x3(3))) then
+          continue
+      else
+c       on remet de l ordre
+        trace=0.d0
+        do i=1,3
+           z3(i)=x3(i)
+           trace=trace+z3(i)
+           do j=1,3
+               z33(i,j)=v33(i,j)
+           end do
+        end do
+c       on cherche la plus grande valeur propre
+        imax=1
+        zmax=z3(imax)
+        do i=2,3
+           if(z3(i).gt.zmax) then
+              imax=i
+              zmax=z3(i)
+           end if
+        end do
+c       on cherche la plus petite
+        imin=3
+        zmin=z3(imin)
+        do i=2,1,-1
+           if(z3(i).lt.zmin) then
+              imin=i
+              zmin=z3(i)
+           end if
+        end do
+        if (imin.ne.imax) then
+c           on deduit l intermediaire
+            zmed=trace-(zmin+zmax)      
+            imed=6-(imin+imax)
+c           on range correctement
+            x3(1)=z3(imax)
+            x3(2)=z3(imed)
+            x3(3)=z3(imin)
+            do j=1,3
+                v33(j,1)=z33(j,imax)
+                v33(j,2)=z33(j,imed)
+                v33(j,3)=z33(j,imin) 
+            end do
+c           on teste si c est bien dans l ordre
+C            call chre3(z33,y33,v33)
+C             if( (z33(1,1).lt.z33(2,2)).or.
+C      #          (z33(2,2).lt.z33(3,3)).or.
+C      #          (z33(1,1).lt.z33(3,3)) ) then
+C                 print*,'erreur b3_v33 lors du classement des VP'
+C                 print*,'valeurs propres:'
+C                 do i=1,3
+C                     write(*,'(A2,I1,A2,E10.3)') 'x(',i,')=',x3(i)
+C                 end do
+C                 print*,'matrice a diagonaliser'
+C                 call afic33(y33)
+C                 print*,'matrice de passage'
+C                 call afic33(v33)
+C                 print*,'matrice diagonale'
+C                 call afic33(z33)
+C                 erreur=.true.
+C             end if
+         end if       
+      end if
+c***********************************************************************
+
+c     controle des normes de v33
+      do i=1,3
+        xn=sqrt(v33(1,i)**2+v33(2,i)**2+v33(3,i)**2)
+c        print*,'norme v(',i,')=',xn
+        if(abs(xn-1.d0).gt.1.d-4) then
+            print*,'vecteur propre anormal ds b3_v33'
+            call afic33(x33)
+c           print*,'remplacement par vi v vj'
+            call indce1(i,k,l)
+            v33(1,i)=v33(2,k)*v33(3,l)-v33(3,k)*v33(2,l)
+            v33(2,i)=v33(3,k)*v33(1,l)-v33(1,k)*v33(3,l)
+            v33(3,i)=v33(1,k)*v33(2,l)-v33(2,k)*v33(1,l) 
+            xn=sqrt(v33(1,i)**2+v33(2,i)**2+v33(3,i)**2)
+            do k=1,3
+               v33(k,i)=v33(k,i)/xn
+            end do
+            call afic33(v33)
+c           read*          
+        end if
+      end do
+      goto 30
+      
+c     **verif produit scalaire entre v1 et v2*****
+20    eps1=0.d0
+      do i=1,3
+       eps1=eps1+v33(i,1)*v33(i,2)
+      end do
+c      print*,'valp33 v1.v2=',eps1
+      if(abs(eps1).gt.1.d-4) then
+c         print*,'erreur produit scalaire v1 v2 av :',eps1
+c        test produit scalaire v1 v3         
+         eps1=0.d0
+         do i=1,3
+           eps1=eps1+v33(i,1)*v33(i,3)
+         end do
+         if(abs(eps1).gt.1.d-4) then
+c            print*,'erreur produit scalaire v1 v3 av :',eps1 
+c           correction de v1
+            do i=1,3
+              v33(i,1)=v33(i,1)-eps1*v33(i,3)
+            end do
+c           renormalisation
+            xn=dsqrt(v33(1,1)**2+v33(2,1)**2+v33(3,1)**2)
+            do i=1,3
+               v33(i,1)=v33(i,1)/xn
+            end do               
+c            erreur=.true.
+c            goto 10
+         end if
+c        v1 et v3 etant orthogonaux on reconstruit v2 par produit
+c        vectoriel
+         v33(1,2)=v33(2,1)*v33(3,3)-v33(3,1)*v33(2,3)
+         v33(2,2)=v33(3,1)*v33(1,3)-v33(1,1)*v33(3,3)
+         v33(3,2)=v33(1,1)*v33(2,3)-v33(2,1)*v33(1,3)
+      else
+c      test produit scalaire v2 v3
+       eps1=0.d0
+       do i=1,3
+        eps1=eps1+v33(i,2)*v33(i,3)
+       end do 
+c       print*,'valp33 v2.v3=',eps1
+       if(abs(eps1).gt.1.d-4) then
+c         print*,'erreur produit scalaire v2 v3 av :',eps1
+c        test produit scalaire v1 v3         
+         eps1=0.d0
+         do i=1,3
+           eps1=eps1+v33(i,1)*v33(i,3)
+         end do
+         if(abs(eps1).gt.1.d-4) then
+c            print*,'erreur produit scalaire v1 v3 av :',eps1         
+c           correction de v3
+            do i=1,3
+              v33(i,3)=v33(i,3)-eps1*v33(i,1)
+            end do
+c           renormalisation
+            xn=dsqrt(v33(1,3)**2+v33(2,3)**2+v33(3,3)**2)
+            do i=1,3
+               v33(i,3)=v33(i,3)/xn
+            end do 
+         end if
+c        v1 et v3 etant orthogonaux on reconstruit v2 par produit
+c        vectoriel
+         v33(1,2)=v33(2,1)*v33(3,3)-v33(3,1)*v33(2,3)
+         v33(2,2)=v33(3,1)*v33(1,3)-v33(1,1)*v33(3,3)
+         v33(3,2)=v33(1,1)*v33(2,3)-v33(2,1)*v33(1,3)
+        else
+c        test du produit scalaire entre v1 v3
+         eps1=0.d0
+         do i=1,3
+          eps1=eps1+v33(i,1)*v33(i,3)
+         end do 
+c        print*,'valp33 v3.v1=',eps1
+         if(dabs(eps1).gt.1.d-4) then
+c           print*,'erreur produit scalaire v3 v1 av :',eps1
+c          test produit scalaire v3 v2         
+           eps1=0.d0
+           do i=1,3
+             eps1=eps1+v33(i,2)*v33(i,3)
+           end do
+           if(dabs(eps1).gt.1.d-4) then
+c            print*,'erreur produit scalaire v3 v2 av :',eps1         
+c           correction de v3 avec v2
+            do i=1,3
+              v33(i,3)=v33(i,3)-eps1*v33(i,2)
+            end do
+c           renormalisation
+            xn=dsqrt(v33(1,3)**2+v33(2,3)**2+v33(3,3)**2)
+            do i=1,3
+               v33(i,3)=v33(i,3)/xn
+            end do 
+c           v2 et v3 etant orthogonaux on reconstruit v1 par produit
+c           vectoriel
+            v33(1,1)=v33(2,2)*v33(3,3)-v33(3,2)*v33(2,3)
+            v33(2,1)=v33(3,2)*v33(1,3)-v33(1,2)*v33(3,3)
+            v33(3,1)=v33(1,2)*v33(2,3)-v33(2,2)*v33(1,3)             
+           end if 
+        end if        
+       end if
+      end if
+
+30    continue
+c     mise en ordre du produit vectoriel
+      v33(1,3)=v33(2,1)*v33(3,2)-v33(3,1)*v33(2,2)
+      v33(2,3)=v33(3,1)*v33(1,2)-v33(1,1)*v33(3,2)
+      v33(3,3)=v33(1,1)*v33(2,2)-v33(2,1)*v33(1,2) 
+
+
+c     matrice de passage inverse
+      do i=1,3
+       do j=1,3
+        v33t(i,j)=v33(j,i)
+       end do
+      end do 
+    
+c***********************************************
+ 
+c     verif validite des matrice de passage
+c     (on change de nase une matrice unitaire)
+
+      call mtmt3d(v33,v33t,3,3,3,u33)
+c      print*,'Image matrice identite apres correction'
+c      call afic33(u33)      
+      do i=1,3
+       do j=1,3
+        if (i.eq.j)then
+         if( abs(u33(i,i)-un) .gt. sqrt(epsv))then
+          erreur=.true.
+          goto 10
+         endif
+        else
+         if( abs(u33(i,j)) .gt. sqrt(epsv))then
+          erreur=.true.
+          goto 10
+         endif
+        end if
+       end do
+      end do 
+c     affichage des variables en cas de pb de diagonalisation  
+c10    continue
+
+
+10    if(erreur)then
+       print*,'_______________________________'
+       print*,'pb vecteur propre ds b3_v33'
+       print*,'matrice deja diagonale :',diago
+       print*,'ordre :',ordre
+       print*,'vp multiple :',vpmultiple
+       print*,'matrice a diagonaliser :'
+       call afic33(x33)  
+       print*,'valeurs propres:',x3(1),x3(2),x3(3)
+       print*,'x1-x2',x3(1)-x3(2)
+       print*,'x2-x3',x3(2)-x3(3) 
+       print*,'|',epsv,'*x(1)|',dabs(epsv * x3(1))     
+       print*,'|',epsv,'*x(2)|',dabs(epsv * x3(2))              
+       print*,'matrice de passage:'
+       call afic33(v33)
+       print*,'image matrice identite:'
+       call afic33(u33)  
+       print*,'valeurs propres:',x3(1),x3(2),x3(3) 
+       print*,'matrice de passage:'
+       call afic33(v33)       
+c      read* 
+      end if
+     
+      return
+      end
+***************************************************************************************
+     
+
+ 
+ 

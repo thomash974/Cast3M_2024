@@ -1,0 +1,763 @@
+C RNFR3D    SOURCE    FD218221  24/02/07    21:15:25     11834          
+      subroutine rnfr3d(istep,nbrenf,numr,epstf33,vecr,epsr0,epsrf,
+     #eprp0,eprpf,your,syr,sigre0,sigref,hplr,tomr,ekr,skr,ATRref,khir,
+     #gamr,sprec,teta1,teta2,dt,ppas,theta,eprm0,eprmf,ttaref,rhor,
+     #mu00,fl3d,errr,xnr,xmuthr,eprk0,eprkf,tokr,Kr,plast_seule,
+     #ann,xn,bn,ngf,ipzero,epspmf33,spre0,spref,epst033,depsa,epleq0,
+     #epleqf,epsmf,epsm0,sigr_nl,coeff_nlr,epsre0,epart,eparv,
+     #hypo,plr_iso,METHODNL,garder,Pb_nl,travail_fissure)
+      
+c     calcul de la deformation et de la contrainte axiale dans un renfort
+
+c     2 variables de controle doivent être renseignees :
+c     - GARDER qui indique si le resultat doit être garder ou non
+c     - PB_NL qui indique si une hypothese a ete modifiee pour les 
+c     operateurs et la source non locale, si PB_NL=1 alors GARDER=.false.
+
+c     si PB_NL=1 comme on repart de la solution precedente on peut ajuster
+c     les hypotheses d ecoulement via la variable HYPO, cela en fonction de la
+c     solution non locale actuelle. Donc même si GARDER=.false. et PB_NL=1
+c     HYPO peut prendre l'une des 3 valeurs (1 ecoulement plastique positif, 
+c     0 pas d'ecoulement plastique, -1 ecoulement plastique negatif)
+
+c     Pour que GARDER puisse être mis a .true. il faut que toutes les hypothese
+c     d ecoulement soient vraies au niveau de la structure, il y a donc une detection
+c     des PB_NL lors de l etape non local, si au moins un PB_NL est detecte tout est
+c     faut et GARDER=.false., si tous les PB_NL sont à 0 alors on peut
+c     GARDER la solution de l ecoulement plastique. Comme l'ecoulement plastique
+c     est realise, on poursuit alors les etapes non locales avec une hypothese
+c     sans ecoulement (HYPO=0).
+
+c     la permutation de PB_NL à 0 n est possible qu'en fin de procedure
+c     que si HYPO n a pas changé pour ce point
+
+c     si PB_NL=0 au retour de l etape non locale la nouvelle contrainte non locale
+c     est gardee definitivement car toutes les hypotheses d ecoulement etaient
+c     coherentes
+
+
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      integer istep,nbrenf,numr,err1
+      logical plast_seule
+c     def finale, orientation      
+      real*8 epst033(3,3),epstf33(3,3),vecr(nbrenf,3),epspmf33(3,3)
+c     def totale, plastique...      
+      real*8 epsr0,epsrf,source_nl,eprp0,eprpf,your,syr,sigr_nl
+      real*8 sigre0,sigref,depsa,hplr,tomr,ekr,skr,spre0,spref
+      real*8 ATRref,khir,gamr,sprec,coeff_nlr
+      real*8 epse0,epsre0,epart,epsref,epsraf,eparv
+      real*8 teta1,teta2,dt,theta,epsmf,epsm0,hypo,Pb_nl
+c     deformation plastique cumulee pour la plsticite isotrope
+      real*8 epleq0,epleqf,Pb_nl0       
+      logical ppas
+      real*8 eprm0,eprmf,ttaref,rhor,mu00,eprk0,eprkf,tokr,Kr,K,epprr
+      logical fl3d,errr,garder
+      real*8 xnr,xmuthr
+      integer ngf,errgauss
+      real*8 ann(ngf,ngf+1),bn(ngf),xn(ngf)
+      integer ipzero(ngf) 
+      real*8 epspm
+      logical METHODNL,travail_fissure
+      
+c     variables locales      
+      real*8 epsrf3(3),gamr3(3)
+      real*8 epsr,ynorm,Teta,Tetaref
+      real*8 kt,km,kf,mucr,mu0,ATR1,epsmk,cc0,depsm,dsigr,f1,sigeq,f2
+      real*8 epsemin,dtk,xkk,ake,akk,bk,xmm,ame,amm,bm
+      real*8 depse1,depse2,depspm
+      real*8 tol_syr
+      real*8 epsre_nl,siger
+
+      real*8 epspm3(3),gamp3(3),depspm3(3),dgamp3(3)
+      real*8 epsmf3(3),gamf3(3),epsm03(3),gam03(3)
+      parameter (epsemin=1.0d-6,tol_syr=1.000001)
+      logical plr_iso  
+c     prepa resolution par Jacobien
+      real*8 Jf(3,3)
+      
+     
+
+c     intialisation      
+      errr=.false.
+      garder=.true.
+      Pb_nl0=Pb_nl
+
+c     plasticité isotrope
+c      plr_iso=.true.      
+c      plr_iso=.false.       
+c      if ((istep.eq.0).or.(istep.eq.2))then
+c       print*,'rnfr3d theta',theta,'ttaref',ttaref
+c       print*,'hplr,tomr,ekr,skr,ATRref,khir,gamr,sprec,teta1,teta2,dt' 
+c       print*, hplr,tomr,ekr,skr,ATRref,khir,gamr,sprec,teta1,teta2,dt
+c       print*,'DEBUT theta,eprm0,ttaref,rhor'
+c       print*, theta,eprm0,ttaref,rhor
+c       print*,'eprk0,eprkf,tokr,K'
+c       print*, eprk0,eprkf,tokr,K
+c       read*
+c      end if
+
+c********* deformations imposee par la matrice en adherence parfaite ***
+      
+c     ** deformation finale dans la matrice suivant l axe du renfort ***      
+      epsmf=0.d0       
+      do i=1,3
+          epsmf3(i)=0.d0
+          do j=1,3
+              epsmf3(i)=epsmf3(i)+epstf33(i,j)*vecr(numr,j)
+          end do
+          epsmf=epsmf+epsmf3(i)*vecr(numr,i)
+      end do
+c     deformation orthogonale 
+      ynorm=0.d0
+      do i=1,3
+          gamf3(i)=epsmf3(i)-epsmf*vecr(numr,i)
+          ynorm=ynorm+gamf3(i)**2
+      end do
+c     tension de la matrice dans la direction du renfort
+      epsmf=epsmf+0.5d0*ynorm 
+      
+c     ** deformation initiale dans la matrice suivant l axe du renfort * 
+      epsm0=0.d0       
+      do i=1,3
+          epsm03(i)=0.d0
+          do j=1,3
+              epsm03(i)=epsm03(i)+epst033(i,j)*vecr(numr,j)
+          end do
+          epsm0=epsm0+epsm03(i)*vecr(numr,i)
+      end do
+c     deformation orthogonale 
+      ynorm=0.d0
+      do i=1,3
+          gam03(i)=epsm03(i)-epsm0*vecr(numr,i)
+          ynorm=ynorm+gam03(i)**2
+      end do
+c     tension initiale de la matrice dans la direction du renfort
+      epsm0=epsm0+0.5d0*ynorm 
+      
+c     ** increment de deformation de la matrice suivant l axe du renfort
+      depsm=epsmf-epsm0
+        
+c********   deformation axiale finale et increment *********************
+
+      if ((istep.eq.0).or.(.not.METHODNL)) then 
+c        deformation finale dans la renfort en adherence parfaite      
+         epsrf=epsmf 
+c        increment de deformation du renfort = celui de la matrice
+         deps=depsm       
+      else if (METHODNL) then
+c        etape non local initiale (istep=1) ou intermediaire (istep=3)
+c        deformation elastique initiale
+         if(ppas) then
+             sigr0=spre0
+             epsre0=sigr0/your             
+         end if
+c        deformation finale du renfort      
+         if(istep.eq.1) then
+c            1er passage en calcul local 
+c            deformation elastique finale avec tir elastique
+             if(spre0.eq.spref) then
+c                pas de variation de precontrainte, on continue le chargement 
+c                on adopte l increement de la deformation locale comme
+c                tir elastique           
+                 epsref=epsre0+depsm
+             else
+c                la precontrainte vient d etre mise a jour             
+                 if(spref.ge.0.) then
+                     if(coeff_nlr.ne.1.) then
+                         print*,'Remise en tension impossible dans'
+                         print*,'rnfr3d car cable endommage'
+                         print*,'damr=',1.d0-coeff_nlr 
+                         errr=.true. 
+                         return
+                     else                         
+                         epsref=spref/your
+                     end if
+                 else
+                    print*,'Pb spref<0 ds rnfr3d'
+                    errr=.true.
+                    return
+                 end if
+             end if        
+c            deformation resultante de la somme des increments pour le tir            
+             epsrf=epsref+eprk0+eprm0+eprp0            
+         else          
+c            istep>1 
+c            contrainte effective
+             siger=sigr_nl/coeff_nlr
+c            deformation elastique non locale
+             epsre_nl=siger/Your
+c            deformation finale supposee  (cf endorf pour la
+c            deformation anelastique hypothetique eparv)
+             if(plr_iso) then
+                 print*,'plasticite iso non prevue dans endorf3d'
+                 err1=1
+                 errr=.true.
+                 return
+             else
+c                ecrouissage cinematique 
+c                utilisation des hypotheses pour le predicteur        
+                 if(hypo.eq.1.) then   
+c                    hypothese ecoulement positif 
+                     if(( siger.gt.(syr+hplr*eprp0)).and.(siger.gt.0.))
+     #                   then
+c                        hypothese ok                     
+                         epsrf=epsre_nl+eparv+(siger-syr)/hplr
+                         Pb_nl=0.d0                           
+                     else  
+c                        hypothese erronee
+                         hypo=0.d0
+c                        la covergence etant assuree par les tirs elastiques
+c                        on annonce pas de Pb_nl mais on ne conserve pas la
+c                        solution                         
+                         garder=.false.
+                         Pb_nl=0.d0                           
+                         return                      
+                     end if
+                 else if (hypo.eq.-1.) then
+c                    hypothese ecoulement negatif                 
+                     if((siger.lt.(-syr+hplr*eprp0)).and.(siger.lt.0.))
+     #                   then
+c                        hypothese ok                     
+                         epsrf=epsre_nl+eparv+(siger+syr)/hplr
+                     else  
+c                        hypothese erronee                     
+                         hypo=0.d0
+c                        la covergence etant assuree par les tirs elastiques
+c                        on annonce pas de Pb_nl mais on ne conserve pas la
+c                        solution                         
+                         garder=.false.
+                         Pb_nl=0.d0  
+                         return
+                     end if
+                 else
+c                    hypothese tir elastique                  
+                     epsrf=epsre_nl+epart
+c                    on continue                    
+                 end if
+c                affichage du traitement  en cas d hypothese fausse               
+                 if((hypo*siger).lt.0.) then
+                   print*,'dans rnfr3d'                 
+                   print*,'hypo',hypo 
+                   print*,'siger',siger
+                   print*,'epsrf',epsrf
+                   print*,'siger',siger
+                   print*,'eprp0',eprp0
+                   print*,'syr+hplr*eprp0',syr+hplr*eprp0
+                   print*,'-syr+hplr*eprp0',-syr+hplr*eprp0
+                   print*,'hypo',hypo,'hypo',hypo
+                   print*,'(siger-syr)/hplr',(siger-syr)/hplr
+                   print*,'(siger+syr)/hplr',(siger+syr)/hplr
+                   print*,'hplr',hplr
+                   print*,'syr/hplr',syr/hplr
+c                  errr=.true.
+c                  return
+                 end if                  
+             end if
+         end if         
+      else
+         print*,'istep & methnl ont des valeurs imprevues ds rnfr3d'
+         errr=.true.
+         return         
+      end if
+c     increment de deformation supposee
+      deps=epsrf-epsr0
+      
+c     **** calcul de la contrainte effective dans les renforts *********
+
+c     istep: 0 calcul local
+c     istep: 1 premiere etape non locale
+c     istep: 3 etape non locale intermediaire
+c     istep: 2 derniere etape non local
+
+c     increment de deformation
+c     print*,epsr0,epsrf
+c     read*
+
+      if ((spre0.ne.spref).and.(.not.ppas)) then
+c         on est en train de faire varier la precontrainte
+c         on ne calcule que la variation de deformation elastique
+c         pour qu elle soit compatible avec la precontrainte imposee
+c           print*,'rnfr3d:spre0,spref',spre0,spref
+          sigr0=spref
+          if(sigr0.gt.0.) then
+             sigre0=sigr0/coeff_nlr
+          else
+             print*,'Pb spref<0 ds rnfr3d'
+             errr=.true.
+             return
+          end if
+c         taux de chargement maxi        
+          mu00=abs(sigre0/syr)
+          mu00=max(mu0,mu00)
+c         contrainte effective finale        
+          sigref=sigre0
+c          print*,'rnfr3d:sigrf',sigrf
+c         def elastique
+          epse0=sigref/your          
+c         actualisation de la def plastique         
+          eprpf=eprp0
+c         actualisation de la def visqueuse  de Maxwell       
+          eprmf=eprm0 
+c         actualisation de la def visqueuse  de Kelvin       
+          eprkf=eprk0    
+c         actualisation deformation plastique cumulee
+          epleqf=epleq0          
+c         fin de traitement si variation de precontrainte
+      else
+c         pas de variation de la precontrainte      
+          if (ppas) then
+c            initialisation de la variable interne si premier pas          
+c            print*,'initialisation precontrainte renfort:',sprec
+             sigr0=sprec
+             sigre0=sigr0
+c            initialisation des autres variables internes du renfort
+             eprp0=0.d0
+             eprm0=0.d0
+             eprk0=0.d0
+             epleq0=0.d0
+c            maj taux de chragement maxi             
+             mu0=abs(sigre0/syr)
+             mu00=max(mu0,mu00)        
+c            read*
+          end if
+c         la precontrainte n a pas variee donc on calcule normalement        
+c         on teste si le calcul de relaxation est nécessaire ou pas
+c          if (rhor.gt.0.) then       
+             if((dt.eq.0.).or.(tomr.eq.0.).or.(ekr.eq.0.)
+     #           .or.(.not.fl3d).or.(plast_seule)) then   
+c                calcul elastoplastique : tir elastique
+                 sigref=sigre0+your*deps
+c                test du critere de plasticite
+                 if(plr_iso) then
+c                    plasticite isotrope                 
+                     f1=sigref-(syr+(hplr*epleq0))
+                 else
+c                    plasticite cinematique                 
+                     f1=(sigref-hplr*eprp0)-syr
+                 end if
+                 if(f1.gt.0.d0) then
+c                   franchissement du critere en traction, on plastifie
+                    dep=f1/(your+hplr)
+                    sigref=sigref-your*dep
+c                   print*,'plastification ds rnfr3d',epsr0,epsrf,
+c     #             eprp0,eprpf,your,syr,sigre0,sigrf
+c                   read*
+                 else
+                     if(plr_iso) then 
+                         f1=-sigref-(syr+(hplr*epleq0))
+                     else    
+                         f1=-(sigref-hplr*eprp0)-syr
+                     end if                         
+                     if (f1.gt.0.d0) then
+c                      franchissement du critere en compression, on plastifie
+                       dep=-f1/(your+hplr) 
+                       sigref=sigref-your*dep
+                     else
+c                      pas d increment plastique
+                       dep=0.d0
+                     end if                
+                 end if
+c                actualisation de la def plastique         
+                 eprpf=eprp0+dep
+                 depsa=dep
+c                actualisation de la def visqueuse         
+                 eprmf=eprm0
+                 eprkf=eprk0
+c                coeff de consolidation debut de pas
+c                prise en compt du taux de chargement maxi dans le temps
+                 mu0=abs(sigre0/syr)
+                 mu00=max(mu0,mu00)  
+c                actualisation de la deformation plastique cumulee
+                 epleqf=epleq0+abs(dep)                 
+              else
+c                calcul visco elastique : tir visco elastique
+c                print*,'rnfr3d calcul visco elastique'
+c                deformation elastique debut de pas
+                 epse0=sigre0/your
+c                coeff de consolidation debut de pas
+c                prise en compt du taux de chargement
+                 mu0=min(abs((sigre0-hplr*eprp0)/syr),1.d0)
+                 mu00=max(mu0,mu00)
+                 if(khir.gt.1.) then
+                     mucr=0.6667d0*khir/(khir-1.d0)
+                     km=mucr/(mucr-mu0)
+                     if(km.lt.0.) then
+                          print*,'km<0 ds rnfr3d',km
+                          print*,mu0,sigr0,syr
+                          errr=.true.
+                          return
+                     end if
+                 else
+                     km=1.d0
+                 end if
+c                prise en compte de la temperature
+c                energie d activation fonction du chragement
+                 ATR1=ATRref*exp(gamr*max(mu00,xmuthr))
+                 Teta=0.5d0*(teta1+teta2)+273.15d0
+                 Tetaref=ttaref+273.15d0
+c                coeff  d amplification de la def differee         
+c                kt=exp(-(ATR1/8.31d0)*(1.d0/Teta-1.d0/Tetaref)) 
+                 if(Teta.gt.Tetaref) then 
+                     kt=exp(ATR1*((Teta-Tetaref)**xnr))
+                 else
+                     if(Teta.lt.Tetaref) then
+                        kt=exp(-ATR1*((Tetaref-Teta)**xnr))
+                     else
+                        kt=1.d0
+                     end if
+                 end if
+                 if(kt.gt.200.) then
+                    print*,'Amplification thermique rnfr3d :',kt
+                    print*,'Valeur tres grande'
+                    print*,'verifier les donnees ATR et XNR'
+                    print*,ATRref,Teta,xnr,Tetaref,mu00
+                    errr=.true.
+                 end if
+c                potentiel de deformation differee
+                 epsmk=ekr*km*kt
+c                deformation elastique caracteristique
+                 epsek=skr/your
+c                coefficient de deformation differee
+                 kf=epsmk/epsek 
+c                print*,'rnfr3d kf:',kf,epsmk,epsek,ekr,km,kt         
+c                coeff de consolidation
+                 if (abs(epse0).gt.epsemin) then
+                     x1=eprm0/epse0
+                 else
+                     x1=eprm0/sign(epsemin,epse0)
+c                    print*,'rnfr3d:',sign(epsemin,epse0)
+                 end if
+                 if(x1.gt.0.d0) then
+c                    deformation elastique dans le sens de la def de consolidation : ok         
+                     cc0=(exp(x1/kf))/kf
+c                    print*,x1,kf,cc0
+                 else
+c                    les deformation epse et epsm sont de signe opposée: 
+c                    il faut attendre que la def visqueuse revienne du bon signe
+c                    en bloquant la consolidation a sa valeur minimale         
+                     cc0=1.d0/kf
+                 end if
+c                print*,'rnfr3d cc0:',cc0
+c                resolution du tir visco elastique
+c                depsm=dt*(epse0+theta*deps)/(tomr*cc0*(1.d0+theta*dt/(tomr*cc0)))
+                 taum=tomr*cc0
+                 tauk=tokr/kt
+                 K=Kr/kt
+c                construction du Jacobien de la solution analytique
+c                Jf=d(depse,depsk)/d(v,epse0,epsk0)
+                 call jacobflu3d(tauk,K,taum,0.d0,1.d0,dt,Jf,err1) 
+                 if(err1.eq.1) then
+                     print*,'Erreur prepa Jacobienne ds rnfr3d'
+                     errr=.true.
+                     return
+                 end if
+c               *** tir : calcul des increments sans deformation plastique              
+c               preparation de la matrice de couplage 
+                do i=1,3
+                    do j=1,3           
+                        if(i.eq.1) then
+                            ann(i,j)=1.d0
+                        else
+                            ann(i,j)=0.d0
+                        end if
+                    end do
+                    bn(i)=0.d0
+                end do
+c               1ere ligne depse
+                depse1=Jf(1,1)*deps/dt+Jf(1,2)*epse0+Jf(1,3)*eprk0
+c               2eme ligne depsk
+                depsk1=Jf(2,1)*deps/dt+Jf(2,2)*epse0+Jf(2,3)*eprk0
+c               deduction depsm               
+                depsm1=deps-depse1-depsk1
+c               actualisation des variables internes
+                eprmf=eprm0+depsm1
+                eprkf=eprk0+depsk1         
+                eprpf=eprp0
+                epleqf=epleq0
+                dsigr=your*depse1
+                sigref=sigre0+dsigr
+                depsa=depsk1+depsm1
+c               print*,'rnfr3d---',sigr0,eprmf,eprf,sigrf         
+c               test de plasticité
+                if(plr_iso) then
+c                  plasticité isotrope              
+                   sigeq=sigref
+                else
+c                  plasticite cinematique              
+                   sigeq=sigref-hplr*eprpf
+                end if
+                if(sigeq.gt.0.d0) then
+                  if(plr_iso) then
+c                    plasticite isotrope                  
+                     f1=sigeq-(syr+hplr*epleq0)
+                     Ep=your
+                     Hp=-hplr                     
+                  else
+c                    plasticite cinematique                  
+                     f1=sigeq-syr
+                     Ep=your
+                     Hp=-hplr
+                  end if
+                else
+                  if (plr_iso) then
+c                    plasticite isotrope
+                     f1=-sigeq-(syr+hplr*epleq0)
+                     Ep=-your
+                     Hp=hplr                     
+                  else
+c                    plasticite cinematique                  
+                     f1=-sigeq-syr
+                     Ep=-your
+                     Hp=hplr
+                  end if
+                end if
+                if(f1.gt.0.d0) then
+c                print*,'ecoulement plastique dans rnfr3d'
+c                print*,'sigre0,eprmf,eprf,sigrf,f1',sigr0,eprmf,eprf,sigref,f1
+c                read*           
+c                ecoulement plastique couple a la relaxation
+c                preparation de la matrice de couplage 
+                 do i=1,4
+                  do j=1,4           
+                    if(i.eq.1) then
+                        ann(i,j)=1.d0
+                    else
+                        ann(i,j)=0.d0
+                    end if
+                  end do
+                  bn(i)=0.d0
+                 end do
+c                1ere ligne Elastique        
+c                couplage avec depsp
+                 ann(1,4)=Jf(1,1)/dt               
+c                2eme ligne Kelvin
+c                affectation dans la matrice de couplage         
+                 ann(2,4)=Jf(2,1)/dt
+c                3eme ligne Maxwell
+                 ann(3,1)=1.d0
+                 ann(3,2)=1.d0
+                 ann(3,4)=1.d0 
+c                4eme ligne plasticite
+                 ann(4,1)=Ep
+                 ann(4,4)=Hp
+                 bn(4)=-f1         
+c                resolution du systeme lineaire                   
+                 call gaus3d(4,ann,xn,bn,ngf,errgauss,ipzero) 
+                 if(errgauss.eq.1) then
+                   errr=.true.
+                   print*,'Pb avec gaus3d viscoplasticite ds rnfr3d'
+                   return
+                 end if 
+c                recuperation des solution
+                 depse2=xn(1)
+                 depsk2=xn(2)
+                 depsm2=xn(3)
+                 depsp =xn(4)
+c                actualisation des variables internes 
+                 eprkf=eprkf+depsk2    
+                 eprmf=eprmf+depsm2
+                 eprpf=eprpf+depsp
+                 dsigr=your*depse2
+                 sigref=sigref+dsigr 
+                 depsa=depsk2+depsm2+depsp 
+c                actualisation deformation plastique cumulee
+                 epleqf=epleq0+abs(depsp)               
+c                verif criteres de plasticite
+                 if(plr_iso) then
+c                  plasticite isotrope               
+                   sigeq=sigref
+                 else
+c                  plasticite cinematique               
+                   sigeq=sigref-hplr*eprpf
+                 end if
+                 if(sigeq.gt.0.d0) then
+                  if(plr_iso) then
+c                   plasticite isotrope                
+                    if(sigeq.gt.((syr+hplr*epleqf)*tol_syr)) then
+                        print*,'Pd de plasticite ds rnfr3d'
+                        print*,sigeq,'>',syr+hplr*epleqf
+                        errr=.true.
+                    end if
+                  else
+c                   plasticite cimenmatique                
+                    if(sigeq.gt.syr*tol_syr) then
+                        print*,'Pd de plasticite ds rnfr3d'
+                        print*,sigeq,'>',syr
+                        errr=.true.
+                    end if
+                  end if
+                else
+                 if (plr_iso) then
+c                   plasticite isotrope
+                    if(sigeq.lt.-((syr+hplr*epleqf)*tol_syr)) then
+                        print*,'Pd de plasticite ds rnfr3d'
+                        print*,sigeq,'<',-(syr+hplr*epleqf)
+                        errr=.true.
+                    end if  
+                 else
+c                   plasticite cinematique                
+                    if(sigeq.lt.-syr*tol_syr) then
+                        print*,'Pd de plasticite ds rnfr3d'
+                        print*,sigeq,'<',-syr
+                        errr=.true.
+                    end if 
+                 end if                    
+                end if
+                if(errr) then
+                 do i=1,4
+                  do j=1,4
+                    print*,'ann(',i,j,')=',ann(i,j)
+                  end do
+                  print*,'bn(',i,')=',bn(i)
+                 end do
+                 return
+                end if
+             end if   
+            end if 
+c           else
+c            print*,'Renfort avec section nulle ds rnfr3d'
+c           si rhor = 0           
+c            sigre0=0.d0
+c           taux de chargement maxi        
+c            mu00=abs(sigre0/syr)
+c           contrainte finale        
+c            sigref=sigre0
+c           actualisation de la def plastique         
+c            eprpf=eprp0
+c           actualisation de la def visqueuse  de Maxwell       
+c           eprmf=eprm0 
+c           actualisation de la def visqueuse  de Kelvin       
+c            eprkf=eprk0
+c           deformation plastique equivalente            
+c            epleqf=0.0d0            
+c           fin de traitement si rho=0
+c            continue     
+c           end if       
+      end if   
+
+c***********************************************************************     
+      
+
+c      print*,'renfort num:',numr 
+c     if(istep.eq.2) then     
+c     print*,'FIN theta,eprm0,eprmf,ttaref,rhor'
+c     print*, theta,eprm0,eprmf,ttaref,rhor
+c     print*,'-----------------------------------------------'
+c      print*,'dans rnfr3d'
+c*    read*  
+c     end if   
+C       print*,'fin rnfr3d, renfort :', numr
+C       print*,'epsr0',epsr0
+C       print*,'epsrf',epsrf
+C       print*,'eprp0',eprp0,'eprpf',eprpf
+C       print*,'eprm0',eprm0,'eprmf',eprmf
+C       print*,'mu00',mu00
+C       print*,'sigre0',sigre0,'sigref',sigref 
+C       print*,'------------------------------------------------'
+C       read*
+
+c******** controle de l hypothese d ecoulement *************************
+
+      if(istep.ne.1) then   
+        if(Pb_nl0.eq.0.) then
+c           les hypothese sont stabilisees au niveau GLOBAL: on les garde                 
+            Pb_nl=0.d0
+c           on peut repartir avec ces valeurs
+            garder=.true.
+        else
+c           on ne garde pas encore la solution car certains EF changent
+c           d hypothese        
+            garder=.false.
+            if((eprpf.gt.eprp0).and.(hypo.eq.1.))then
+c               les hypotheses locales sont correctes mais pb niveau global
+                hypo=1.d0
+c               mais ok au niveau local, on en informe le niveau global
+                Pb_nl=0.d0 
+            else if((eprpf.lt.eprp0).and.(hypo.eq.-1.))then
+c               les hypotheses locales sont correctes mais pb niveau global
+                hypo=-1.d0
+c               mais ok au niveau local, on en informe le niveau global
+                Pb_nl=0.d0  
+            else if((hypo.ne.0.).and.travail_fissure)then
+c               on garde l hypothese d ecoulement plastique dans
+c               la fissure en cours d 'ouverture quoi qu'il arrive
+                Pb_nl=0.d0                                 
+            else if((eprpf.eq.eprp0).and.(hypo.ne.0.).and.
+     #          (.not.travail_fissure))then
+c               hypothese erronee sur ecoulement hors fissure
+                hypo=0.d0
+c               on conserve hypo=0 hors fissure pour la suite                
+                Pb_nl=0.d0
+            else if((abs(eprpf-eprp0).lt.epsemin).and.(hypo.eq.0.))
+     #          then
+c               hypothese quasi ok
+                Pb_nl=0.d0
+            else if((abs(eprpf-eprp0).ge.epsemin).and.(hypo.eq.0.))
+     #          then     
+                if(travail_fissure) then
+c                   on privilegie l hypothese d ecoulement                
+                    if (eprpf.gt.eprp0) then
+c                        il y a eu plastification avec hypo=0                   
+                         hypo=1.d0
+c                        on gardera cette hypothese                         
+                         Pb_nl=0.d0
+                    else 
+c                        il y a eu plastification avec hypo=0                   
+                         hypo=-1.d0
+c                        on gardera cette hypothese                         
+                         Pb_nl=0.d0
+                    end if
+                else
+c                   on gardera hypo=0              
+                    hypo=0.d0
+                    Pb_nl=0.d0
+                end if                        
+            else          
+                 print*,'cas imprevu dans endorf'
+                 print*,'eprpf',eprpf
+                 print*,'eprp0',eprp0                
+                 print*,'hypo_actu',hypo
+                 print*,'Pb_nl',Pb_nl
+                 print*,'travail_fissure',travail_fissure
+                 err1=1
+                 errr=.true.
+                 return         
+            end if
+        end if
+      else
+c        istep=1 on impose les hypotheses d ecoulement pour la
+c        premiere etape non locale en fonction du tir local
+c         if (eprpf.eq.eprp0) then
+c             on suppose pas  d ecoulement  plastique        
+              hypo=0.d0
+c         else if (eprpf.gt.(eprp0+epsemin)) then
+c             ecoulement plastique  positif
+c              hypo=1.d0
+c         else if (eprpf.lt.(eprp0-epsemin)) then
+c             ecoulement plastique negatif         
+c              hypo=-1.d0
+c         end if
+c        on repart de la solution precedente pour construire 
+c        l operateur tangent de NRM dans UNPAS avec la solution convergee 
+c        du pas precedent sauf pour le premier pas ou on garde le tir local
+         if (.not.ppas) then         
+            garder=.false.
+         else
+            garder=.true.
+         end if
+c        on ne sait pas encore si l hypothese est coherente         
+         Pb_nl=0.d0
+      end if         
+      
+c***********************************************************************      
+      
+      return
+      
+      end     
+      
+      
+ 
+ 

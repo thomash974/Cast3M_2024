@@ -1,0 +1,70 @@
+C SEPA      SOURCE    FANDEUR   22/01/19    21:15:16     11256          
+      SUBROUTINE SEPA(MRIGID,IRET)
+*
+*  EXTRAI DE MRIGID LA PARTIE SANS MULTIPLICATEUR SI IRET=1
+*  EXTRAI DE MRIGID LA PARTIE AVEC MULTIPLICATEUR SI IRET=2
+*
+      IMPLICIT INTEGER(I-N)
+-INC SMRIGID
+
+      SEGACT MRIGID
+c
+      NRIGE=IRIGEL(/1)
+      IF(NRIGE.LE.5) THEN
+        CALL ERREUR (5)
+      ENDIF
+c
+      NRIGEL=0
+      DO 1 I=1,IRIGEL(/2)
+        DESCR=IRIGEL(3,I)
+        SEGACT DESCR
+        DO 6 K=1,LISINC(/2)
+          IF(LISINC(K).EQ.'LX  ') GO TO 7
+   6    CONTINUE
+        GO TO 1
+   7    CONTINUE
+        NRIGEL=NRIGEL+1
+   1  CONTINUE
+c
+      IF (IRET.EQ.1) NRIGEL=IRIGEL(/2)-NRIGEL
+c
+      SEGINI RI1
+      RI1.MTYMAT=MTYMAT
+      RI1.IFORIG=IFORIG
+c
+      IF (NRIGEL.EQ.0) GOTO 9000
+c
+      IEL=0
+      DO 3 I=1,IRIGEL(/2)
+        DESCR=IRIGEL(3,I)
+        IMUL=1
+c
+        DO 11 K=1,LISINC(/2)
+          IF(LISINC(K).NE.'LX  ') GO TO 11
+          IMUL=2
+          GO TO 12
+   11   CONTINUE
+c
+   12   CONTINUE
+        IF (IMUL.EQ.IRET) THEN
+          IEL=IEL+1
+          RI1.COERIG(IEL)=COERIG(I)
+          DO J=1,NRIGE
+            RI1.IRIGEL(J,IEL)=IRIGEL(J,I)
+          ENDDO
+        ENDIF
+   3  CONTINUE
+c      if (iel.ne.nrigel) call erreur(5)
+
+ 9000 CONTINUE
+      DO I=1,IRIGEL(/2)
+        DESCR=IRIGEL(3,I)
+        SEGDES DESCR
+      ENDDO
+c
+      SEGDES MRIGID,RI1
+      MRIGID=RI1
+c*      RETURN
+      END
+
+ 

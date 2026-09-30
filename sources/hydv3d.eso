@@ -1,0 +1,69 @@
+C HYDV3D    SOURCE    PV090527  23/01/27    21:15:38     11574          
+      subroutine hydv3d(err1,hyd0,hydr,hyds,dth00,dth0,dtr00,dtr0,
+     #dfl00,dfl0,dcpp00,dcpp0,epspt600,epspt60,epspc600,epspc60,
+     #epsvt600,epsvt60,epspg600,epspg60,epsps600,epsps60,epsk006,
+     #epsk06,epsm006,epsm06,epleqc00,epleqc0,fshr006,fshr06)
+
+c     actualisation des variables internes en fonction du degre
+c     d hydratation
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables externes
+      real*8 hyd0,hydr,hyds,dfl00,dfl0,dtr00,dtr0
+      real*8 epspt600(6),epspt60(6)
+      real*8 epspc600(6),epspc60(6)  
+      real*8 epsvt600(6),epsvt60(6)      
+      real*8 epspg600(6),epspg60(6)
+      real*8 epsps600(6),epsps60(6)
+      real*8 epsk006(6),epsk06(6)
+      real*8 epsm006(6),epsm06(6)
+      real*8 sigef006(6),sigef06(6)
+      real*8 sigm006(6),sigm06(6)
+      real*8 fshr006(6),fshr06(6)
+      real*8 epleqc00,epleqc0
+      integer err1
+      
+c     variables locales
+      integer j    
+   
+
+c     **** endommagements isotropes ************************************   
+c     en dommagement thermique      
+      call hydrvari3d(dth00,dth0,hyd0,hydr,hyds)         
+c     endommagement effectif de fluage
+      call hydrvari3d(dfl00,dfl0,hyd0,hydr,hyds) 
+c     endo pre pic de traction
+      call hydrvari3d(dtr00,dtr0,hyd0,hydr,hyds)
+c     endo pre pic de compression
+      call hydrvari3d(dcpp00,dcpp0,hyd0,hydr,hyds)
+c     deformation equivalent de compression
+      call hydrvari3d(epleqc00,epleqc0,hyd0,hydr,hyds)      
+     
+      
+c     *** deformation plastique ****************************************
+      do j=1,6
+c        traction      
+         call hydrvari3d(epspt600(j),epspt60(j),hyd0,hydr,hyds)
+c        compression cisaillement         
+         call hydrvari3d(epspc600(j),epspc60(j),hyd0,hydr,hyds)
+c        thermique transitoire         
+         call hydrvari3d(epsvt600(j),epsvt60(j),hyd0,hydr,hyds)         
+c        gel         
+         call hydrvari3d(epspg600(j),epspg60(j),hyd0,hydr,hyds)
+c        def         
+         call hydrvari3d(epsps600(j),epsps60(j),hyd0,hydr,hyds)  
+c        fluage kelvin         
+         call hydrvari3d(epsk006(j),epsk06(j),hyd0,hydr,hyds) 
+c        fluage maxwell         
+         call hydrvari3d(epsm006(j),epsm06(j),hyd0,hydr,hyds)
+c        taux de franchissement des seuils capillaires
+         call hydrvari3d(fshr006(j),fshr06(j),hyd0,hydr,hyds)         
+      end do 
+       
+      
+      return
+      end
+      
+ 

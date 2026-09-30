@@ -1,0 +1,67 @@
+C MTCONV    SOURCE    OF166741  24/03/28    21:15:09     11811          
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C     MTCONV : MED TYPE CONVERSION
+C              Cette SUBROUTINE permet de convertir des types issus de
+C              MED 4.x.x en REAL*8 pour Cast3M
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+      SUBROUTINE MTCONV(mtype,IVALI4,IVALI8,XVALI4,XVALI8,ITAIL,
+     &                  XVALOU,iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC CCMED
+
+      INTEGER   ITAIL, iret
+C  Si MED nous a donne des INTEGER*4
+      INTEGER*4 IVALI4(*)
+C  Si MED nous a donne des INTEGER*8
+      INTEGER   IVALI8(*)
+C  Si MED nous a donne des REAL*4
+      REAL*4    XVALI4(*)
+C  Si MED nous a donne des REAL*8
+      REAL*8    XVALI8(*)
+C  Restitution dans    des REAL*8
+      REAL*8    XVALOU(*)
+
+      iret = 0   
+
+C Cas des MED_INT32
+      IF      (mtype .EQ. MED_INT32) THEN
+        DO ii = 1, ITAIL
+          XVALOU(ii) = IVALI4(ii)
+        ENDDO
+
+C Cas des MED_INT64
+      ELSE IF (mtype .EQ. MED_INT64) THEN
+        DO ii = 1, ITAIL
+          XVALOU(ii) = IVALI8(ii)
+        ENDDO
+
+C Cas des MED_FLOAT32
+      ELSE IF (mtype .EQ. MED_FLOAT32) THEN
+        DO ii = 1, ITAIL
+          XVALOU(ii) = XVALI4(ii)
+        ENDDO
+
+C Cas des MED_FLOAT64
+      ELSE IF (mtype .EQ. MED_FLOAT64) THEN
+        DO ii = 1, ITAIL
+          XVALOU(ii) = XVALI8(ii)
+        ENDDO
+
+      ELSE
+        iret = 1095
+        INTERR(1) = mtype
+        CALL ERREUR(iret)
+      ENDIF
+
+c      RETURN
+      END
+
+ 

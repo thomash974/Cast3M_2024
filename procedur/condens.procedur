@@ -1,0 +1,268 @@
+$$$$ CONDENS
+* CONDENS   PROCEDUR  FD144363  22/12/22    21:15:03     11536          
+'DEBP' CONDENS RXT*TABLE $paroic*MMODEL MTP*MOT MTF*MOT MRVP*MOT
+       KHcu*'FLOTTANT' ;
+*
+*-----------------------------------------------------------------------
+* Modélisation de la ondensation en paroi
+*-----------------------------------------------------------------------
+*
+* E/  rxt     : Interface avec l'utilisateur
+* E/  $paroic : MMODEL de la paroi condensante
+* E/  MTP     : Nom dans INCO de la température paroi 
+* E/  MTF     : Nom dans INCO de la température fluide 
+* E/  MRVP    : Nom dans INCO de la densité vapeur 
+* E/  KHCU    : Borne inf. du coefficient d'échange sensible (W/m2/K)
+*
+*  /S QC    : FLOTTANT  : Flux de vapeur condensé sur $paroic (kg/s)
+*  /S FCOND : CHPO (SS) : Débit de condensation surfacique (kg/m2/s)
+*  /S ECOND : FLOTTANT  : Energie vers la paroi due à la condensation (W)
+*  /S HCOND : FLOTTANT  : Enthalpie vers la paroi due à la condensation (W) 
+*  /S KKC   : CHPO (SC) : Coefficient de transfert de masse (m/s)
+*  /S RvI   : CHPO (SS) : Densité vapeur à l'interface = ROsat(Psat(Tw),Tw) (kg/m3)
+*  /S FHP   : CHPO (SC) : Puissance surfacique totale vers la paroi (W/m2)
+*  /S HT    : CHPO (SS) : Coefficient de transfert thermique par
+*                         convecton (energie sensible, W/m2/K)
+*
+*-----------------------------------------------------------------------
+* Les flux de masse Jv et de chaleur Phi sont calculés via l'analogie
+* de Chilton-Colburn :
+*   Jv  = kc ro (Yv - Yvsat)   (en kg/s/m2),
+*   Phi = HT (Tg - Tw) + Jv Lv (en W/m2)
+* où kc (resp. H_T) est la somme d'une contribution de convection
+* naturelle et d'une contribution de convection forcée :  
+*   Sh  = k L / Dv = Sh1 + Sh2   Nu  = HT L / lambda = Nu1 + Nu2
+*   Sh2 = 0.13 (Gr Sc)**1/3      Nu1 = 0.13 (Gr Pr)**1/3    
+*         (convection naturelle, corrélation de Mc Adams)
+*   Sh1 = 0.0296 Re**0.8 Sc**1/3 Nu2 = 0.0296 Re**0.8 Pr**1/3 
+*         (couche limite turbulente sur une plaque plane))
+*-----------------------------------------------------------------------
+* Hypotheses :
+* 1. On néglige la résistance du film liquide : Ti=Tw et Pv,i=Psat(Tw)
+* 2. Même composition du mélange en air sec au bulk et à l'interface
+*------------------------------------------------------------------------
+*
+'SI' ('NON' rxt . 'TBT' . 'VAPEUR') ;
+  'QUIT' CONDENS ;
+'FINS' ;
+tbt = rxt . 'TBT' ;
+tic = rxt . 'TIC' ;
+geo = rxt . 'GEO' ;
+*
+paroic = 'DOMA' $paroic 'MAILLAGE' ;
+Diagpc = 'DOMA' $paroic 'XXDIAGSI' ;
+*
+ndlc  = 'DIME' tic . 'PT' ;
+Pt    = 'EXTR' tic . 'PT'    ndlc ;
+Rhomn = 'EXTR' tic . 'Rhomn' ndlc ;
+Cpm   = 'EXTR' tic . 'Cpm'   ndlc ;
+*
+*
+*- Paroi condensante (P)
+*
+*
+* Densités du mélange, des incondensables
+* transportés, de la vapeur et de l'air
+ROP = 'REDU' tic . 'RHO' paroic ;
+RH2P RHEP RO2P RN2P RCO2P RCOP = 0. 0. 0. 0. 0. 0. ;
+'SI' TBT . 'TH2' ;
+  RH2P  = 'REDU' tic . 'RH2'  paroic ;
+'FINS' ;
+'SI' TBT . 'THE' ;
+  RHEP  = 'REDU' tic . 'RHE'  paroic ;
+'FINS' ;
+'SI' TBT . 'TO2' ;
+  RO2P  = 'REDU' tic . 'RO2'  paroic ;
+'FINS' ;
+'SI' TBT . 'TN2' ;
+  RN2P  = 'REDU' tic . 'RN2'  paroic ;
+'FINS' ;
+'SI' TBT . 'TCO2' ;
+  RCO2P = 'REDU' tic . 'RCO2' paroic ;
+'FINS' ;
+'SI' TBT . 'TCO' ;
+  RCOP  = 'REDU' tic . 'RCO'  paroic ;
+'FINS' ;
+RvP = 'REDU' tic . MRVP paroic ;
+RvP = 'KOPS' RvP '|<' 1.e-10 ;
+*
+* Rnc : densité des incondensables (air non compris)
+* Correction 1 : RairP=0 et RvP=ROP - Rnc si Rair<0
+* Correction 2 : RvP = 0 si ROP - Rnc < 0
+Rnc   = Rh2P '+' RheP '+' Ro2P '+' Rn2P '+' Rco2P '+' RcoP ;
+Rtest = ROP '-' Rnc ;
+RvP   = 'MINI' RvP Rtest ;
+RvP   = 'KOPS' RvP '|<' 1.e-10 ;
+RairP = ROP '-' RvP '-' Rnc ;
+RairP ='KOPS' RairP '|<' 1.e-10 ;
+*
+* Fractions massiques
+IROP  = 'INVE' ROP     ;
+YvP   = RvP   '*' IROP ;
+Yh2P  = Rh2P  '*' IROP ;
+YheP  = RheP  '*' IROP ;
+Yo2P  = Ro2P  '*' IROP ;
+Yn2P  = Rn2P  '*' IROP ;
+Yco2P = Rco2P '*' IROP ;
+YcoP  = RcoP  '*' IROP ;
+YairP = RairP '*' IROP ;
+*
+* Viscosité dynamique (Pa/s)
+MuP = 'REDU' tic . 'Mu' paroic ;
+*
+* Températures gaz et paroi (K)
+Tfk  = ('REDU' tic . MTF paroic) '+' 273.15 ;
+Twk  = ('REDU' tic . MTP paroic) '+' 273.15 ;
+*
+* Pvap
+PvP = RvP '*' TBT . 'Rgvap' '*' Tfk ;
+*
+*
+*- Interface (I)
+*
+*
+* P et RO de la vapeur :
+* Pvap=Psat(Tw) et ROvap = RO(Psat(Tw),Tw)
+PvI  = PSATT Twk ;
+RvI = PvI '*' ('INVE' (TBT . 'Rgvap' * Twk)) ;
+*
+* P et RO des incondensables avec filtre du cas YVP=1 (100% vapeur en paroi)
+* (hyp : même composition en air sec du mélange en (P) et en (I))
+PncI   = Pt  -  PvI ;
+epsyvp = 1.D-10 ;
+fyvp   = 'MASQUE' (1.0 '-' YVP) 'SUPERIEUR' epsyvp ;
+YncP   = (1. '-' YVP '*' fyvp) '+' (1.0 '-' fyvp '*' epsyvp) ;
+RgncI = (TBT . 'Rgo2'  '*' YO2P) '+' (TBT . 'Rgn2'  '*' YN2P)  '+'
+        (TBT . 'Rghe'  '*' YHEP) '+' (TBT . 'Rgh2'  '*' YH2P)  '+'
+        (TBT . 'Rgco'  '*' YCOP) '+' (TBT . 'Rgco2' '*' YCO2P) '+' 
+        (TBT . 'Rgair' '*' YAIRP) '/' YncP ;
+RncI  = PncI '*' ('INVE' (RgncI '*' Twk)) '*' fyvp ;
+*
+* RO du mélange
+ROI =  RvI '+' RncI ;
+*
+* Fraction massique vapeur
+YvI =  RvI '*' ('INVE' ROI) ;
+*
+*
+*- Corrélation
+*
+*
+* DV : Coefficient de diffusion de la vapeur dans le mélange (m2/s)
+YO2NP = YO2P '+' (YAIRP '*' 0.2329) ;
+YN2NP = YN2P '+' (YAIRP '*' 0.7671) ;
+DV = VAPDIF Pt Tfk YVP YH2P YHEP YO2NP YN2NP YCO2P YCOP ;
+*
+*
+* Corrélation de convection naturelle
+*
+*
+* Coefficient de transfert de masse k (m/s)
+BB  = 0.13 '*' ((9.81 * Rhomn '*' ('INVE' MuP)) '**' (1./3.)) ;
+DRO = (('ABS' (ROP '-' ROI)) '*' IROP) '**' (1./3.) ;
+'SI' ('EGA' TBT.'MODCOND' 'CHIL1');
+   may1  = 'MASQUE' (1. '-' YVI) 'SUPERIEUR' 0.0001;
+   denom = (may1 * (1. '-' YVI)) + ((1. '-' may1) '*' 0.0001) ;
+   DRO   = DRO '*' ('INVE' DENOM) ;
+'FINSI' ;
+KKCN = (DV '**' (2./3.)) '*' DRO '*' BB  ;
+*
+* Coefficient Echange convectif
+* hL/lambda = 0.13 (Gr Pr) ** 1/3
+* Ht = DRO*BB*Lambda * (rho*(inve MuP)) ** 1/3
+* or Pr = 1 donc Lambda = MuP*Cp
+LAMBM = MuP '*' Cpm ;
+HTCN  = DRO '*' BB '*' LAMBM '*' ((Rhomn '*' ('INVE' MuP))'**' (1./3.)) ;
+*
+*
+* Corrélation de convection forcée
+* Prise en compte si tic . 'LREF' existe
+*
+*
+'SI' ('EXIS' tic 'LREF') ;
+*
+* Vitesse pour le Reynolds
+  un   = tic . 'UN' ;
+  lcu  = 'EXTR' un 'COMP' ;
+  modu = (un lcu 'PSCA' un lcu) '**' 0.5 ;
+  modu = 'NOEL' GEO . '$vtf' modu ;
+  modu = 'ELNO' GEO . '$vtf' modu ;
+  modu = 'NOEL' GEO . '$vtf' modu ;
+  modu = 'ELNO' GEO . '$vtf' modu ;
+  modu = 'NOEL' GEO . '$vtf' modu ;
+  modu = 'ELNO' GEO . '$vtf' modu ;
+  modu = 'REDU' modu paroic ;
+*
+* Filtre des valeurs négatives ou nulles de lref
+  lref = 'REDU' tic . 'LREF' paroic ;
+  lmin = 1.D-8 ;
+  IL1   = lref 'MASQ' 'EGSUP' lmin ;
+  lref  = (IL1 '*' lref) - (IL1 '-' 1. '*' lmin) ;
+*
+* Corrélation plaque plane turbulente
+  KKCF = (DV '**' (2./3.)) '*' (modu '**' 0.8)
+       '*' 0.0296 '*' (lref '**' (-0.2))
+       '*' ((Rhomn '*' ('INVE' MuP)) '**' (1.4/3.)) ;
+*
+  HTCF = (modu '**' 0.8) * LAMBM
+       '*' 0.0296 '*' (lref '**' (-0.2))
+       '*' ((Rhomn '*' ('INVE' MuP)) '**' 0.8) ;
+*
+  KKCF = IL1 '*' KKCF ;
+  HTCF = IL1 '*' HTCF ;
+*  
+  KK   = 'ABS' (KKCN '+' KKCF) ;
+  HT   = 'ABS' (HTCN '+' HTCF) ;
+'SINO' ;
+  KK = 'ABS' KKCN ;
+  HT = 'ABS' HTCN ;
+'FINS' ;
+*
+* Fonction indicatrice de la condensation
+IND  = (PvP - PvI) 'MASQ' 'EGSUP'  0. ;
+*
+* Khcu <EG HT <EG HTMAX
+HT    = (IND '*' HT) '-' (IND '-' 1. '*' KHcu) ;
+INDH  = HT 'MASQ' 'EGSUP' KHcu ;
+HT    = (INDH '*' HT) '-' (INDH '-' 1. '*' KHcu) ;
+HTMAX = 5000. ;
+IK1   = HT 'MASQ' 'INFERIEUR' HTMAX ;
+HT    = (IK1 '*' HT) - (IK1 '-' 1. '*' HTMAX) ;
+*
+* Jv = kc ro (Yv - Yvsat)  (en kg/s/m2)
+* Qc = intégrale de Jv sur paroic
+KKC = 'KCHT' $paroic 'SCAL' 'SOMMET' (KK  '*' IND) ; 
+KRO = 'KCHT' $paroic 'SCAL' 'SOMMET' (KKC '*' ROP) ;
+KKC = 'NOEL' $paroic KKC ;
+*fd
+*YVI='KOPS' YVI '>|' 0.99   ;
+*DYV = YvP - YvI ;
+*BM = (YVI '-' YVP) '/' (1.0 '-' YVI);
+*mess ' mini maxi BM ' ' ' (mini bm) ' ' (maxi Bm) ;
+*bm = 'ABS' bm ;
+*FSUC = ('LOG' (1.0 '+' BM)) '*' ('INVE' BM) ;
+*FCOND =  DYV * KRO * FSUC ;
+*fd
+Fcond =  (YvP '-' YvI) '*' KRO ;
+Qc    = Diagpc '*' Fcond ;
+QcT   = Qc '*' Tfk ;
+Qc    = 'ABS' ('SOMT' Qc) ;
+QcT   = 'ABS' ('SOMT' QcT) ;
+Econd = tbt . 'Cvvap' '*' QcT ;
+Hcond = tbt . 'Cpvap' '*' QcT ;
+*
+RvI   = 'KCHT' $paroic 'SCAL' 'SOMMET' RvI;
+Fcond = 'KCHT' $paroic 'SCAL' 'SOMMET' Fcond ;
+Fconv = 'KCHT' $paroic 'SCAL' 'SOMMET' (Tfk '-' Twk '*' HT) ;
+FHP   = 'NOEL' $paroic (Fcond '*' tbt . 'Lv' '+' Fconv) ;
+*
+**** Affichage de grandeurs moyennes
+*volp = 'SOMT' (Diagpc) ;
+*'MESS' '==> Tgaz moyen paroi = '((somt (Diagpc * Tfk))/volp) ;
+*'MESS' '==> Tpar moyen paroi = '((somt (Diagpc * Twk))/volp) ;
+*'MESS' '==> Yvpa moyen paroi = '((somt (Diagpc * YVP))/volp) ;
+*'MESS' '==> KKC (mini) (maxi) = ' (MINI KKC)  (MAXI KKC)   ;
+*
+'FINP' Qc Fcond Econd Hcond KKC RvI FHP HT  ; 
+ 
+ 

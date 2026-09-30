@@ -1,0 +1,25 @@
+C CHNSNG    SOURCE    PV        20/11/14    23:36:47     10781          
+*  impose par penalisation une relation dans am
+*
+      subroutine chnsng(am,nbnn,i,j,k)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      dimension am(nbnn,nbnn)
+*
+      xpenl=am(i,i)*1d-3
+      am(i,i)=am(i,i)-2*xpenl
+      am(i,j)=am(i,j)+xpenl
+      am(i,k)=am(i,k)+xpenl
+      am(j,i)=am(j,i)+xpenl
+      am(k,i)=am(k,i)+xpenl
+      am(j,j)=am(j,j)-xpenl/2
+      am(k,k)=am(k,k)-xpenl/2
+      am(j,k)=am(j,k)-xpenl/2
+      am(k,j)=am(k,j)-xpenl/2
+
+
+*
+      end
+
+
+ 

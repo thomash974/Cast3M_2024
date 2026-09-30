@@ -1,0 +1,21 @@
+C MOCHPH    SOURCE    CB215821  21/08/20    21:15:14     11089          
+      SUBROUTINE MOCHPH(MOMODL,NMOD)
+*----------------------------------------------------------------------
+*     -  CAS DE LA FORMULATION 'CHANGEMENT_PHASE'
+*            DEFINITION DES NOMS DES MODELES
+*----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+*
+      CHARACTER*16 MOMODL(*)
+*
+*     Mots attendus à la lecture des données de l'operateur MODE
+*
+      NMOD=2
+      MOMODL(1)='PARFAIT         '
+      MOMODL(2)='SOLUBILITE      '
+*     MOMODL(3)='PROGRESSIF      '
+
+      END 

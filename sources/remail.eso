@@ -1,0 +1,48 @@
+C REMAIL    SOURCE    CB215821  23/06/20    21:15:05     11684          
+      SUBROUTINE REMAIL()
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : REMAIL
+C DESCRIPTION : Remaille suivante un algorithme d'optimisation 
+C     topologique anisotrope dû à T. Coupez
+C               Voir procédure MAILTOPO qui fait le travail      
+C               avec l'opérateur OPTO
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stephane GOUNAND (CEA/DES/ISAS/DM2S/SEMT/LTA)
+C               mel : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C***********************************************************************
+C VERSION    : v1, 09/04/2021, version initiale
+C HISTORIQUE : v1, 09/04/2021, creation
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC SMTEXTE
+-INC PPARAM
+*
+      SEGINI,MTEXTE
+      MTEXTE.MTEXT ='MAILTOPO REMA'
+      MTEXTE.NCART = 13
+      SEGACT,MTEXTE
+
+      CALL ECROBJ('TEXTE',MTEXTE)
+      RETURN
+*
+* End of subroutine REMAIL
+*
+      END
+
+ 
+ 

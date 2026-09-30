@@ -1,0 +1,78 @@
+C RAG3D     SOURCE    FD218221  24/02/07    21:15:24     11834          
+      subroutine rag3d(taar,nrjg,tref0,aar0,sr1,srsrag,teta1,
+     # teta2,dt,aar1,vrag00,Kb,Kgel,bgel,xmgel,dphigel,bg0,bg1,
+     # vvgel,cgel,rt,alat,err1)
+
+c      sous programme de calcul de l avancement chimique de rag
+
+
+c   ********************************************************************
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+c   ********************************************************************
+
+      real*8 taar,nrjg,tref0,aar0,sr1,srsrag,teta1,teta2     
+      real*8 alpharag,Ear,temp1,aar1,vvgel,cgel,rt
+      real*8 vrag00,Kb,Kgel,bgel,xmgel,dphigel,bg0,bg1
+      integer err1
+      
+      real*8 vgel0,vgel1,vgel
+      
+c      print*,"taar,nrjg,tref0,aar0,sr1,srsrag,teta1,dt"
+c      print*, "vrag00,aar1,vrag1"
+c      print*,taar,nrjg,tref0,aar0,sr1,srsrag,teta1,dt,
+c     # vrag00,aar1,vrag1 
+
+c     **** avancement chimique ***************************************** 
+     
+      call avch3d(vrag00,taar,nrjg,tref0,sr1,srsrag,teta1,
+     # teta2,dt,aar0,aar1,err1)
+
+c     **** coefficients poromecanique **********************************
+      if(vrag00.gt.0.) then
+         if(aar0.gt.alat) then
+             vgel1=(aar1-alat)*vrag00/(1.d0-alat)
+             vgel0=(aar0-alat)*vrag00/(1.d0-alat)                      
+         else
+             vgel0=0.d0       
+             if(aar1.gt.alat) then
+                 vgel1=(aar1-alat)*vrag00
+c                /(1.d0-alat)
+             else
+                 vgel1=0.d0
+             end if
+         end if
+         dphigel=vgel1-vgel0
+c        evaluation des coeffs de Biot pour le gel de rag
+c        vgel=0.5d0*(vgel0+vgel1)
+         vgel=vgel1
+         bg1=2.d0*vgel1/(1.d0+vgel1)
+c        bgel=0.5d0*(bg0+bg1)
+         bgel=bg1
+         if(bgel.ge.1.) then
+             print*,'bgel trop grand dans rag3d bgel=',bgel
+             err1=1
+             return
+         end if 
+c        module de Biot gel-beton        
+         call mbio3d(Kb,vgel,bgel,Kgel,xmgel,err1)
+c        prise en compte des vides connectee         
+         xmgel=xmgel/(1.0d0+xmgel*Vvgel*Cgel/Rt)       
+      else
+c       pas de rag      
+        dphigel=0.d0
+        bgel=0.d0
+        bg1=0.d0
+        xmgel=0.d0
+      end if
+      
+
+c      print*,'rag3d',bgel,xmgel,kb,vgel,kgel,cgel      
+      
+      return
+      
+      end
+c***********************************************************************      
+      
+ 
+ 

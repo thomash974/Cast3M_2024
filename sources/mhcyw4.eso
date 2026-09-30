@@ -1,0 +1,11 @@
+C MHCYW4    SOURCE    OF166741  24/03/28    21:15:06     11811          
+
+      SUBROUTINE mhcyw4
+
+      write(*,*) 'Subroutine MHCYW4 no longer used'
+      call erreur(5)
+
+c      return
+      END
+
+ 

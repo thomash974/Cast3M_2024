@@ -1,0 +1,37 @@
+C DTCHAM    SOURCE    CB215821  20/11/09    10:36:23     10766          
+      SUBROUTINE DTCHAM(IRET)
+*-----------------------------------------------------------------------
+*     DESTRUCTION D'UN NOUVEAU CHAMELEM ( MCHAML )
+*-----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+-INC SMCHAML
+-INC PPARAM
+      MCHELM=IRET
+      call oooprl(1)
+      SEGACT MCHELM
+      DO 100 IA=1,IMACHE(/1)
+      MCHAML=ICHAML(IA)
+      SEGACT MCHAML
+      DO 200 IB=1,IELVAL(/1)
+      MELVAL=IELVAL(IB)
+      SEGSUP MELVAL
+  200 CONTINUE
+      n2 = 0
+      segadj mchaml
+**    SEGSUP MCHAML
+  100 CONTINUE
+      l1=0
+      n1=0
+      n3=0
+      segadj mchelm
+***   SEGSUP MCHELM
+***   IRET=0
+      call oooprl(0)
+      RETURN
+      END
+
+
+
+
+ 
+ 

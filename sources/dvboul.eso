@@ -1,0 +1,122 @@
+C DVBOUL    SOURCE    KICH      22/09/22    21:15:01     11465          
+      SUBROUTINE DVBOUL(s,centre,ray,nbrobl,nombre,ib,igau)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+c     ***********************************************************
+c     calcul de la plus petite hypersphere, dimension espace < 6
+c     algorithme inspiré de miniball 
+c     ***********************************************************
+      integer lisr(nbrobl)
+      real*8 centre(nbrobl-1),rayon(nbrobl-1)
+      real*8 s(nbrobl-1,nombre)
+          
+      klisp = 0
+ 10   continue
+      lisr(1) = 1
+*      write(6,*)'advblis1',(lisr(ju),ju = 1,nbrobl)
+      do iu = 1,nbrobl-1
+        centre(iu) = s(iu,1)
+      enddo
+      ray2 = 0.D0
+      call dvdmax(s,centre,ray2,lisr,nbrobl,nombre,indx)
+*      write(6,*)'dvboul1',klisp,((centre(ju)/1.e6),ju=1,nbrobl-1),indx
+      if(indx.gt.0) then
+        lisr(2) = lisr(1)
+        lisr(1) = indx
+        do iu = 1,nbrobl-1
+          centre(iu) = (s(iu,lisr(1)) + s(iu,lisr(2)))*0.5D0
+          rayon(iu) = s(iu,lisr(1)) - centre(iu)
+        enddo
+        ray2 = rayon(1)*rayon(1) + rayon(2)*rayon(2) + 
+     &2.D0*rayon(3)*rayon(3)
+        if (nbrobl.gt.4) then
+         ray2 = ray2 + 2.D0*(rayon(4)*rayon(4) + rayon(5)*rayon(5))
+        endif
+          ray = dsqrt(ray2)
+      else
+*       write(6,*) 'boulA',klisp
+       return
+      endif
+      klisp = klisp + 1
+*     verification 
+*      write(6,*)'advblis2',(lisr(ju),ju = 1,nbrobl)
+          call dvdmax(s,centre,ray2,lisr,nbrobl,nombre,indx)
+*      write(6,*)'dvboul2',klisp,((centre(ju)/1.e6),ju=1,nbrobl-1),indx
+* nouvel essai 2D
+      if(indx.gt.0) then
+        lisr(2) = lisr(1)
+        lisr(1) = indx
+        do iu = 1,nbrobl-1
+          centre(iu) = (s(iu,lisr(1)) + s(iu,lisr(2)))*0.5D0
+          rayon(iu) = s(iu,lisr(1)) - centre(iu)
+        enddo
+        ray2 = rayon(1)*rayon(1) + rayon(2)*rayon(2) 
+     &+2.D0*rayon(3)*rayon(3)
+        if (nbrobl.gt.4) then
+         ray2 = ray2 + 2.D0*(rayon(4)*rayon(4) + rayon(5)*rayon(5))
+        endif
+          ray = dsqrt(ray2)
+         klisp = 2
+      else
+*       write(6,*) 'boulB',klisp
+       return
+      endif
+      klis0 = 0
+      NDIM = 2
+      ray2max = ray2
+
+ 20   continue 
+*     verification 
+          call dvdmax(s,centre,ray2,lisr,nbrobl,nombre,indx)
+          
+          if(klisp.gt.nombre/2) then
+           write(6,*) 'pb ', ib,igau
+           return
+          endif
+          
+          if (ray2max.gt.0) then
+            delray = dabs((ray2 - ray2max)/ray2max)
+          else 
+            delray = 0.d0
+          endif
+          if(ib.eq.230.and.igau.eq.6.and..false.) then
+      write(6,*) 'oul',klisp,klis0,ndim,indx,ray2,delray
+      write(6,*) ((centre(ju)/1.e6),ju=1,nbrobl-1)
+          endif
+          ray = dsqrt(ray2)
+          if(indx.eq.0.or.delray.lt.1.D-10) then
+*       write(6,*) 'boulklisp',klisp,ndim
+            return
+          else
+            if (ray2.gt.ray2max) ray2max = ray2
+            do ll = ndim,2,-1
+              lisr(ll) = lisr(ll-1)
+            enddo
+            lisr(1) = indx
+            klisp = klisp + 1
+            if(klisp-1.eq.klis0+ndim) then
+              ndim = ndim + 1
+              if (ndim.eq.nbrobl+1) then
+c        interr(1) = ib
+c        interr(2) = igau
+       write(6,*) 'arret boules',klisp, ib,igau,klis0,ndim
+         call erreur(5)
+*        call erreur(-366)
+              return
+              endif
+              klis0 = klisp - 1
+              nd = ndim
+            else  
+            endif
+              call dvhyp2(nbrobl,nombre,s,nd,lisr,iok,r2,centre)
+           if(ib.eq.230.and.igau.eq.6.and..false.) write(6,*) 'R2',r2
+              ray2 = r2
+           
+            goto 20
+          endif
+
+      RETURN
+      END
+ 
+ 
+ 

@@ -1,0 +1,966 @@
+C BSIGM1    SOURCE    SP204843  23/09/22    21:15:09     11746          
+      SUBROUTINE BSIGM1(IPMAIL,LRE,NSTRS,NBPGAU,MELE,MFR,IVASTR,
+     &        IPMINT,IVACAR,IPORE,LHOOK,NFOR,IVAFOR,ADPG,BDPG,CDPG,
+     &        IIPDPG,NCAR1,MELPHA,noer)
+*----------------------------------------------------------------------
+*         ______________________________                              *
+*        |                              |                             *
+*        |  CALCUL DES FORCES AUX NOEUDS|                             *
+*        |______________________________|                             *
+*                                                                     *
+*        massif, poreux, incompressibles                              *
+*                                                                     *
+*---------------------------------------------------------------------*
+*                                                                     *
+*   ENTREES :                                                         *
+*   ________                                                          *
+*                                                                     *
+*        IPMAIL   Pointeur sur un segment  MELEME           ACTIF E/S *
+*        LRE      Nombre de ddl dans la matrice de rigidite           *
+*        NSTRS    Nombre de composante de contraintes/deformations    *
+*        NBPGAU   Nombre de points d'integration pour les contraintes *
+*        MELE     Numero de l'element fini                            *
+*        MFR      Numero de la formulation                            *
+*        IVASTR   pointeur sur un segment MPTVAL contenant les        *
+*                 les melvals de contraints                           *
+*        IPMINT   Pointeur sur un segment MINTE             ACTIF E/S *
+*        IVACAR   pointeur sur un segment MPTVAL de caracteristiques  *
+*        IPORE    Nombre de fonctions de forme                        *
+*        LHOOK    Taille de la matrice de hooke                       *
+*        NFOR     Nombre de composantes de forces                     *
+*                                                                     *
+*   SORTIES :                                                         *
+*   ________                                                          *
+*                                                                     *
+*        IVAFOR   pointeur sur un segment MPTVAL contenant les        *
+*                 les melvals de forces                               *
+*                                                                     *
+*        ADPG      forces aux noeud support des                       *
+*        BDPG      deformations planes generalisees                   *
+*        CDPG                                                         *
+*                                                                     *
+*---------------------------------------------------------------------*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC CCHAMP
+-INC CCGEOME
+
+-INC SMCHAML
+-INC SMCHPOI
+-INC SMELEME
+-INC SMCOORD
+-INC SMMODEL
+-INC SMINTE
+C
+      SEGMENT MWRK1
+        REAL*8 XFORC(LRE), XFINC(LRE),XSTRS(NSTRS), XE(3,NBBB)
+        REAL*8 SHPWRK(6,NBNO), BGENE(LHOOK,LRE)
+      ENDSEGMENT
+*
+      SEGMENT MWRK3
+       REAL*8 BPSS(3,3),XEL(3,NBBB)
+      ENDSEGMENT
+*
+      SEGMENT MWRK5
+       REAL*8 XGENE(NSTN,LRN)
+      ENDSEGMENT
+*
+      segment mwrk67
+         real*8 valcar(nca1)
+      endsegment
+*
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS)    ,NSOF(NS)
+        INTEGER      IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+*
+      CHARACTER*8  CMATE,CELEM,MO8
+      DIMENSION A(4,60),BB(3,60),xatef1(3,3),PP(4,4)
+      logical drend
+*
+      MELEME=IPMAIL
+      NBNN=NUM(/1)
+      NBELEM=NUM(/2)
+*
+      IDECAP=0
+      NHRM=NIFOUR
+      IELE=NUMGEO(MELE)
+*
+      MINTE=IPMINT
+C_______________________________________________________________________
+C
+C     NUMERO DES ETIQUETTES      :
+C     ETIQUETTES DE 1 A 98 POUR TRAITEMENT SPECIFIQUE A L ELEMENT
+C     DANS LA ZONE SPECIFIQUE A CHAQUE ELEMENT COMMENCANT PAR :
+C     5  CONTINUE
+C     ELEMENT 5   ETIQUETTES 1005 2005 3005 4005   ...
+C     44 CONTINUE
+C     ELEMENT 44  ETIQUETTES 1044 2044 3044 4044   ...
+C_______________________________________________________________________
+C
+      IF(MELE.GE.1.AND.MELE.LE.100) THEN
+C            CABL SEG2 SEG3 TRI3 TRI4 TRI6 TRI7 QUA4 QUA5 QUA8
+      GOTO (   99,  99,  99,   4,  99,   4,  99,   4,  99,   4
+C            QUA9 RAC2 RAC3 CUB8 CU20 PRI6 PR15 LIA3 LIA4 LIA6
+     1      ,  99,  99,  99,   4,   4,   4,   4,  99,  99,  99
+C            LIA8 MULT TET4 TE10 PYR5 PY13 COQ3  DKT POUT LISP
+     2      ,  99,  99,   4,   4,   4,   4,  99,  99,  99,  99
+C            FAC3 FAC4 FAC6 FAC8 LTR3 LQU4 LCU8 LPR6 LTE4 LPY5
+     3      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            COQ8 TUYA TUFI COQ2 POI1 BARR RACO LSU2 COQ4 LISM
+     4      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            COF3 RES2 LSU3 LSU4 LICO COQ6 CVS2 CVS3 CVT3 CVT6
+     5      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            CVQ4 CVQ8 THP5 TH13 THP6 TH15 THC8 TH20 ICT3 ICQ4
+     6      ,  99,  99,  99,  99,  99,  99,  99,  99,   4,   4
+C            ICT6 ICQ8 ICC8 ICT4 ICP6 IC20 IC10 IC15 TRIP QUAP
+     7      ,   4,   4,   4,   4,   4,   4,   4,   4,  79,  79
+C            CUBP TETP PRIP TIMO JOI2 JOI3 JOT3 JOI4 JOI6 JOI8
+     8      ,  79,  79,  79,  79,  99,  99,  99,  99,  99,  99
+C            LISC TRIH  DST LIC4 CERC TUYO LSE2 LITU HYT3 HYQ4
+     9      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99)
+c cccccc
+     .      ,MELE
+      ELSEIF(MELE.GE.101.AND.MELE.LE.200) THEN
+C            HYT4 HYP6 HYC8 TRIS QUAS POIS FOR3 JOP3 JOP6 JOP8
+      GOTO (   99,  99,  99,  99,  99,  99,  99,  80,  80,  80
+C            POL3 POL4 POL5 POL6 POL7 POL8 POL9 PO10 PO11 PO12
+     1      ,   4,   4,   4,   4,   4,   4,   4,   4,   4,   4
+C            PO13 PO14 BAR3 BAEX LIA2 QUAH CUBH ROT3 SEF2 TRF3
+     2      ,   4,   4,  99,  99,  99,  99,  99,  99,  99,  99
+C            QUF4 CUF8 PRF6 TEF4 PYF5 MSE3 MTR6 MQU9 MC27 MP18
+     3      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            MT10 MP14 SEF3 TRF7 QUF9 CF27 PF21 TF15 PF19 SEG6
+     4      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            TR21 QU36 C216 P126 TE56 PY91 TRH6 BSE2 BTR4 BQU5
+     5      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            BCU9 BPR7 BTE5 BPY6 FRO4 SEGS POJS JCT3 JCI4 JGI2
+     6      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            JGT3 JGI4 TRIQ QUAQ CUBQ TETQ PRIQ TRIR QUAR CUBR
+     7      ,  99,  99, 173, 173, 173, 173, 173, 173, 173, 173
+C            TETR PRIR Q4RI Q8RI JOQ3 JOQ6 JOQ8 JOR3 JOR6 JOR8
+     8      , 173, 173,   4,   4, 185, 185, 185, 185, 185, 185
+C            T1D2 T1D3 M1D2 M1D3 LC03 LC07 LC09 LC27 LC21 LC15
+     9      ,  99,  99,   4,   4,  99,  99,  99,  99,  99,  99)
+c cccccc
+     .      ,MELE-100
+      ELSEIF(MELE.GE.201.AND.MELE.LE.300) THEN
+C            LC19 LS03 LS07 LS09 LS27 LS21 LS15 LS19 BS03 BS07
+      GOTO (   99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            BS09 BS27 BS21 BS15 BS19 MC03 MC07 MC09 MC27 MC21
+     1      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            MC15 MC19 M103 M107 M109 M127 M121 M115 M119 MS03
+     2      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            MS07 MS09 MS27 MS21 MS15 MS19 QC03 QC07 QC09 QC27
+     3      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            QC21 QC15 QC19 Q103 Q107 Q109 Q127 Q121 Q115 Q119
+     4      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            QS03 QS07 QS09 QS27 QS21 QS15 QS19 CIFL SURE SHB8
+     5      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            CAF2 CAF3 XQ4R XC8R JOI1 ZCO2 ZCO3 ZCO4 TUY2 TUY3
+     6      ,  99,  99,  99,  99,  99,  99,  99,  99,  99,  99
+C            COS2 COA2 ICY5 IC13 CU27 PR21 TE15 PY19 C20R P15R
+     7      ,  99,  99,   4,   4,   4,   4,   4,   4,   4,   4)
+c cccccc
+     .      ,MELE-200
+      ENDIF
+C
+C_______________________________________________________________________
+C
+C     SECTEUR DE CALCUL POUR LES ELEMENTS MASSIFS ET ELEMENTS INCOMPRESSIBLES
+C_______________________________________________________________________
+C
+   4  CONTINUE
+      DIM3=1.D0
+      NBNO=NBNN
+      NBBB=NBNN
+C
+C    INTRODUCTION DES COORD DU POINT AUTOUR DUQUEL SE FAIT LE
+C    MOUVEMENT DE LA SECTION EN DEFO PLANE GENERALISEE
+C    Pas de rotation en 1D
+C    ET INITIALISATION DES FORCES AU NOEUD SUPPORT DE LA DEFO
+C    PLANE GENERALISEE
+      IF (IIPDPG.GT.0)THEN
+        IREF=(IIPDPG-1)*(IDIM+1)
+        XDPGE=XCOOR(IREF+1)
+        YDPGE=XCOOR(IREF+2)
+      ELSE
+        XDPGE=XZero
+        YDPGE=XZero
+      ENDIF
+      ADPG=XZero
+      BDPG=XZero
+      CDPG=XZero
+C
+      SEGINI MWRK1
+      mwrk67=0
+      
+      if (melpha.gt.0) melva1 = melpha
+
+      DO 3004  IB=1,NBELEM
+C
+C     ON CHERCHE  LES COORDONNEES DES NOEUDS DE L ELEMENT IB
+C
+      CALL DOXE(XCOOR,IDIM,NBNN,NUM,IB,XE)
+C
+C     MISE A 0 DES FORCES
+C
+      CALL ZERO(XFINC,1,LRE)
+C
+C     BOUCLE SUR LES POINTS DE GAUSS
+C
+C     CALCUL DES COEFF DE MODIFICATION DE LA MATRICE B-BARRE (INCOMPRES)
+      IF (MFR.EQ.31) THEN
+        CALL BBCALC(MELE,NBNN,MFR,IDIM,XE,
+     &              NBPGAU,POIGAU,QSIGAU,ETAGAU,DZEGAU,
+     &              NSTRS,LRE,IFOUR,NHRM,A,BB,SHPTOT,SHPWRK,
+     &              BGENE,XDPGE,YDPGE,PP)
+      ENDIF
+
+      ISDJC=0
+      DO 5004  IGAU=1,NBPGAU
+C
+C   RECUPERATION DE L'EPAISSEUR
+C
+        DIM3=1.D0
+      IF (IFOUR.EQ.-2)THEN
+        MPTVAL=IVACAR
+        IF (IVACAR.NE.0) THEN
+         MELVAL=IVAL(1)
+         IF (MELVAL.NE.0) THEN
+          IGMN=MIN(IGAU,VELCHE(/1))
+          IBMN=MIN(IB,VELCHE(/2))
+          DIM3=VELCHE(IGMN,IBMN)
+         ENDIF
+        ENDIF
+      ENDIF
+*
+      CALL BMATST(IGAU,NBPGAU,POIGAU,QSIGAU,ETAGAU,DZEGAU,
+     1            MELE,MFR,NBNN,LRE,IFOUR,NSTRS,NHRM,DIM3,
+     2            XE,SHPTOT,SHPWRK,BGENE,DJAC,XDPGE,YDPGE)
+
+      IF (DJAC.EQ.0.D0) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(259)
+         GOTO 9904
+        else
+         noer=259
+         return
+        endif
+      ENDIF
+      IF (DJAC.LT.0.D0) ISDJC=ISDJC+1
+*
+      DJAC=ABS(DJAC)*POIGAU(IGAU)
+
+C En cas d'elements incompressibles : BGENE selon la methode B-BARRE
+      IF (MFR.EQ.31) THEN
+        CALL BBAR(IGAU,NBPGAU,POIGAU,QSIGAU,ETAGAU,DZEGAU,
+     &            MELE,NBNN,LRE,IFOUR,NSTRS,XE,DJAC,A,BB,BGENE)
+      ENDIF
+C
+C     ON CHERCHE LES CONTRAINTES
+C
+      MPTVAL=IVASTR
+      DO 6004 ICOMP=1,NSTRS
+        MELVAL=IVAL(ICOMP)
+        IGMN=MIN(IGAU,VELCHE(/1))
+        IBMN=MIN(IB  ,VELCHE(/2))
+        XSTRS(ICOMP)=VELCHE(IGMN,IBMN)
+ 6004 CONTINUE
+C
+C     CALCUL DE B*SIGMA
+C
+* initialise
+      CALL ZERO(XFORC,1,LRE)
+* contribution point  d integration
+      CALL BSIG(BGENE,XSTRS,NSTRS,LRE,DJAC,XFORC)
+* matrice d'efficacite
+        drend = .false.
+        MPTVAL=IVACAR
+        IF (IVACAR.GT.0) THEN
+         nca1 = ival(/1)
+         if (mwrk67.eq.0) segini mwrk67
+         if (nca1.ne.valcar(/1)) segadj mwrk67
+         celem = 'MASSIF  '
+         IF(IVAL(NCAR1).GT.0.OR.IVAL(NCAR1+1).GT.0) THEN
+          DO 9008 IM= 1,IVAL(/1)
+          IF (IVAL(IM).GT.0) THEN
+            MELVAL=IVAL(IM)
+            
+C         Pour optimisation et eviter _gfortran_compare_string inefficace
+            MO8=TYVAL(IM)(1:8)
+            IF (MO8.EQ.'REAL*8  ') THEN
+              IBMN=MIN(IB  ,VELCHE(/2))
+              IGMN=MIN(IGAU,VELCHE(/1))
+              VALCAR(IM)=VELCHE(IGMN,IBMN)
+            ELSE
+              IBMN=MIN(IB  ,IELCHE(/2))
+              IGMN=MIN(IGAU,IELCHE(/1))
+              VALCAR(IM)=IELCHE(IGMN,IBMN)
+            ENDIF
+          ELSE
+            VALCAR(IM)=0.D0
+          ENDIF
+ 9008    CONTINUE
+        nstep = 2
+        if (ifour.eq.2) nstep = 3
+        MO8=TYVAL(ncar1)(1:8)
+        if (ival(ncar1).gt.0.and.MO8.eq.'REAL*8  ') then
+           drend = .true.
+           do i = 1,nstep
+            do j = 1, nstep
+              xatef1(i,j) = 0.d0
+            enddo
+            xatef1(i,i) = valcar(ncar1)
+          enddo
+        endif
+        MO8=TYVAL(ncar1+1)(1:8)
+        if (ival(ncar1).eq.0.and.MO8.eq.'REAL*8  ') then
+          drend = .false.
+          do i = 1,nstep
+            do j = 1, nstep
+              xatef1(i,j) = 0.d0
+            enddo
+            xatef1(1,1) = valcar(ncar1+7)
+            xatef1(2,2) = valcar(ncar1+8)
+            if (nstep.eq.3) xatef1(3,3) = valcar(ncar1+9)
+          enddo
+        endif
+        call effi3(valcar,tyval,nca1,ncar1,xforc,lre,ib,igau,xatef1,
+     & nstep,drend,celem)
+        ENDIF
+      ENDIF
+
+* ponderation par la phase
+        IF (MELPHA.GT.0) THEN
+          IBMN=MIN(IB  ,melva1.VELCHE(/2))
+          IGMN=MIN(IGAU,melva1.VELCHE(/1))
+          coe1 = melva1.velche(igmn,ibmn)
+       CALL OPTABj(1,1,2,1,xforc,0.d0,xforc,LRE,1,LRE,2,0,coe1,IRETO)
+        ENDIF
+
+*  stocke
+C      do ii = 1,LRE
+C          xfinc(ii) = xfinc(ii) + xforc(ii)
+C      enddo
+C      On realise l'addition en FORTRAN pur (plus rapide)
+       CALL OPTABj(1,1,3,2,xfinc,xforc,xfinc,LRE,LRE,LRE,0,0,0.D0,IRETO)
+*
+ 5004 CONTINUE
+
+      IF(ISDJC.NE.0.AND.ISDJC.NE.NBPGAU) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(195)
+         GOTO 9904
+        else
+         noer=195
+         return
+        endif
+      ENDIF
+C
+C   EXTRACTION DES FORCES AU NOEUD SUPPORT DE LA DEF PLAN GENE
+C   ON CALCULE LES RESULTANTES DES FORCES SUR CHAQUE ELEMENT
+C
+      NFOFO=NFOR
+      if (IIPDPG.gt.0) then
+      IF (IFOUR.EQ.-3) THEN
+        NFOFO=NFOR-3
+        ADPG=ADPG+XFINC(NBNN*NFOFO+1)
+        BDPG=BDPG+XFINC(NBNN*NFOFO+2)
+        CDPG=CDPG+XFINC(NBNN*NFOFO+3)
+      ELSE IF (IFOUR.EQ. 7.OR.IFOUR.EQ. 8.OR.IFOUR.EQ.9.OR.
+     .         IFOUR.EQ.10.OR.IFOUR.EQ.14) THEN
+        NFOFO=NFOR-1
+        ADPG=ADPG+XFINC(NBNN*NFOFO+1)
+      ELSE IF (IFOUR.EQ.11) THEN
+        NFOFO=NFOR-2
+        ADPG=ADPG+XFINC(NBNN*NFOFO+1)
+        BDPG=BDPG+XFINC(NBNN*NFOFO+2)
+      ENDIF
+      endif
+C
+C     ON RANGE XFORC DANS MELVAL
+C
+      IE=0
+      MPTVAL=IVAFOR
+      DO IGAU=1,NBNN
+       DO ICOMP=1,NFOFO
+        IE=IE+1
+        MELVAL=IVAL(ICOMP)
+        IBMN=MIN(IB  ,VELCHE(/2))
+        VELCHE(IGAU,IBMN)=XFINC(IE)
+       ENDDO
+      ENDDO
+ 3004 CONTINUE
+
+ 9904 CONTINUE
+      SEGSUP MWRK1
+      if (mwrk67.ne.0) segsup mwrk67
+      GOTO 510
+C__________________________________________________________________
+C_______________________________________________________________________
+C
+C     MILIEUX POREUX
+C_______________________________________________________________________
+C
+  79  CONTINUE
+C
+C    POUR CES ELEMENTS  NBBB = NOMBRE DE NOEUDS
+C                       NBNO = NOMBRE DE FONCTIONS DE FORME
+C
+      DIM3=1.D0
+      NBNO=IPORE
+      NBBB=NBNN
+      LRN = NBNO-NBBB
+      LRB=LRE-LRN
+*
+      NSTN=1
+      SEGINI MWRK1,MWRK5
+C
+      DO 3079  IB=1,NBELEM
+C
+C     ON CHERCHE  LES COORDONNEES DES NOEUDS DE L ELEMENT IB
+C
+      CALL DOXE(XCOOR,IDIM,NBNN,NUM,IB,XE)
+C
+C     MISE A 0 DES FORCES
+C
+      CALL ZERO(XFORC,1,LRE)
+C
+C     BOUCLE SUR LES POINTS DE GAUSS
+C
+      ISDJC=0
+      DO 5079  IGAU=1,NBPGAU
+C
+C   RECUPERATION DE L'EPAISSEUR
+C
+      IF (IFOUR.EQ.-2)THEN
+        MPTVAL=IVACAR
+        IF (IVACAR.NE.0) THEN
+         MELVAL=IVAL(1)
+         IF (MELVAL.NE.0) THEN
+          IGMN=MIN(IGAU,VELCHE(/1))
+          IBMN=MIN(IB,VELCHE(/2))
+          DIM3=VELCHE(IGMN,IBMN)
+        ELSE
+          DIM3=1.D0
+        ENDIF
+       ENDIF
+      ENDIF
+C
+      CALL BNPORE(IGAU,NBNO,NBBB,LRE,IFOUR,LHOOK,NSTN,NHRM,
+     .            DIM3,XE,SHPTOT,SHPWRK,BGENE,XGENE,DJAC,1)
+      IF (DJAC.EQ.0.D0) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(259)
+         GOTO 9979
+        else
+         noer=259
+         return
+        endif
+      ENDIF
+      IF(DJAC.LT.0.) ISDJC=ISDJC+1
+      DJAC=ABS(DJAC)*POIGAU(IGAU)
+C
+C     ON CHERCHE LES CONTRAINTES
+C
+      MPTVAL=IVASTR
+      DO 6079 ICOMP=1,NSTRS
+        MELVAL=IVAL(ICOMP)
+        IGMN=MIN(IGAU,VELCHE(/1))
+        IBMN=MIN(IB  ,VELCHE(/2))
+        XSTRS(ICOMP)=VELCHE(IGMN,IBMN)
+ 6079 CONTINUE
+C
+C     CALCUL DE B*SIGMA
+C
+      CALL BSIG(BGENE,XSTRS,LHOOK,LRE,DJAC,XFORC)
+
+*     ON AJOUTE LES TERMES EN FP
+*     SIGNE - POUR ETRE COHERENT AVEC RIGI
+*
+      r_z = XSTRS(NSTRS)*DJAC
+      DO 6179 J=1,LRN
+         JJ=LRB+J
+         XFORC(JJ)=XFORC(JJ) - r_z*XGENE(1,J)
+ 6179 CONTINUE
+*
+ 5079 CONTINUE
+      IF(ISDJC.NE.0.AND.ISDJC.NE.NBPGAU) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(195)
+         GOTO 9979
+        else
+         noer=195
+         return
+        endif
+      ENDIF
+C
+C     ON RANGE XFORC DANS MELVAL
+C     D'ABORD LES FORCES PUIS LES DEBITS
+C
+      IE=0
+      MPTVAL=IVAFOR
+      DO IGAU=1,NBNN
+       DO ICOMP=1,NFOR-1
+        IE=IE+1
+        MELVAL=IVAL(ICOMP)
+        VELCHE(IGAU,IB)=XFORC(IE)
+       ENDDO
+      ENDDO
+*
+      DO 7179 IGAU=1,NBSOM(IELE)
+        IE=IE+1
+        MELVAL=IVAL(NFOR)
+        IGAV  = IBSOM(NSPOS(IELE)+IGAU-1)
+        VELCHE(IGAV,IB)=XFORC(IE)
+ 7179 CONTINUE
+*
+ 3079 CONTINUE
+
+ 9979 CONTINUE
+      SEGSUP MWRK1,MWRK5
+      GOTO 510
+C_______________________________________________________________________
+C__________________________________________________________________
+C
+C     MILIEUX POREUX - SUITE
+C_______________________________________________________________________
+C
+ 173  CONTINUE
+C
+C    POUR CES ELEMENTS  NBBB = NOMBRE DE NOEUDS
+C                       NBNO = NOMBRE DE FONCTIONS DE FORME
+C
+      DIM3=1.D0
+      NBNO=IPORE
+      NBBB=NBNN
+      IF(MELE.GE.173.AND.MELE.LE.177) THEN
+        IDECAP = 2
+      ELSE IF (MELE.GE.178.AND.MELE.LE.182) THEN
+        IDECAP = 3
+      ENDIF
+*
+      NSTN=IDECAP
+      NSTB=4
+      IF(IFOUR.EQ.1.OR.IFOUR.EQ.2) NSTB=6
+      LPP = NBNO-NBBB
+      LRN=IDECAP*LPP
+      LRB=LRE-LRN
+
+      SEGINI MWRK1,MWRK5
+C
+      DO 3173  IB=1,NBELEM
+C
+C     ON CHERCHE  LES COORDONNEES DES NOEUDS DE L ELEMENT IB
+C
+      CALL DOXE(XCOOR,IDIM,NBNN,NUM,IB,XE)
+C
+C     MISE A 0 DES FORCES
+C
+      CALL ZERO(XFORC,1,LRE)
+C
+C     BOUCLE SUR LES POINTS DE GAUSS
+C
+      ISDJC=0
+      DO 5173  IGAU=1,NBPGAU
+C
+C   RECUPERATION DE L'EPAISSEUR
+C
+      IF (IFOUR.EQ.-2)THEN
+        MPTVAL=IVACAR
+        IF (IVACAR.NE.0) THEN
+         MELVAL=IVAL(1)
+         IF (MELVAL.NE.0) THEN
+          IGMN=MIN(IGAU,VELCHE(/1))
+          IBMN=MIN(IB,VELCHE(/2))
+          DIM3=VELCHE(IGMN,IBMN)
+        ELSE
+          DIM3=1.D0
+        ENDIF
+       ENDIF
+      ENDIF
+C
+      CALL BNQORE(IGAU,NBNO,NBBB,LRE,IFOUR,NSTB,NSTN,NHRM,
+     &     DIM3,XE,SHPTOT,SHPWRK,BGENE,XGENE,DJAC,IDECAP,LHOOK,1)
+      IF (DJAC.EQ.0.D0) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(259)
+         GOTO 99173
+        else
+         noer=259
+         return
+        endif
+      ENDIF
+      IF(DJAC.LT.0.) ISDJC=ISDJC+1
+      DJAC=ABS(DJAC)*POIGAU(IGAU)
+C
+C     ON CHERCHE LES CONTRAINTES
+C
+      MPTVAL=IVASTR
+      DO 6173 ICOMP=1,NSTRS
+        MELVAL=IVAL(ICOMP)
+        IGMN=MIN(IGAU,VELCHE(/1))
+        IBMN=MIN(IB  ,VELCHE(/2))
+        XSTRS(ICOMP)=VELCHE(IGMN,IBMN)
+ 6173 CONTINUE
+C
+C     CALCUL DE B*SIGMA
+C
+      CALL BSIG(BGENE,XSTRS,LHOOK,LRE,DJAC,XFORC)
+*
+*     ON AJOUTE LES TERMES EN FP
+*     SIGNE - POUR ETRE COHERENT AVEC RIGI
+*
+      DO 6273 IPR=1,IDECAP
+         IPR1=(IPR-1)*LPP
+         IPR2=NSTRS-IDECAP+IPR
+         r_z = XSTRS(IPR2) * DJAC
+         DO 6373 J=1,LPP
+           JJ=LRB+IPR1+J
+           XFORC(JJ)=XFORC(JJ)- r_z * XGENE(IPR,IPR1+J)
+ 6373    CONTINUE
+ 6273 CONTINUE
+*
+ 5173 CONTINUE
+
+      IF(ISDJC.NE.0.AND.ISDJC.NE.NBPGAU) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(195)
+         GOTO 99173
+        else
+         noer=195
+         return
+        endif
+      ENDIF
+C
+C     ON RANGE XFORC DANS MELVAL
+C     D'ABORD LES FORCES PUIS LES DEBITS
+C
+      IE=0
+      MPTVAL=IVAFOR
+      DO IGAU=1,NBNN
+       DO ICOMP=1,NFOR-IDECAP
+        IE=IE+1
+        MELVAL=IVAL(ICOMP)
+        VELCHE(IGAU,IB)=XFORC(IE)
+       ENDDO
+      ENDDO
+*
+      DO 7273 IPR=1,IDECAP
+         IPR1=NFOR-IDECAP+IPR
+         DO 7373 IGAU=1,NBSOM(IELE)
+           IE=IE+1
+           MELVAL=IVAL(IPR1)
+           IGAV  = IBSOM(NSPOS(IELE)+IGAU-1)
+           VELCHE(IGAV,IB)=XFORC(IE)
+ 7373    CONTINUE
+ 7273 CONTINUE
+*
+ 3173 CONTINUE
+*
+99173 CONTINUE
+      SEGSUP MWRK1,MWRK5
+      GOTO 510
+C__________________________________________________________________
+C_______________________________________________________________________
+C
+C     JOINTS EN FORMULATION MILIEUX POREUX
+C_______________________________________________________________________
+C
+  80  CONTINUE
+C
+C    POUR CES ELEMENTS  NBBB = NOMBRE DE NOEUDS
+C                       NBNO = NOMBRE DE FONCTIONS DE FORME
+C
+      NBNO=IPORE
+      NBBB=NBNN
+      LRN=(NBNO-NBBB)*3/2
+      LRB=LRE-LRN
+      NSTN=1
+      NFAC=(3*NBBB-NBNO)/2
+      NMIL=LRN-NBSOM(IELE)
+      SEGINI MWRK1,MWRK3,MWRK5
+      I195=0
+      I259=0
+C
+      DO 3080  IB=1,NBELEM
+C
+C     ON CHERCHE  LES COORDONNEES DES NOEUDS DE L ELEMENT IB
+C
+      CALL DOXE(XCOOR,IDIM,NBNN,NUM,IB,XE)
+C
+C     CALCUL DES AXES LOCAUX ET DES CORDONNES LOCALES
+C
+      CALL JOPLOC(XE,SHPTOT,NBBB,NBNO,IFOUR,XEL,BPSS)
+C
+C     MISE A 0 DES FORCES
+C
+      CALL ZERO(XFORC,1,LRE)
+C
+C     BOUCLE SUR LES POINTS DE GAUSS
+C
+      ISDJC=0
+      DO 5080  IGAU=1,NBPGAU
+C
+      CALL BNPORJ(IGAU,NBNO,NBBB,LRE,IFOUR,LHOOK,NSTN,XE,XEL,
+     .            SHPTOT,SHPWRK,BPSS,BGENE,XGENE,DJAC,1)
+      IF (DJAC.EQ.0.) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(259)
+         GOTO 9980
+        else
+         noer=259
+         return
+        endif
+      ENDIF
+      IF(DJAC.LT.0.) ISDJC=ISDJC+1
+      DJAC=ABS(DJAC)*POIGAU(IGAU)
+C
+C     ON CHERCHE LES CONTRAINTES
+C
+      MPTVAL=IVASTR
+      DO 6080 ICOMP=1,NSTRS
+        MELVAL=IVAL(ICOMP)
+        IGMN=MIN(IGAU,VELCHE(/1))
+        IBMN=MIN(IB  ,VELCHE(/2))
+        XSTRS(ICOMP)=VELCHE(IGMN,IBMN)
+ 6080 CONTINUE
+C
+C     CALCUL DE B*SIGMA
+C
+      CALL BSIG(BGENE,XSTRS,LHOOK,LRE,DJAC,XFORC)
+*
+*     ON AJOUTE LES TERMES EN FP
+*     SIGNE - POUR ETRE COHERENT AVEC RIGI
+*
+      r_z = XSTRS(NSTRS)*DJAC
+      DO 6180 J=1,LRN
+         JJ=LRB+J
+         XFORC(JJ)=XFORC(JJ)-XGENE(1,J)*r_z
+ 6180 CONTINUE
+
+ 5080 CONTINUE
+      IF (ISDJC.NE.0.AND.ISDJC.NE.NBPGAU) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(195)
+         GOTO 9980
+        else
+         noer=195
+         return
+        endif
+      ENDIF
+C
+C     ON RANGE XFORC DANS MELVAL
+C     D'ABORD LES FORCES PUIS LES DEBITS
+C
+      MPTVAL=IVAFOR
+C
+      IE=0
+      DO IGAU=1,NFAC
+        DO ICOMP=1,NFOR-1
+          IE=IE+1
+          MELVAL=IVAL(ICOMP)
+          VELCHE(IGAU,IB)=XFORC(IE)
+        ENDDO
+      ENDDO
+*
+*     debits ( d'abord sommets puis mileux des cotes ad-hoc )
+*
+      MELVAL=IVAL(NFOR)
+      IGMN = NSPOS(IELE)-1
+      DO IGAU=1,NBSOM(IELE)
+         IE   = IE+1
+         IGAV = IBSOM(IGMN + IGAU)
+C*       VELCHE(IGAV,IB)=XFORC(IE)*0.D0
+         VELCHE(IGAV,IB)=0.D0
+      ENDDO
+*
+      IGMN = NBBB - NMIL
+      DO IGAU=1,NMIL
+         IE=IE+1
+         IGAV  = IGMN + IGAU
+         VELCHE(IGAV,IB)=XFORC(IE)
+      ENDDO
+*
+ 3080 CONTINUE
+
+ 9980 CONTINUE
+      SEGSUP MWRK1,MWRK3,MWRK5
+      GOTO 510
+C__________________________________________________________________
+C_______________________________________________________________________
+C
+C     JOINTS EN FORMULATION MILIEUX POREUX - SUITE
+C_______________________________________________________________________
+C
+ 185  CONTINUE
+C
+C    POUR CES ELEMENTS  NBBB = NOMBRE DE NOEUDS
+C                       NBNO = NOMBRE DE FONCTIONS DE FORME
+C
+      IF (MELE.GE.185.AND.MELE.LE.187) THEN
+        IDECAP = 2
+      ELSE IF (MELE.GE.188.AND.MELE.LE.190) THEN
+        IDECAP = 3
+      ENDIF
+C
+      NBNO=IPORE
+      NSTN=IDECAP
+      NSTB=2
+      IF(IFOUR.EQ.1.OR.IFOUR.EQ.2) NSTB=3
+C
+      NBBB=NBNN
+      LPP=(NBNO-NBBB)*3/2
+      LRN=IDECAP*LPP
+      LRB=LRE-LRN
+      NFAC=(3*NBBB-NBNO)/2
+      NMIL=LPP-NBSOM(IELE)
+      SEGINI MWRK1,MWRK3,MWRK5
+      I195=0
+      I259=0
+C
+      DO 3185  IB=1,NBELEM
+C
+C     ON CHERCHE  LES COORDONNEES DES NOEUDS DE L ELEMENT IB
+C
+      CALL DOXE(XCOOR,IDIM,NBNN,NUM,IB,XE)
+C
+C     CALCUL DES AXES LOCAUX ET DES CORDONNES LOCALES
+C
+      CALL JOPLOC(XE,SHPTOT,NBBB,NBNO,IFOUR,XEL,BPSS)
+C
+C     MISE A 0 DES FORCES
+C
+      CALL ZERO(XFORC,1,LRE)
+C
+C     BOUCLE SUR LES POINTS DE GAUSS
+C
+      ISDJC=0
+      DO 5185  IGAU=1,NBPGAU
+C
+      CALL BNPQRJ(IGAU,NBNO,NBBB,LRE,IFOUR,LHOOK,NSTN,XE,XEL,
+     .      SHPTOT,SHPWRK,BPSS,BGENE,XGENE,DJAC,IDECAP,NSTB,1)
+      IF (DJAC.EQ.0.) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(259)
+         GOTO 9985
+        else
+         noer=259
+         return
+        endif
+      ENDIF
+      IF(DJAC.LT.0.) ISDJC=ISDJC+1
+      DJAC=ABS(DJAC)*POIGAU(IGAU)
+C
+C     ON CHERCHE LES CONTRAINTES
+C
+      MPTVAL=IVASTR
+      DO 6185 ICOMP=1,NSTRS
+        MELVAL=IVAL(ICOMP)
+        IGMN=MIN(IGAU,VELCHE(/1))
+        IBMN=MIN(IB  ,VELCHE(/2))
+        XSTRS(ICOMP)=VELCHE(IGMN,IBMN)
+ 6185 CONTINUE
+C
+C     CALCUL DE B*SIGMA
+C
+      CALL BSIG(BGENE,XSTRS,LHOOK,LRE,DJAC,XFORC)
+*
+*     ON AJOUTE LES TERMES EN FP
+*     SIGNE - POUR ETRE COHERENT AVEC RIGI
+*
+      DO IPR=1,IDECAP
+        IPR1=(IPR-1)*LPP
+        IPR2=NSTRS-IDECAP+IPR
+        r_z = XSTRS(IPR2)*DJAC
+        DO J=1,LPP
+          JJ=LRB+IPR1+J
+          XFORC(JJ)=XFORC(JJ)-XGENE(IPR,IPR1+J)*r_z
+        ENDDO
+      ENDDO
+
+ 5185 CONTINUE
+      IF (ISDJC.NE.0.AND.ISDJC.NE.NBPGAU) THEN
+        INTERR(1)=IB
+        if (noer.eq.0) then
+         CALL ERREUR(195)
+         GOTO 9985
+        else
+         noer=195
+         return
+        endif
+      ENDIF
+C
+C     ON RANGE XFORC DANS MELVAL
+C     D'ABORD LES FORCES PUIS LES DEBITS
+C
+      IE=0
+      MPTVAL=IVAFOR
+      JCOMP = NFOR-IDECAP
+      DO IGAU=1,NFAC
+        DO ICOMP=1,JCOMP
+          IE=IE+1
+          MELVAL=IVAL(ICOMP)
+          VELCHE(IGAU,IB)=XFORC(IE)
+        ENDDO
+      ENDDO
+*
+*     debits ( d'abord sommets puis mileux des cotes ad-hoc )
+*
+      DO 7485 IPR=1,IDECAP
+        IPR1 = NFOR-IDECAP+IPR
+        MELVAL=IVAL(IPR1)
+
+        DO 7285 IGAU=1,NBSOM(IELE)
+          IE=IE+1
+          IGAV  = IBSOM(NSPOS(IELE)+IGAU-1)
+C*        VELCHE(IGAV,IB)=XFORC(IE)*0.D0
+          VELCHE(IGAV,IB)=0.D0
+ 7285   CONTINUE
+*
+        DO 7385 IGAU=1,NMIL
+          IE=IE+1
+          IGAV  = NBBB - NMIL +IGAU
+          VELCHE(IGAV,IB)=XFORC(IE)
+ 7385   CONTINUE
+ 7485 CONTINUE
+*
+ 3185 CONTINUE
+
+ 9985 CONTINUE
+      SEGSUP MWRK1,MWRK3,MWRK5
+      GOTO 510
+C
+C
+   99 CONTINUE
+      MOTERR(1:4)=NOMTP(MELE)
+      MOTERR(5:12)='BSIGMA'
+      CALL ERREUR(86)
+C
+  510 CONTINUE
+
+      END
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,15 @@
+C TRAPS1    SOURCE    PV090527  23/01/27    21:16:05     11574          
+c*************************************************************************
+c     transposition d une matrice
+      subroutine traps1(xt,x,jdim)
+      integer jdim,i,j
+      real*8 xt(jdim,jdim),x(jdim,jdim)
+      do i=1,jdim
+        do j=1,jdim
+           xt(i,j)=x(j,i)
+        end do
+      end do 
+      return
+      end
+      
+ 

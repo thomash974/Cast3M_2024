@@ -1,0 +1,37 @@
+C HOOK3D    SOURCE    FD218221  24/02/07    21:15:13     11834          
+       subroutine hook3d(iso,xmat,nmat,nbelas,ierr1,
+     # raideur66,souplesse66)
+
+c     actualisation des matrices d elasticite isotrope
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      logical iso
+      integer nmat,ierr1,nbelas
+      real*8 xmat(nmat)
+      real*8 youn,nu,kb,mub
+      real*8 raideur66(6,6),souplesse66(6,6)
+      real*8 coeff1,coeff2,yja,nja
+      parameter (coeff1=0.001d0,coeff2=0.999) 
+
+      if(iso) then
+         call xmat3d(youn,xmat,nmat,vnmat,nstype,nbelas,0,1)
+         call xmat3d(nu,xmat,nmat,vnmat,nstype,nbelas,0,2)
+         call hoo03d(iso,youn,nu,kb,mub,ierr1,raideur66,souplesse66)
+c         print*,'dans hook3d',youn,nu
+         if(ierr1.eq.1) then
+             print*,'ERREUR1 dans hook3d'
+             return
+         end if
+      else
+c        cas orthotrope en base fixe
+         call rior3d(xmat,nmat,nbelas,ierr1,
+     #   raideur66,souplesse66)
+c         print*,'Dans hook3d base fice H'         
+c         call afic66(raideur66)
+c         print*,'Dans hook3d base fice C'         
+c         call afic66(souplesse66)  
+c         read*
+      end if
+      return
+      end 

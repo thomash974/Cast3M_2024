@@ -1,0 +1,131 @@
+C DEVINT    SOURCE    BP208322  20/06/16    21:15:04     10627          
+      SUBROUTINE DEVINT(ICHATE,ICHAFO,KTNUM,KTRAV,REPRIS)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE : algorithme de Fu - de Vogelaere               *
+*     ________________________________________________               *
+*                                                                    *
+*     Interpolation du chargement fourni en LISTREEL.                *
+*     Remplissage du segment de travail KTRAV.                       *
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+* e   ICHATE  pointeur sur un LISTREEL, abscisse                     *
+* e   ICHAFO  pointeur sur un LISTREEL, ordonnee                     *
+* e   KTNUM   segment contenant les parametres numeriques            *
+* s   KTRAV   segment de travail                                     *
+* e   REPRIS  logique indiquant si le calcul est en reprise          *
+*                                                                    *
+*     Auteur, date de creation:                                      *
+*                                                                    *
+*     Lionel VIVAN, le 17 avril 1990                                 *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLREEL
+*
+      SEGMENT,MTNUM
+         REAL*8 XDT(NPC1),XTEMPS(NPC1)
+      ENDSEGMENT
+      SEGMENT,MTRAV
+         REAL*8 FTCHG(NPC2)
+      ENDSEGMENT
+      LOGICAL REPRIS
+      
+*     RECUP DES ARGUMENTS
+*
+      MTNUM = KTNUM
+      NPC1   = XDT(/1)
+      PASTEM = XDT(1)
+      PASTS2 = PASTEM * 0.5D0
+      MLREE1 = ICHATE
+      SEGACT MLREE1
+      NF = MLREE1.PROG(/1)
+      MLREE2 = ICHAFO
+      SEGACT MLREE2
+      
+*     CREATION DE MTRAV  
+*
+      NPC2 = 2 * NPC1
+      SEGINI MTRAV
+      KTRAV = MTRAV
+*
+*     INTERPOLATION DU CHARGEMENT
+*
+*     initialisation des indices debut et fin de recherche
+      N1 = 1
+      N2 = 2
+      
+c c     SI REPRISE, ON CHERCHE LES FORCES A TREPRISE-DT/2
+c       IF ( REPRIS ) THEN
+c          TEMP = XTEMPS(1)
+c          TES2 = TEMP - PASTS2
+c       write(*,*) 'devint: reprise => cherche F(t=',TES2,') --> FTCHG(1)'
+c          CALL INTLIN(TES2,ICHATE,ICHAFO,NF,N1,N2, FTEM,IRET)
+c          IF (IRET.EQ.0) THEN
+c *           temps en dehors de la liste
+c             CALL ERREUR(208)
+c             RETURN
+c          ENDIF         
+c c     SI 1er APPEL A DYNE, ON SUPPOSE LES FORCES a t<0 NULLES
+c       ELSE
+c          FTEM = 0.D0
+c       ENDIF
+c       IT2 = 1
+c       FTCHG(IT2) = FTEM
+c c       FTCHG(IT2) = 1./(FTEM-FTEM)
+c c       write(*,*) 'devint: bidouille pour montrer l inutilite',FTCHG(IT2)
+c     bp,2020 : ci-dessus me semble inutile car FTCHG(1) -> FEXA(*,1,2)
+c     qui n'est pas utilise meme en reprise. 
+c     En effet, en cas de reprise, devini appelle dyne23 qui remplit 
+c     FTOTA a partir de la table de reprise.
+c     En cas d'intialisation, devini utilise FTCHG(1)=0 !
+      IT2 = 1
+      FTCHG(IT2) = 0.D0
+      
+c     BOUCLE SUR PAS DE TEMPS ET PAS DE TEMPS+DT/2
+      NPC3 = NPC1 - 1
+      DO 10 IT = 1,NPC3
+c        interpolation a t_IT
+         TEMP = XTEMPS(IT)
+         CALL INTLIN(TEMP,ICHATE,ICHAFO,NF,N1,N2, FTEM,IRET)
+         IF (IRET.EQ.0) THEN
+*           temps en dehors de la liste
+            CALL ERREUR(208)
+            RETURN
+         ENDIF
+         IT2 = IT2 + 1
+         FTCHG(IT2) = FTEM
+c        interpolation a t_IT + dt/2
+         TES2 = TEMP + PASTS2
+         CALL INTLIN(TES2,ICHATE,ICHAFO,NF,N1,N2, FTEM,IRET)
+         IF (IRET.EQ.0) THEN
+*           temps en dehors de la liste
+            CALL ERREUR(208)
+            RETURN
+         ENDIF
+         IT2 = IT2 + 1
+         FTCHG(IT2) = FTEM
+ 10   CONTINUE
+ 
+c     DERNIER PAS DE TEMPS
+      TEMP = XTEMPS(NPC1)
+      IRET=-1
+      CALL INTLIN(TEMP,ICHATE,ICHAFO,NF,N1,N2, FTEM,IRET)
+      IF (IRET.EQ.0) THEN
+*        temps en dehors de la liste
+         CALL ERREUR(208)
+         RETURN
+      ENDIF
+      IT2 = IT2 + 1
+      FTCHG(IT2) = FTEM
+*
+      SEGDES,MLREE1,MLREE2
+*
+      END
+
+ 

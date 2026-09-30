@@ -1,0 +1,52 @@
+C COFL3D    SOURCE    FD218221  24/02/07    21:15:05     11834          
+       subroutine cofl3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas,V33,dt,kthermv,kthermp,kmecap,keau,knanov,
+     # cflux3)
+
+c      calcul des coeff de fluage total pour mc3d
+
+c      declarations externes
+       implicit integer(i-n)
+       implicit real*8(a-h,o-z)
+
+       integer nmat,nstype,ndtens,nvari,nbelas
+       integer vnmat(nstype)
+       integer vnvari(nstype,2)
+       real*8 xmat(nmat)
+       real*8 var0(nvari),varf(nvari)
+       real*8 dt
+       real*8 V33(3,3)
+       real*8 kthermv,keau,knanov,kthermp,kmecap
+       real*8 cflux3(nstype,3)
+
+       real*8 xxk,CC3(3),taum,tauk,psi,aux1,aux2,kflum,kflup
+
+c     coefficient de fluage de Maxwell
+      call xmat3d(kflum,xmat,nmat,vnmat,nstype,nbelas,2,2)
+c     facteurs influencant le coeff de consolidation
+      kflup=kflum*keau*kthermp*kmecap 
+c      print*,'dans cofl3d ', kflum,keau,kthermv,kthermp,kmecap
+
+c     coefficient de consolidation dans la direction des contraintes init
+      call cons3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,
+     # vnvari,ndtens,nbelas,kflup,V33,CC3)
+
+c     Temps caracteristiques pour les fluages
+      call xmat3d(taum,xmat,nmat,vnmat,nstype,nbelas,2,1)
+      call xmat3d(tauk,xmat,nmat,vnmat,nstype,nbelas,4,1)
+      call xmat3d(psi,xmat,nmat,vnmat,nstype,nbelas,4,2)
+
+      aux1=(1.d0-exp(-(dt*kthermv*keau)/tauk))/psi
+      aux2=dt*kthermv/taum
+c      print*,'dans nano3d',Knanov,keau,aux2,dt,kthermv,taum
+      do i=1,3
+        cflux3(2,i)=kflup*log(1.d0+aux2/(kflup*CC3(i)))
+        cflux3(3,i)=Knanov*keau*aux2
+        cflux3(4,i)=aux1
+        cflux3(1,i)=cflux3(2,i)+cflux3(3,i)+cflux3(4,i)
+      end do
+      return
+      end
+
+         
+ 

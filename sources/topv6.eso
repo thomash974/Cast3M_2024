@@ -1,0 +1,164 @@
+C TOPV6     SOURCE    GOUNAND   21/04/06    21:15:37     10940          
+      SUBROUTINE TOPV6(TRAVL,QTOL,ICBES)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPV6
+C DESCRIPTION :
+*
+* Calcul des meilleurs candidats par maximum lexical
+*
+C     
+C     
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 09/11/2017, version initiale
+C HISTORIQUE : v1, 09/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMELEME
+      POINTEUR KELEM.MELEME
+      POINTEUR KEXTO.MELEME
+      POINTEUR IBTLOC.MELEME
+      POINTEUR IPBTL2.MELEME
+      POINTEUR KTBES.MELEME
+      POINTEUR KTBES2.MELEME
+*anc      POINTEUR IMCAND.MELEME
+-INC TMATOP1
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+      POINTEUR IPBTL.MELEMX
+-INC SMLENTI
+*anc      POINTEUR KNNO.MLENTI
+      POINTEUR LIDXCA.MLENTI
+      POINTEUR LOKVOL.MLENTI
+      POINTEUR LNQUAL.MLENTI
+      POINTEUR LINDI.MLENTI
+      POINTEUR LINDJ.MLENTI
+-INC SMLREEL
+      POINTEUR IQUAL.MLREEL
+      POINTEUR LQUALS.MLREEL
+-INC SMCOORD
+      POINTEUR KCOORD.MCOORD
+*-INC STRAVJ
+      POINTEUR TRAVK.TRAVJ
+*-INC STRAVL
+*     
+      LOGICAL LOK
+*anc      LOGICAL LTOIBO
+*anc      LOGICAL LTOIBA
+      INTEGER JCAND
+      LOGICAL LCHANG
+      LOGICAL LCHTOP
+* Liste de topologies de maillages candidates
+*      SEGMENT ITCAND(0)
+* Liste de topologies de maillages candidats de plus petit volume non nul
+*      SEGMENT ITVOL(JG)
+* Liste de topologies de maillages candidats de plus petit volume
+* et de meilleure qualité
+*      SEGMENT ILQUAL(JG)
+*      SEGMENT ILIND(JG)
+*      SEGMENT JLIND(JG)
+*     
+* Executable statements
+*     
+*      WRITE(IOIMP,*) 'coucou topv6'
+      IDIMP1=IDIM+1
+*
+      LMCANS=TRAVL.MCANS
+      LIDXCA=TRAVL.IDXCA
+      LOKVOL=TRAVL.OKVOL
+      LQUALS=TRAVL.QUALS
+      LNQUAL=TRAVL.NQUAL
+      LINDI=TRAVL.INDI
+      LINDJ=TRAVL.INDJ
+*      IPBTL=TRAVL.PBTL
+*     
+* Calcul la liste des indices des meilleurs candidats dans ITVOL
+* cf. procedure MAXLEXI
+* Il est sans doute possible
+* de n'avoir que ILIND
+*     
+      IINDIC=1
+*
+      NINDI=0
+      DO IVOCOU=1,NVOCOU
+         NINDI=NINDI+1
+         LINDI.LECT(NINDI)=IVOCOU
+      ENDDO
+*      
+ 10   CONTINUE
+      XMAX2=-1.D0
+*
+      NINDJ=0
+*      
+      DO IQ=1,NINDI
+         II=LINDI.LECT(IQ)
+         ICAND=LOKVOL.LECT(II)
+         IF (IINDIC.GT.LNQUAL.LECT(ICAND)) THEN
+            NINDJ=NINDJ+1
+            LINDJ.LECT(NINDJ)=II
+         ELSE
+            IELDEB=LIDXCA.LECT(ICAND)
+            XMAX2=MAX(XMAX2,LQUALS.PROG(IELDEB+IINDIC-1))
+         ENDIF
+      ENDDO
+*
+      IF (NINDJ.GT.0) THEN
+         DO IINDJ=1,NINDJ
+            LINDI.LECT(IINDJ)=LINDJ.LECT(IINDJ)
+         ENDDO
+         NINDI=NINDJ
+*         
+         GOTO 20
+      ELSE
+         DO IQ=1,NINDI
+            II=LINDI.LECT(IQ)
+            ICAND=LOKVOL.LECT(II)
+            IELDEB=LIDXCA.LECT(ICAND)
+            XQUAL=LQUALS.PROG(IELDEB+IINDIC-1)            
+*            IF (ABS(XMAX-XQUAL).LE.XZPREC) THEN
+* Il faut faire tres attention à ce critère
+            XPREC=MAX(XZPREC*1.D2,XMAX2*QTOL)
+            IF (ABS(XMAX2-XQUAL).LE.XPREC) THEN
+               NINDJ=NINDJ+1
+               LINDJ.LECT(NINDJ)=II
+            ENDIF
+         ENDDO
+*
+         DO IINDJ=1,NINDJ
+            LINDI.LECT(IINDJ)=LINDJ.LECT(IINDJ)
+         ENDDO
+         NINDI=NINDJ
+*
+         IF (NINDI.EQ.1) GOTO 20
+      ENDIF
+*      
+      IINDIC=IINDIC+1
+      GOTO 10
+ 20   CONTINUE
+*
+      ICBES=LOKVOL.LECT(LINDI.LECT(1))
+      RETURN
+*     
+*     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPV6   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*     
+* End of subroutine TOPV6
+*     
+      END
+
+ 

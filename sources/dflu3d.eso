@@ -1,0 +1,31 @@
+C DFLU3D    SOURCE    PV090527  23/01/27    21:15:25     11574          
+c***********************************************************************
+      subroutine dflu3d(xkm,cc3,dflu0,dflu1,dfin)
+     
+c     endommagement par fluage
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 tauflu,epss,epspic,dfmx,xkm
+      real*8 dflu0,dflu1,dfin,ccmax,xmax
+      real*8 cc3(3)      
+      real*8 dflu
+      
+c     calcul de l'endommagement effectif actuel en fonction de la consolidation
+      ccmax=max(cc3(1),cc3(2),cc3(3),1.0d0)
+      xmax=xkm*ccmax
+      if(xmax.gt.1.) then
+         dflu=dfin*(1.d0-1.d0/ccmax)
+      else
+         dflu=0.d0
+      end if     
+c     condition de croissance de l endo de fluage      
+      dflu1=max(dflu0,dflu)
+      if(dflu1.gt.0.) then
+          print*,'dflu0',dflu0,'dflu1',dflu1,'dfin',dfin,'ccmax',ccmax
+      end if
+      
+      return
+      end
+      
+ 

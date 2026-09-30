@@ -1,0 +1,34 @@
+C SELMOD    SOURCE    CB215821  19/07/30    21:18:02     10273          
+      subroutine selmod(mmodel,mmod1,mofor)
+*
+*  selectionne dans le modele la partie concernée par mofor
+* ( si  thermique on regarde dans le materiau
+*
+      implicit real*8(a-h,o-z)
+      implicit integer (i-n)
+      character*(*) mofor
+-INC SMMODEL
+      segact mmodel
+      segini,mmode1=mmodel
+      n1=0
+      do 1 i=1,kmodel(/1)
+         imodel=kmodel(i)
+         segact imodel
+         do  j=1,formod(/2)
+           if( formod(j).eq.mofor) go to 4
+           if(formod(j).eq.'THERMIQUE' ) then
+             do  k=1,matmod(/2)
+               if(matmod(k).eq.mofor) go to 4
+             enddo
+           endif
+         enddo
+         go to 1
+    4    continue
+         n1=n1+1
+         mmode1.kmodel(n1)=kmodel(i)
+    1 continue
+      if(n1.ne.kmodel(/1)) segadj mmode1
+      mmod1=mmode1
+      end
+
+ 

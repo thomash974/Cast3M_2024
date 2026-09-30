@@ -1,0 +1,89 @@
+C ETOIL1    SOURCE    GOUNAND   21/03/31    21:15:05     10931          
+      SUBROUTINE ETOIL1(NODE,IPT1,
+     $        IPT2)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : ETOIL1
+C
+C DESCRIPTION : Etant donné un maillage simple IPT1 constitue
+C     d'elements de type POI1, SEG2, TRI3 ou QUA4 et un noeud NODE, on
+C     construit IPT2 le maillage obtenu par étoilement de IPT1 avec
+C     NODE.
+C     L'étoilement est fait avec les éléments de IPT1 qui ne
+C     contiennent pas NODE.
+C     IPT1 est supposé actif.  IPT2 est rendu actif*MOD.
+C
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 05/02/2013, version initiale
+C HISTORIQUE : v1, 05/05/2013, création
+C HISTORIQUE : v2, gestion correcte du ITYPEL
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMELEME
+      PARAMETER(NLICIT=4)
+      INTEGER LTENT(NLICIT)
+      INTEGER LTSOR(NLICIT)
+* Type d'éléments en entrée
+*                 POI1 SEG2 TRI3 QUA4
+      DATA LTENT/ 1,   2,   4,   8/
+* Type d'éléments en sortie
+*                 SEG2 TRI3 TET4 PYR5
+      DATA LTSOR/ 2,   4,   23,  25/
+      LOGICAL LNODE
+*     
+* Executable statements
+*
+      ITENT=IPT1.ITYPEL
+      IDENT=0
+      DO i=1,nlicit
+         if (itent.eq.ltent(i)) then
+            ident=i
+            goto 666
+         endif
+      enddo
+ 666  continue
+      if (ident.eq.0) then
+*  44 2
+*     Type d'element inconnu %m1:4
+         MOTERR(1:4)=NOMS(ITENT)
+         CALL ERREUR(44)
+         RETURN
+      endif
+*     On extrait les éléments du bord qui ne s'appuient pas 
+*     sur NODE
+*     +1 car ce seront des éléments volumiques
+      NBNN=IPT1.NUM(/1)+1
+      NBELEM=IPT1.NUM(/2)
+      NBSOUS=0
+      NBREF=0
+      SEGINI IPT2
+      IPT2.ITYPEL=LTSOR(ident)
+      NBELE2=0
+      DO IBELE1=1,IPT1.NUM(/2)
+         LNODE=.FALSE.
+         DO IBNN1=1,IPT1.NUM(/1)
+            INO=IPT1.NUM(IBNN1,IBELE1)
+            IF (INO.EQ.NODE) LNODE=.TRUE.
+            IPT2.NUM(IBNN1,NBELE2+1)=INO
+         ENDDO
+         IPT2.NUM(NBNN,NBELE2+1)=NODE
+         IPT2.ICOLOR(NBELE2+1)=IPT1.ICOLOR(IBELE1)
+         IF (.NOT.LNODE) NBELE2=NBELE2+1
+      ENDDO
+      NBELEM=NBELE2
+      SEGADJ IPT2
+      RETURN
+*
+* End of subroutine ETOIL1
+*
+      END
+
+ 

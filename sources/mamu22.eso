@@ -1,0 +1,35 @@
+C MAMU22    SOURCE    PV        20/02/22    21:15:07     10531          
+      subroutine mamu22(long,val11,lpl1,val1,lpl,pt)
+      implicit real*8 (a-h,o-z)
+      real*8 val11(*),val1(*)
+      real*8 pt(36)
+           id12=lpl1
+           id2=lpl
+           pt1=pt(1)
+           pt2=pt(2)
+           pt4=pt(3)
+           pt5=pt(4)
+           do 110 i=1,long
+              xval11=val11(i)
+              xval12=val11(i+id12)
+              xval1=val1(i)
+              xval2=val1(i+id2)
+              pt1=pt1+xval1*xval11
+              pt2=pt2+xval1*xval12
+              pt4=pt4+xval2*xval11
+              pt5=pt5+xval2*xval12
+ 110       continue
+           pt(1)=pt1
+           pt(2)=pt2
+           pt(3)=pt4
+           pt(4)=pt5
+
+
+
+           end
+
+ 
+ 
+ 
+ 
+ 

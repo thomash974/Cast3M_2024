@@ -1,0 +1,26 @@
+C SCNDC     SOURCE    PV        19/09/26    21:15:20     10309          
+      SUBROUTINE SCNDC(N,XA,XB)
+C-------------------------------------------------------------------
+C
+C            DEPLACER LE CONTENU D'UN TABLEAU DANS UN AUTRE
+C            Avec unrolling
+C
+        implicit real*8 (a-h,o-z)
+
+        real*8 xa(*),xb(*)
+C
+C*    DO   I =1,N
+C*      XB(I)=XA(I)
+C*    ENDDO
+      do  i=1,n-3,4
+       xb(i)=xa(i)
+       xb(i+1)=xa(i+1)
+       xb(i+2)=xa(i+2)
+       xb(i+3)=xa(i+3)
+      enddo
+      do j=i,n
+       xb(j)=xa(j)
+      enddo
+
+      END
+ 

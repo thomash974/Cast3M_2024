@@ -1,0 +1,200 @@
+C PROVC2    SOURCE    JB251061  21/04/14    21:15:07     10963          
+C 
+      SUBROUTINE PROVC2(IPCHE1,IPLMO1,IPLMO3,IPCHE3)
+*********************************************************************
+*                 PRODUIT VECTORIEL DE 1 CHAMELEMS par Z (en 2D)
+*********************************************************************
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C--------------------------------------------------------------------
+C  ENTREE
+C     IPCHE1   CHAMELEM
+C     MLMOT1  LISTMOTS DE COMPOSANTES ASSOCIEES AU 1-ER  CHAMP
+C     MLMOT3  LISTMOTS DE COMPOSANTES ASSOCIEES AU 3-EME CHAMP
+C  SORTIE
+C     IPCHE3    POINTEUR SUR LE MCHAML RESULTAT
+c
+c BP,2020 : inspire de SCACHA.eso, voir aussi PROVC3.eso
+c
+C--------------------------------------------------------------------
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+-INC SMCHAML
+-INC SMELEME
+-INC SMLMOTS
+C
+      CHARACTER*8 NOIN
+c     tableau des indices pour le produit vectoriel
+      INTEGER     KCOMP1(2)
+      DATA        KCOMP1/2,1/
+C
+      IPCHE3=0
+C
+C=========================================================
+C     RECUP DES LISTMOTS + VERIF DES DIMENSIONS
+C=========================================================
+
+*     LISTE 1
+      MLMOT1=IPLMO1
+      SEGACT MLMOT1
+      NINC = MLMOT1.MOTS(/2)
+      
+*     liste 3
+      MLMOTS=IPLMO3
+      SEGACT MLMOTS
+      
+      IF(MOTS(/2).NE.NINC) THEN
+        SEGDES MLMOTS
+        MOTERR(1:4)='PVEC'
+        MOTERR(5:12)='LISTMOTS'
+        CALL ERREUR(125)
+        RETURN
+      ENDIF
+      
+      IF(NINC.NE.2) THEN
+c       erreur : On attend un objet de type %M1:8 de dimension %i1
+        SEGDES MLMOTS,MLMOT1
+        MOTERR(1:8)='LISTMOTS'
+        INTERR(1)=2
+        CALL ERREUR(1028)
+        RETURN
+      ENDIF
+      
+
+C=========================================================
+C     RECUP DU MCHAML
+C=========================================================
+C
+      MCHEL1=IPCHE1
+      SEGACT MCHEL1
+      N1=MCHEL1.IMACHE(/1)
+
+c     on ne cree pas un nouveau MCHEL3 ordonne, 
+c     on fera la recherche de composante a la volee
+
+
+C=========================================================
+C     CREATION DU MCHELM
+C=========================================================
+C
+      L1=4
+      N3=6
+C
+      SEGINI MCHELM
+      TITCHE='PVEC'
+
+      IFOCHE=MCHEL1.IFOCHE
+      IPCHE3=MCHELM
+C____________________________________________________________________
+C
+C     DEBUT DE LA BOUCLE SUR LES DIFFERENTES ZONES
+C____________________________________________________________________
+C
+      DO 500 ISOUS=1,N1
+*
+*     INITIALISATION
+*
+
+      MELEME = MCHEL1.IMACHE(ISOUS)
+      IMACHE(ISOUS)= MELEME
+      CONCHE(ISOUS)= MCHEL1.CONCHE(ISOUS)
+C
+C
+      INFCHE(ISOUS,1)=0
+      INFCHE(ISOUS,2)=0
+      INFCHE(ISOUS,3)=MCHEL1.INFCHE(ISOUS,3)
+      INFCHE(ISOUS,4)=MCHEL1.INFCHE(ISOUS,4)
+      INFCHE(ISOUS,5)=0
+      INFCHE(ISOUS,6)=MCHEL1.INFCHE(ISOUS,6)
+      
+C     RECUP DU MCHAM3 DE LA ZONE
+      MCHAM3=MCHEL1.ICHAML(ISOUS)
+      SEGACT,MCHAM3
+C
+C     CREATION DU MCHAML RESULTAT DE LA SOUS ZONE
+C
+      N2=NINC
+      SEGINI MCHAML
+      ICHAML(ISOUS)=MCHAML
+
+c
+c----- BOUCLE SUR LES COMPOSANTES RESULTATS ---------------      
+c
+       DO 110  ICOMP=1,NINC
+       
+c    +++ recherche de la composante JCOMP1 +++
+         JCOMP1=KCOMP1(ICOMP)
+         DO 111 ICOMP1=1,MCHAM3.NOMCHE(/2)
+           IF(MCHAM3.NOMCHE(ICOMP1).EQ.MLMOT1.MOTS(JCOMP1)) GOTO 112
+ 111     CONTINUE
+c        erreur: Impossible d'extraire la composante %m1:4 du champ par element
+         MOTERR(1:4)=MLMOT1.MOTS(ICOMP)
+         CALL ERREUR(236)
+         RETURN      
+ 112     CONTINUE
+         MELVA1= MCHAM3.IELVAL(ICOMP1)
+         SEGACT MELVA1
+       
+c    +++ Creation du MELVAL resultat +++
+         NOMCHE(ICOMP)=MLMOTS.MOTS(ICOMP)
+         TYPCHE(ICOMP)='REAL*8'
+         N1PTEL= MELVA1.VELCHE(/1)
+         N1EL  = MELVA1.VELCHE(/2)
+         N2PTEL= 0
+         N2EL  = 0
+c          write(*,*) 'Composante',ICOMP,'/',NINC,' nom:',NOMCHE(ICOMP)
+c          SEGINI MELVAL
+c          IELVAL(ICOMP)=MELVAL
+c          fait + simplement + bas
+         
+c    +++ on met dans le resultat le produit des composantes +++
+c        1ere composante : -y
+         IF(ICOMP.EQ.1) THEN
+            SEGINI MELVAL
+            DO  IE= 1,N1EL
+            DO  IB= 1,N1PTEL
+              VELCHE(IB,IE)=-1.*MELVA1.VELCHE(IB,IE)
+            ENDDO
+            ENDDO  
+c        2eme composante : +x        
+         ELSEIF(ICOMP.EQ.2) THEN
+c           DO  IE= 1,N1EL
+c           DO  IB= 1,N1PTEL
+c             VELCHE(IB,IE)=MELVA1.VELCHE(IB,IE)
+c           ENDDO
+c           ENDDO    
+c           ou + simplement
+            SEGINI,MELVAL=MELVA1
+         ELSE
+            write(IOIMP,*) 'IDIM,ICOMP,NINC=',IDIM,ICOMP,NINC
+            CALL ERREUR(5)
+         ENDIF
+         IELVAL(ICOMP)=MELVAL
+              
+cbp,2020         segdes,MELVAL
+
+110    CONTINUE
+c----- FIN DE BOUCLE SUR LES COMPOSANTES RESULTATS ---------------      
+C
+      SEGDES,MCHAM3
+
+cbp,2020      segdes,MCHAML
+
+500   CONTINUE
+C____________________________________________________________________
+C
+C     FIN DE BOUCLE SUR LES ZONES 
+C____________________________________________________________________
+
+      segdes mchel1
+      
+      RETURN
+      END
+
+
+ 
+ 
+ 
+ 

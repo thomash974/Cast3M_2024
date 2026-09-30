@@ -1,0 +1,11 @@
+C MPFPR4    SOURCE    OF166741  24/03/28    21:15:09     11811          
+
+      SUBROUTINE mpfpr4
+
+      write(*,*) 'Subroutine MPFPR4 no longer used'
+      call erreur(5)
+
+c      return
+      END
+
+ 

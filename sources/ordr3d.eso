@@ -1,0 +1,92 @@
+C ORDR3D    SOURCE    FD218221  24/02/07    21:15:22     11834          
+       subroutine ordr3d(ndim,nordre,Fval,affiche,actift,NBRACTT)
+       
+c      classement des numeros de critere du plus grand au plus petit dans 
+c      le tableau d entiers nordre (1 est le numero de l actif le plus grand)       
+
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+
+c      dimension du classement       
+       integer ndim
+c      tableau de classement       
+       integer nordre(ndim)
+c      valeur des criteres       
+       real*8 Fval(ndim)
+       logical affiche,affiche_local
+c      logique critere ACTIFT
+       logical ACTIFT(ndim) 
+c      nombre de critere actifs
+       integer NBRACTT       
+       
+c      variables locales       
+       integer iordre,ival,iaux,nbr_inactif
+       
+c      option d affichage
+       affiche_local=affiche
+c       affiche_local=.true.       
+       
+c      initialisation de nordre et comptage des actifs
+       NBRACTT=0
+       nbr_inactif=0
+       do idir=1,ndim
+            if(actift(idir)) then
+                NBRACTT=NBRACTT+1
+                nordre(NBRACTT)=idir
+            else
+                nbr_inactif=nbr_inactif+1
+                nordre(ndim-(nbr_inactif-1))=idir
+            end if
+       end do
+       if(nbractt+nbr_inactif.ne.ndim) then
+            print*,'ordr3d de inclusion3d: pb de classement criteres'
+            stop
+       end if
+       
+c      classement du plus grand au plus petit
+c      on parcourt la liste des criteres   
+       do iordre=1,ndim-1
+c       on compare avec tous ceux au dessous a vec le courant      
+        do ival=iordre+1,ndim
+            if((Fval(nordre(ival)).gt.Fval(nordre(iordre))).and.
+     #         actift(nordre(ival))) then
+c               on echange
+                iaux=nordre(iordre)
+                nordre(iordre)=nordre(ival)
+                nordre(ival)=iaux
+            end if
+        end do
+       end do
+       
+C c      classement des inactifs du plus grand au plus petit
+C c      on parcourt la liste des criteres   
+C        do iordre=NBRACTT+1,ndim
+C c       on compare avec tous ceux au dessous       
+C         do ival=iordre+1,ndim
+C             if(Fval(nordre(ival)).gt.Fval(nordre(iordre))) then
+C c               on echange
+C                 iaux=nordre(iordre)
+C                 nordre(iordre)=nordre(ival)
+C                 nordre(ival)=iaux
+C             end if
+C         end do
+C        end do       
+                         
+       
+       if (affiche_local) then
+        print*,'Dans ordr3d'
+        do iordre=1,ndim
+          write(*,'(A15,I2,A2,I2,1X,A2,I2,A2,E10.3,L2)') 
+     #    'Numero d ordre(,',iordre,')=',nordre(iordre),
+     #    'F(',nordre(iordre),')=',Fval(nordre(iordre)),
+     #    actift(nordre(iordre))
+        end do
+c        read*
+       end if 
+       
+       return
+       end
+       
+       
+ 
+ 

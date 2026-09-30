@@ -1,0 +1,52 @@
+C DVINVE    SOURCE    KICH      19/09/26    21:15:08     10311          
+      subroutine dvinve(md,tens,v,x,inv)
+c
+c     *********
+c     inversion
+c     *********
+c
+      implicit real*8(a-h,o-z)
+      implicit integer (i-n)
+      real*8 v(5),x(5),tens(5,5)
+ 1000 continue
+      do 1600 iy=1,md-1
+ 1005 continue
+      if(tens(iy,iy).eq.0.) go to 1030
+      do 1020 iz=iy+1,md
+      do 1010 iw=iy+1,md
+ 1010 tens(iz,iw)=tens(iz,iw)-tens(iz,iy)*tens(iy,iw)/tens(iy,iy)
+ 1020 v(iz)=v(iz) - tens(iz,iy)*v(iy)/tens(iy,iy)
+      go to 1600
+ 1030 continue
+      indic3=0
+      if(iy.eq.md) go to 1600
+      do 1500 iz=iy+1,md
+      if(tens(iz,iy).eq.0.) go to 1500
+      if(indic3.eq.1) go to 1500
+      do 1040 iw=iy,md
+      vx=tens(iy,iw)
+      tens(iy,iw)=tens(iz,iw)
+      tens(iz,iw)=vx
+ 1040 continue
+      vx=v(iy)
+      v(iy)=v(iz)
+      v(iz)=vx
+      indic3=1
+ 1500 continue
+      if(indic3.eq.1) go to 1005
+ 1600 continue
+      inv=1
+      do 1610 iy=1,md
+ 1610 if(tens(iy,iy).eq.0.) inv=0
+      if(inv.eq.0) go to 2000
+      do 1620 iy=md,2,-1
+      do 1620 iw=iy-1,1,-1
+ 1620 v(iw)=v(iw)-tens(iw,iy)*v(iy)/tens(iy,iy)
+      do 1650 iy=1,md
+      ih=iy
+      x(ih)=v(ih)/tens(ih,ih)
+ 1650 continue
+      return
+ 2000 end
+
+ 

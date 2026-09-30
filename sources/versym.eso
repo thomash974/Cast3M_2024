@@ -1,0 +1,118 @@
+C VERSYM    SOURCE    PV090527  23/09/21    21:15:08     11744          
+*
+************************************************************************
+* verification symetrie de la matrice
+*      
+* IANTI = 0  : matrice symetrique       ->  Aij =  Aji  pour i<j
+* IANTI = 1  : matrice antisymetrique   ->  Aij = -Aji  (et  Aii=0)
+* IANTI = 2  : matrice quelconque       ->  pas de verification
+*
+************************************************************************
+      SUBROUTINE versym(re,ire1,ire2,ire3,IANTI)
+
+      IMPLICIT REAL*8 (a-h,o-z)
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+      REAL*8 re(ire1,ire2,ire3)
+*     facteur de blocage pour optimiser le cache
+      PARAMETER (NINC=32)
+      PARAMETER (LIMTAIL=65532)
+      
+*     matrice asymetrique (quelconque) -> pas de verif
+      IF(IANTI.ne.0.and.IANTI.ne.1) return
+      
+*     matrices carree uniquement
+      IF (ire1.ne.ire2) CALL erreur(1044)
+      mdim=ire1
+      
+*     parametres      
+      xzref=(xpetit/xzprec)
+      xzprla=xzprec*1.d3
+      
+*     boucle sur les termes ir,jr (limite sur ir pour optimiser cache)
+
+*   - Cas symetrique
+      IF(IANTI.eq.0.and.ire1.lt.limtail) THEN
+        do iel=1,ire3
+
+
+
+          do i=1,mdim,ninc
+            do jr=i+1,mdim
+                redj=abs(re(jr,jr,iel))
+              do ir=i,min(jr-1,i+ninc-1)
+                re1=re(ir,jr,iel)
+                re2=re(jr,ir,iel)
+                redi=abs(re(ir,ir,iel))
+                xn=abs(re1-re2)
+                xd=abs((re1+re2) / 2.D0)+xzref
+                xd=max(xd,redi,redj)
+                if (xn.gt.xd*xzprla) then
+c                   MOTERR=' '
+c                   MOTERR(1:10)='SYMETRIQUE'
+                  MOTERR='SYMETRIQUE'
+                  reaerr(1)=re1
+                  reaerr(2)=re2
+                  reaerr(3)=xn
+                  call erreur(1044)
+                  return
+                endif
+                if (xn.gt.xd*xpetit) then
+                   rem=(re1+re2)/2.d0
+                   re(ir,jr,iel)=rem
+                   re(jr,ir,iel)=rem
+                endif
+              enddo
+            enddo
+          enddo
+        enddo
+        
+*   - Cas anti-symetrique (on change les signes)
+      ELSEIF(IANTI.eq.1) THEN
+        do iel=1,ire3
+          do i=1,mdim,ninc
+            do jr=1,mdim
+              do ir=i,min(jr-1,i+ninc-1)
+                re1=re(ir,jr,iel)
+                re2=re(jr,ir,iel)
+                xn=abs(re1+re2)
+                xd=abs((re1-re2) / 2.D0)+xzref
+                if (xn.gt.xd*xzprla) then
+c                   MOTERR=' '
+c                   MOTERR(1:15)='ANTI-SYMETRIQUE'
+                  MOTERR='ANTI-SYMETRIQUE'
+                  reaerr(1)=re1
+                  reaerr(2)=re2
+                  reaerr(3)=xn
+                  call erreur(1044)
+                  return
+                endif
+              enddo
+            enddo
+          enddo
+c         verif diagonale nulle
+          do ir=1,mdim
+                re1=re(ir,ir,iel)
+                if (abs(re1).gt.xzref) then
+c                   MOTERR=' '
+c                   MOTERR(1:15)='ANTI-SYMETRIQUE'
+                  MOTERR='ANTI-SYMETRIQUE'
+                  reaerr(1)=re1
+                  reaerr(2)=0.D0
+                  reaerr(3)=abs(re1)
+                  call erreur(1044)
+                  return
+                endif          
+          enddo
+        enddo
+      ENDIF
+      
+      END
+
+ 
+ 
+ 
+ 
+ 
+ 

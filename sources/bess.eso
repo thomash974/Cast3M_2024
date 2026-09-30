@@ -1,0 +1,37 @@
+C BESS      SOURCE    CB215821  23/10/18    21:15:03     11760          
+      SUBROUTINE BESS
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+      PARAMETER(NTYP=6)
+      CHARACTER*2 CTYP(NTYP)
+      DATA CTYP/'J0','J1','JN','Y0','Y1','YN'/
+      MACRO,   ( J0 , J1 , JN , Y0 , Y1 , YN )
+
+C     On vient lire le Type de fonction de Bessel que l'on souhaite utiliser
+      CALL LIRMOT(CTYP,NTYP,IPOS1,1)
+      IF(IERR .NE. 0)RETURN
+
+      CASE, IPOS1
+        WHEN, J0
+          CALL OPOBJE(24)
+        WHEN, J1
+          CALL OPOBJE(25)
+        WHEN, Y0
+          CALL OPOBJE(26)
+        WHEN, Y1
+          CALL OPOBJE(27)
+        WHEN, JN
+          CALL OPOBJE(31)
+        WHEN, YN
+          CALL OPOBJE(32)
+      ENDCASE
+
+      RETURN
+      END
+ 

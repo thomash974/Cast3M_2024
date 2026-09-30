@@ -1,0 +1,27 @@
+C BNORM     SOURCE    FANDEUR   22/05/02    21:15:02     11359          
+      SUBROUTINE BNORM(X,Y,N)
+C
+C   NORMALISE Y  DANS X
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+      DIMENSION X(*),Y(*)
+
+      REAL*8   DDOT
+      EXTERNAL DDOT
+
+      SCALE=DDOT(N,Y,1,Y,1)
+      IF(SCALE.LE.0.D0) THEN
+        CALL ERREUR(277)
+        RETURN
+      ENDIF
+      SCALE=SQRT(SCALE)
+      DO I= 1,N
+        X(I)=Y(I)/SCALE
+      ENDDO
+
+c      RETURN
+      END
+
+ 

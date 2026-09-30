@@ -1,0 +1,80 @@
+C INTLIN    SOURCE    BP208322  20/06/16    21:15:05     10627          
+      SUBROUTINE INTLIN(TEMPS,KTE,KFT,LON,L1,L2,FT0,IRET)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     INTERPOLATION LINEAIRE D'UNE VALEUR                            *
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+*  e  TEMPS   Abscisse a interpoler                                  *
+*  e  KTE     LISTREEL des abscisses triees par ordre croissant      *
+*  e  KFT     LISTREEL des ordonnees                                 *
+*  e  LON     Longueur de la LISTREEL des abscisses                  *
+*  e/s L1     indice de debut de recherche dans les abscisses        *
+*  e/s L2     = L1+1 (a priori toujours vrai)                        *
+*  s  FT0     Valeur interpolee                                      *
+*  s  IRET    IRET = 1, succes                                       *
+*  s  IRET    IRET = 0, echec                                        *
+*                                                                    *
+*--------------------------------------------------------------------*
+-INC SMLREEL
+
+      FT0 = 0.D0
+      MLREE1 = KTE
+      MLREE2 = KFT
+      T1 = MLREE1.PROG(L1)
+      TL = MLREE1.PROG(LON) 
+      
+c *     verif temporaire
+c       if(L1.GE.LON) then
+c         write(*,*) 'impossible d interpoler entre ',L1,' et ',LON
+c         IRET = 0
+c         return
+c       endif
+      
+*     temps en dehors de la liste ?
+      IF (TEMPS.LE.T1 .OR. TEMPS.GE.TL) THEN
+*        tentative de rattrapage (bp,2020)
+*        bp: d'apres mesure sur 1 cas (a faire evoluer si besoin),
+*            la tolerance de 1D-5 devrait assurer le test sur 
+*            l'erreur cumulee jusqu'a environ 1E7 pas de temps
+*            (on suppose que le pas de temps ne varie pas trop)
+         TOL=1.D-5*(TL-T1)/DBLE(LON - L1)
+         IF (ABS(TEMPS-T1).LT.TOL) THEN
+           FT0=MLREE2.PROG(L1)
+           IRET = 1
+c            write(*,*) 't=',TEMPS,'~',T1,'on prend PROG(',L1,')=',FT0
+         ELSEIF (ABS(TEMPS-TL).LT.TOL) THEN
+           FT0=MLREE2.PROG(LON)
+           IRET = 1
+c            write(*,*) 't=',TEMPS,'~',TL,'on prend PROG(',LON,')=',FT0
+         ELSE
+*          temps en dehors de la liste
+c            write(*,*) 't=',TEMPS,'out of [',T1,' - ',TL,'] !!!'   
+           IRET = 0
+         ENDIF
+         RETURN
+      ENDIF
+      
+*     recherche dans la liste      
+      DO 10 L = L2,LON
+         T2 = MLREE1.PROG(L)
+         L2 = L
+         IF (TEMPS.LT.T2) GOTO 20
+         T1 = T2
+         L1 = L2
+ 10   CONTINUE
+ 
+*     interpolation lineaire
+ 20   CONTINUE 
+      FT1 = MLREE2.PROG(L1)
+      FT2 = MLREE2.PROG(L2)
+      DT = (TEMPS - T1) / (T2 - T1)
+      FT0 = (FT2 - FT1) * DT + FT1
+      IRET = 1
+*
+      END
+
+ 

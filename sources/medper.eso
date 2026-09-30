@@ -1,0 +1,48 @@
+C MEDPER    SOURCE    OF166741  23/02/15    21:15:07     11416          
+
+      INTEGER FUNCTION MEDPER (itypel)
+
+      IMPLICIT REAL*8(A-H,O-Z)
+      IMPLICIT INTEGER(I-N)
+
+C MEDPER = ipo indique la position (+1) dans le tableau iper (CCMED.INC)
+C MEDPER = -1  si pas de permutation pour le type d'element demande
+
+           IF (itypel.EQ. 6) THEN
+C       Cas des TRI6
+        ipo = 0
+      ELSE IF (itypel.EQ.10) THEN
+C       Cas des QUA8
+        ipo = 5
+      ELSE IF (itypel.EQ.15) THEN
+C       Cas des CU20
+        ipo = 12
+      ELSE IF (itypel.EQ.17) THEN
+C       Cas des PR15
+        ipo = 31
+      ELSE IF (itypel.EQ.24) THEN
+C       Cas des TE10
+        ipo = 45
+      ELSE IF (itypel.EQ. 7) THEN
+C       Cas des TRI7
+        ipo = 54
+      ELSE IF (itypel.EQ.11) THEN
+C       Cas des QUA9
+        ipo = 60
+      ELSE IF (itypel.EQ.26) THEN
+C       Cas des PY13
+        ipo = 68
+      ELSE IF (itypel.EQ. 3) THEN
+C       Cas des SEG3
+        ipo = 80
+      ELSE
+C Pas de permutation pour les elements non listes au-dessus
+        ipo = -1
+      ENDIF
+
+      MEDPER = ipo
+
+c      RETURN
+      END
+
+ 

@@ -1,0 +1,49 @@
+C TBEFF     SOURCE    GOUNAND   23/01/20    21:15:04     11564          
+c subroutine utilisee dans tableau
+c source ensam    aout 94
+
+***************************************************
+*
+*  EFFACE LA FENETRE GRAPHIQUE
+*  ET LA REINITIALISE AUX DIMENTIONS D'UNE FEUILLE A4
+*  EN TENANT COMPTE DE L'ORIENTATION 'ZHORIZ'
+*
+***************************************************
+        SUBROUTINE TBEFF
+* attention il ne faut pas de implicit real*8
+*
+*  DEFINITION DES VARIABLES
+*
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+        INTEGER         NBCOUL
+        CHARACTER*72    TITR
+
+*
+        TITR = ' '
+        CALL TRINIT(24,0.d0,0.d0,TITR,1.5,.TRUE.,NBCOUL)
+        IF (ZHORIZ) THEN
+          X1 = 0.
+          X2 = 0.
+          Y1 = 0.
+          Y2 = 0.
+          zmi=-1.
+          zma=+1.
+          CALL DFENET(0.,29.7,0.,21.,zmi,zma,X1,X2,Y1,Y2,.FALSE.)
+        ELSE
+          X1 = 0.
+          X2 = 0.
+          Y1 = 0.
+          Y2 = 0.
+          zmi=-1.
+          zma=+1.
+          CALL DFENET(0.,21.,0.,29.7,zmi,zma,X1,X2,Y1,Y2,.FALSE.)
+        ENDIF
+*
+        END
+*
+****  FIN DE LA PROCEDURE EFFACER  ****************
+***************************************************
+ 

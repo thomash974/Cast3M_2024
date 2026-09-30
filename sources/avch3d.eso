@@ -1,0 +1,51 @@
+C AVCH3D    SOURCE    PV090527  23/01/27    21:15:06     11574          
+      subroutine avch3d(pch,taar,nrjg,tref0,sr1,srsrag,teta1,
+     # teta2,dt,aar0,aar1,err1)
+
+c      sous programme de calcul de l avancement chimique de rag
+
+
+c   ********************************************************************
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+c   ********************************************************************
+
+      real*8 pch,taar,nrjg,tref0,aar0,sr1,srsrag,teta1,teta2,dt     
+      real*8 alpharag,Ear,temp1,aar1,vvgel,cgel,rt
+      integer err1
+
+c     constante cinetique a tref 
+      if((taar.ne.0.).and.(pch.ne.0.)) then
+c         temperature moyenne pendant la pas de temps
+          temp1=0.5d0*(teta1+teta2)
+c         la reaction est lente      
+          alpharag=taar**(-1)
+c         prise en compte de l activation thermique
+          Ear=nrjg/8.31d0
+          temp1=teta1+273.15d0
+          tempr=tref0+273.15d0
+c         activation thermique de la reaction      
+          AR=dEXP(-EaR*((1.d0/temp1)-(1.d0/tempr)))
+          alpharag=alpharag*AR
+c         calcul de l avancement chimique
+          if(aar0.lt.sr1) then 
+             if (sr1.gt.srsrag) then
+                 alpharag=alpharag*((sr1-srsrag)/(1.d0-srsrag))**2
+                 aar1=sr1-(sr1-aar0)*exp(-alpharag*dt)
+             else
+                 aar1=aar0
+             end if
+          else
+             aar1=aar0
+          end if
+c         la reaction ne peut pas rediminuer
+          aar1=max(aar0,aar1)          
+      else
+c         pas de donnee pour la reaction on la laisse a zero   
+          aar1=0.d0
+      end if
+      
+      return
+      end
+      
+ 

@@ -1,0 +1,77 @@
+C EPLC3D    SOURCE    PV090527  23/02/13    21:15:06     11592          
+      SUBROUTINE EPLC3D(pt0,pc0,M,s1,s2,s3,lcc,Vdep)
+c     Ecoulement plastique plastique CamCaly (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      real*8 pt0,pc0,M,s1,s2,s3,lcc,Vdep(3)
+
+C       t1 = M ** 2
+C       t2 = pc0 ** 2
+C       t5 = t2 * pc0 * t1 / 0.12D2
+C       t6 = pt0 * t1
+C       t7 = 0.9D1 * t6
+C       t8 = s1 + s2 + s3
+C       t9 = 0.2D1 * t1 * t8
+C       t11 = 0.3D1 * s2
+C       t12 = 0.3D1 * s3
+C       t16 = 0.4D1 / 0.9D1 * t1 * t8
+C       t18 = 0.2D1 / 0.3D1 * s2
+C       t19 = 0.2D1 / 0.3D1 * s3
+C       t24 = pt0 ** 2
+C       t25 = 0.2D1 / 0.3D1 * t1 * t8
+C       t32 = 0.3D1 * s1
+C       t37 = 0.2D1 / 0.3D1 * s1
+C       Vdep(1) = (t5 + t2 * (t7 + t9 + 0.6D1 * s1 - t11 - t12) / 0.36D2 +
+C      # pc0 * (t6 + t16 - 0.4D1 / 0.3D1 * s1 + t18 + t19) * pt0 / 0.4D1 +
+C      # (t6 + t25 + 0.2D1 * s1 - s2 - s3) * t24 / 0.12D2) * lcc
+C       Vdep(2) = (t5 + t2 * (t7 + t9 - t32 + 0.6D1 * s2 - t12) / 0.36D2 +
+C      # pc0 * (t6 + t16 + t37 - 0.4D1 / 0.3D1 * s2 + t19) * pt0 / 0.4D1 +
+C      # t24 * (t6 + t25 - s1 + 0.2D1 * s2 - s3) / 0.12D2) * lcc
+C       Vdep(3) = (t5 + t2 * (t7 + t9 - t32 - t11 + 0.6D1 * s3) / 0.36D2 +
+C      # pc0 * (t6 + t16 + t37 + t18 - 0.4D1 / 0.3D1 * s3) * pt0 / 0.4D1 +
+C      # (t6 + t25 - s1 - s2 + 0.2D1 * s3) * t24 / 0.12D2) * lcc
+     
+      t1 = sqrt(0.3D1)
+      t3 = sqrt(0.4D1)
+      t4 = t3 * t1 * lcc
+      t6 = (pc0 - pt0) ** 2
+      t7 = t6 ** 2
+      t10 = s1 + s2 + s3 + 0.3D1 / 0.2D1 * pc0 + 0.3D1 / 0.2D1 * pt0
+      t11 = t10 ** 2
+      t12 = M ** 2
+      t13 = t12 ** 2
+      t15 = s1 ** 2
+      t19 = s2 ** 2
+      t23 = s3 ** 2
+      t27 = sqrt((t13 * t11 + 0.81D2 / 0.2D1 * t15 + 0.81D2 / 0.2D1 * (-
+     #s2 - s3) * s1 + 0.81D2 / 0.2D1 * t19 - 0.81D2 / 0.2D1 * s2 * s3 + 
+     #0.81D2 / 0.2D1 * t23) * t7)
+      t28 = 0.1D1 / t27
+      t29 = t6 * t28
+      t30 = t12 * t10
+      t32 = 0.9D1 / 0.2D1 * s2
+      t33 = 0.9D1 / 0.2D1 * s3
+      t38 = 0.9D1 / 0.2D1 * s1
+      Vdep(1) = (t30 + 0.9D1 * s1 - t32 - t33) * t29 * t4 / 0.6D1
+      Vdep(2) = t6 * (t30 - t38 + 0.9D1 * s2 - t33) * t28 * t4 / 0.6D1
+      Vdep(3) = (t30 - t38 - t32 + 0.9D1 * s3) * t29 * t4 / 0.6D1
+
+
+
+
+
+
+
+
+      if(Vdep(1).ne.vdep(1)) then
+        print*,'Pb dans eplc3d'
+        print*,'pt0,pc0,M,s1,s2,s3,lcc,Vdep'
+        print*,pt0,pc0,M,s1,s2,s3,lcc,Vdep
+      end if
+
+            
+      return
+      end
+ 
+ 

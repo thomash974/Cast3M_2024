@@ -1,0 +1,64 @@
+C MAJW3D    SOURCE    FD218221  24/02/07    21:15:19     11834          
+      subroutine majw3d(epspt60,epspt6,wplt06,wplt6,wpltx06,wpltx6,
+     # wpl3,vwpl33,vwpl33t,wplx3,vwplx33,vwplx33t,XE3D,NBNMAX3D,
+     # NBNB3D,IDIMB3D,Method_N,LcH,Method_H,err1)
+      
+c     mise a jour du tenseur des ouvertures: Sellier mai 2015
+
+c     tables de dimension fixe pour resolution des sytemes lineaires 
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables externes
+      integer NB_HELM
+      real*8 LCH
+      logical Method_H,Method_N
+      real*8 epspt60(6),epspt6(6)
+      real*8 wplt06(6),wplt6(6),wpltx06(6),wpltx6(6)
+      real*8 wpl3(3),vwpl33(3,3),vwpl33t(3,3)
+      real*8 wplx3(3),vwplx33(3,3),vwplx33t(3,3)
+      integer NBNMAX3D,NBNB3D,idimb3d,err1
+      real*8 xe3d(3,NBNMAX3D)
+      
+c     variables locales
+      real*8 depspt33(3,3),depspt3(3)
+      real*8 vdepspt33(3,3),vdepspt33t(3,3)
+      real*8 long3(3),dwp6(6),dw6(6)
+      real*8 wplt33(3,3)
+      real*8 wpltx061(6),wpltx61(6)
+      real*8 wpltx33(3,3),wplt61(6),aux6(6),aux3(3)       
+     
+c     *** actualisation ouvertures de fissures actuelles  **************
+ 
+c     base principale de l increment d ouverture
+      call bsfs3d(epspt6,epspt60,depspt3,
+     # vdepspt33,vdepspt33t)
+c     calcul des tailles dans les directions principales des increments
+c     choix de la methode pour le calcul de la taille de la zone de traction
+c     pour une raison de stabilité dans la methode  de calcul de la taille
+c     on verifie que la methode de calcul est la meme dans les trois directions
+      err1=0
+c      print*,'dans majw3d av tail3d',Method_N,Method_H,LcH
+      call tail3d(long3,vdepspt33,Method_N,Method_H,
+     # XE3D,NBNMAX3D,NBNB3D,IDIMB3D,LcH,err1)
+c      print*,'dans majw3d ap tail3d',Method_N,Method_H,LcH
+C     do i=1,3
+C          write(*,'(a9,i2,1x,a2,3(1x,e10.3),a4,e10.3)') 
+C      #  'Direction', i ,'(',(vdepspt33(j,i),j=1,3),'),L=',long3(i)
+C     end do
+      if(err1.eq.1) then
+          print*,'Pb de calcul de taille dans majw3d'
+          return
+      end if
+      
+c     mise a jour des ouvertures actuelles et maximales
+      call wfis3d(depspt3,long3,vdepspt33t,wplt06,wplt6,
+     # vwpl33,vwpl33t,wpl3,wpltx06,wpltx6,vwplx33,vwplx33t,wplx3)
+
+c     ******************************************************************  
+     
+      return
+      end      
+      
+ 
+ 

@@ -1,0 +1,67 @@
+C DDOTIP    SOURCE    PV090527  23/08/01    21:15:02     11387          
+      function ddotip(lon,val1,ind,val2)
+*  produit scalaire sparse. ind est le tableau de pointeur. 
+*  si lon est negatif, on fait la boucle à l'envers.
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      dimension val1(*),val2(*),ind(*)
+      resu1=0.d0
+      resu2=0.d0
+      resu3=0.d0
+      resu4=0.d0
+      if (lon.gt.0) then
+       do 10 i=0,lon-4,4
+        indn1=ind(i+1)
+        indn2=ind(i+2)
+        indn3=ind(i+3)
+        indn4=ind(i+4)
+        resu1=resu1+val1(i+1)*val2(indn1)
+        resu2=resu2+val1(i+2)*val2(indn2)
+        resu3=resu3+val1(i+3)*val2(indn3)
+        resu4=resu4+val1(i+4)*val2(indn4)
+  10   continue
+       if(i.le.lon-2) then
+        indn1=ind(i+1)
+        indn2=ind(i+2)
+        resu1=resu1+val1(i+1)*val2(indn1)
+        resu2=resu2+val1(i+2)*val2(indn2)
+        i=i+2
+       endif
+       if(i.le.lon-1) then
+        indn1=ind(i+1)
+        resu1=resu1+val1(i+1)*val2(indn1)
+        i=i+1
+       endif
+      elseif (lon.lt.0) then
+       lon=-lon
+       do 20 i=lon+1,5,-4
+        indn1=ind(i-1)
+        indn2=ind(i-2)
+        indn3=ind(i-3)
+        indn4=ind(i-4)
+        resu1=resu1+val1(i-1)*val2(indn1)
+        resu2=resu2+val1(i-2)*val2(indn2)
+        resu3=resu3+val1(i-3)*val2(indn3)
+        resu4=resu4+val1(i-4)*val2(indn4)
+   20  continue
+       if(i.ge.3) then
+        indn1=ind(i-1)
+        indn2=ind(i-2)
+        resu1=resu1+val1(i-1)*val2(indn1)
+        resu2=resu2+val1(i-2)*val2(indn2)
+        i=i-2
+       endif
+       if(i.ge.2) then
+        indn1=ind(i-1)
+        resu1=resu1+val1(i-1)*val2(indn1)
+        i=i-1
+       endif
+
+      endif
+      ddotip=resu1+resu2+resu3+resu4
+      return
+      end
+
+ 
+ 
+ 

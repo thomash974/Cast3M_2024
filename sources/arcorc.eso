@@ -1,0 +1,86 @@
+C ARCORC    SOURCE    CB215821  20/11/25    13:18:22     10792          
+      SUBROUTINE ARCORC (IPCHPT,REF)
+
+***********************************************************************
+*
+*                          A R C O R C
+*
+* FONCTION:
+* ---------
+*
+*     MISE A ZERO, S'ILS EXISTENT, DES ELEMENTS RELATIFS A UNE INCONNUE
+*     'NOMDU'
+*
+*
+* PARAMETRES:  (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPCHPT  ENTIER     (E/S)    CHPOINT DE TRAVAIL
+*
+*     REF     ENTIER     (E)      NUMERO DE L'INCONNUE A METTRE A ZERO
+*
+*
+* SOUS-PROGRAMMES APPELES:
+* ------------------------
+*
+*     ANCHPO
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL BOUDA     11 SEPTEMBRE 2015
+*
+* LANGAGE:
+* --------
+*
+*     FORTRAN 77 & 90
+*
+***********************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC CCHAMP
+
+
+      INTEGER IPCHPT
+      INTEGER REF
+
+      INTEGER IINC
+      INTEGER IPBUFF
+      CHARACTER*(LOCOMP) MOC
+
+      IINC=0
+
+      MCHPOI=IPCHPT
+      SEGACT MCHPOI
+      NSOUPO=IPCHP(/1)
+
+      DO 10 ISOUPO=1,NSOUPO
+        MSOUPO= IPCHP(ISOUPO)
+        SEGACT MSOUPO
+        MPOVAL=IPOVAL
+        SEGACT MPOVAL
+        NC = NOCOMP(/2)
+
+        DO 20 IC = 1,NC
+          MOC=NOCOMP(IC)
+          IF ( MOC .EQ. NOMDU(REF) ) THEN
+            IINC=IINC+VPOCHA(/1)
+          ENDIF
+20      CONTINUE
+10    CONTINUE
+
+
+*Mise a zero des eventuels elments
+      IF (IINC .NE. 0) THEN
+        IPBUFF=IPCHPT
+        CALL ANCHPO(IPBUFF,NOMDU(REF),IPCHPT)
+      ENDIF
+
+      END
+ 

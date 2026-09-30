@@ -1,0 +1,295 @@
+C ADETAT    SOURCE    OF166741  23/12/04    21:15:03     11800          
+
+*
+* on ne travaille que sur les formulations mecanique et poreux,
+*  thermique, diffusion (, electrostatique) et LIAISON (kich)
+*
+      subroutine adetat
+
+      implicit real*8(a-h,o-Z)
+      implicit integer (i-n)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCHAML
+-INC SMCHPOI
+-INC SMMODEL
+-INC SMCHARG
+-INC SMTABLE
+      segment limode(0)
+      parameter (nnonom=16, nnoind=8, nnofor=10)
+      character*22 indic(nnoind)
+      dimension ilo(nnoind)
+      character*16 mformu(nnofor)
+      character*8 ctyp,mtyp,chai1
+      logical ibo
+      character*4 init(1),nomc,nonom(nnonom)
+      data nonom/'MECA','DIMP','TIMP','TERA','TECO',
+     $           'Q   ','DEFI','REAC','CIMP','UIMP',
+     $           'FORC','MODE','MATE','BLOD','BLOM','BLOT'/
+      data init/'NOUV'/
+      data indic /'DEPLACEMENTS          ','CONTRAINTES           ',
+     &            'TEMPERATURES          ','VARIABLES_INTERNES    ',
+     &            'DEFINELA              ','PROPORTIONS_PHASE     ',
+     &            'CONCENTRATIONS        ','POTENTIELS_ELECTRIQUES'/
+      data ilo / 12, 11, 12, 18, 8, 17, 14, 22 /
+      data mformu /'MECANIQUE       ','POREUX          ',
+     &             'LIAISON         ','DIFFUSION       ',
+     &             'ELECTROSTATIQUE ','THERMIQUE       ',
+     &             'CHARGEMENT      ','METALLURGIE     ',
+     &             'CHANGEMENT_PHASE','MELANGE         '/
+
+      call lirmot(init,1,initia,0)
+
+      call LIROBJ('MMODEL  ',IPMODL,1,iretou)
+      call ACTOBJ('MMODEL  ',IPMODL,1)
+      IF (IERR.NE.0) RETURN
+C     Extension du MMODEL en cas de modele de MELANGE
+      CALL MODETE(IPMODL,MMODEL,IMELAN)
+      IF (IERR.NE.0) RETURN
+
+*  On cree un modele contenant les formulations dans mformu traitees par adetat
+      NSOUS=MMODEL.KMODEL(/1)
+      N1   =NSOUS
+      segini,MMODE1
+      NZON=0
+      DO I = 1, NSOUS
+        IMODEL=mmodel.KMODEL(I)
+        NFOR  =FORMOD(/2)
+        IF    (NFOR.EQ.1) THEN
+          CALL PLACE(mformu,nnofor,iplac,FORMOD(1))
+          if (iplac.EQ.0) GOTO 1119
+        ELSEIF(NFOR.EQ.2) THEN
+          CALL PLACE(mformu,2,iplac,FORMOD(1))
+          if (iplac.EQ.0) GOTO 1119
+          CALL PLACE(mformu,2,iplac,FORMOD(2))
+          if (iplac.EQ.0) GOTO 1119
+        ELSE
+          GOTO 1119
+        ENDIF
+        NZON=NZON+1
+        MMODE1.KMODEL(NZON) =  IMODEL
+1119    CONTINUE
+      ENDDO
+      if (nzon.ne.nsous) then
+        n1 = nzon
+        segadj,MMODE1
+      endif
+c*      NSOUS=MMODE1.KMODEL(/1)
+      NSOUS=nzon
+
+      if (initia.eq.0)then
+        mchelm=0
+        call LIROBJ('MCHAML  ',mchelm,1,iretou)
+        CALL ACTOBJ('MCHAML  ',mchelm,1)
+        if (ierr.ne.0) return
+        segini,mchel2=mchelm
+        n1=mchel2.ichaml(/1)
+        n3=mchel2.infche(/2)
+        l1=16
+        segadj,mchel2
+      else
+        n1=0
+        n3=6
+        l1=16
+        segini mchel2
+        mchel2.ifoche=ifour
+      endif
+      mchel2.TITCHE='cree par adetat'
+      n1io = n1
+
+*-DEBUT de la boucle sur les arguments a lire pus a traiter
+      do i = 1, 1000
+        ctyp='  '
+        CALL QUETYP(CTYP,0,IRETOU)
+*        write(6,*) ' iretou ctyp' , iretou,ctyp
+         if (iretou.eq.0) go to 2
+
+      if(ctyp.eq.'FLOTTANT'.or.ctyp.eq.'ENTIER') then
+         call lirree(xva,1,iret)
+         ctyp='FLOTTANT'
+         call lircha(nomc,1,iretou)
+      elseif(ctyp.eq.'MOT' ) then
+         call lircha(nomc,1,iretou)
+         call lirree(xva,1,iret)
+         ctyp='FLOTTANT'
+      else
+         call LIROBJ(ctyp,ipo,1,iretou)
+         call actobj(ctyp,ipo,1)
+      endif
+      if(ierr.ne.0) return
+
+      if(ctyp.eq.'CHPOINT') then
+        CALL ACTOBJ('CHPOINT ',IPO,1)
+        CALL CHAME1(0,MMODE1,IPO,' ',Ipche2,5)
+        if (ierr.ne.0) return
+        ipo=ipche2
+
+      elseif(ctyp.eq.'FLOTTANT') then
+         call ecrcha('STRESSES')
+         call ecrree(xva)
+         call ecrcha(nomc)
+         call ECROBJ('MMODEL  ',mmode1)
+         call ecrcha('CHML')
+         call manuel
+         if(ierr.ne.0) return
+         call LIROBJ('MCHAML  ',ipo,1,iretou)
+         call ACTOBJ('MCHAML  ',ipo,1)
+         if (ierr.ne.0) return
+
+      elseif(ctyp.eq.'CHARGEME') then
+         mcharg=ipo
+         call lirree(xva,1,iret)
+         if(ierr.ne.0) return
+         segact mcharg
+         ika=0
+         do k=1,kcharg(/1)
+           nomc=chanom(k)
+           do  ka=1,nnonom
+             if( nomc.eq.nonom(ka) ) go to 10
+           enddo
+           ika=ika+1
+           call ecrcha(nomc)
+           call ecrree (xva)
+           call ECROBJ('CHARGEME',mcharg)
+           call tire
+           segact mcharg
+           call quetyp(ctyp,1,iretou)
+           if(ierr.ne.0) return
+           call LIROBJ(ctyp,ipa,1,iretou)
+           ipche2=ipa
+           if(ctyp.eq.'CHPOINT ') then
+              CALL ACTOBJ('CHPOINT ',IPA,1)
+              CALL CHAME1(0,MMODE1,IPA,' ',Ipche2,5)
+              IF (IERR.NE.0) RETURN
+           elseif (ctyp.eq.'MCHAML') then
+*
+*  AM  21/5/08
+*  SI C'EST UN MCHAML, ON LE REDUIT D'ABORD SUR LE MODELE
+*  SI CE N'EST PAS POSSIBLE, ON VA EN 10
+*
+               CALL ACTOBJ('MCHAML  ',IPA,1)
+               CALL REDUAF(IPA,MMODE1,IPA2,0,IRET,KERRE)
+               IF(IRET.EQ.0) GO TO 10
+               CALL CHASUP(MMODE1,IPA2,IPche2,IRET,5)
+           else
+C SP 11/06/20
+C Si autre type (MMODEL par ex.), on itere :
+C            write(6,*) ' Objet tire du charg. de type', ctyp
+             GOTO 10
+           endif
+           mchel3=ipche2
+           n13= mchel3.ichaml(/1)
+           n33= mchel3.infche(/2)
+           iy=n1
+           n1 = n1 + n13
+           n3= max(n3,n33)
+           segadj mchel2
+           do kk=1,n13
+             mchel2.conche(iy+kk)=mchel3.conche(kk)
+             mchel2.ichaml(iy+kk)=mchel3.ichaml(kk)
+             mchel2.imache(iy+kk)=mchel3.imache(kk)
+             do jk=1,n33
+               mchel2.infche(iy+kk,jk)=mchel3.infche(kk,jk)
+             enddo
+           enddo
+   10      continue
+        enddo
+        go to 1
+
+      elseif(ctyp.eq.'TABLE') then
+        ika=0
+        mtable=ipo
+        segact mtable
+        ika=0
+        do k=1,nnoind
+          mtyp=' '
+          call ACCTAB(mtable,'MOT     ',IJ,XJ,indic(k)(1:ilo(k)),ibo,IU,
+     $                    MTYP,IK,XK,CHAI1,IBO,IPA)
+          segact mtable
+          if(MTYP.EQ.' ') go to  11
+          if(MTYP.eq.'CHPOINT ') then
+              CALL ACTOBJ('CHPOINT ',IPA,1)
+              CALL CHAME1(0,MMODE1,IPA,' ',Ipche2,5)
+              IF (IERR.NE.0) RETURN
+          elseif(mtyp.eq.'MCHAML' ) then
+*
+*  AM  21/5/08
+*  SI C'EST UN MCHAML, ON LE REDUIT D'ABORD SUR LE MODELE
+*  SI CE N'EST PAS POSSIBLE, ON VA EN 11
+*
+               CALL ACTOBJ('MCHAML  ',IPA,1)
+               CALL REDUAF(IPA,MMODE1,IPA2,0,IRET,KERRE)
+               IF(IRET.EQ.0) GO TO 11
+*
+              CALL CHASUP(MMODE1,IPA2,IPche2,IRET,5)
+          else
+              go to 11
+          endif
+          mchel3=ipche2
+          n13= mchel3.ichaml(/1)
+          n33= mchel3.infche(/2)
+          iy=n1
+          n1 = n1 + n13
+          n3= max(n3,n33)
+          segadj mchel2
+          do kk=1,n13
+            mchel2.conche(iy+kk)=mchel3.conche(kk)
+            mchel2.ichaml(iy+kk)=mchel3.ichaml(kk)
+            mchel2.imache(iy+kk)=mchel3.imache(kk)
+            do jk=1,n33
+              mchel2.infche(iy+kk,jk)=mchel3.infche(kk,jk)
+            enddo
+          enddo
+   11     continue
+        enddo
+        go to 1
+      endif
+      mchel3=ipo
+*  PV
+      CALL CHASUP(MMODE1,mchel3,mchpv,IRET,5)
+      IF (IRET.NE.0) CALL ERREUR(IRET)
+      if (ierr.ne.0) return
+      mchel3=mchpv
+      n13= mchel3.ichaml(/1)
+      n33= mchel3.infche(/2)
+      iy=n1
+      n1 = n1 + n13
+      n3= max(n3,n33)
+      segadj mchel2
+      do kk=1,n13
+         mchel2.conche(iy+kk)=mchel3.conche(kk)
+         mchel2.ichaml(iy+kk)=mchel3.ichaml(kk)
+         mchel2.imache(iy+kk)=mchel3.imache(kk)
+         do jk=1,n33
+            mchel2.infche(iy+kk,jk)=mchel3.infche(kk,jk)
+         enddo
+      enddo
+
+   1  continue
+      enddo
+*-FIN de la boucle sur les arguments
+
+* Fin du traitement
+   2  continue
+      if (n1.eq.0) then
+        mchel1 = mchel2
+      else
+* on va essayer de regrouper les supports de chamelem car plusieurs
+* operateurs partent du principes que si un modele a n sous-zones le
+* chamelem doit avoir le meme nombre de sous zones
+        iprio=5
+*        call zpchel (mchel2,1)
+        call confor(mchel2,mchel1, mmodel,iprio)
+*        call zpchel( mchel1,1)
+      endif
+      call actobj('MCHAML  ',mchel1,1)
+      call ECROBJ('MCHAML  ',mchel1)
+
+      segsup,mmode1
+
+c      return
+      end
+
+ 

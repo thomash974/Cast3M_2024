@@ -1,0 +1,27 @@
+C MBIO3D    SOURCE    PV090527  23/01/27    21:15:51     11574          
+      subroutine mbio3d(Kb,vgel,bgel,Kgel,xmgel,err1)
+      
+c     calcul du module de biot 
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      real*8 Kb,vgel,bgel,Kgel,xmgel
+      integer err1
+
+      real*8 Ksgel
+
+c     module de compressibilite du beton par rapport au gel         
+      Ksgel=Kb/(1.d0-bgel)   
+      if (vgel.gt.0.d0) then
+             xmgel=((bgel-vgel)/Ksgel+vgel/Kgel)**(-1)
+c            print*,'ds Mbiot3d:', bgel,vgel,Ksgel,vgel,Kgel,xmgel
+c            read*
+      else
+c            valeurs nulle en attendant que la pression monte
+             bgel=0.d0
+             xmgel=0.d0
+      end if
+      return
+      end
+ 

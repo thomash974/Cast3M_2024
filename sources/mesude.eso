@@ -1,0 +1,151 @@
+C MESUDE    SOURCE    PV        22/06/15    21:15:02     11388          
+
+C   Mesure la carte de densite d'un maillage (CHPOINT)
+
+      SUBROUTINE MESUDE(MELEME)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCHPOI
+-INC SMCOORD
+-INC CCREEL
+
+      LOGICAL ISEG3
+      SEGMENT ICPR(NBPTS)
+      SEGMENT INLPP
+        integer INL(NP1)
+      ENDSEGMENT
+
+      segact mcoord
+
+C---- CAS DU MAILLAGE VIDE
+
+      ISOU1=LISOUS(/1)
+      IF (ITYPEL.EQ.0.AND.ISOU1.EQ.0) THEN
+        NAT=1
+        NSOUPO=0
+        SEGINI,MCHPOI
+        MCHPOI.IFOPOI=IFOUR
+        MCHPOI.JATTRI(1)=1
+        CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+        CALL ECROBJ('CHPOINT ',MCHPOI)
+        RETURN
+      ENDIF
+
+C---- CAS USUEL
+
+C     Changement du maillage en lignes : appel a CHANLG
+      CALL ECROBJ('MAILLAGE',MELEME)
+      CALL CHANLG
+      IF (IERR.NE.0) RETURN
+      CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+      CALL ACTOBJ('MAILLAGE',MELEME,1)
+      IF (IERR.NE.0) RETURN
+
+      NBSOU1 = LISOUS(/1)
+      IF (NBSOU1.NE.0) THEN
+        CALL ERREUR(426)
+        RETURN
+      ENDIF
+
+C     IPT1 : maillage des segments, IPT2 : des points
+      IPT2 = MELEME
+      CALL CHANGE(IPT2,1)
+
+      IPT1 = MELEME
+      NBEL1 = IPT1.NUM(/2)
+      SEGACT MCOORD
+
+C     Initialisation du CHPOINT
+      NAT    = 1 
+      NSOUPO = 1 
+      SEGINI, MCHPOI
+      MTYPOI = '        '
+      MOCHDE = ' CHPOINT de densite de mailles '
+      JATTRI(1) = 1
+      IFOPOI = IFOUR
+
+      NC = 1
+      SEGINI, MSOUPO
+      IPCHP(1) = MSOUPO
+      NOCOMP(1) = 'SCAL'
+      IGEOC = IPT2
+
+      N = IPT2.NUM(/2)
+      SEGINI, MPOVAL
+      IPOVAL = MPOVAL
+
+C     Segments de travail
+      SEGINI,ICPR
+      DO 10 IP=1,N
+        ICPR(IPT2.NUM(1,IP)) = IP
+ 10    CONTINUE
+C     Segment INLPP : nb. ligne par point
+      NP1 = N
+      SEGINI,INLPP
+
+C     Gestion maillage quadratique
+      ISEG3 = (ITYPEL.EQ.3)
+      IS2  = 2
+      IF (ISEG3) IS2 = 3
+
+C     Calcul de la densite
+      VPOCHA(1,1) = 0.D0
+      ID1 = IDIM + 1
+      DO 20 K=1,NBEL1
+        IP1 = IPT1.NUM(1,K)
+        IP2 = IPT1.NUM(IS2,K)
+
+        XD1 = 0.D0
+        DO 21 I=1,IDIM
+          XI1 = XCOOR((IP1-1)*ID1+I)
+          XI2 = XCOOR((IP2-1)*ID1+I)
+          XD1 = XD1 + (XI2 - XI1)**2
+ 21     CONTINUE
+        XD1 = SQRT(XD1)
+
+        VPOCHA(ICPR(IP1),1) = VPOCHA(ICPR(IP1),1)+XD1
+        VPOCHA(ICPR(IP2),1) = VPOCHA(ICPR(IP2),1)+XD1
+        iNL(ICPR(IP1)) = INL(ICPR(IP1))+1
+        iNL(ICPR(IP2)) = INL(ICPR(IP2))+1
+*     write(6,*) 'IP1,IP2,XD1 =',IP1,IP2,XD1
+ 20   CONTINUE 
+
+      DO 30 I=1,N
+*  en seg3 les points milieux ne sont pas encore remplis
+
+        if (inl(i).le.0) inl(i)=igrand
+        if (inl(i).gt.0) then
+           VPOCHA(I,1) = VPOCHA(I,1) / iNL(I)
+        else
+           VPOCHA(I,1) = 0.d0
+        endif
+ 30   CONTINUE
+
+      IF (ISEG3) THEN
+        DO 40 K=1,NBEL1
+          IP1 = IPT1.NUM(1,K)
+          IP2 = IPT1.NUM(IS2,K)
+          XD1 = VPOCHA(ICPR(IP1),1)
+          XD2 = VPOCHA(ICPR(IP2),1)
+          XDM = 0.5D0*(XD1+XD2)
+          IPM =  IPT1.NUM(2,K)
+          VPOCHA(ICPR(IPM),1) = XDM
+ 40     CONTINUE
+      ENDIF
+      segsup inlpp
+
+      CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+      CALL ECROBJ('CHPOINT ',MCHPOI)
+
+      RETURN
+      END
+ 
+ 
+ 
+ 
+ 

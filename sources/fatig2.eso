@@ -1,0 +1,521 @@
+C FATIG2    SOURCE    KICH      22/09/22    21:15:02     11465          
+      SUBROUTINE FATIG2(ITCONT,ITTEMP,IPMODE,IPCAR,ICF1,xre1,xre2,
+     &ICLE,NCLE,CLE,ZECRIT,ICHOUT)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC SMCHAML
+-INC SMELEME
+-INC SMEVOLL
+-INC SMLREEL
+      PARAMETER (MCRIT=5)
+      SEGMENT,MLCARF
+        integer lcarfa(2*MCRIT,N1)
+      ENDSEGMENT
+      SEGMENT,MCYSIG
+        integer lcysig(nbrobl,ncycl)
+        real*8 sigcyc(nbrobl,ncycl),pcyc(ncycl)
+      ENDSEGMENT
+      SEGMENT,MRECYC
+         real*8 ycyc(ncycl)
+      ENDSEGMENT
+      SEGMENT,MDEVCY
+         real*8 sdcyc(nbrobl-1,ncycl)
+      ENDSEGMENT
+      SEGMENT,MDEVSI
+         real*8 sd(nbrobl)
+      ENDSEGMENT
+      LOGICAL LOG0,LOG1,dcarf1,dcarf2,d_cle
+      CHARACTER*4 COFA(2*MCRIT),CLE(NCLE)
+      real*8 cofa1(NCLE-1),cofa2(NCLE-1)
+      DATA COFA/'ADVK','BDVK','APAP','BPAP','ASIN','BSIN','ACRO','BCRO',
+     &'A_DC','B_DC'/
+
+
+
+      SQ2 = dsqrt(2.d0)
+      SQ3S2 = dsqrt(1.5D0)
+      SQ3 = dsqrt(3.d0)
+
+
+      mmodel = ipmode
+      segact mmodel
+      n1 = kmodel(/1)
+      n2 = 0
+      l1 = 16
+      n3 = 6
+      segini mchel2
+       mchel2.titche(1:8) = 'FATIGUE '
+      if (ICF1.gt.0) then
+        mchel1= ICF1
+        segact mchel1
+*       mchel2.titche(9:16) = mchel1.titche(9:16)
+      endif
+      segini mlcarf
+
+      if(icle.ge.2.and.icle.le.6) then 
+         n=0
+         segini mevoll
+         IEVTEX = 'EVOLUTION VIDE'
+         mevnul = mevoll
+         segdes mevoll
+      endif
+              
+
+
+      do ik = 1,n1
+        imodel = kmodel(ik)
+        segact imodel
+        mchel2.conche(ik) = conmod
+        mchel2.imache(ik) = imamod
+        mchel2.ifoche = ifour
+        mchel2.infche(ik,4) = infmod(7)
+        mchel2.infche(ik,6) = 5
+
+        if(ICF1.gt.0) then
+        do ic = 1,mchel1.imache(/1)
+         if (mchel1.imache(ic).eq.imamod) then
+           mchaml = mchel1.ichaml(ic) 
+           segact mchaml
+           n2 = nomche(/2)     
+           do inom = 1,n2
+* controler les noms des caracteristiques du critere             
+             melval = ielval(inom)
+             if(icle.le.6) then
+               do jcr = 1,mcrit
+              if(nomche(inom)(1:4).eq.cofa(2*jcr-1)(1:4)) then
+                             segact melval
+                      lcarfa(2*jcr-1,ik) = melval
+              endif
+              if(nomche(inom)(1:4).eq.cofa(2*jcr)(1:4)) then
+                             segact melval
+                      lcarfa(2*jcr,ik) = melval
+              endif
+               enddo
+             endif             
+
+           enddo
+           segdes mchaml
+         endif 
+        enddo
+* verification        
+          d_cle = .true.
+          do jcr = 1,mcrit
+            dcarf1 = .false.
+            dcarf2 = .false.
+            if (lcarfa(2*jcr-1,ik).gt.0) dcarf1 = .true. 
+            if (lcarfa(2*jcr,ik).gt.0)   dcarf2 = .true.
+            if (icle.eq.1) then
+             d_cle = dcarf1 .and. dcarf2 .and. d_cle
+            else if (icle.ge.2.and.icle.le.6.and.jcr.eq.icle-1) then
+              d_cle = dcarf1 .and. dcarf2
+            endif
+          enddo        
+          
+          if (.not.d_cle) then
+            call erreur(472)
+            return
+          endif
+        endif
+
+* sorties
+         if(icle.eq.1) then
+           n2 = ncle - 1
+         elseif(icle.ge.2.and.icle.le.6) then
+           n2 = 2
+         else 
+           n2 = 1
+         endif
+           segini mchaml
+           mchel2.ichaml(ik) = mchaml
+         meleme = imamod
+         segact meleme
+         nbelem = num(/2)
+         nbgs = infele(4)
+           n1ptel= nbgs
+           n1el = nbelem
+           n2ptel = 0
+           n2el = 0
+         if(icle.eq.1) then
+           do je = 1,n2
+            segini melval
+            ielval(je) = melval
+            nomche(je) = cle(je+1)
+            typche(je) = 'REAL*8'
+           enddo
+         elseif(icle.gt.1) then
+          segini melval
+          ielval(1) = melval
+          nomche(1) = cle(icle)
+           typche(1) = 'REAL*8'
+         endif
+
+         if(icle.ge.2.and.icle.le.6) then 
+           n2ptel = nbgs
+           n2el = nbelem
+           n1ptel = 0
+           n1el = 0
+           segini melval
+         ielval(2) = melval
+         nomche(2) = 'PTAU'
+         typche(2) = 'POINTEUREVOLUTIO'
+              segini kevoll
+              ielche(1,1) = kevoll
+              kevdvk = kevoll
+              jg = 2
+              segini mlreel
+              iprogx = mlreel
+              segini mlreel
+              iprogy = mlreel
+              NUMEVX = 4
+              NUMEVY='REEL'
+              NOMEVX = 'P'
+              NOMEVY = 'TAU'
+              TYPX = 'LISTREEL'
+              TYPY = 'LISTREEL'
+         endif
+
+      enddo
+
+      mtable = ITCONT
+      mtab1 = ittemp
+
+      i0 = 0 
+      X0 = 0.D0
+      LOG0 = .TRUE.
+      ip0 = 0
+      I1 = 0
+      x1 = 0.d0
+      LOG1 = .TRUE.
+      IP1 = 0
+      
+      CALL DIMEN7 (ittemp,ntemps)
+      do jr =1,2
+        if(jr.eq.1) xreu = xre1
+        if(jr.eq.2) xreu = xre2
+* presuppose indice 0 t=0.
+      if(xreu.eq.0.d0) then
+       intc = 0
+      elseif(xreu.gt.0.d0) then
+         xd1 = xreu
+       do ind1 = 1,ntemps
+           I0 = ind1 - 1
+           CALL ACCTAB(ITTEMP,'ENTIER',I0,X0,' ',LOG0,IP0,
+     &                       'FLOTTANT',I1,X1,' ',LOG1,IP1)
+          if (ierr.ne.0) return
+         xu = xreu - x1
+         if (xu.gt.0.d0.and.xu.le.xd1) then
+           xd1 = xu
+         else if (dabs(xu).le.xd1) then
+           goto 14
+         else
+           I0 = I0 - 1
+           goto 14
+         endif
+       enddo        
+ 14    continue 
+       intc = I0
+      endif
+
+        if(jr.eq.1) i0temd = intc
+        if(jr.eq.2) then
+         if(xre2.gt.0) then
+           i0temf = intc
+         else
+           i0temf = ntemps -1
+         endif
+        endif
+      enddo
+
+      DO ik = 1,kmodel(/1)
+         isk = 0
+         imodel = kmodel(ik)
+
+* sorties 
+         mcham2 = mchel2.ichaml(ik)
+         nomid = lnomid(4)
+         segact nomid
+         nbrobl = lesobl(/2)
+         segini mdevsi
+
+         ncycl = i0temf - i0temd + 1
+         segini mcysig
+         segini MDEVCY
+         segini mrecyc
+
+        ktem = 0
+        DO I0 = i0temd,i0temf
+          ktem = ktem + 1
+           CALL ACCTAB(ITCONT,'ENTIER',I0,X0,' ',LOG0,IP0,
+     &                       'MCHAML ',I1,X1,' ',LOG1,IP1)
+         MCHELM = ip1
+         SEGACT MCHELM 
+
+         do is = 1,imache(/1)
+           if(imamod.eq.imache(is)) isk = is
+         enddo
+         if (isk.eq.0) then
+           call erreur(472)
+           return
+         endif
+         mchaml = ichaml(isk) 
+         segact mchaml
+* controle des composantes de contraintes
+         n2 = nomche(/2)
+* on travaille a priori avec les composantes obligatoires
+         do iobl = 1, nbrobl
+          do imch = 1,nomche(/2)
+            if(lesobl(iobl).eq.nomche(imch)) then
+              lcysig(iobl,ktem) = ielval(imch)
+              melval = ielval(imch)
+              segact melval
+            endif
+          enddo
+         enddo
+
+         segdes mchaml
+         SEGDES MCHELM
+        ENDDO
+
+         meleme = imamod
+         nbelem = num(/2)
+         nbgs = infele(4)
+         nstrs = infele(16)
+         mfr = infele(13)
+         DO ib = 1,nbelem
+          do igau = 1,nbgs
+
+* caracteristiques critere
+            IF(ib.eq.1.and.igau.eq.1) THEN
+* kich : d un point de vue pratique on attend des constantes
+            if(icle.eq.1) then
+              do jcr = 1,mcrit
+               melva1 = lcarfa(2*jcr-1,ik)
+               IGMN=MIN(IGAU,melva1.VELCHE(/1))
+               IBMN=MIN(IB  ,melva1.VELCHE(/2))
+               cofa1(jcr) = melva1.velche(igmn,ibmn)*(-1)
+
+               melva2 = lcarfa(2*jcr,ik)
+               IGMN=MIN(IGAU,melva2.VELCHE(/1))
+               IBMN=MIN(IB  ,melva2.VELCHE(/2))
+               cofa2(jcr) = melva2.velche(igmn,ibmn)
+              enddo
+            
+            elseif(icle.ge.2.and.icle.le.6) then
+               melva1 = lcarfa(2*icle-3,ik)
+               IGMN=MIN(IGAU,melva1.VELCHE(/1))
+               IBMN=MIN(IB  ,melva1.VELCHE(/2))
+               cofa1(icle-1) = melva1.velche(igmn,ibmn)*(-1)
+
+               melva2 = lcarfa(2*icle-2,ik)
+               IGMN=MIN(IGAU,melva2.VELCHE(/1))
+               IBMN=MIN(IB  ,melva2.VELCHE(/2))
+               cofa2(icle-1) = melva2.velche(igmn,ibmn)
+            endif
+             cofa1(6) = 0.d0
+             cofa2(6) = 0.d0
+            ENDIF
+
+* trajet de chargement
+            DO icyc = 1,ncycl 
+
+              do iobl = 1,nbrobl
+            MELVAL = lcysig(iobl,icyc)
+          if (melval.gt.0) then
+            IGMN=MIN(IGAU,VELCHE(/1))
+            IBMN=MIN(IB  ,VELCHE(/2))
+            sd(iobl)=VELCHE(IGMN,IBMN)
+            sigcyc(iobl,icyc) = VELCHE(IGMN,IBMN)
+          else 
+            sd(iobl) = 0.d0
+            sigcyc(iobl,icyc) = 0.d0
+          endif
+              enddo
+
+      PCYC(ICYC) = (SIGCYC(1,ICYC)+SIGCYC(2,ICYC)+SIGCYC(3,ICYC))/3
+         if(ib.eq.1.and.igau.eq.1.and.icyc.eq.1) then
+           pcymax = pcyc(1)
+           pcymin = pcyc(1)
+         else
+           pcymax = max(pcymax,pcyc(icyc))
+           pcymin = min(pcymin,pcyc(icyc))
+         endif
+       SDCYC(1,icyc)   = (SIGCYC(1,icyc)-SIGCYC(2,icyc))/SQ2
+       SDCYC(2,icyc)=(SIGCYC(1,icyc)+SIGCYC(2,icyc)-2.*PCYC(icyc))*SQ3S2
+       SDCYC(3,icyc)   =  SIGCYC(4,icyc)
+       if(nbrobl.gt.4) then
+         SDCYC(4,icyc)   =  SIGCYC(5,icyc)
+         SDCYC(5,icyc)   =  SIGCYC(6,icyc)
+       endif
+
+      if (igau.eq.6) then
+*       write(6,*) 'f2-6-icyc',icyc,(sigcyc(iu,icyc),iu = 1,5)
+      endif
+
+* boucle icyc
+            ENDDO
+
+      if(nbrobl.le.1) then
+*       write(6,*) 'DVPA2, manquent composantes contraintes'
+       interr(1) = imodel
+       interr(2) = imamod
+       call erreur(973)
+       return
+      endif
+
+
+* calculs criteres
+             if(icle.eq.1) then
+               do jl = 2,ncle
+      call FATIG3(sigcyc,pcyc,ycyc,nbrobl,ncycl,jl,
+     & cofa1(jl-1),cofa2(jl-1),ycri,SDCYC,ib,igau)
+          melval = mcham2.ielval(jl-1)
+          velche(igau,ib) = ycri
+               enddo
+             else
+      call FATIG3(sigcyc,pcyc,ycyc,nbrobl,ncycl,icle,
+     &cofa1(icle-1),cofa2(icle-1),ycri,SDCYC,ib,igau)
+          melval = mcham2.ielval(1)
+          velche(igau,ib) = ycri
+             endif
+
+* sorties
+       IF (ICLE.GT.1.and.ICLE.LT.7) THEN
+
+        if (ib.eq.1.and.igau.eq.1) then
+          melval = mcham2.ielval(2)
+          kevdvk = ielche(1,1)
+        endif
+
+        if (ycri.gt.zecrit) then
+            melval = mcham2.ielval(2)
+              n = 2
+              segini mevoll
+              ielche(igau,ib) = mevoll
+              ITYEVO='REEL'
+              IEVTEX='CYCLE P/TAU '
+              IEVTEX(13:20) = mchel1.titche(9:16)
+              segini kevoll
+              ievoll(1) = kevoll
+              ievoll(2) = kevdvk
+          if(icle.eq.2.or.icle.eq.3) then
+            jg = ncycl
+          else
+            jg = 1
+          endif
+              segini mlreel
+              iprogx = mlreel
+              segini mlree1
+              iprogy = mlree1
+              TYPX = 'LISTREEL'
+              TYPY = 'LISTREEL'
+
+          if(icle.eq.2.or.icle.eq.3) then
+c       Critère de Dang Van et Papadopoulos
+              NUMEVY='REEL'
+              NOMEVX = 'P'
+              NOMEVY = 'TAU'
+            do jcyc = 1,ncycl
+             mlree1.prog(jcyc) = ycyc(jcyc)
+             prog(jcyc) = pcyc(jcyc)
+            enddo
+          else
+            mlree1.prog(1) = ycyc(2)
+            prog(1) = ycyc(1)
+            if(icle.eq.4) then
+c       Critère de Sines
+              NUMEVY='REEL'
+              NOMEVX = 'P moyenne'
+              NOMEVY = 'sqrt(J2),a'
+            elseif(icle.eq.5) then
+c       Critère de Crossland
+              NUMEVY='REEL'
+              NOMEVX = 'P max'
+              NOMEVY = 'sqrt(J2),a'
+            elseif(icle.eq.6) then
+c       Critère de Deperrois
+              NUMEVY='REEL'
+              NOMEVX = 'P max'
+              NOMEVY = 'A(psi)'
+            endif
+          endif
+
+          segdes mlreel,mlree1
+          segdes kevoll
+          segdes mevoll
+
+         else 
+           melval = mcham2.ielval(2)
+           ielche(igau,ib) = mevnul
+         endif
+        ENDIF
+
+* boucle igau
+          enddo
+* boucle ib
+         ENDDO
+
+
+         if(icle.ge.2.and.icle.le.6) then
+          kevoll = kevdvk
+          mlreel = iprogx
+          mlree1 = iprogy
+           if (abs(pcymin).le.1.e-6.and.abs(pcymax).le.1.e-6) then
+             pcymin = -1.D0
+             pcymax = 1.D0
+           elseif (abs((pcymax - pcymin)/pcymax).le.0.1) then
+             pcymin = pcymin - 0.1*abs(pcymax)
+             pcymax = pcymax + 0.1*abs(pcymax)
+           endif
+           prog(1) = pcymin
+           prog(2) = pcymax
+*           WRITE(6,*) 'MINMAX',PCYMIN,PCYMAX
+           mlree1.prog(1) = cofa1(icle-1)*(-1)*pcymin + cofa2(icle-1)
+           mlree1.prog(2) = cofa1(icle-1)*(-1)*pcymax + cofa2(icle-1)
+          segdes mlreel,mlree1
+          segdes kevoll
+         endif
+
+         do lt = 1,ktem
+          do iobl = 1, nbrobl
+           melval = lcysig(iobl,lt)
+           if(melval.gt.0) segdes melval
+          enddo
+         enddo
+         do jcr = 1,mcrit
+           melva1 = lcarfa(2*jcr-1,ik)
+           if (melva1.gt.0) segdes melva1
+           melva2 = lcarfa(2*jcr,ik)
+           if (melva2.gt.0) segdes melva2
+         enddo
+         segsup mdevsi
+         segsup mcysig
+         segsup mrecyc
+        segdes imodel
+        mchaml = mchel2.ichaml(ik)
+        if(icle.eq.1) then
+         do jf = 1,ncle-1
+           melval = ielval(jf)
+           segdes melval
+         enddo
+        elseif(icle.ge.2.and.icle.le.6) then
+         do jf = 1,2
+           melval = ielval(jf)
+           segdes melval
+         enddo
+        endif
+        segdes mchaml
+* boucle ik
+      ENDDO
+
+       if(ICF1.gt.0) segdes mchel1
+      segdes mmodel,mchel2
+      ICHOUT = MCHEL2
+      RETURN
+      END
+ 
+ 
+ 

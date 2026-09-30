@@ -1,0 +1,150 @@
+C REMPL5    SOURCE    JC220346  19/12/29    21:15:07     10441          
+      SUBROUTINE REMPL5
+************************************************************************
+*
+*                             R E M P L 5
+*                             -----------
+*
+*     REMPLACER UN OU PLUSIEURS MOTIFS TROUVES DANS UNE CHAINE PAR
+*     DES CHAINES DE REMPLACEMENT
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+-INC CCASSIS
+-INC CCNOYAU
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLMOTS
+-INC SMTABLE
+*
+      CHARACTER*8 CTYP,CTYP2,CTYP3
+      CHARACTER*512 CHIN,AUX,AUX2
+      CHARACTER*1024 CHOUT
+      
+      EXTERNAL LONG
+*
+*     Lecture de la chaine dont on veut remplacer des portions
+      CALL LIRCHA(CHIN,1,LCHIN)
+      IF (IERR.NE.0) RETURN
+      CHOUT=CHIN
+      LCHOUT=LCHIN
+      LIN=LEN(CHIN)
+      LOUT=LEN(CHOUT)
+*
+*     Lecture du/des motifs a remplacer et des chaines de remplacement
+      CALL QUETYP(CTYP,0,IRETOU)
+      IF (IRETOU.EQ.0) THEN
+          CALL ERREUR(533)
+          RETURN
+      ENDIF
+    
+      IF (CTYP.EQ.'MOT') THEN
+          CALL LIRCHA(AUX,1,LAUX)
+          IF (IERR.NE.0) RETURN
+          CALL LIRCHA(AUX2,1,LAUX2)
+          IF (IERR.NE.0) RETURN
+          JGM=1
+          JGN=LAUX
+          SEGINI,MLMOT1
+          JGN=LAUX2
+          SEGINI,MLMOT2
+          MLMOT1.MOTS(1)=AUX
+          MLMOT2.MOTS(1)=AUX2
+          NMOTIF=1
+          
+      ELSEIF (CTYP.EQ.'LISTMOTS') THEN
+          CALL LIROBJ('LISTMOTS',IOB1,1,IRET)
+          IF (IERR.NE.0) RETURN
+          CALL LIROBJ('LISTMOTS',IOB2,1,IRET)
+          IF (IERR.NE.0) RETURN
+          MLMOT1=IOB1
+          MLMOT2=IOB2
+          SEGACT,MLMOT1,MLMOT2
+          NB1=MLMOT1.MOTS(/2)
+          NB2=MLMOT2.MOTS(/2)
+          IF (NB1.NE.NB2) THEN
+              CALL ERREUR(854)
+              RETURN
+          ENDIF
+          NMOTIF=NB1
+          
+      ELSEIF (CTYP.EQ.'TABLE') THEN
+          CALL LIROBJ('TABLE',IOB,1,IRET)
+          IF (IERR.NE.0) RETURN
+          MTAB1=IOB
+          SEGACT,MTAB1
+          NMOTIF=MTAB1.MLOTAB
+          NCAR1=0
+          NCAR2=0
+          IF (NBESC.NE.0) SEGACT,IPILOC
+          DO K=1,NMOTIF
+              CTYP2=MTAB1.MTABTI(K)
+              CTYP3=MTAB1.MTABTV(K)
+              IF (CTYP2.NE.'MOT'.OR.CTYP3.NE.'MOT') THEN
+                  CALL ERREUR(647)
+                  RETURN
+              ENDIF
+              IMO1=IPCHAR(MTAB1.MTABII(K))
+              IMO2=IPCHAR(MTAB1.MTABII(K)+1)
+              ILON=IMO2-IMO1
+              NCAR1=MAX(NCAR1,ILON)
+              IMO1=IPCHAR(MTAB1.MTABIV(K))
+              IMO2=IPCHAR(MTAB1.MTABIV(K)+1)
+              ILON=IMO2-IMO1
+              NCAR2=MAX(NCAR2,ILON)
+          ENDDO
+          JGM=NMOTIF
+          JGN=NCAR1
+          SEGINI,MLMOT1
+          JGN=NCAR2
+          SEGINI,MLMOT2
+          DO K=1,NMOTIF
+              IMO1=IPCHAR(MTAB1.MTABII(K))
+              IMO2=IPCHAR(MTAB1.MTABII(K)+1)
+              ILON=IMO2-IMO1
+              MLMOT1.MOTS(K)=ICHARA(IMO1:IMO1+ILON-1)
+              IMO1=IPCHAR(MTAB1.MTABIV(K))
+              IMO2=IPCHAR(MTAB1.MTABIV(K)+1)
+              ILON=IMO2-IMO1
+              MLMOT2.MOTS(K)=ICHARA(IMO1:IMO1+ILON-1)
+          ENDDO
+          SEGDES,MTAB1
+          IF (NBESC.NE.0) SEGDES,IPILOC
+      ENDIF
+      
+*     Remplacements des motifs les uns apres les autres
+      DO 10 K=1,NMOTIF
+          AUX=MLMOT1.MOTS(K)
+          AUX2=MLMOT2.MOTS(K)
+          LAUX=LONG(AUX)
+          LAUX2=LONG(AUX2)
+          LDEC=LAUX2-LAUX
+          IDEB=1
+ 20       IPO=INDEX(CHOUT(IDEB:LOUT),AUX(1:LAUX))
+          IF (IPO.EQ.0) GOTO 10
+          IPO=IDEB-1+IPO
+          IF (LDEC.NE.0) THEN
+              CHOUT(IPO+LAUX2:LOUT)=CHOUT(IPO+LAUX:LOUT)
+C             Protection contre des remplacements trop volumineux
+              IF ((LCHOUT+LDEC).GT.LOUT) THEN
+                  CALL ERREUR(1111)
+                  RETURN
+              ENDIF
+              LCHOUT=LCHOUT+LDEC
+          ENDIF
+          CHOUT(IPO:IPO+LAUX2-1)=AUX2(1:LAUX2)
+          IDEB=IPO+LAUX2
+          IF (IDEB.GT.LCHOUT) GOTO 10
+          GOTO 20
+ 10   CONTINUE
+ 
+      IF (CTYP.EQ.'MOT'.OR.CTYP.EQ.'TABLE') SEGSUP,MLMOT1,MLMOT2
+      CALL ECRCHA(CHOUT(1:LIN))
+      
+      END
+
+
+
+ 

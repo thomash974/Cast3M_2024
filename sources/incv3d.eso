@@ -1,0 +1,20 @@
+C INCV3D    SOURCE    FD218221  24/02/07    21:15:16     11834          
+        subroutine incv3d(X6,DX3,O333)
+
+c       declarations externes
+        implicit integer(i-n)
+        implicit real*8(a-h,o-z)
+
+        real*8 X6(6),DX3(3),O333(3,3,3)
+        integer i,j,k,l
+
+        do i=1,3
+            do j=1,6
+                call indce0(j,k,l)
+                X6(j)=X6(j)+dX3(i)*O333(i,k,l)
+            end do
+        end do
+
+        return
+        end
+ 

@@ -1,0 +1,14 @@
+C TCU20A    SOURCE    OF166741  23/12/04    21:15:11     11800          
+C
+C ===>  SOUS-PROGRAMME  TCU20A  PLUS UTILISE    <===
+C ===>  SUBROUTINE              NO LONGER USED  <===
+C
+      SUBROUTINE TCU20A
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      RETURN
+      END
+
+ 

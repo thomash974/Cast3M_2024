@@ -1,0 +1,236 @@
+C SMCHP1    SOURCE    OF166741  23/03/03    21:15:04     11416          
+
+C***********************************************************************
+C NOM         : smchp1.eso
+C DESCRIPTION : accretion d'un CHAMP a sortir au format MED
+C ENTREES     : ITLAC   : SEGMENT contenant les MELEMES a sortir
+C             : IPOIN1  : POINTEUR sur l'objet a explorer (CHPOINT ou MCHAML)
+C             : CTYP1   : chaine contenant le type de l'objet de pointeur IPOIN1
+C             : IPOIN2  : POINTEUR sur SEGMENT IFOCHA approprie
+C             : numdt   : numero de pas de temps
+C             : xtps    : Valeur du temps pour ce pas de temps
+C***********************************************************************
+
+      SUBROUTINE SMCHP1 (ITLAC,IPOIN1,CTYP1,IPOIN2,fname,numdt,xtps)
+
+      IMPLICIT INTEGER(i-n)
+      IMPLICIT REAL*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCMED
+
+-INC SMELEME
+-INC SMCHPOI
+-INC SMCHAML
+-INC SMLMOTS
+-INC SMMED
+
+C-----Chaine de Caracteres de longueur MED_NAME_SIZE=64
+      CHARACTER*(*) fname, CTYP1
+
+      REAL*8       xtps
+      CHARACTER*4  cha4F
+      CHARACTER*8  cha8c
+
+      EXTERNAL LONG
+
+      ilon2 = LONG(fname)
+
+C  *********************************************************************
+C  *  Demande des CHPOINT                                              *
+C  *********************************************************************
+      IF (CTYP1(1:8) .EQ. 'CHPOINT ') THEN
+        MCHPOI = IPOIN1
+        nbzone = MCHPOI.IPCHP(/1)
+
+C   Initialisation de LISCHP ou extension de LISCHP
+        IF (IPOIN2 .EQ. 0) THEN
+          nbmspo = nbzone
+          SEGINI,LISCHP
+          LISCHP.NBENTI = 0
+          IPOIN2 = LISCHP
+        ELSE
+          LISCHP = IPOIN2
+          nbmspo = LISCHP.NBENTI + nbzone
+          IF (nbmspo .GT. LISCHP.LICHAP(/1)) THEN
+            SEGADJ,LISCHP
+          ENDIF
+        ENDIF
+        IF (nbzone.EQ.0) RETURN
+
+C Determination du FORMAT automatique
+        cha4F='(I )'
+        nbsort = LISCHP.NBENTI + nbzone
+        IFORMA = INT(LOG10(REAL(nbsort))) + 1
+        IF (IFORMA.LT.1 .AND. IFORMA.GT.8) THEN
+          CALL ERREUR(1094)
+          RETURN
+        ENDIF
+        WRITE(cha4F(3:3),'(I1)') IFORMA
+        IF (ilon2+IFORMA+1.GT.MED_NAME_SIZE) THEN
+          CALL ERREUR(1111)
+          RETURN
+        END IF
+
+        nbsort = LISCHP.NBENTI
+
+        nbrzo = 0
+        DO ii = 1, nbzone
+          MSOUPO = MCHPOI.IPCHP(ii)
+          IPT1   = MSOUPO.IGEOC
+C         On saute les maillages vides
+          IF (IPT1.NUM(/2).EQ.0) GOTO 201
+C         On saute les 'LX' et 'FLX'
+          IF (MSOUPO.NOCOMP(1).EQ.'LX  ' .OR.
+     &        MSOUPO.NOCOMP(1).EQ.'FLX ') GOTO 201
+          nbrzo = nbrzo + 1
+ 201      CONTINUE
+        ENDDO
+
+        numzo = 0
+        DO ii = 1, nbzone
+          MSOUPO = MCHPOI.IPCHP(ii)
+          IPT1   = MSOUPO.IGEOC
+
+C         On ne traite pas les maillages vides, les 'LX' et 'FLX'
+          IF (IPT1.NUM(/2).EQ.0) GOTO 20
+          IF (MSOUPO.NOCOMP(1).EQ.'LX  ' .OR.
+     &        MSOUPO.NOCOMP(1).EQ.'FLX ') GOTO 20
+
+          nbsort = nbsort + 1
+          CALL AJOU(ITLAC,IPT1)
+
+          if (nbrzo.EQ.1) then
+            LISCHP.NOCHAP(nbsort) = fname(1:ilon2)
+          else
+            numzo = numzo + 1
+            WRITE(cha8c,cha4F) numzo
+            LISCHP.NOCHAP(nbsort) = fname(1:ilon2)//'_'//cha8c
+          endif
+
+          LISCHP.PNUMDT(nbsort)   = numdt
+          LISCHP.LICHAP(nbsort)   = MSOUPO
+          LISCHP.LIMAIL(nbsort)   = IPT1
+          LISCHP.ISUPOR(nbsort,1) = 0
+          LISCHP.ISUPOR(nbsort,2) = 0
+          LISCHP.XTEMPS(nbsort)   = xtps
+ 20       CONTINUE
+        ENDDO
+        LISCHP.NBENTI = nbsort
+
+C  *********************************************************************
+C  *  Demande des MCHAML                                               *
+C  *********************************************************************
+      ELSE IF (CTYP1(1:8) .EQ. 'MCHAML  ')THEN
+        MCHELM = IPOIN1
+        nbzone = MCHELM.ICHAML(/1)
+
+C   Initialisation de LISCHA ou extension de LISCHA
+        IF (IPOIN2 .EQ. 0) THEN
+          nbmspo = nbzone
+          SEGINI,LISCHA
+          LISCHA.NBENTI = 0
+          IPOIN2 = LISCHA
+        ELSE
+          LISCHA = IPOIN2
+          nbmspo = LISCHA.NBENTI + nbzone
+          IF (nbmspo .GT. LISCHA.LICHAP(/1)) THEN
+            SEGADJ,LISCHA
+          ENDIF
+        ENDIF
+
+        IF (nbzone.EQ.0) RETURN
+
+        nbsort = LISCHA.NBENTI
+
+        DO ii = 1, nbzone
+          LISCHA.LIMAIL(nbsort+ii) = 0
+          LISCHA.LICHAP(nbsort+ii) = 0
+        ENDDO
+
+C Determination du FORMAT automatique
+        IFORMA = INT(LOG10(REAL(nbzone))) + 1
+        IF (IFORMA.LT.1 .OR. IFORMA.GT.8) THEN
+          CALL ERREUR(1094)
+          RETURN
+        ENDIF
+        cha4F = '(I )'
+        WRITE(cha4F(3:3),'(I1)') IFORMA
+
+C Extraction de la liste des constituants communs (LISTMOTS)
+        JGN = NCONCH
+        JGM = nbzone
+        SEGINI,MLMOTS
+
+        nbz = 0
+        JGM = 0
+        DO ii = 1,nbzone
+          IPT1 = MCHELM.IMACHE(ii)
+          IF (MEDEL(IPT1.ITYPEL) .EQ. MED_NONE) GOTO 11
+
+          ISUPP = MCHELM.INFCHE(ii,6)
+          IF (ISUPP.GT.2) THEN
+            CALL ERREUR(609)
+            RETURN
+          ENDIF
+
+          CALL PLACE(MLMOTS.MOTS,JGM,iplace,MCHELM.CONCHE(ii))
+          IF (iplace .EQ. 0) THEN
+            JGM = JGM + 1
+            MLMOTS.MOTS(JGM) = MCHELM.CONCHE(ii)
+            iplace = JGM
+          ENDIF
+
+          nbz = nbz + 1
+          LISCHA.LICHAP(nbsort+nbz) = iplace
+          LISCHA.LIMAIL(nbsort+nbz) = ii
+
+ 11       CONTINUE
+        ENDDO
+
+        SEGSUP,MLMOTS
+
+        IF (JGM .GT. 1) THEN
+          IF (ilon2+IFORMA+1.GT.MED_NAME_SIZE) THEN
+            CALL ERREUR(1111)
+            RETURN
+          END IF
+        END IF
+
+        nbsort = LISCHA.NBENTI
+
+        DO ii = 1, nbz
+
+          nbsort = nbsort + 1
+          iplace = LISCHA.LICHAP(nbsort)
+          isz    = LISCHA.LIMAIL(nbsort)
+
+          IF (JGM .GT. 1) THEN
+            WRITE(cha8c,cha4F) iplace
+            fname = fname(1:ilon2)//'_'//cha8c
+          ENDIF
+
+          IPT1 = MCHELM.IMACHE(isz)
+          CALL AJOU(ITLAC,IPT1)
+
+          LISCHA.NOCHAP(nbsort)   = fname
+          LISCHA.PNUMDT(nbsort)   = numdt
+          LISCHA.LICHAP(nbsort)   = MCHELM.ICHAML(isz)
+          LISCHA.LIMAIL(nbsort)   = IPT1
+          LISCHA.ISUPOR(nbsort,1) = MCHELM.INFCHE(isz,6)
+          LISCHA.ISUPOR(nbsort,2) = MCHELM.INFCHE(isz,4)
+          LISCHA.XTEMPS(nbsort)   = xtps
+
+        ENDDO
+
+        LISCHA.NBENTI = nbsort
+
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+
+c      return
+      END
+
+ 

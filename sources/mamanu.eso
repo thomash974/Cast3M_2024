@@ -1,0 +1,270 @@
+C MAMANU    SOURCE    OF166741  23/12/04    21:15:06     11800          
+
+*--------------------------------------------------------------------*
+*                                                                    *
+*   CREATION D'UN MCHAML PAR MANU VALEUR EN UN PT D'INTEGRATION      *
+*            (OPTION 'CHAM' PP 24/11/92)                             *
+*                                                                    *
+*--------------------------------------------------------------------*
+
+      SUBROUTINE MAMANU
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMELEME
+-INC SMMODEL
+-INC SMCHAML
+-INC SMINTE
+
+      SEGMENT INFO
+        INTEGER INFELL(JG)
+      ENDSEGMENT
+
+      PARAMETER(NBOPT=2,NBSUP=5)
+      CHARACTER*(4)      MOOPT, LISOPT(NBOPT)
+      CHARACTER*(8)      TYPOBJ, LISSUP(NBSUP)
+      CHARACTER*(LOCOMP) MOCOMP
+      CHARACTER*(LOCHAI) MOCHOY, CHATYPE
+
+      DATA LISOPT / 'TYPE','POSI' /
+      DATA LISSUP / 'NOEUD   ','GRAVITE ',
+     &              'RIGIDITE','MASSE   ','STRESSES' /
+
+      IENT1 = 0
+      IENT2 = 0
+      IENT3 = 0
+      MOCOMP = '        '
+      MCHELM = 0
+
+* 1. LECTURE IMPERATIVE DU MODELE :
+      TYPOBJ = 'MMODEL  '
+      CALL LIROBJ(TYPOBJ,MMODEL,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+*    Activation du modele
+      CALL ACTOBJ(TYPOBJ,MMODEL,1)
+
+* 2. LECTURE DES OPTIONS :
+* 2.1. OPTIONS PAR DEFAUT
+      LTYPE   = 1
+      CHATYPE = ' '
+      IPOSI   = 1
+
+* 2.2. LECTURE SOIT D'UN MOT CLE, SOIT DU NOM DE COMPOSANTE
+ 2    CONTINUE
+      LGCHOY = 0
+      CALL LIRCHA(MOCHOY,1,LGCHOY)
+      IF (IERR.NE.0) RETURN
+
+* 0 TRAITEMENT DES MOTS CLE
+      MOOPT = '    '
+      MOOPT(1:4) = MOCHOY(1:4)
+      CALL PLACE(LISOPT,NBOPT,IPLACE,MOOPT)
+
+* 1 MOT-CLE : (SOUS-)TYPE
+      IF (IPLACE.EQ.1) THEN
+        CALL LIRCHA(CHATYPE,1,LTYPE)
+        IF (IERR.NE.0) RETURN
+
+* 2 MOT-CLE : PLACE
+      ELSE IF (IPLACE.EQ.2) THEN
+        CALL LIRMOT(LISSUP,NBSUP,IPOSI,1)
+        IF (IERR.NE.0) RETURN
+
+* 3 Autres : MOCHOY EST LA COMPOSANTE
+      ELSE
+        LGCHOY = MIN(LGCHOY,LOCOMP)
+        MOCOMP(1:LGCHOY) = MOCHOY(1:LGCHOY)
+        GOTO 10
+
+      ENDIF
+      GOTO 2
+
+* 3. LECTURE DES ENTIERS DEFINISSANT LE POINT D'INTEGRATION
+ 10   CONTINUE
+      CALL LIRENT(IENT1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL LIRENT(IENT2,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL LIRENT(IENT3,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+      IF (IRETOU.EQ.0) IENT3=1
+
+* 4. LECTURE DE LA VALEUR A AFFECTER AU POINT D'INTEGRATION
+      CALL LIRREE(XFLOT,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+*D      CALL LIRREE(XFLOT,0,IRETOU)
+*D      IRETF = IRETOU
+*D      IF (IRETF.EQ.0) THEN
+*D        TYOPBJ = '        '
+*D        CALL QUETYP(TYPOBJ,1,IRETOU)
+*D        IF (IERR.NE.0) RETURN
+*D        CALL LIROBJ(TYPOBJ,IPOBJ,1,IRETOU)
+*D        IF (IERR.NE.0) RETURN
+*D      ENDIF
+
+* ON VERIFIE IENT1,IENT2 ET IENT3
+      NZONE = mmodel.KMODEL(/1)
+      IF (IENT3.LT.1 .OR. IENT3.GT.NZONE) THEN
+        INTERR(1)=IENT3
+        INTERR(2)=NZONE
+        CALL ERREUR(8001)
+        RETURN
+      ENDIF
+
+      IMODEL = mmodel.KMODEL(IENT3)
+      NFOR   = imodel.FORMOD(/2)
+      MELEME = imodel.IMAMOD
+      NBELEM = meleme.NUM(/2)
+      IF (IENT1.LT.1 .OR. IENT1.GT.NBELEM) THEN
+        INTERR(1)=IENT1
+        INTERR(2)=NBELEM
+        INTERR(3)=IENT3
+        CALL ERREUR(8002)
+        RETURN
+      ENDIF
+
+C Recuperation d'informations sur le support :
+      ISUPMO = IPOSI
+      MINTE  = 0
+      MELE   = imodel.NEFMOD
+
+C Traitement des cas particuliers :
+      CALL PLACE(FORMOD,NFOR,icont,'CONTACT         ')
+      CALL PLACE(FORMOD,NFOR,ichph,'CHANGEMENT_PHASE')
+      CALL PLACE(FORMOD,NFOR,ither,'THERMIQUE       ')
+      CALL PLACE(FORMOD,NFOR,idiff,'DIFFUSION       ')
+      CALL PLACE(FORMOD,NFOR,imeta,'METALLURGIE     ')
+      iray = 0
+      IF (ither.NE.0) THEN
+        nmat = imodel.matmod(/2)
+        CALL PLACE(imodel.matmod,nmat,iray,'RAYONNEMENT     ')
+      ENDIF
+C Pour le contact, on met aux noeuds d'office :
+      IF (icont.NE.0 .OR. ichph.NE.0) THEN
+        IF (IPOSI.NE.1) THEN
+          write(ioimp,*) FORMOD(1),'POSI ==> NOEUD'
+          CALL ERREUR(21)
+          RETURN
+        ENDIF
+        ISUPMO = 1
+C Pour le rayonnement :
+      ELSE IF (iray.NE.0) THEN
+        IF (IPOSI.EQ.2) THEN
+          write(ioimp,*) 'RAYONNEMENT POSI ==> RIGIDITE'
+          CALL ERREUR(21)
+          RETURN
+        ENDIF
+        MELE = NUMGEO(MELE)
+C Pour la thermique (hors rayonnement), diffusion, metallurgie
+      ELSE IF (ither.NE.0 .OR. idiff.NE.0 .OR. imeta.NE.0) THEN
+        IF (IPOSI.EQ.1) THEN
+          ISUPMO = 1
+        ELSE IF (IPOSI.EQ.2) THEN
+          ISUPMO = 2
+        ELSE
+          ISUPMO = 6
+        ENDIF
+      ENDIF
+
+C Nombre de points d'integration selon la formulation
+      IF (ISUPMO.EQ.1) THEN
+        NBPGAU = meleme.NUM(/1)
+      ELSE
+c thermique (y compris rayonnement), diffusion, metallurgie
+        IF (ither.NE.0 .OR. idiff.NE.0 .OR. imeta.NE.0) THEN
+          IF (ISUPMO.EQ.2) THEN
+            CALL TSHAPE(MELE,'GRAVITE',MINTE)
+          ELSE
+            CALL TSHAPE(MELE,'GAUSS  ',MINTE)
+          ENDIF
+          NBPGAU = MINTE.POIGAU(/1)
+        ELSE
+          IF (imodel.INFMOD(/1).LT.ISUPMO+2) THEN
+            CALL ELQUOI(MELE,0,ISUPMO,info,IMODEL)
+            MINTE = info.INFELL(11)
+            IF      (ISUPMO.EQ.2) THEN
+              NBPGAU = 1
+            ELSE IF (ISUPMO.EQ.3) THEN
+              NBPGAU = INFELL(6)
+            ELSE IF (ISUPMO.EQ.4) THEN
+              NBPGAU = INFELL(3)
+            ELSE IF (ISUPMO.EQ.5) THEN
+              NBPGAU = INFELL(4)
+            ENDIF
+            segsup,info
+          ELSE
+            MINTE = imodel.INFMOD(ISUPMO+2)
+            IF      (ISUPMO.EQ.2) THEN
+              NBPGAU = 1
+            ELSE IF (ISUPMO.EQ.3) THEN
+              NBPGAU = INFELE(6)
+            ELSE IF (ISUPMO.EQ.4) THEN
+              NBPGAU = INFELE(3)
+            ELSE IF (ISUPMO.EQ.5) THEN
+              NBPGAU = INFELE(4)
+            ENDIF
+          ENDIF
+        ENDIF
+      ENDIF
+
+      IF (IENT2.LT.1 .OR. IENT2.GT.NBPGAU) THEN
+        INTERR(1) = IENT2
+        INTERR(2) = NBPGAU
+        INTERR(3) = IENT3
+        CALL ERREUR(8004)
+        RETURN
+      ENDIF
+
+* CONSTRUCTION DU MCHAML
+      L1=LTYPE
+      N1=1
+      N3=6
+      SEGINI,MCHELM
+      TITCHE(1:L1) = CHATYPE(1:LTYPE)
+      CONCHE(1) = CONMOD
+      IMACHE(1) = MELEME
+      IFOCHE    = IFOUR
+      INFCHE(1,1) = 0
+      INFCHE(1,2) = 0
+      INFCHE(1,3) = NIFOUR
+      INFCHE(1,4) = MINTE
+      INFCHE(1,5) = 0
+      INFCHE(1,6) = ISUPMO
+
+      N2 = 1
+      SEGINI,MCHAML
+      ICHAML(1) = MCHAML
+      NOMCHE(1) = MOCOMP
+*D      IF (IRETF.NE.0) THEN
+        TYPCHE(1)='REAL*8          '
+        N1PTEL = NBPGAU
+        N1EL   = NBELEM
+        N2PTEL = 0
+        N2EL   = 0
+        SEGINI,MELVAL
+        VELCHE(IENT2,IENT1)=XFLOT
+*D      ELSE
+*D        TYPCHE(1) = 'POINTEUR'//TYPOBJ
+*D        N1PTEL=0
+*D        N1EL=0
+*D        N2PTEL=NBPGAU
+*D        N2EL=NBELEM
+*D        SEGINI,MELVAL
+*D        IELCHE(IENT2,IENT1)=IPOBJ
+*D      ENDIF
+      IELVAL(1)=MELVAL
+
+* ECRITURE DU RESULTAT
+      TYPOBJ = 'MCHAML  '
+      CALL ACTOBJ(TYPOBJ,MCHELM,1)
+      CALL ECROBJ(TYPOBJ,MCHELM)
+
+c      RETURN
+      END
+
+ 

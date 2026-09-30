@@ -1,0 +1,145 @@
+C BARYC5    SOURCE    GOUNAND   21/04/06    21:15:01     10940          
+      SUBROUTINE BARYC5(MELEMX,KPVIRT,TRAVK,KGRAV)
+      IMPLICIT REAL*8(A-H,O-Z)
+      IMPLICIT INTEGER(I-N)
+C***********************************************************************
+C NOM         : BARYC5
+C DESCRIPTION :
+C     CALCUL LE BARYCENTRE D'UN MAILLAGE ET LA METRIQUE MOYENNE ASSOCIEE
+C     Repris de baryce.eso.
+C     Par rapport à baryc2, ignore le noeud virtuel KPVIRT
+C     Gère le noeud virtuel KPVIRT
+C
+C     Par rapport à baryc3, on gère le MCOORD différemment, en vue de
+C     faire moins de SEGADJ à l'aide du segment TRAVK
+C
+C     Comme baryc4 mais avec un MELEMX      
+C     
+C     KGRAV est le numéro du nouveau noeud créé
+C     
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 26/09/2017, version initiale
+C HISTORIQUE : v1, 26/09/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC TMATOP1
+*-INC SMELEMX
+-INC SMCOORD
+      POINTEUR KCOORD.MCOORD
+*-INC SMETRIQ
+      POINTEUR KCMETR.METRIQ
+*-INC STRAVJ
+      POINTEUR TRAVK.TRAVJ
+      LOGICAL lchang
+      PARAMETER(NGRAV=4)
+      DIMENSION XGRAV(NGRAV)
+      PARAMETER(NMET=6)
+      DIMENSION XMET(NMET)
+*
+* Executable statements
+*
+*      SEGACT,MCOORD
+      IDIMP1=IDIM+1
+      KCOORD=TRAVK.COORD
+      KCMETR=TRAVK.CMETR
+*     mis dans topv2      SEGACT KCOORD*MOD
+      DO I=1,NGRAV
+         XGRAV(I)=0.D0
+      ENDDO
+      DO I=1,NMET
+         XMET(I)=0.D0
+      ENDDO
+      NPOIN=0
+*      SEGACT,MELEMX
+*      DO 3 J=1,IPT1.NUM(/2)
+*         DO 31 I=1,IPT1.NUM(/1)
+      DO 3 J=1,NLCOU
+         DO 31 I=1,NNCOU
+            INO=MELEMX.NUMX(I,J)
+            IF (KPVIRT.NE.0) THEN
+               IF (INO.EQ.KPVIRT) GOTO 31
+            ENDIF
+            NPOIN=NPOIN+1
+            IREF=IDIMP1*(INO-1)
+            DO 5 L=1,IDIMP1
+               XGRAV(L)=XGRAV(L)+KCOORD.XCOOR(IREF+L)
+ 5          CONTINUE
+            IF (KCMETR.NE.0) THEN
+               DO 6 ININ=1,KCMETR.XIN(/1)
+                  IF (IMET.EQ.4) THEN
+                     XMET(ININ)=XMET(ININ)+KCMETR.XIN(ININ,INO)
+                  ELSE
+                     if (imomet.eq.1) then
+                        XMET(ININ)=XMET(ININ)+LOG(KCMETR.XIN(ININ,INO))
+                     else
+                        XMET(ININ)=XMET(ININ)+KCMETR.XIN(ININ,INO)
+                     endif
+                  ENDIF
+ 6             CONTINUE
+            ENDIF
+ 31      CONTINUE
+ 3    CONTINUE
+*      SEGDES,MELEMX
+C     ON MET LE CENTRE DE GRAVITE DANS LA TABLE DES POINTS
+C     ET LA METRIQUE ASSOCIEE LE CAS ECHANT
+      NPCOUN=TRAVK.NPCOU+1
+      CALL TOPADP(TRAVK,NPCOUN,1,lchang,'baryc5 : TRAVK')
+      if (ierr.ne.0) return
+*      if (iveri.ge.2) then
+*         call vetopi(travk,'baryc5 : Apres extension travk 1')
+*         if (ierr.ne.0) return
+*      endif            
+
+*      write(ioimp,*) 'npcoun,npcou,npmax',npcoun,travk.npcou,travk.npmax
+*      NBPTS=XCOOR(/1)/IDIMP1+1
+*      SEGADJ,MCOORD
+*      IREF=(NBPTS-1)*IDIMP1
+      IREF=(NPCOUN-1)*IDIMP1
+      DO 11 I=1,IDIMP1
+         KCOORD.XCOOR(IREF+I)=XGRAV(I)/NPOIN
+ 11   CONTINUE
+      IF (KCMETR.NE.0) THEN
+         DO 12 ININ=1,KCMETR.XIN(/1)
+            IF (IMET.EQ.4) THEN
+               KCMETR.XIN(ININ,NPCOUN)=XMET(ININ)/NPOIN
+            ELSE
+               if (imomet.eq.1) then
+                  KCMETR.XIN(ININ,NPCOUN)=EXP(XMET(ININ)/NPOIN)
+               else
+                  KCMETR.XIN(ININ,NPCOUN)=XMET(ININ)/NPOIN
+               endif
+            ENDIF
+ 12      CONTINUE
+      ENDIF
+*      KGRAV=XCOOR(/1)/IDIMP1
+      KGRAV=NPCOUN
+      if (iveri.ge.2.and.lchang) then
+         call vetopi(travk,'baryc5 : Apres extension travk 2')
+         if (ierr.ne.0) return
+      endif            
+      
+      RETURN
+      END
+
+
+ 

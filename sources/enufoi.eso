@@ -1,0 +1,58 @@
+C ENUFOI    SOURCE    SP204843  23/02/16    21:15:03     11599          
+      SUBROUTINE ENUFOI
+*---------------------------------------------------------------------
+*
+*     OPTION '*' OPERATEUR ENUMERER
+*
+*     SYNTAXE : voir notice ENUM
+* 
+*--------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      CHARACTER*8 CTYP
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLOBJE
+
+C---------------------------------
+C     LECTURE DES ARGUMENTS
+C---------------------------------
+      CALL LIRENT(NFOIS,1,IRET)
+      IF (IERR.NE.0) RETURN
+
+      CALL QUETYP(CTYP,1,IRET)
+      IF (IERR.NE.0) RETURN
+
+      CALL PLAMO8(LTYPOB,NTYPOB,IPLA,CTYP)
+      IF (IPLA.EQ.0) THEN
+        CALL ERREUR(1138)
+        RETURN
+      ELSE
+        CALL LIROBJ(CTYP,IPOBJ,1,IRET)
+        IF (IERR.NE.0) RETURN
+      ENDIF
+
+C---------------------------------
+C     DEFINITION DU LISTOBJE
+C---------------------------------
+      NOBJ = NFOIS
+      SEGINI,MLOBJE
+      TYPOBJ = CTYP
+
+      DO 10 IOB=1,NOBJ
+        LISOBJ(IOB) = IPOBJ
+ 10   CONTINUE
+
+
+C---------------------------------
+C     ECRITURE DU RESULTAT 
+C---------------------------------
+      CALL ECROBJ('LISTOBJE',MLOBJE)
+
+      RETURN
+      END
+
+ 
+ 

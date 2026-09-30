@@ -1,0 +1,182 @@
+C CHAMAS    SOURCE    OF166741  23/12/04    21:15:04     11800          
+
+C=======================================================================
+C=                            C H A M A S                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=   Calcul des flux equivalents a des sources volumiques dans le cas  =
+C=   des elements MASSIFs (1D, 2D, 3D).                                =
+C=                                                                     =
+C=  Parametres :  (E)=Entree  (S)=Sortie                               =
+C=  ------------                                                       =
+C=   IPMODE  (E)   Pointeur du MMODEL a traiter                        =
+C=   IFORMU  (E)   Entier indiquant la formulation du modele a traiter =
+C=   IPCHSO  (E)   Pointeur du MCHAML de sources                       =
+C=   ISUPCH  (E)   Support des champs en entree                        =
+C=   IPCHAL  (S)   Pointeur sur le champ des flux equivalents          =
+C=======================================================================
+
+      SUBROUTINE CHAMAS (IPMODE,IFORMU, IPCHSO,ISUPCH, IPCHAL)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMMODEL
+-INC CCREEL
+
+      SEGMENT INFO
+        INTEGER INFELL(JG)
+      ENDSEGMENT
+
+
+      MMODEL = IPMODE
+      NSOU=KMODEL(/1)
+      MCHELM = IPCHAL
+      MCHEL1 = IPCHSO
+      NSZ1 = MCHEL1.IMACHE(/1)
+
+C  3 - BOUCLE SUR LES ZONES ELEMENTAIRES DU MODELE (ISOU)
+C ========================================================
+C     IQGAU : indicateur modele source gaussienne
+      IQGAU = 0
+      DO 100 ISOU = 1, NSOU
+C =====
+C  3.1 - Modele elementaire ISOU
+C =====
+        IMODEL = mmodel.KMODEL(ISOU)
+C =====
+C  3.2 - Recherche dans le MCHAML des sources (IPCHSO) du maillage
+C        (IMAMOD) associe au modele elementaire iSou, puis recuperation
+C        du MCHAML elementaire de sources associe (IPSONO)
+C =====
+        IS0    = 0
+        IPCHAM = 0
+        IPSONO = 0
+        DO is = 1, NSZ1
+          IF (MCHEL1.IMACHE(is).EQ.imodel.IMAMOD .AND.
+     &        MCHEL1.CONCHE(is).EQ.imodel.CONMOD) THEN
+            IS0    = IS
+            IPCHAM = MCHEL1.ICHAML(is)
+            mchaml = IPCHAM
+c il faudrait chercher la composante si le champ en a plus qu'une.
+            IPSONO = mchaml.IELVAL(1)
+            GOTO 10
+          ENDIF
+        ENDDO
+ 10     CONTINUE
+        IF (IPSONO.EQ.0) GOTO 100
+C
+C =====
+C  3.2.x FORMULATION SOURCE
+C        Construction du MELVAL des valeurs de la distribution
+C        de chaleur specifiee par le modele
+C =====
+        IK1   = 0
+        NEF   = imodel.NEFMOD
+        IPGEO = imodel.IMAMOD
+        IF (IMODEL.MATMOD(1).EQ.'SOURCE   ') THEN
+C
+          NMAT = IMODEL.MATMOD(/2)
+C Source "sans rien" => rien a faire !
+          IF (NMAT.EQ.1) THEN
+C
+C Source GAUSSIENNE
+          ELSEIF (IMODEL.MATMOD(2).EQ.'GAUSSIENNE') THEN
+            IK1   = 1
+            IQGAU = 1
+            IF (IMODEL.MATMOD(3).EQ.'ISOTROPE_TRANSVE') IK1 = 2
+            IF (ISUPCH.NE.6) THEN
+              MOTERR(1:8)='MCHAML'
+              CALL ERREUR(981)
+              RETURN
+            ENDIF
+            CALL TSHAPE(NEF,'GAUSS',IPINTE)
+            CALL CHAGA1(IPCHAM,IPGEO,IPINTE,IK1,IPSON1,XQT0)
+            IF (IERR.NE.0) RETURN
+            IPSONO=IPSON1
+C
+C Sinon ERREUR 251
+          ELSE
+            CALL ERREUR(251)
+            RETURN
+          ENDIF
+        ENDIF
+C
+C =====
+C  3.3 - Recuperation d'informations sur l'element fini du modele
+C        elementaire iSou (NEF)
+C =====
+        IF (IFORMU.EQ.1 .OR. IFORMU.EQ.2 .OR. IFORMU.EQ.3) THEN
+C* A ce jour : diffusion = thermique (en attendant retour diffusion = mecanique)
+C*        IF (IFORMU.EQ.1 .OR. IFORMU.EQ.2) THEN
+          IF (ISUPCH.EQ.6) THEN
+            CALL TSHAPE(NEF,'GAUSS',IPINTE)
+          ELSE IF (ISUPCH.EQ.2) THEN
+            CALL TSHAPE(NEF,'GRAVITE',IPINTE)
+          ELSE
+            write(ioimp,*) 'CHAMAS : incoherence IFORMU ISUPCH'
+            CALL ERREUR(5)
+            RETURN
+          ENDIF
+        ELSE
+          IF (imodel.INFMOD(/1).LT.2+ISUPCH) THEN
+            CALL ELQUOI(NEF,0,ISUPCH,ipinf,imodel)
+            IF (IERR.NE.0) RETURN
+            info = ipinf
+            IPINTE = info.INFELL(11)
+            SEGSUP,info
+          ELSE
+            IPINTE = imodel.INFMOD(2+ISUPCH)
+          ENDIF
+        ENDIF
+C =====
+C  3.4 - Calcul des flux nodaux equivalents (segment MELVAL)
+C =====
+        IF (IDIM.EQ.3) THEN
+          CALL CHAMA3(IPSONO,IPGEO,IPINTE,IPCHEQ)
+        ELSE IF (IDIM.EQ.2) THEN
+          CALL CHAMA2(IPSONO,IPGEO,IPINTE,IPCHEQ)
+        ELSE IF (IDIM.EQ.1) THEN
+          CALL CHAMA1(IPSONO,IPGEO,IPINTE,IPCHEQ)
+        ENDIF
+        IF (IERR.NE.0) GOTO 100
+C =====
+C  3.5 - Initialisation du MCHAML des flux de chaleur nodaux equivalents
+C        (MCHAML) associe au modele elementaire iSou (maillage IMAMOD)
+C        Remplissage des donnees associees a MCHAML dans MCHELM (global)
+C =====
+C       Recuperation du nom de la composante duale dans le modele
+        NOMID  = imodel.LNOMID(2)
+
+        N2=NOMID.LESOBL(/2)
+        SEGINI,MCHAML
+        DO ii=1,N2
+*         Comme on integre qu'un seul CHAMP en massif
+*         et qu'en THERMOHYDRIQUE on a 3 composantes
+*         possibles pour la duale, on cree 3 composantes
+*         avec le meme MELVAL
+          mchaml.NOMCHE(ii) = NOMID.LESOBL(ii)
+          mchaml.TYPCHE(ii) ='REAL*8'
+          mchaml.IELVAL(ii) = IPCHEQ
+        ENDDO
+
+        mchelm.CONCHE(ISOU)   = imodel.CONMOD
+        mchelm.IMACHE(ISOU)   = IPGEO
+        mchelm.ICHAML(ISOU)   = MCHAML
+        mchelm.INFCHE(ISOU,3) = NIFOUR
+        mchelm.INFCHE(ISOU,6) = 1
+
+ 100  CONTINUE
+C=====
+C Fin de la boucle sur les sous-modeles elementaires
+C=====
+C
+      END
+ 
+ 

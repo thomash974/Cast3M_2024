@@ -1,0 +1,76 @@
+C INTMOD    SOURCE    PASCAL    20/04/01    21:15:52     10568          
+      SUBROUTINE INTMOD(IPMOD1,IPMOD2)
+C----------------------------------------------------------------------C
+C    INTERSECTION DEUX MODELES
+C
+C    SYNTAXE : MOD1 = INTE MOD2 MOD3
+
+C    Rq. : l'operation est faite sur les sous-zones
+C
+C    ENTREES :
+C      - IPMOD1 = MOD2
+C      - IPMOD2 = MOD3 
+
+C    SORTIE : le resultat est renvoye dans la pile.
+C
+C----------------------------------------------------------------------C
+
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+
+C Activation de l'objet :
+      MMODE1 = IPMOD1
+      MMODE2 = IPMOD2
+      SEGACT, MMODE1, MMODE2
+
+C---- CAS MODELE VIDE EN ARGUMENT ----C
+
+      NBS1 = MMODE1.KMODEL(/1)
+      IF (NBS1.EQ.0) THEN
+        CALL ECROBJ('MMODEL',IPMOD1)
+        RETURN
+      ENDIF
+
+      NBS2 = MMODE2.KMODEL(/1)
+      IF (NBS2.EQ.0) THEN
+        CALL ECROBJ('MMODEL',IPMOD2)
+        RETURN
+      ENDIF
+
+C---- CAS GENERAL ----C
+
+C Creation du MMODEL resultat :
+      N1   = NBS1 + NBS2
+      SEGINI,MMODEL
+
+C Identification des sous-zones communes :
+      NBS0 = 0
+      DO 100 I1=1,NBS1
+        IMOD1 = MMODE1.KMODEL(I1)
+        DO 110 I2=1,NBS2
+          IMOD2 = MMODE2.KMODEL(I2)
+          IF (IMOD1.EQ.IMOD2) THEN
+            NBS0 = NBS0 + 1
+            KMODEL(NBS0) = IMOD1
+          ENDIF
+ 110    CONTINUE
+ 100  CONTINUE
+
+C Ajustement segment MMODEL si besoin :
+      IF (NBS0.NE.N1) THEN
+        N1 = NBS0
+        SEGADJ, MMODEL
+      endif
+
+C Ecriture resultat dans la pile :
+      CALL ECROBJ('MMODEL',MMODEL)
+
+      RETURN
+      END
+
+ 
+ 
+ 

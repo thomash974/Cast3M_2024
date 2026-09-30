@@ -1,0 +1,43 @@
+C PCCD3D    SOURCE    PV090527  23/02/13    21:15:12     11592          
+      SUBROUTINE PCCD3D(precision3d,poro0,epccv,ppcc,pfcc,pc,rt,pt)
+c     pressions limites actuelle de CamClay 
+c     (A.Sellier 2021/04/23)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 precision3d,poro0,EPLCCV,ppcc,pfcc,pc,rt,pt
+      real*8 pc1,pc2
+      
+c     pression de consolidation actuelle
+      if(epccv.le.0.d0) then 
+c      consolidation      
+       if(epccv+poro0*(1.d0-2.d0*precision3d).gt.0.d0) then 
+c       la pression de consolidation peut encore évoluer      
+        t8 = (pfcc / ppcc) ** (epccv / (-0.1D1 + poro0 + epccv) / poro0)
+        pc1 = ppcc * t8
+        pc2=max(ppcc,pc,pc1)
+        pc=min(pfcc,pc2)
+        if(pc.ne.pc) then
+          print*,'pb dans pccd3d appele par endo3d'
+        end if
+       else
+c       on a atteint la pression limite
+        pc=pfcc
+       end if
+      else
+c      deconsolidation
+c      interdite en dessous valeur initiale      
+       pc=max(ppcc,pc)
+       pc=min(pfcc,pc)
+      end if       
+      
+c     pression limite de traction triaxiale constante
+      pt = -rt
+            
+   
+      return
+      end
+      
+     
+ 
+ 

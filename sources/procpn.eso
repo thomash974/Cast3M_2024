@@ -1,0 +1,164 @@
+C PROCPN    SOURCE    PV090527  23/01/05    21:15:04     11542          
+      SUBROUTINE PROCPN(IAREA,IRET)
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC CQALITE
+      SAVE SPROCEDUR
+      SAVE nbproc,iargu_sauv
+      SEGMENT SPROCEDUR
+*  nomcom nom du fichier de la procedure
+*  nomcou nom de la de la procedure
+       CHARACTER*(LOCHAI) nomcom(procdim)
+       CHARACTER*(LONOM)  nomcou(procdim)
+      ENDSEGMENT
+
+      integer procdim
+      external long
+      CHARACTER*(*) IAREA
+      character*(lochai) rep,entr,cvarenv,dirb
+      character*(LONOM) nomf,nomm
+      character*(*) noml
+      equivalence(cvarenv,ivarenv)
+      equivalence(entr   ,ientr  )
+*  initialistion segment procedures
+      procdim=1000
+      segini sprocedur
+* recherche et ouverture des repertoires
+      cvarenv='CASTEM_PROCEDUR' //char(0)
+      l=lochai
+      call ooozen(ivarenv,l)
+      if (l.gt.1) then
+        rep=cvarenv(1:l)
+      else
+        rep='./:./procedur/:/u2/castem/procedur/'
+      endif
+      l=long(rep)
+**    write(6,*) 'rep: ',l,rep
+      idrep=1
+      ifrep=l
+      nbproc=0
+*  boucle sur les repertoires indiques
+  20  continue
+*  recherche debut fin du repertoire
+%IF WIN32,WIN64
+      ind=index(rep(idrep:ifrep),';')
+%ELSE
+      ind=index(rep(idrep:ifrep),':')
+%ENDIF
+**    ind=index(rep(idrep:ifrep),';')
+**    if (ind.eq.0) ind=index(rep(idrep:ifrep),':')
+      if(ind.eq.0)  ind=ifrep-idrep+2
+      ifrep=ind+idrep-2
+      dirb=rep(idrep:ifrep)
+      lgb=long(dirb)
+*     write(6,*)' ouverture de:',dirb(1:lgb),lgb
+%IF WIN32,WIN64
+      if(dirb(lgb:lgb).ne.'/'.and.dirb(lgb:lgb).ne.'\') then
+%ELSE
+      if(dirb(lgb:lgb).ne.'/') then
+%ENDIF
+**        write(6,*) 'ajout de / '
+        dirb(1:lgb+1)=dirb(1:lgb)//'/'
+        lgb=lgb+1
+      endif
+      call fopendir(dirb(1:lgb)//char(0),iret,iajout)
+**    write(6,*) ' ouverture repertire ',dirb(1:lgb)
+      if (iret.ne.0) then
+         lgbt=min(lgb,128)
+        moterr        =dirb(1:lgbt)
+       if(dirb(1:lgbt).ne.'./procedur/') call erreur(1133)
+      else
+*  lecture du contenu
+  10  continue
+      entr=char(0)
+      call freaddir(ientr)
+      if(ichar(entr(1:1)).ne.0) then
+       lg=long(entr)-1
+**     write(6,*) 'entr',lg,entr(1:50)
+       ind=index(entr(max(1,lg-8):lg),'.procedur')
+       if(ind.ne.0) then
+        ind=ind+lg-9
+        nomf=entr(1:ind-1)
+**      write(6,*) 'fichier procedur trouve:', nomf
+        call chcass(nomf,1,nomm)
+**      write(6,*) ' nom de la procedur ',nomf
+        do j=1,nbproc
+         if (nomcou(j).eq.nomm) then
+          moterr     =nomm
+          call erreur(-302)
+          iqpro=1
+          goto 10
+         endif
+        enddo
+        nbproc=nbproc+1
+        if(nbproc.gt.procdim) then
+           procdim=procdim+1000
+           segadj sprocedur
+        endif
+        call nomobj('PROCEDUR',nomm,-nbproc)
+        nomcou(nbproc)=nomm
+**      write(6,*) 'nomf(1:ind-1)',nomf(1:ind-1)
+        nomcom(nbproc)(1:lgb+ind-1+10)=
+     >    dirb(1:lgb)//nomf(1:ind-1)//'.procedur'//char(0)
+**      write(6,*) nomcou(nbproc),' ',nomcom(nbproc)
+       endif
+       goto 10
+      endif
+      call fclosedir
+      endif
+*  il faut sauter le separateur
+      idrep=ifrep+2
+      ifrep=l
+      if (idrep.lt.l) goto 20
+      procdim=nbproc
+      segadj sprocedur
+      return
+*  lecture procedur
+      entry procli(iarea,iret)
+**     write(6,*) 'iret en entree',iret
+***    iargu=iargu_sauv
+       read (36,fmt='(A500)',end=1000) iarea
+       iret=iret+1
+       if(iarea(1:4).eq.'$$$$')
+     > read (36,fmt='(A500)',end=1000) iarea
+      return
+ 1000 continue
+      iret=99999
+      return
+conversion nom numero
+      entry procl2(noml,iret)
+      do i=1,nbproc
+       if(nomcou(i).eq.noml) then
+          iret=i
+          return
+       endif
+      enddo
+      iret=0
+      return
+*  procedure en lecture
+      entry procl1(noml)
+      noml=nomcou(iargu_sauv)
+      return
+*  ouverture procedure
+      entry procpo(iargu,iret)
+       iargu_sauv=iargu
+**     write(6,*) 'procpo iargu ',iargu
+       close(unit=36)
+       segact sprocedur
+       if (iargu.gt.nbproc) call erreur(5)
+       if (iargu.le.0) call erreur(5)
+       iargu_sauv=iargu
+**     write(6,*) ' ouverture de ',nomcom(iargu)
+       open(file=nomcom(iargu),unit=36,iostat=ios)
+**     write(6,*) 'ios= ',ios
+       if (ios.ne.0) call erreur(5)
+       iret=99999
+       return
+      end
+ 
+ 
+ 
+ 

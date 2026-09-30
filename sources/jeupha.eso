@@ -1,0 +1,275 @@
+C JEUPHA    SOURCE    CB215821  21/08/20    21:15:12     11089          
+      SUBROUTINE JEUPHA
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+* +------------------------------------------------------------------------+
+* | création des "jeux" a associer aux matrices de blocages pour le modele |
+* | CHANGEMENT_PHASE                                                       |
+* | en entrée : objet modele , MCHAML de temperature de changement         |
+* | de phase et temperature initiale, matrice de blocages                  |
+* +------------------------------------------------------------------------+
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMELEME
+-INC SMMODEL
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMCHAML
+
+      SEGMENT XCPR1(nbpts,5)
+C      xcpr1(:,1)  : Noeud 'LX' corespondant au noeud INCO pour ivamod(2)
+C      xcpr1(:,2)  : Noeud 'LX' corespondant au noeud INCO pour ivamod(3) (Cas 'SOLUBILITE')
+C      xcpr1(:,3)  : Valeur initiale INCONNUE A
+C      xcpr1(:,4)  : Valeur initiale INCONNUE B (Cas 'SOLUBILITE')
+C      xcpr1(:,5)  : Solubilite pour le NOEUD INCONNUE A
+
+      SEGMENT XCPR2(nbpts,2)
+C       XCPR2(:,1) : Pour chaque indice de noeud 'LX', 0. ou 1. pour indiquer sa presence
+C       XCPR2(:,2) : Pour chaque indice de noeud 'LX', la valeur du jeu
+
+      SEGMENT NOTYPE
+        CHARACTER*16 TYPE(NBTYPE)
+      ENDSEGMENT
+
+      SEGMENT MPTVAL
+        INTEGER      IPOS(NS),NSOF(NS)
+        INTEGER      IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      PARAMETER ( NINF=3 )
+      INTEGER INFOS(NINF)
+
+      CHARACTER*(LOCOMP) MPRIM1,MPRIM2
+      CHARACTER*(LCONMO) CONM
+
+      LOGICAL LOG_A
+
+* +--------------------------------------------------------------------+
+      ipt2  = 0
+      MPRIM2= ' '
+
+C     ----------------------------------------
+C     Lecture du modele
+      call lirobj('MMODEL  ',mmode2,1,iretou)
+      call actobj('MMODEL  ',mmode2,1)
+      if(ierr.ne.0) return
+
+C     ----------------------------------------
+C     Lecture du materiaux
+      call lirobj('MCHAML  ',IPMATR,1,iretou)
+      call actobj('MCHAML  ',IPMATR,1)
+      if(ierr.ne.0) RETURN
+      CALL REDUAF(IPMATR,MMODE2,MCHEL2,0,IR2,KER)
+      IF(IR2  .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+C     Changement eventuel aux noeuds
+      ISUP=1
+      CALL CHASUP(MMODE2,MCHEL2,mchelm,IRT2,ISUP)
+      IF(IRT2.NE.0) THEN
+        CALL ERREUR(IRT2)
+        RETURN
+      ENDIF
+      mchel2=mchelm
+
+C     ----------------------------------------
+C     Lecture du CHPOINT des valeurs au depart
+      call lirobj('CHPOINT ',mchpo1,1,iretou)
+      call actobj('CHPOINT ',mchpo1,1)
+      if(ierr.ne.0) return
+
+C     ----------------------------------------
+      SEGINI,XCPR1,XCPR2
+
+C     Pour Komcha 1 seul SEGINI
+      nbtype = 1
+      nbrobl = 1
+      nbrfac = 0
+      segini,notype,nomid
+      ipnomi = nomid
+      notype.type(1) ='REAL*8'
+
+C     On fait le travail
+      nbelem = 0
+      do 100 i = 1,mmode2.kmodel(/1)
+        inomax = 0
+        imodel = mmode2.kmodel(i)
+        nfor   = imodel.formod(/2)
+
+        call place(imodel.formod,nfor,iplac,'CHANGEMENT_PHASE')
+        if (iplac .eq. 0) goto 100
+
+        nomid  = imodel.lnomid(1)
+        ipt1   = imodel.ivamod(2)
+        MPRIM1 = nomid.lesobl(1)
+        IF    (imodel.matmod(1)(1:10) .EQ. 'PARFAIT   ')THEN
+          ICAS = 1
+
+        ELSEIF(imodel.matmod(1)(1:10) .EQ. 'SOLUBILITE')THEN
+          ICAS   = 2
+          ipt2   = imodel.ivamod(3)
+          MPRIM2 = nomid.lesobl(2)
+
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+
+        if(i .gt. 1)then
+c         remise a zero des 2 premieres lignes
+          call zero(xcpr1(1,1),nbpts,2)
+        endif
+
+C       On fait l'XCPR1 indexes par les noeuds des INCONNUES (remettre a zero a chaque sous-zones qui se partagent les noeuds primals potentiellement)
+        do 101 iel=1,ipt1.num(/2)
+c         noeud 1 : 'LX'
+c         noeud 2 & noeud 3 (numero de noeud egal) : 'inconnues classiques A et B'
+          nno    = ipt1.num(2,iel)
+          inomax = MAX(inomax,nno)
+          if(nint(xcpr1(nno,1)) .eq. 0) then
+            ino1        =ipt1.num(1,iel)
+            xcpr1(nno,1)= real(ino1)
+            inomax      = MAX(inomax,ino1)
+            if (ICAS .eq. 2)then
+              ino2        =ipt2.num(1,iel)
+              xcpr1(nno,2)= real(ino2)
+              inomax      = MAX(inomax,ino2)
+            endif
+          endif
+  101   continue
+
+C       Recherche des valeurs dans le CHPOINT initial
+        do 102 isoupo=1,mchpo1.ipchp(/1)
+          msoup1 = mchpo1.ipchp(isoupo)
+C         Le 'LX' ne nous interesse pas pour le CHPOINT INITIAL
+          if (msoup1.nocomp(1) .EQ. 'LX      ') goto 102
+
+          ipt1   = msoup1.igeoc
+          nbel1  = ipt1.num(/2)
+          mpova1 = msoup1.ipoval
+          do icmp=1,msoup1.nocomp(/2)
+            if    (msoup1.nocomp(icmp) .eq. MPRIM1)then
+              do 103 iel=1,nbel1
+                nel1          = ipt1.num(1,iel)
+                xcpr1(nel1,3) = mpova1.vpocha(iel,icmp)
+ 103          continue
+
+            elseif(msoup1.nocomp(icmp) .eq. MPRIM2)then
+              do 104 iel=1,nbel1
+                nel1          = ipt1.num(1,iel)
+                xcpr1(nel1,4) = mpova1.vpocha(iel,icmp)
+ 104          continue
+            endif
+          enddo
+ 102    continue
+
+C       Recuperation du MELVAL dans le materiau
+        meleme=imodel.imamod
+        conm  =imodel.conmod
+        call ident(meleme,conm,ipmatr,0,infos,iret)
+        if(iret .eq. 0)then
+          CALL ERREUR(21)
+          return
+        endif
+        if(ierr.ne.0) return
+        
+        nomid=ipnomi
+        if    (ICAS .EQ. 1)then
+          nomid.lesobl(1)='PRIM'
+        elseif(ICAS .EQ. 2)then
+          nomid.lesobl(1)='SOLU'
+        else
+          call erreur(5)
+        endif
+        call komcha(ipmatr,meleme,conm,ipnomi,notype,1,infos,3,mptval)
+        if (ierr.ne.0) return
+
+        melva1=mptval.ival(1)
+        n1ptel=melva1.velche(/1)
+        n1el  =melva1.velche(/2)
+
+        do iel=1,meleme.num(/2)
+          do ino=1,meleme.num(/1)
+            nno          = meleme.num(ino,iel)
+            xcpr1(nno,5) = melva1.velche(min(ino,n1ptel),min(iel,n1el))
+          enddo
+        enddo
+
+C       Calcul des jeux
+        do 120 ipts=1,nbpts
+          ilx1  = nint(xcpr1(ipts,1))
+          if(ilx1 .eq. 0)goto 120
+
+          xdeb_A        = xcpr1(ipts,3)
+          xsol_A        = xcpr1(ipts,5)
+          XCPR2(ilx1,1) = 1.D0
+          XCPR2(ilx1,2) = xsol_A - xdeb_A
+          nbelem        = nbelem + 1
+
+          if(ICAS .eq. 2)then
+            ilx2          = nint(xcpr1(ipts,2))
+            xdeb_B        = xcpr1(ipts,4)
+            XCPR2(ilx2,1) = 1.D0
+            XCPR2(ilx2,2) =-xdeb_B
+            nbelem        = nbelem + 1
+          endif
+ 120    continue
+        segsup,mptval
+ 100  continue
+
+
+
+*     +-------------------------------------------------------------+
+*     |   Creation et Remplissage du CHPOINT de FLX resultat        |
+*     +-------------------------------------------------------------+
+      nat = 1
+      if(nbelem .eq. 0) then
+        nbnn   = 0
+        nsoupo = 0
+        segini,mchpo3
+
+      else
+        nbnn   = 1
+        nbref  = 0
+        nbsous = 0
+
+        segini,ipt4
+        ipt4.itypel = 1
+
+        nsoupo = 1
+        nc     = 1
+        n      = nbelem
+        segini,mchpo3,msoup1,mpova1
+        mchpo3.ipchp(1)    = msoup1
+        msoup1.nocomp(1)   ='FLX'
+        msoup1.igeoc       = ipt4
+        msoup1.ipoval      = mpova1
+
+        ipo=0
+        do 301,ia=1,inomax
+          itest = nint(XCPR2(ia,1))
+          if (itest .eq. 0) goto 301
+          ipo                  = ipo + 1
+          ipt4.num(1,ipo)      = ia
+          mpova1.vpocha(ipo,1) = XCPR2(ia,2)
+ 301    continue
+      endif
+
+      mchpo3.mochde    ='chpoint cree par PHAJ'
+      mchpo3.mtypoi    ='jeux'
+      mchpo3.ifopoi    = ifour
+      mchpo3.jattri(1) = 2
+
+      nomid=ipnomi
+      segsup,notype,nomid
+      SEGSUP,XCPR1
+
+      call actobj('CHPOINT ',mchpo3,1)
+      call ecrobj('CHPOINT ',mchpo3)
+
+      END
+ 

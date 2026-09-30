@@ -1,0 +1,51 @@
+C EAU3D     SOURCE    FD218221  24/02/07    21:15:10     11834          
+       subroutine eau3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,vnvari,
+     # ndtens,nbelas,teta1,teta2,tetaref,mfr,keau)
+
+c      calcul des coeff hydrique pour mc3d
+
+c      declarations externes
+       implicit integer(i-n)
+       implicit real*8(a-h,o-z)
+
+       integer nmat,nstype,ndtens,nvari,nbelas
+       integer vnmat(nstype)
+       integer vnvari(nstype,2)
+       real*8 xmat(nmat)
+       real*8 var0(nvari),varf(nvari)
+       real*8 teta1,teta2,tetaref,mfr
+       real*8 pwcap,bwcap,swcap,keau
+
+c      nrj activation pour l eau
+       real*8 nrjw 
+       parameter (nrjw=17000.d0)
+       real*8 biotw,poro2,vw2,xnsat,mvgn
+       real*8 pw0,Mwat,dphiw,bw0,bw1
+       integer numpw,numbw,numsw
+
+
+       call xmat3d(poro2,xmat,nmat,vnmat,nstype,nbelas,1,2)
+       call xmat3d(vw2,xmat,nmat,vnmat,nstype,nbelas,1,3)
+       call xmat3d(biotw,xmat,nmat,vnmat,nstype,nbelas,1,4)
+       call xmat3d(xnsat,xmat,nmat,vnmat,nstype,nbelas,1,5)
+       call xmat3d(mvgn,xmat,nmat,vnmat,nstype,nbelas,1,6)
+       call xmat3d(tkvg,xmat,nmat,vnmat,nstype,nbelas,1,7)
+ 
+       call xvar3d(pw0,numpw,var0,nvari,vnvari,nstype,ndtens,1,3)
+       call xvar3d(bw0,numbw,var0,nvari,vnvari,nstype,ndtens,1,4)
+       call xvar3d(sw0,numsw,var0,nvari,vnvari,nstype,ndtens,1,5)
+
+       call watr3d(mfr,biotw,poro2,vw2,xnsat,mvgn,pwcap,bwcap,swcap,
+     # teta2,tetaref,tkvg,pw0,Mwat,dphiw,bw0,bw1)
+
+       varf(numpw)=pwcap
+       varf(numbw)=bwcap
+       varf(numsw)=swcap
+
+       keau=swcap
+c       print*,'ds eau3d keau',keau
+
+       return
+       end
+
+ 

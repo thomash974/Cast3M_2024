@@ -1,0 +1,207 @@
+C RIGELI    SOURCE    PV        22/02/02    21:15:02     11277          
+      SUBROUTINE RIGELI(IPRIG0,IPMAS0,IPAMO0,IPRIGI,IPMASS,IPAMOR,
+     &                                       IDEMEM,IDEME0,IDEME1,IELIM)
+      
+      IMPLICIT INTEGER(I-N)
+
+************************************************************************
+*
+*                            R I G E L I
+*                            -----------
+*
+*
+* FONCTION:
+* ---------
+*
+*     elimination des relations sur la matrice de ridigite
+*     + inconnues liees sur les autres matrices
+*
+*     note: le code est extrait de resou.eso
+*     on y ajoute la gestion (eventuelle) d autres matrices en parallele  
+*
+*
+* CREATION et MODIFICATION:
+* ------------------------
+
+*     PASCAL BOUDA, 4 SEPTEMBRE 2020
+*
+************************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMRIGID
+-INC SMELEME
+
+*----------------------------------------------------------------------*
+      CHARACTER*4  NOHR(1)
+      INTEGER*4 IOHR
+      EQUIVALENCE(IOHR,NOHR)
+
+      POINTEUR  RIEL1.MRIGID,RIEL2.MRIGID,RIEL3.MRIGID
+*----------------------------------------------------------------------*
+*Initialisations (cf resou.eso)
+      IGRADJ=0
+      IUNIL=0 
+      NOUNIL=1 
+      IDEPE=0 
+      IMTVID=0
+*Nombre de passes max-1
+      NELIM=2
+      NOEN=1
+*----------------------------------------------------------------------*
+*  verification pas de blocage en double
+      CALL VERLAG(IPRIG0)
+      if (ierr.ne.0) return
+*----------------------------------------------------------------------*
+*Copie avant debut du travail 
+      MRIGID=IPRIG0
+      segact mrigid
+      if (jrcond.ne.0) nelim=30
+      SEGINI,RIEL1=MRIGID
+      SEGDES RIEL1
+      IPRIGI=RIEL1
+*Copie des matrices auxiliaires
+      RIEL2=0
+      RIEL3=0
+      IPMASS=0
+      IPAMOR=0      
+      IF (IPMAS0.NE.0) THEN
+         MRIGID=IPMAS0
+         SEGINI,RIEL2=MRIGID
+         SEGACT RIEL2*MOD
+         RIEL2.MTYMAT='TEMPORAI'
+         SEGDES RIEL2
+         IPMASS=RIEL2
+      ENDIF
+      IF (IPAMO0.NE.0) THEN
+         MRIGID=IPAMO0
+         SEGINI,RIEL3=MRIGID
+         SEGACT RIEL3*MOD
+         RIEL3.MTYMAT='TEMPORAI'
+         SEGDES RIEL3
+         IPAMOR=RIEL3
+      ENDIF
+*----------------------------------------------------------------------*
+* On sort si la premiere matrice n'est pas de sstype RIGIDITE (i.e. matrice deja eliminee
+      MRIGID=IPRIGI 
+      SEGACT MRIGID*MOD
+      IF (MRIGID.MTYMAT.NE.'RIGIDITE') RETURN
+      MRIGID.MTYMAT='TEMPORAI'
+*----------------------------------------------------------------------*      
+* On verifie qu hormis les matrices en 'noharm', 
+* toutes les matrices avec mode de fourier on le mm numero
+      nohr='NOHA'
+      IIF1=IRIGEL(5,1)
+      IIFOUR=IIF1
+      DO I=1,IRIGEL(/2)-1
+         IIF2=IRIGEL(5,I+1)
+         DIIF=IIF2-IIF1
+         IF ((DIIF.NE.0).AND.(IIF1.NE.IOHR.AND.IIF2.NE.IOHR)) THEN
+            CALL ERREUR(324)
+         ELSE
+            IF (IIF1.NE.IOHR) IIFOUR=IIF1
+            IF (IIF2.NE.IOHR) IIFOUR=IIF2
+         ENDIF
+      IIF1=IIF2
+      END DO
+      DO I=1,MRIGID.IRIGEL(/2)
+         MRIGID.IRIGEL(5,I)=IIFOUR
+      ENDDO
+      SEGDES MRIGID
+*----------------------------------------------------------------------*
+*     debut du travail delimination (cf resou.eso)
+*  y a t il des matrices de relations non unilaterales
+      segact mrigid
+      nrige= irigel(/1)
+      idepe=0
+      nbr = irigel(/2)
+      do 1000 irig = 1,nbr
+       meleme=irigel(1,irig)
+       segact meleme
+       if ((irigel(6,irig).eq.0.or.nounil.eq.1).and.itypel.eq.22)
+     >    idepe=idepe+num(/2)
+       if (irigel(6,irig).ne.0) iunil=1
+       if (irigel(7,1).ne.0) insym=1
+1000  continue
+*  elimination recursive des conditions aux limites
+*  on la fait en gradient conjugue ou en appel de unilater
+      nfois=nelim-1
+      if (igradj.eq.1.or.(iunil.eq.1.and.nounil.eq.0)) nfois=29
+      lagdua=0
+      imult=1
+      icond=idepe
+      icondi=icond+1
+      IELIM=0
+      do ifois=1,nfois
+      if(imult.ne.0.and.icond.ne.0.and.
+     >      (icondi-icond.gt.0.or.igradj.eq.1)) then
+       icondi=icond
+       lagdua=-1
+       IELIM=IELIM+1
+       if(ierr.ne.0) return
+       call resouc(mrigid,mrigic,idemem,ideme0,ideme1,
+     >       nounil,lagdua,icond,imult,IELIM,imtvid,nelim)
+**     write(6,*) ' passe ',if,' condition ',icond
+       ri1=mrigic
+       segact ri1
+**     write(6,*) 'rigeli ri1 ichole',ri1,ri1.ichole
+       if(ierr.ne.0) return
+*----------------------------------------------------------------------*
+*Elimination (eventuelle) en parallele sur les autres matrices
+      IF (ICONDI.GT.ICOND) THEN  
+         CALL RIGEL2(MRIGID,RIEL2)
+         IF(IERR.NE.0) RETURN
+         CALL RIGEL2(MRIGID,RIEL3)
+         IF(IERR.NE.0) RETURN
+      ENDIF
+*----------------------------------------------------------------------*
+      mrigid=mrigic
+      endif
+      enddo
+*  Si on n'a pas reussi a tout eliminer, on fait encore une passe pour creer lagdua
+      lagdua=0
+      if (iunil.eq.0.or.nounil.eq.1) then
+      if (icond.ne.0) then
+       IELIM=IELIM+1
+      ICONDI=ICOND
+       if(ierr.ne.0) return
+        call resouc(mrigid,mrigic,idemem,ideme0,ideme1,
+     >        nounil,lagdua,icond,imult,IELIM,imtvid,nelim)
+**     write(6,*) ' passe ','finale',' condition ',icond
+      if(ierr.ne.0) return
+*----------------------------------------------------------------------*
+*Elimination (eventuelle) en parallele sur les autres matrices
+      IF (ICONDI.GT.ICOND) THEN 
+         CALL RIGEL2(MRIGID,RIEL2)
+         IF(IERR.NE.0) RETURN
+         CALL RIGEL2(MRIGID,RIEL3)
+         IF(IERR.NE.0) RETURN
+      ENDIF
+*----------------------------------------------------------------------*
+      mrigid=mrigic
+      endif
+      endif
+**     write (6,*) 'nombre de passes',if
+      if (idepe.ne.0) noid = 1
+*----------------------------------------------------------------------*
+*Mise au propre (triangularisation via nbinc) + sauvegarde des matrices eliminees
+      IPRIGI=MRIGID
+      CALL NBINC(IPRIGI,NR)
+      IF(IERR.NE.0) RETURN  
+      IF (IPMASS.NE.0) THEN
+         IPMASS=RIEL2
+         CALL NBINC(IPMASS,NM)
+         IF(IERR.NE.0) RETURN
+      ENDIF
+      IF (IPAMOR.NE.0) THEN
+         IPAMOR=RIEL3
+         CALL NBINC(IPAMOR,NA)
+         IF(IERR.NE.0) RETURN
+      ENDIF 
+*----------------------------------------------------------------------*
+*      call prrigi(IPRIGI,1)
+      END
+
+
+ 
+ 

@@ -1,0 +1,51 @@
+C THER3D    SOURCE    FD218221  24/02/07    21:15:28     11834          
+       subroutine ther3d(xmat,nmat,vnmat,nstype,var0,varf,nvari,
+     # vnvari,ndtens,nbelas,teta1,teta2,tetaref,dtherm,kthermv,kthermp)
+
+c      calcul des coeff thermiques pour mc3d
+
+c      declarations externes
+       implicit integer(i-n)
+       implicit real*8(a-h,o-z)
+
+       integer nmat,nstype,ndtens,nvari,nbelas
+       integer vnmat(nstype)
+       integer vnvari(nstype,2)
+       real*8 xmat(nmat)
+       real*8 var0(nvari),varf(nvari)
+       real*8 teta1,teta2,tetaref
+       real*8 dtherm,kthermv,kthermp
+
+c      nrj activation pour l eau
+       real*8 nrjw 
+       parameter (nrjw=17000.d0)
+       real*8 teta,nrjf,tetas,DT80,dtherm0
+       integer num
+       real*8 vw,poro
+       real*8 CTHP,CTHV
+
+c      on prend la temperature milieu de pas
+       teta=0.5d0*(teta1+teta2)
+c      recuperation des donnees
+
+c      sous type 2=Mawxell
+c      sous num  3=nrjf
+       call xmat3d(nrjf,xmat,nmat,vnmat,nstype,nbelas,2,3)
+       call xmat3d(tetas,xmat,nmat,vnmat,nstype,nbelas,2,4)
+       call xmat3d(dt80,xmat,nmat,vnmat,nstype,nbelas,2,5)
+       call xmat3d(vw,xmat,nmat,vnmat,nstype,nbelas,1,3)
+       call xmat3d(poro,xmat,nmat,vnmat,nstype,nbelas,1,2)
+c      recup valeur et numero d une vari de type scalaire
+       call xvar3d(dtherm0,num,var0,nvari,vnvari,nstype,ndtens,1,6)
+
+       call thrm3d(teta,nrjf,tetas,tetaref,DT80,
+     # dtherm0,dtherm,CTHp,CTHv,poro,vw,nrjw)
+
+c      stockage de la vari calculee
+       varf(num)=dtherm
+       kthermv=CTHv
+       kthermp=CTHp
+
+       return
+       end
+ 

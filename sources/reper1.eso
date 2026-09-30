@@ -1,0 +1,65 @@
+C REPER1    SOURCE    OF166741  23/02/15    21:15:10     11416          
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C  ****  INTERFACE CAST3M-MED
+C  ****  Recupere les OBJETS nommes de type CTYPE et leur nom
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+      SUBROUTINE REPER1(CTYP,SREPER)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC CCASSIS
+-INC CCMED
+
+-INC SMMED
+
+      CHARACTER*(*) CTYP
+
+C***********************************************************************
+C DEBUT DES INSTRUCTIONS
+C***********************************************************************
+      ILONG = LMNNOM
+      IF (ILONG .EQ. 0 .OR. CTYP.EQ.'ANNULE  ') THEN
+        NBENT = 0
+        SEGINI,SREPER
+        RETURN
+      ENDIF
+
+      NBENT = ILONG
+      SEGINI,SREPER
+
+      IF (NBESC.NE.0) SEGACT,IPILOC
+      MM = 0
+      DO io = ILONG, 1, -1
+        IF(INOOB1(io).EQ.1)          GOTO 1
+        IF(INOOB2(io).NE.CTYP)       GOTO 1
+C        IF(INOOB2(io).EQ.'ANNULE  ') GOTO 1
+C        IF(INOOB1(io)(1:1).EQ.'#'  ) GOTO 1
+
+        IP     = INOOB1(io)
+        IDEBCH = IPCHAR(IP)
+        IFINCH = IPCHAR(IP+1)-1
+        if ((ifinch-idebch+1).gt.med_name_size) then
+          write(ioimp,*) 'REPER1 : NAME LENGTH > MED_NAME_SIZE'
+          call erreur(5)
+        endif
+        MM = MM+1
+        SREPER.IREPER(MM) = IOUEP2(io)
+        SREPER.CREPER(MM) = ' '
+        SREPER.CREPER(MM) = ICHARA(IDEBCH:IFINCH)
+
+ 1      CONTINUE
+      END DO
+      IF (NBESC.NE.0) SEGDES,IPILOC
+
+      NBENT = MM
+      SEGADJ,SREPER
+
+      END 
+
+ 

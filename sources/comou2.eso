@@ -1,0 +1,423 @@
+C COMOU2    SOURCE    JK148537  23/08/21    21:15:10     11723          
+      SUBROUTINE COMOU2(iqmod,INDESO,ipil,iwrk52,wrk53,iwr522)
+*
+*  creation des segments de noms de composantes des MCHAML
+*   CREES PAR LE MODELE ELEMENTAIRE
+* attention : accorder a inomid.eso appele des la creation du imodel !!
+*  creation des segments de rangement des deche associes aux precedents
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+-INC PPARAM
+-INC CCOPTIO
+C==DEB= FORMULATION HHO == INCLUDE =====================================
+-INC CCHHOPA
+C==FIN= FORMULATION HHO ================================================
+*
+-INC SMMODEL
+      pointeur nomid1.nomid
+-INC DECHE
+*
+      imodel = iqmod
+*
+      MELE1  = MELE
+      NPINT3 = NPINT
+      MFR2   = MFR
+      do im=1,matmod(/2)
+        if (matmod(im).eq.'MODAL' .or. matmod(im).eq.'STATIQUE' .or.
+     &      matmod(im).eq.'IMPEDANCE')     MFR2= infele(13)
+      enddo
+
+      iiluc = 25
+C*?      iiluc = NMOT (=25)
+      SEGINI,liluc
+      DO ijluc = 1, iiluc
+*
+*       AIGUILLAGE SUIVANT MOT CLE
+*
+        mocomp = 0
+        GOTO ( 1, 2, 99, 99, 99, 6, 7,99,99,10,11,12,13,14,15,16,17,18,
+     1        99,20,21,99,23,24,25) ijluc
+*
+  99    CONTINUE
+c       pas de composantes pour ce champ
+        if(lnomid(15).ne.0) then
+          nomid =lnomid(15)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          NBROBL=0
+          NBRFAC=0
+          SEGINI NOMID
+          MOCOMP=NOMID
+        endif
+        GOTO 120
+
+C       COMPOSANTE 'SCAL'
+   1    CONTINUE
+        ITAIL=lnomid(/1)
+        if(lnomid(16).ne.0) then
+          nomid =lnomid(16)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          MOCOMP=NOMID
+          LESOBL(1)='SCAL'
+        endif
+        nsca = 1
+        GOTO 120
+
+C       COMPOSANTE 'TEMP'
+   2    CONTINUE
+        if(lnomid(17).ne.0) then
+          nomid =lnomid(17)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          MOCOMP=NOMID
+          LESOBL(1)='TEMP'
+        endif
+        ntem = 1
+        GOTO 120
+C
+   6    CONTINUE
+        if(lnomid(1).ne.0) then
+          nomid =lnomid(1)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDPRIM(IMODEL,MFR2,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ndep = nbrobl + nbrfac
+        GOTO 120
+C
+   7    CONTINUE
+        if(lnomid(2).ne.0) then
+          nomid =lnomid(2)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDDUAL(IMODEL,MFR2,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        nfor = nbrobl + nbrfac
+        GOTO 120
+C
+  10    CONTINUE
+        if(lnomid(3).ne.0) then
+          nomid =lnomid(3)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDGRAD(MFR2,IFOUR,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ngra = nbrobl + nbrfac
+        GOTO 120
+C
+  11    CONTINUE
+        if(lnomid(4).ne.0) then
+          nomid =lnomid(4)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDCONT(iqmod,IFOUR,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        nstrs = nbrobl + nbrfac
+        GOTO 120
+C
+  12    CONTINUE
+        if(lnomid(5).ne.0) then
+          nomid =lnomid(5)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDDEFO(iqmod,IFOUR,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ndefo = nbrobl + nbrfac
+        GOTO 120
+C
+  13    CONTINUE
+        if(lnomid(6).ne.0) then
+          nomid =lnomid(6)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+C==DEB= FORMULATION HHO == Oubli des composantes STAB et **HO ==========
+          IF (MFR2.EQ.HHO_MFR_ELEMENT) nbrobl = nbrobl - 4
+C==FIN= FORMULATION HHO ================================================
+        else
+          CALL IDMATR(MFR2,iqmod,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ncara = nbrobl + nbrfac
+        NMATR = nbrobl
+        if(inplas.eq.3) ncara=ncara+7
+        NMATT = ncara
+        NUMAT = NMATT
+        GOTO 120
+C
+  14    CONTINUE
+        inat = inplas
+        if(lnomid(7).ne.0) then
+          nomid =lnomid(7)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDCARA(iqmod,MFR2,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          if (nomid.gt.0) segact nomid
+        endif
+        ncarb = nbrobl + nbrfac
+        NCARR = ncarb
+        IF(MFR.EQ.15) ncarb=ncarb*2
+        IF(MFR.EQ.7.OR.MFR.EQ.13) ncarb=ncarb+IDIM
+        NUCAR = ncarb
+        NCARF = nbrfac
+        GOTO 120
+C
+  15    CONTINUE
+        if(lnomid(8).ne.0) then
+          nomid =lnomid(8)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDTEMP(MFR2,IFOUR,NPINT3,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ntur = nbrobl + nbrfac
+        GOTO 120
+C
+  16    CONTINUE
+        if(lnomid(9).ne.0) then
+          nomid =lnomid(9)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDPRIN(MFR2,IFOUR,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        npri = nbrobl + nbrfac
+        GOTO 120
+C
+C       COMPOSANTE 'MAHO'
+  17    CONTINUE
+        if(lnomid(18).ne.0) then
+          nomid =lnomid(18)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          LESOBL(1)='MAHO'
+          MOCOMP=NOMID
+        endif
+        nmah = 1
+        GOTO 120
+C
+C       COMPOSANTE 'MAHT'
+  18    CONTINUE
+        if(lnomid(19).ne.0) then
+          nomid =lnomid(19)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          NBROBL=1
+          NBRFAC=0
+          SEGINI NOMID
+          LESOBL(1)='MAHT'
+          MOCOMP=NOMID
+        endif
+        nhot = 1
+        GOTO 120
+C
+  20    CONTINUE
+        if(lnomid(10).ne.0) then
+          nomid =lnomid(10)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDVARI(MFR2,iqmod,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          if(nomid.ne.0) then
+           segact nomid
+          else
+           segini nomid
+           mocomp = nomid
+          endif
+        endif
+        nvari = nbrobl + nbrfac
+
+C        Dans le cas ou il n'existe pas de variables internes, on
+C        declare artificiellement une variable bidon afin de creer
+C        des objets de travail permettant de respecter les interfaces
+C        des routines auxquelles les variables internes peuvent etre
+C        transmises
+C        L'absence de variables internes est possible en particulier
+C        pour une loi 'NON_LINEAIRE' 'UTILISATEUR', il faut alors
+C        respecter l'interface de la routine UMAT
+C
+        if (inatuu.lt.0) then
+          IF (NVARI.EQ.0) THEN
+            NBROBL=1
+            NBRFAC=0
+            SEGADJ,NOMID
+            LESOBL(1)='VARI'
+            MOCOMP=NOMID
+            nvari = 1
+          ENDIF
+        endif
+        NVART = nvari 
+        GOTO 120
+C
+  21    CONTINUE
+        if(lnomid(11).ne.0) then
+          nomid =lnomid(11)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDGRAF(MFR2,IFOUR,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ngrf = nbrobl + nbrfac
+        GOTO 120
+C
+  23    CONTINUE
+        if(lnomid(12).ne.0) then
+          nomid =lnomid(12)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDPHAS(MFR2,iqmod,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        nrhi = nbrobl + nbrfac
+        GOTO 120
+C
+  24    CONTINUE
+        if(lnomid(13).ne.0) then
+          nomid =lnomid(13)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+        else
+          CALL IDDEIN(iqmod,IFOUR,MOCOMP,NBROBL,NBRFAC)
+          nomid = mocomp
+          segact nomid
+        endif
+        ndein = nbrobl + nbrfac
+        GOTO 120
+C
+  25    CONTINUE
+        if(lnomid(14).eq.0) then
+C         On met la composante 'SCAL' pour des besoins dans UMAT (Avant c'etait 'PAEX')
+          nomid =lnomid(16)
+          if(nomid .eq. 0)then
+            nbrobl=0
+            nbrfac=0
+          else
+            nbrobl=lesobl(/2)
+            nbrfac=lesfac(/2)
+          endif
+          mocomp=nomid
+        else
+          nomid =lnomid(14)
+          nbrobl=lesobl(/2)
+          nbrfac=lesfac(/2)
+          mocomp=nomid
+          nparex=nbrobl + nbrfac
+
+          if(nbrobl .eq. 0)then
+C           On met la composante 'SCAL' pour des besoins dans UMAT (Avant c'etait 'PAEX')
+            nomid =lnomid(16)
+            nbrobl=lesobl(/2)
+            nbrfac=lesfac(/2)
+            mocomp=nomid
+
+          else
+C           On verifie si la composante 'T   ' est en 1ere position (fait par MODE)
+            if(lesobl(1).EQ.'T   ')then
+              if(nbrobl .EQ. 1)then
+C      On met la composante 'SCAL' pour des besoins dans UMAT (Avant c'etait 'PAEX')
+                nomid =lnomid(16)
+                nbrobl=lesobl(/2)
+                nbrfac=lesfac(/2)
+                mocomp=nomid
+
+              else
+C               On retire la composante 'T   '
+                nbrobl=nbrobl-1
+                segini,nomid1
+                do iii=1,nbrobl
+                  nomid1.lesobl(iii)=lesobl(iii+1)
+                enddo
+                mocomp=nomid1
+              endif
+            endif
+          endif
+        endif
+        nparex = nbrobl + nbrfac
+        GOTO 120
+C
+ 120    CONTINUE
+        liluc(ijluc,1) = mocomp
+      enddo
+      
+      mran = INDESO
+      DO ijluc = 1, iiluc
+        nomid =liluc(ijluc,1)
+        if(nomid .eq. 0)then
+          mobl  =0
+          mfac  =0
+        else
+          mobl  =lesobl(/2)
+          mfac  =lesfac(/2)
+        endif
+        segini pilnec
+        liluc(ijluc,2) = pilnec
+      ENDDO
+      ipil = liluc
+      nexo = 0
+      segini WRK52,wrk522
+      iwrk52 = wrk52
+      iwr522 = wrk522
+      END
+ 
+ 

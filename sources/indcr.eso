@@ -1,0 +1,156 @@
+C INDCR     SOURCE    CB215821  23/07/12    21:15:06     11704          
+      SUBROUTINE INDCR(MOT,NMO,IPT1,MCHEL1)
+C=======================================================================
+C     SUBROUTINE DE LA PROCEDURE INDIC DE QUALITE D'UN MAILLAGE
+C          PHILIPPE BEAUMIER  90
+C     CONTIENT LES ZONES RELATIVES AUX DIFFERENTS CHAMPS
+C     CREATION DU CHAMELEM RESULTAT
+C
+C=======================================================================
+C
+C  INPUT
+C
+C     MOT    : SUCCESSION DES MOTS CLES LUS
+C     NMO    : NOMBRE DE MOTS CLES LUS
+C     IPT1   : POINTEUR SUR LE MAILLAGE
+C
+C   OUTPUT
+C
+C     MCHEL1 : POINTEUR SUR LE CHAMELEM RESULTAT
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMELEME
+-INC SMCOORD
+C
+      CHARACTER*(LOCOMP) MOT(*)
+      SEGMENT/WRK1/(XE(3,NBNO))
+C
+C     Activation du maillage
+      SEGACT IPT1
+C     Erreur si aucun mot lu
+      IF(NMO.EQ.0) GOTO 666
+C     Preparation du MCHAML (titre, nbr sous zones, options)
+      L1=7
+      NSOUS=IPT1.LISOUS(/1)
+      N1=NSOUS
+      IF(N1.EQ.0) N1=1
+      N3=5
+      SEGINI MCHEL1
+      MCHEL1.TITCHE='QUALITE'
+      MCHEL1.CONCHE(1)='                '
+      MCHEL1.IFOCHE=IFOUR
+C
+C     Boucle sur les sous zones du maillage (et donc celles du champ resulat)
+      N2=NMO
+      DO ISOUS=1,MAX(1,NSOUS)
+C        Recuperation de la sous zone
+         IF(NSOUS.NE.0) THEN
+            IPT2=IPT1.LISOUS(ISOUS)
+            SEGACT IPT2
+         ELSE
+            IPT2=IPT1
+         ENDIF
+C        Remplissage du MCHAML (maillage sous zone, options)
+         MCHEL1.IMACHE(ISOUS)=IPT2
+         MCHEL1.INFCHE(ISOUS,1)=0
+         MCHEL1.INFCHE(ISOUS,2)=0
+         MCHEL1.INFCHE(ISOUS,3)=NIFOUR
+         MCHEL1.INFCHE(ISOUS,4)=0
+         MCHEL1.INFCHE(ISOUS,5)=0
+C        Remplissage du MCHAML (creation des composantes)
+         SEGINI MCHAM1
+         MCHEL1.ICHAML(ISOUS)=MCHAM1
+C        Boucle sur les composantes du champ
+         DO ICOMP=1,NMO
+C           Remplissage du MCHAML (nom de la composante)
+            MCHAM1.TYPCHE(ICOMP)='REAL*8'
+            MCHAM1.NOMCHE(ICOMP)=MOT(ICOMP)
+C           Preparation du tableau de valeurs du champ : MELVAL
+            N2PTEL=0
+            N2EL=0
+C---------> Indicateur 'PLAN'
+            IF (MOT(ICOMP).EQ.'PLAN') THEN
+C              Cas des elements prevus (QUA4,QUA8,TRI3,TRI6)
+               IF (((IPT2.ITYPEL).EQ.8).OR.((IPT2.ITYPEL).EQ.10).OR.
+     &             ((IPT2.ITYPEL).EQ.4).OR.((IPT2.ITYPEL).EQ.6)) THEN
+C                 Initialisation et remplissage du MELVAL
+                  N1PTEL=1
+                  N1EL=IPT2.NUM(/2)
+                  SEGINI MELVA1
+                  NBNO=IPT2.NUM(/1)
+                  SEGINI WRK1
+                  CALL NORCOS(MELVA1.VELCHE,IPT2.NUM(/1),N1EL,XCOOR,
+     &                        IDIM,IPT2.NUM,XE,IPT2.ITYPEL)
+                  SEGDES WRK1
+C              Pour les autres elements : champ vide
+               ELSE
+C                 Initialisation et remplissage du MELVAL
+                  N1PTEL=0
+                  N1EL=0
+                  SEGINI MELVA1
+               ENDIF
+C---------> Indicateur 'ASPE'
+            ELSEIF (MOT(ICOMP).EQ.'ASPE') THEN
+C              Cas des elements prevus (TRI3,TET4)
+               IF (((IPT2.ITYPEL).EQ.4).OR.((IPT2.ITYPEL.EQ.23))) THEN
+C                 Initialisation et remplissage du MELVAL
+                  N1PTEL=1
+                  N1EL=IPT2.NUM(/2)
+                  SEGINI MELVA1
+                  CALL ASPERT(MELVA1.VELCHE,IPT2.NUM,IPT2.NUM(/1),N1EL,
+     &                        IPT2.ITYPEL)
+C              Pour les autres elements : champ vide
+               ELSE
+C                 Initialisation et remplissage du MELVAL
+                  N1PTEL=0
+                  N1EL=0
+                  SEGINI MELVA1
+               ENDIF
+C---------> Indicateur 'SKEW'
+            ELSEIF (MOT(ICOMP).EQ.'SKEW') THEN
+C              Cas des elements prevus (TRI3,TET4)
+               IF (((IPT2.ITYPEL).EQ.4).OR.((IPT2.ITYPEL.EQ.23))) THEN
+C                 Initialisation et remplissage du MELVAL
+                  N1PTEL=1
+                  N1EL=IPT2.NUM(/2)
+                  SEGINI MELVA1
+                  CALL SKEWNS(MELVA1.VELCHE,IPT2.NUM,IPT2.NUM(/1),N1EL,
+     &                        IPT2.ITYPEL)
+C              Pour les autres elements : champ vide
+               ELSE
+C                 Initialisation et remplissage du MELVAL
+                  N1PTEL=0
+                  N1EL=0
+                  SEGINI MELVA1
+               ENDIF
+C---------> Autres mots (normalement impossible de passer ici !)
+            ELSE
+               MOTERR=MOT(ICOMP)
+               CALL ERREUR(7)
+            ENDIF
+C           Lien vers le MELVAL
+            MCHAM1.IELVAL(ICOMP)=MELVA1
+C           Travail termine : desactivation du MELVAL
+            SEGDES MELVA1
+         ENDDO
+C        Travail termine : desactivation du maillage de la sous zone
+         IF(NSOUS.NE.0) THEN
+            SEGDES IPT2
+         ENDIF
+C        Travail termine : desactivation de la composante
+         SEGDES MCHAM1
+      ENDDO
+C     Travail termine : desactivation du champ et du maillage
+      SEGDES MCHEL1
+      SEGDES IPT1
+666   RETURN
+      END
+
+
+ 
+ 

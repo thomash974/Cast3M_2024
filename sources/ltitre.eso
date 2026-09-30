@@ -1,0 +1,15 @@
+C LTITRE    SOURCE    PV        19/12/11    21:15:06     10427          
+      SUBROUTINE LTITRE
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+      TITREE=' '
+      ilong=1
+      call chaine
+      call lircha(titree,0,ilong)
+      RETURN
+      END
+
+ 
+ 

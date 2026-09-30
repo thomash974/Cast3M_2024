@@ -1,0 +1,255 @@
+C PROPTO    SOURCE    GOUNAND   21/04/06    21:15:22     10940          
+      SUBROUTINE PROPTO
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : PROPTO
+C DESCRIPTION : Une implémentation de l'amélioration d'une topologie
+C               autour d'un élément. On reprend OPTITOPO pour le corps
+C     du programme. On reprend l'extraction et la topologie inverse de
+C     EXTO. Le point crucial sera d'implémenter la modification de la
+C     topologie : enlever les anciens éléments et mettre les nouveaux.
+C     
+C     Ici, on fait les entrées-sorties et on initialise le common avec
+C     les options globales. 
+C
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 04/10/2017, version initiale
+C HISTORIQUE : v1, 04/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMELEME      
+      POINTEUR ITOPO.MELEME
+      POINTEUR IELEM.MELEME
+* TOPologie Améliorée      
+      POINTEUR ITOPA.MELEME
+-INC SMLMOTS
+-INC SMCHPOI
+      POINTEUR ICMETR.MCHPOI
+* METrique sur la topologie Améliorée       
+      POINTEUR ICMETA.MCHPOI
+      INTEGER IMPR,IRET
+      integer oooval
+      parameter(ncle=10)
+      character*8 mtyp
+      character*4 mcle(ncle)
+      logical lmet
+     
+      data mcle /'IMPR','VERI','VTOL','QTOL','VIRT','SGAJ','ALGO'
+     $     ,'AJNO','NCMA','STMA'/ 
+*      data mmet /'SANS','DENS','CSTE','ISOT','ANIS'/
+*     
+* Executable statements
+*
+      impr=0
+      IF (IMPR.Ge.5) WRITE(IOIMP,*) 'Entrée dans propto.eso'
+*      
+*     Initialisation des données dans le common TMATOP2
+*     Attention, il faut mettre les mêmes valeurs par défaut
+*     que dans ryo2v et prtopv
+*    
+      impr=0
+      iveri=0
+      isgadj=0
+      xvtol=1.d-11
+      qtol=1.d-2
+      ipvirt=0
+      imet=0
+      imomet=0
+      xdens=0.d0
+      icmetr=0
+      ialgo=0
+      iajno=0
+      incma=1000
+      istma=0
+*      write(ioimp,*) 'propto : entree      =',OOOVAL(2,1)
+* Entrees
+      CALL LIROBJ('MAILLAGE',ITOPO,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL LIROBJ('MAILLAGE',IELEM,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL QUETYP(MTYP,0,IRET)
+      if (iret.EQ.1) then
+         if (MTYP.NE.'MOT     ') THEN
+*
+*     Lecture de la métrique voulue :
+c     LOG1  : pas de métrique,
+c     FLOT1 : taille de maille ;
+C     CHPO1 : inverse de la métrique isotrope, nom de composante G ou
+C     anisotrope, noms de composante G11, G21, G22, (G31, G32, G33 en
+C     3D) 
+*
+            IF (MTYP.EQ.'LOGIQUE ') THEN
+               call lirlog(lmet,1,IRLOG)
+               IF (IERR.NE.0) RETURN
+            ELSEIF (MTYP.EQ.'CHPOINT ') THEN
+               CALL LIROBJ('CHPOINT',ICMETR,1,IRET)
+               IF (IERR.NE.0) RETURN
+               call extr11(icmetr,mlmots)
+               if (ierr.ne.0) return
+               segact mlmots
+               CALL PLACE(MOTS,MOTS(/2),iplac,'G   ')
+               if (iplac.ne.0) then
+                  imet=3
+               else
+                  imet=4
+               endif
+               segsup mlmots
+            elseif (MTYP.EQ.'FLOTTANT'.OR.MTYP.EQ.'ENTIER') then
+               call lirree(XDENS,1,IRET)
+               IF (IERR.NE.0) RETURN
+               imet=2
+            else
+*  39 2
+* On ne veut pas d'objet de type %m1:8
+               MOTERR(1:8)=MTYP
+               CALL ERREUR(39)
+               RETURN
+            endif
+         endif
+      endif
+*
+*     Mots-Clefs
+*      
+ 10   continue
+      call lirmot(mcle,ncle,imot,0)
+      if (imot.eq.1) then
+*     call lirree(xval,1,iret)
+*         impr=3
+         CALL LIRENT(impr,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.2) then
+*         iveri=2
+         CALL LIRENT(iveri,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.3) then
+         CALL LIRREE(XVTOL,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.4) then
+         CALL LIRREE(QTOL,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.5) then
+         CALL LIROBJ('POINT',IPVIRT,0,IRET)
+         IF (IERR.NE.0) RETURN
+         IF (IRET.EQ.0) THEN 
+            CALL LIRENT(IPVIRT,1,IRET)
+            IF (IERR.NE.0) RETURN
+            IF (IPVIRT.NE.0) THEN
+               write(ioimp,*)
+     $              'On voulait lire un point ou un entier nul'
+               goto 9999
+            ENDIF
+         ENDIF
+      elseif (imot.eq.6) then
+*         isgadj=1
+         CALL LIRENT(isgadj,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.7) then
+         CALL LIRENT(ialgo,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.8) then
+         CALL LIRENT(iajno,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.9) then
+         CALL LIRENT(incma,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.eq.10) then
+         CALL LIRENT(istma,1,IRET)
+         IF (IERR.NE.0) RETURN
+      elseif (imot.ne.0) then
+         MOTERR(1:8)=MCLE(imot)
+         Write(ioimp,*) MOTERR(1:8)
+* Option indisponible
+         CALL ERREUR(19)
+         RETURN
+      endif
+      if (imot.ne.0) goto 10
+*      write(ioimp,*) 'imet=',imet
+*
+* Test des paramètres
+*
+*!debug      if (impr.ge.3) then
+      if (impr.ge.2) then
+         write(ioimp,*) 'Opto parameters :'
+         write(ioimp,186) 'impr',impr,'iveri',iveri,'ipvirt',ipvirt
+     $        ,'imet',imet,'isgadj',isgadj,'ialgo',ialgo,'iajno',iajno
+     $        ,'incma',incma,'istma',istma
+         write(ioimp,188) 'xvtol',xvtol,'qtol',qtol 
+      endif
+*
+*     Initialisation des sorties du common
+*      
+      jparco=0
+      jexplo=0
+      jchang=0
+      jnascm=0
+* Traitement
+*      write(ioimp,*) 'coucou propto, iveri=',iveri
+*     write(ioimp,*) 'propto : avant opto1 =',OOOVAL(2,1)
+* Restituer le CHPOINT sur tous les noeuds ??      
+      CALL OPTO1(ITOPO,IELEM,IPVIRT,ICMETR,
+     $     ITOPA,ICMETA)
+*      write(ioimp,*) 'propto : apres opto1 =',OOOVAL(2,1)
+      IF (IERR.NE.0) RETURN
+*     Sorties
+      CALL ECRENT(JNASCM)
+      CALL ECRENT(JPARCO)
+      CALL ECRENT(JCHANG)
+      CALL ECRENT(JEXPLO)
+*del      if (imet.gt.1) then
+      if (imet.le.2) then
+         if (irlog.eq.1) then
+            call ecrlog(lmet)
+         else
+            CALL ECRREE(XDENS)
+         endif
+      else
+         CALL ECROBJ('CHPOINT',ICMETA)
+      endif
+*del      endif
+      CALL ECROBJ('MAILLAGE',ITOPA)
+*
+* Normal termination
+*
+*      write(ioimp,*) 'propto : sortie      =',OOOVAL(2,1)
+      RETURN
+*
+* Format handling
+*
+ 186  FORMAT (2X,12(A6,'=',I6,2X))
+ 188  FORMAT (2X,12(A6,'=',1PG12.5,2X))
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='PROPTO  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine PROPTO
+*
+      END
+
+ 

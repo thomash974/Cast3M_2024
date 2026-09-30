@@ -1,0 +1,55 @@
+C ADPAS     SOURCE    FANDEUR   22/05/02    21:15:01     11359          
+
+       SUBROUTINE ADPAS(DS,DSMIN,DSMAX,ITS,ITERMY,ANGMIN,ANGMAX,N,t0,tp)                                             
+*
+*=======================================================================
+*      Adaptation automatique de la longueur du pas tangent 
+*=======================================================================
+*
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+       REAL*8 DS,DSMIN,DSMAX,ITERMY,ANGMIN,ANGMAX,t0(N),tp(N)  
+       REAL*8 COEFF,ANGLE,nt0,ntp,psc0p,nrmPS
+       INTEGER ITS,N
+       REAL*8 XPI
+       PARAMETER(XPI=3.141592653589793D0)      
+
+       REAL*8   DNRM2, DDOT
+       EXTERNAL DNRM2, DDOT
+*
+*       WRITE(*,*) 'DSINI =',DS
+
+*===== TEST SUR LE NOMBRE D'ITERATION ==================================
+       COEFF = 2.0D0**((ITERMY-ITS)/2)
+*      augmentation de +20% maxi entre 2 pas
+       COEFF=MIN(COEFF,1.2D0)
+c        COEFF1=COEFF
+       
+*===== TEST SUR L'ANGLE ================================================
+       nt0 = DNRM2(N,t0,1)
+       ntp = DNRM2(N,tp,1)
+       psc0p = DDOT(N,tp,1,t0,1)
+       nrmPS = psc0p/(nt0*ntp)
+*       nrmPS = MIN(nrmPS,1.D0)
+       ANGLE = ABS(ACOS(nrmPS))*180.D0/XPI
+       IF (ANGLE.GT.ANGMAX) THEN
+c           DS = DS/4.
+          COEFF=0.25D0
+       ENDIF
+       IF (ANGLE.LT.ANGMIN) THEN
+c           DS = DS*1.5
+          COEFF=1.5D0
+cbp : pourquoi pas 1.2 ?          
+       ENDIF
+
+*===== MISE A JOUR BORNEE ==============================================
+*      mise a jour
+       DS = DS*COEFF
+       DS=MIN(DS,DSMAX)
+       DS=MAX(DS,DSMIN)       
+c       WRITE(*,*) '>>> DS=',DS,COEFF,COEFF1,ANGLE,ANGMIN,ANGMAX
+
+c       RETURN
+       END
+
+ 

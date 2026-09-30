@@ -1,0 +1,252 @@
+C ZPMODE    SOURCE    SP204843  23/03/10    19:39:27     11625          
+
+*---------------------------------------
+*      ECRITURE D'UN OBJET MODELE
+*---------------------------------------
+
+      SUBROUTINE ZPMODE (MMODEL)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+C==DEB= FORMULATION HHO == Include specifique ==========================
+-INC CCHHOPA
+C==FIN= FORMULATION HHO ================================================
+
+-INC SMMODEL
+-INC SMLMOTS
+
+       EXTERNAL LONG
+
+       character*16 mderiv(6)
+       character*6 cha6Fa,cha6Fb
+       character*8 nomtyp(19),MOT8
+       character*(LOCHAI) motlib,fmt1
+       character*12 MNLOCA(3)
+       logical b_z
+
+       DATA MDERIV/'Lineaire        ','Quadratique     ',
+     $  'TRUSDELL        ','JAUMANN         ','Utilisateur     ',
+     $  'FEFP            '/
+       data nomtyp/
+     1              'INCOPRIM', 'INCODUAL', 'GRADIENT', 'CONTRAIN',
+     1              'DEFORMAT', 'MATERIAU', 'CARACTER', 'TEMPERAT',
+     1              'PRINCIPA', 'VARINTER', 'GRAFLEXI', 'PHASES  ',
+     1              'DEFINELA', 'PARAMEXT', '        ', 'SCAL    ',
+     1              'TEMP    ', 'MAHO    ', 'MAHT    '/
+      DATA MNLOCA /'Moyenne     ','Stress based','HELMHOLTZ   '/
+      SEGACT,MMODEL
+      N1=KMODEL(/1)
+
+      WRITE(IOIMP,190)
+      WRITE(IOIMP,200)
+      WRITE(IOIMP,201)
+      WRITE(IOIMP,210) N1,MMODEL
+      WRITE(IOIMP,201)
+      WRITE(IOIMP,200)
+
+      DO N=1,N1
+        IMODEL=KMODEL(N)
+        SEGACT,IMODEL
+        WRITE(IOIMP,2) N,IMODEL
+        WRITE(IOIMP,3) IMAMOD,NOMTP(NEFMOD)
+        IF (CONMOD.NE.'                ') WRITE(IOIMP,4)CONMOD
+        IF (conmod(17:24).NE.'        ') WRITE(IOIMP,8) conmod(17:24)
+
+        nfor   = formod(/2)
+        NMAT   = MATMOD(/2)
+        nobmod = tymode(/2)
+        mn3    = infmod(/1)
+        if(mn3.ge.13) then
+          inloc = -1*infmod(13)
+          lulvia= infmod(14)
+        else
+          inloc = 0
+          lulvia= 0
+        endif
+
+        WRITE(IOIMP,5) (FORMOD(i),i=1,NFOR)
+        IIPDPG = imodel.IPDPGE
+        IF (IIPDPG.NE.0) WRITE(IOIMP,7) IPTPOI(IIPDPG),IIPDPG
+        IF (NMAT.NE.0) WRITE(IOIMP,6) (MATMOD(i),i=1,NMAT)
+        mecfor=0
+        mdifor = 0
+        do i=1,nfor
+          if(formod(i).eq.'MECANIQUE'.or.formod(i).eq.'POREUX'.or.
+     & formod(i).eq.'NAVIER_STOKES') mecfor=1
+          if(formod(i).eq.'DIFFUSION') mdifor=1
+        enddo
+        if(mecfor.eq.1) then
+c            write(ioimp,27) mderiv(ideriv)
+cbp,2020-12-10 : abandon de IDERIV (MMODEL)
+           if(inloc.ne.0) then
+             write(ioimp,28) mnloca(inloc)
+             if(lulvia.ne.0) then
+               mlmots=lulvia
+               segact,mlmots
+               write(ioimp,29) (mots(iu),iu=1,mots(/2))
+             endif
+           endif
+
+        endif
+        do io=1,19
+          nomid = lnomid(io)
+          if(nomid.gt.0) then
+C         write(6,*) 'nomid',io,nomid
+             segact nomid
+             if(lesobl(/2).ne.0) then
+               write(ioimp,20) nomtyp(io),nomid
+          if(lesobl(/2).NE.0)write(ioimp,21)(lesobl(iu),iu=1,lesobl(/2))
+          if(lesfac(/2).NE.0)write(ioimp,21)(lesfac(iu),iu=1,lesfac(/2))
+             endif
+          endif
+        enddo
+
+         write(ioimp,23)(infele(iu),iu=1,6),infele(13),infele(14)
+
+c*        if (inatuu.ne.0 .or. imatee.ne.0) then
+        if (imatee.ne.0) then
+          write(ioimp,22) cmatee, imatee, inatuu
+          if (inatuu.eq.-1) then
+            write(ioimp,221) matmod(nmat)
+          endif
+          if (inatuu.eq.-2) then
+            iviex = 0
+            CALL PLACE(tymode,nobmod,iviex,'IVIEX   ')
+            write(ioimp,222) ivamod(iviex)
+          endif
+        endif
+
+*       Impression du contenu de TYMODE et IVAMOD
+        cha6Fa(1:4)='(I )'
+        cha6Fb(1:2)='(A'
+        DO i=1,nobmod          
+          IF (i.EQ.1)WRITE(IOIMP,12)
+          MOT8=TYMODE(i)
+          IVA =IVAMOD(I)
+          IF    (MOT8 .EQ. 'MOT     ')THEN
+            CALL QUEVAL(IVA,'MOT     ',ier,lgmot,r_z, motlib,b_z,i_z)
+            IF(IER .NE. 0)CALL ERREUR(5)
+            
+C           Determination du FORMAT automatique
+            IFORMA = INT(LOG10(REAL(lgmot))) + 1
+            IF    (IFORMA.GE.1 .AND. IFORMA.LT.9 )THEN
+              WRITE(cha6Fa(3:3), '(I1)') IFORMA
+            ELSE
+              CALL ERREUR(5)
+            ENDIF
+            
+            
+            WRITE(cha6Fb(3:3+IFORMA-1),FMT=cha6Fa) lgmot
+            cha6Fb(3+IFORMA:3+IFORMA)=')'
+            
+            fmt1='(11X,A8,2X,'//cha6Fb(2:3+IFORMA-1)//')'
+            WRITE(IOIMP,FMT=fmt1) MOT8,motlib(1:MIN(lgmot,72))
+          ELSE
+            WRITE(IOIMP,13) MOT8,IVA
+          ENDIF
+        ENDDO
+
+*       if (infmod(/1).gt.2)  write(IOIMP,*)
+*     $ 'segment d integtration ',(infmod(iu),iu=3,infmod(/1))
+
+        IF (nobmod.NE.0) THEN
+          if ((mecfor.eq.1 .and. inatuu.lt.0) .or. mdifor.eq.1) then
+
+
+            noblib = 0
+            if (mdifor.eq.1) then
+              CALL PLACE(tymode,nobmod,noblib,'LDIEXT  ')
+            else
+              CALL PLACE(tymode,nobmod,noblib,'LMEEXT  ')
+            endif
+            if (noblib.gt.0) then
+              iva=ivamod(noblib+1)
+              call queval(iva,'MOT     ',ier,lgmot,r_z, motlib,b_z,i_z)
+              lglib = INDEX(motlib,'=')-1
+              m_libe = LONG(motlib(1:lglib))
+              if (m_libe.gt.72) then
+                write(ioimp,223) motlib(1:72)//'...'
+              else
+                write(ioimp,223) motlib(1:m_libe)
+              endif
+              m_mode = LONG(motlib(lglib+2:lgmot))
+              write(ioimp,224) motlib(lglib+2:lglib+m_mode+1)
+            endif
+          else
+C            WRITE(IOIMP,12) (TYMODE(i),IVAMOD(i),i=1,nobmod)
+          endif
+        ENDIF
+      
+C=DEB== FORMULATION HHO === Affichages specifiques =====================
+        mfr = NUMMFR(nefmod)
+        IF (mfr .EQ. HHO_MFR_ELEMENT) THEN
+c-dbg      write(ioimp,*)
+c-dbg      write(ioimp,*) 'HHO : IDIM, IFOUR =', IDIM,IFOUR
+c-dbg      write(ioimp,*) '      =>'//charHHO(1:LONG(charHHO))//'<='
+c-dbg      write(ioimp,*) '      FACE ORDER / DOF DIR = ',n_o_face,n_d_face
+c-dbg      write(ioimp,*) '      CELL ORDER / DOF DIR = ',n_o_cell,n_d_cell
+c-dbg      write(ioimp,*) '      HYPOTHESIS = ', hyp_z(2:3)
+c-dbg      write(ioimp,*)
+        ENDIF
+C=FIN== FORMULATION HHO ================================================
+
+      ENDDO
+
+      WRITE(IOIMP,190)
+
+ 190  FORMAT(//)
+ 200  FORMAT(1X,'+',77('-'),'+')
+ 201  FORMAT(1X,'|',T80,'|')
+ 210  FORMAT(' |          OBJET  MMODEL  CONTENANT ',I6,
+     .       ' ZONE(S) ELEMENTAIRE(S)',I10,T80,'|')
+ 2    FORMAT(//10X,' ZONE ELEMENTAIRE NUMERO ',I6,' : IMO',I10,
+     .        /10X,' -----------------------------------------------')
+ 3    FORMAT(/1X,'  POINTEUR SUR L''OBJET MAILLAGE : ',I10,/,
+     .        1X,'  TYPE D''ELEMENT FINI  :  ',3X,A4)
+ 4    FORMAT(1X,'  NOM DU CONSTITUANT   :  ',3X,A24)
+ 5    FORMAT(1X,'  FORMULATION          :  ',5(3X,A16))
+ 6    FORMAT(1X,'  MODELE DE MATERIAU   :  ',5(3X,A16))
+ 7    FORMAT(1X,'  POINT SUPPORT DPGE   :  ',I10,/,
+     $       1X,'  stocke dans le maillage de pointeur', I10)
+ 8    FORMAT(1X,'  NOM DE LA PHASE      :  ',3X,A8)
+ 9    FORMAT(1X,'  VARIABLES INTERNES   :    ',12(1X,A4))
+ 10   FORMAT(1X,'  PARAMETRES MATERIAUX :    ',12(1X,A4))
+ 12   FORMAT(/'   Liste des objets associes : type - valeur')
+ 13   FORMAT(11X,A8,2X,I10,10X)
+ 14   FORMAT(11X,A8,2X,A72)
+ 20   FORMAT(1x,'  Liste des noms de composantes de ',a8, 
+     &          '    -    Pointeur nomid:',I10)
+ 21   format (10x, 16(A4,1X))
+ 22   format(1x,'  MATERIAU cmate imate inatu   : ',a8,2I5)
+ 221  format(9x,'  NOM LOI UTILISATEUR : "',a16,'"')
+ 222  format(9x,'  LOI VISCO_EXTERNE   : ',I5)
+ 223  format(9x,'  "LIBRAIRIE" EXTERNE : "',A,'"')
+ 224  format(9x,'  "FONCTION" EXTERNE  : "',A,'"')
+ 
+ 23   format(/1X,'  numero de l element fini (nefmod):' , i5,/,
+     $       1X,'  points integration epaisseur     :' , i5,/,
+     $       1X,'  points de gauss pour masse       :' , i5,/,
+     $       1X,'  points support de contraintes    :' , i5,/,
+     $       1X,'  nombre de caracteristiques       :' , i5,/,
+     $       1X,'  points de gauss pour rigidite    :' , i5,/,
+     $       1X,'  numero de la formulation E.F(mfr):' , i5,/,
+     $       1X,'  numero de  l element geometrique :' , i5)
+ 27   format(1x,'  Hypothese de deformations : ',a16,/)
+ 28   format(1x,'  Formulation non locale    : ',a12)
+ 29   format(1x,'  Variables moyennees       :',12(1X,A4))
+
+      RETURN
+      END
+
+
+
+ 
+ 
+ 
+ 
+ 

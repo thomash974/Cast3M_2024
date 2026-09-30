@@ -1,0 +1,347 @@
+C MIXEMP    SOURCE    KICH      20/10/02    21:15:05     10733          
+      SUBROUTINE MIXEMP(IPMODL,IPCHE1,IPCHE2,IPCHE3,IRET,NOER)
+C_______________________________________________________________________
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+
+-INC SMMODEL
+-INC SMCHAML
+-INC SMELEME
+-INC SMINTE
+-INC SMLENTI
+-INC SMLMOTS
+-INC SMCOORD
+C
+      SEGMENT STBGRA
+       INTEGER LTBGRA(NBGRA,NBPHA)
+      ENDSEGMENT
+      
+*
+      SEGMENT NOTYPE
+        CHARACTER*16 TYPE(NBTYPE)
+      ENDSEGMENT
+*
+      SEGMENT LIMODE(NK100)
+*
+      PARAMETER ( NINF=3 )
+      INTEGER INFOS(NINF)
+      CHARACTER*8 CMATE
+      CHARACTER*(NCONCH) CONM
+      LOGICAL BDPGE,ldpge,lsupfo,lsupco,lsupma,dcmate
+*
+      lisloi = 0
+      liliph = 0
+C
+*      write(6,*) 'mixemp'
+      mmodel = IPMODL
+      NSOUS = mmodel.kmodel(/1)
+C
+C     ACTIVATION DES CONTRAINTES
+C
+      mchel1 = IPCHE1
+      mchel2 = IPCHE2
+
+*      CALL oooprl(0)
+
+* reperer le nombre de lois
+      jgn = 16
+      jgm = nsous
+      segini mlmots
+      imodel = kmodel(1)
+      mots(1) = conmod(1:16)
+      jg = nsous
+      segini mlenti,mlent1
+
+      do ity = 1,ivamod(/1)
+       if(tymode(ity).eq.'PHASES  ') then
+         lect(1) = ivamod(ity)
+         goto 21
+       endif 
+      enddo 
+  21  klois = 1
+      do 100 ksous =2,nsous
+         imodel = kmodel(ksous)
+         do kl = 1,klois
+          if (conmod(1:16).eq.mots(kl)) goto 100
+         enddo
+         klois = klois + 1
+         mots(klois) = conmod(1:16)
+       do ity = 1,ivamod(/1)
+        if(tymode(ity).eq.'PHASES  ') then
+         lect(klois) = ivamod(ity)
+         goto 100
+        endif 
+       enddo 
+ 100  continue
+      jgm = klois
+      segadj mlmots
+      lisloi = mlmots
+      jg = klois
+      segadj mlenti 
+      liliph = mlenti
+
+      mlmot1 = lisloi
+      mlent1 = liliph
+      L1 = 14
+      n1 = nsous
+      n3 = 6
+      segini mchelm
+      TITCHE = 'CREE PAR  MIXE'
+      ifoche = ifour
+      ipche3 = mchelm
+      kche3 = 0
+
+      DO iloi = 1,klois
+
+        mlmots = mlent1.lect(iloi)
+        segact mlmots
+        nbpha = mots(/2)
+        jg = nbpha 
+        segini mlenti
+C
+C_______________________________________________________________________
+C
+C     BOUCLE SUR LES SOUS ZONES
+C_______________________________________________________________________
+C
+      DO 200 ISOUS = 1, NSOUS
+        
+        imode = kmodel(isous)
+*        write(6,*) CMATEE
+        ima0 = 1
+        IF(conmod(1:16).eq.mlmot1.mots(iloi)) THEN
+  208     ima1 = 0
+          do 221 im=ima0,mchel1.imache(/1)
+            if (mchel1.imache(im).eq.imamod) then
+              ima0 = im
+              mchaml = mchel1.ichaml(ima0)
+              do 211 inom1 = 1,nomche(/2)
+                do iph = 1,nbpha
+                  if(nomche(inom1).eq.mots(iph)) then
+                    lect(iph) = ielval(inom1)
+                    goto 211
+                  endif
+                enddo
+  211         continue
+              do iph =1,nbpha
+                if(lect(iph).eq.0) then
+*      write(6,*) 'proportion de phase ',mots(iph),' zone ',isous, ' ?' 
+                  moterr(1:8)=mots(iph)
+                  interr(1) = isous 
+                  goto 9990
+                endif
+              enddo
+              ima1 = im
+              ima0 = im + 1
+              goto 231
+            endif
+  221     continue
+
+  231     if(ima1.le.0.and.ima0.le.1) then
+            call erreur(5) 
+            return
+          elseif(ima1.le.0.and.ima0.gt.1) then
+            goto 200
+          endif
+
+          stbgra = 0
+          ima2 = 0
+          do 241 im=1,mchel2.imache(/1)
+            if (mchel2.imache(im).eq.imamod) then
+                do iph = 1,nbpha
+                  if(mchel2.conche(im)(17:24).eq.mots(iph)) then
+                    if(stbgra.eq.0) then
+                      ima2 = im
+                      mchaml = mchel2.ichaml(im)
+                      mcham1 = mchaml
+                      n2 = nomche(/2)
+                      nbgra = n2
+                      segini stbgra
+                      do igr =1,n2
+                       ltbgra(igr,iph) = ielval(igr)
+                      enddo
+                    elseif(stbgra.gt.0) then
+                      mchaml = mchel2.ichaml(im)
+                      n2 = nomche(/2)
+                      if(n2.ne.nbgra) then
+*           write(6,*) 'incohérence grandeurs physiques', im
+                  moterr(1:8)='grandeur'
+                  interr(1) = im 
+                       goto 9990
+                      endif
+                      do ii = 1,6
+            if(mchel2.infche(im,ii).ne.mchel2.infche(ima2,ii)) then
+           write(6,*) 'incohérence grandeurs physiques infche', im,ii
+                       goto 9990
+            endif
+                      enddo
+                      do 248 iel =1,nbgra
+                        do igr =1,nbgra 
+                         if(nomche(iel).eq.mcham1.nomche(igr)) then
+                          ltbgra(igr,iph) = ielval(igr)
+                          goto 248
+                         endif
+                        enddo
+ 248                  continue
+                    endif
+                  endif
+                enddo
+            endif
+ 241      continue
+
+          do iph=1,nbpha
+            do igr=1,nbgra
+                if(ltbgra(igr,iph).eq.0) then
+*      write(6,*) 'grandeur physique ',mcham1.nomche(igr),
+*     & ' phase ',mots(iph),' zone ',im,' ?' 
+                  moterr(1:8)=mots(iph)
+                  interr(1) = im
+                  goto 9990
+                endif
+            enddo
+          enddo
+
+          n2ptel = 0
+          n2el = 0
+          m1pt = 1
+          m1el = 1
+
+          DO iph = 1,nbpha
+            melval = lect(iph)
+            m1pt = max(m1pt,velche(/1))
+            m1el = max(m1el,velche(/2))
+          ENDDO
+
+          m0pt = m1pt
+          n0pt = m1el 
+
+          n2 = nbgra
+          segini mchaml
+          
+          DO igr = 1,nbgra
+            if(m0pt.eq.1.or.m0el.eq.1) then
+              m1pt = m0pt
+              n1pt = n0pt
+              do iph = 1,nbpha
+                melval = ltbgra(igr,iph)
+                m1pt = max(m1pt,velche(/1))
+                m1el = max(m1el,velche(/2))
+              enddo
+            endif
+
+            n1ptel = m1pt
+            n1el = m1el 
+            segini melval
+
+            DO iph = 1,nbpha
+              melva1 = lect(iph)
+              mphpt = melva1.velche(/1)
+              mphel = melva1.velche(/2)
+              melva2 = ltbgra(igr,iph)
+              mgrpt = melva2.velche(/1)
+              mgrel = melva2.velche(/2)
+
+              do iel=1,n1el
+                do ig = 1,n1ptel
+                xph = melva1.velche(min(ig,mphpt),min(iel,mphel))
+                xgr = melva2.velche(min(ig,mgrpt),min(iel,mgrel))
+                  if(cmatee.eq.'PARALLEL') then
+          velche(ig,iel) = xph * xgr + velche(ig,iel)          
+                  elseif(cmatee.eq.'SERIE   ') then
+                    if (xgr.eq.0) then
+*      write(6,*) 'grandeur physique nulle',mcham1.nomche(igr),
+*     & ' phase ',mots(iph),' zone ',im,' ?'
+                      goto 9990
+                  moterr(1:8)=mots(iph)
+                  interr(1) = im 
+                    endif
+          velche(ig,iel) = xph / xgr + velche(ig,iel)          
+                  endif
+
+                enddo
+              enddo
+
+            ENDDO
+
+            ielval(igr) = melval
+            typche(igr) = 'REAL*8'
+            nomche(igr) = mcham1.nomche(igr)
+          ENDDO
+
+          kche3 = kche3 + 1
+          mchelm = ipche3
+          if(kche3.gt.imache(/1)) then
+             n1  = imache(/1) + 20
+             n3 = 6
+             segadj mchelm
+          endif
+          ichaml(kche3) = mchaml
+          imache(kche3) = imamod
+          conche(kche3)(1:16) = conmod(1:16)
+          mchel1 = ipche1
+          do ii =1,6 
+            infche(kche3,ii) = mchel2.infche(ima2,ii)
+          enddo
+          goto 208
+        ENDIF
+
+ 200  CONTINUE
+
+* iloi
+      ENDDO
+*
+* Fin normale
+      IRET = 1
+      n1 = kche3
+      mchelm = ipche3
+      segadj mchelm
+      GOTO 9000
+*
+*     ERREUR DANS UNE SOUS ZONE, DESACTIVATION ET RETOUR
+*
+ 9990 CONTINUE
+      IRET = 0
+      if (nbgra.gt.0.and.igr.lt.nbgra) then
+          n2 = igr
+          segadj mchaml
+          kche3 = kche3 + 1
+          mchelm = ipche3
+          if(kche3.gt.imache(/1)) then
+             n1  = imache(/1) + 20
+             n3 = 6
+             segadj mchelm
+          endif
+          ichaml(kche3) = mchaml
+          imache(kche3) = imamod
+          n1 = kche3
+          mchelm = ipche3
+          segadj mchelm
+      else
+          if (kche3.gt.0) then
+           n1 = kche3
+           mchelm = ipche3
+           segadj mchelm
+          else
+           segsup mchelm
+           ipche3 = 0
+           call erreur(5)
+           return
+          endif
+      endif
+      call erreur(-370)
+      return
+*
+C Dernieres desactivations avant de quitter :
+ 9000 CONTINUE
+      mmodel = IPMODL
+      SEGSUP,MMODEL
+
+      END
+
+ 

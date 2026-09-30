@@ -1,0 +1,316 @@
+C QZCON1    SOURCE    BP208322  22/09/22    21:15:04     11464          
+*
+* creation : bp,2022-09-15         
+* inspiré de : QZCONS    SOURCE    PV        20/03/24    21:21:13     10554
+*
+**********************************************************************************
+*   EN ENTREE :                                                                  *
+*      - RI1 : matrice A (non assemblee)                                         *
+*                                                                                *
+*   EN SORTIE :                                                                  *
+*      - XMATR1, XMATR2 : les matrices assemblees A et B nxn                     *
+*        A = A    B = I                                                          *
+*                                                                                *
+*      - MELEME : le maillage support                                            *
+*      - MLMOTS : les composantes (ALFA suelement meme si non coherent !)        *
+**********************************************************************************
+*
+      SUBROUTINE QZCON1(RI1,XMATR1,XMATR2,MELEME,MLMOTS)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMLMOTS
+-INC SMRIGID
+-INC SMCOORD
+
+      SEGMENT ICPR(nbpts)
+      SEGMENT KDDL(NK)
+      SEGMENT KINCO(JGM,NINCO)
+      POINTEUR XMATRM.XMATRI
+
+      LOGICAL AFFICH
+      CHARACTER*4 MOPRI,MODUA
+      PARAMETER(NDDMAX=400)
+
+*     Affichage des messages pour verification
+      AFFICH = IIMPI.GE.21
+
+
+*======================================================================*
+*     INITIALISATIONS
+*======================================================================*
+
+*     du MELEME
+      NBREF=0
+      NBSOUS=0
+      NBELEM=20
+      NBNN=1
+      SEGINI,MELEME
+
+*     du MLMOTS
+      JGN=4
+      JGM=NBELEM
+      SEGINI,MLMOTS
+
+*     de XMATR1 XMATR2
+      NELRIG=1
+      NLIGRD=NBELEM
+      NLIGRP=NLIGRD
+      SEGINI,XMATR1,XMATR2
+
+*     de ICPR = tableau de la numerotation locale
+      SEGACT MCOORD*mod
+      SEGINI,ICPR
+      NLOC=0
+      
+*     de MLMOT1 = tableau des noms d'inconnue locale
+      JGN=4
+      JGM=10
+      SEGINI,MLMOT1
+      JGM1=0
+      
+*     de KINCO = tableau des ddls
+      NINCO=10
+      SEGINI KINCO
+      
+*     nombre total de DDL :      
+      NDDL=0
+
+      
+*======================================================================*
+*     RIGIDITE en entree
+*======================================================================*
+
+        MRIGID=RI1
+        IF(MRIGID.EQ.0) CALL ERREUR(5)
+
+        SEGACT,MRIGID
+        NRIGEL=IRIGEL(/2)
+
+*======================================================================*
+*       BOUCLE SUR LES SOUS-RIGIDITES
+*======================================================================*
+        DO 200 IRI=1,NRIGEL
+
+          IF(AFFICH)
+     &    WRITE(IOIMP,*)'MATRICE ',IRI,'IEME SOUS-RIGIDITE'
+
+          IPT1   = IRIGEL(1,IRI)
+          DES1   = IRIGEL(3,IRI)
+          XMATRI = IRIGEL(4,IRI)
+          SEGACT,DES1,IPT1,XMATRI
+
+*         Verification que la matrice est carr�e
+          NLIG1P=DES1.NOELEP(/1)
+          NLIG1D=DES1.NOELED(/1)
+          IF(NLIG1P.NE.NLIG1D) THEN
+            CALL ERREUR(756)
+            SEGDES,DES1,IPT1,XMATRI,MRIGID
+            RETURN
+          ENDIF
+*         rem : on pourrait aussi tester NOELEP(:) = NOELED(:)
+*                                        LISDUA(:) = dual de LISINC(:)
+          SEGACT,IPT1
+          NBNN1   = IPT1.NUM(/1)
+          NBELEM1 = IPT1.NUM(/2)
+          
+          IF(AFFICH) THEN
+            WRITE(IOIMP,*)'MATRICE : ',IRI,'IEME SOUS-RIGIDITE'
+            WRITE(IOIMP,*) '+INCO=',(DES1.LISINC(iou),iou=1,NLIG1P)
+            WRITE(IOIMP,*) '     #',(DES1.NOELEP(iou),iou=1,NLIG1P)
+          ENDIF
+ 
+*         creation de KDDL = tableau local des ddls
+          NK=NLIG1P
+          SEGINI,KDDL
+
+          XCOEF=COERIG(IRI)
+
+
+*----------------------------------------------------------------------*
+*         BOUCLE SUR LES ELEMENTS
+*----------------------------------------------------------------------*
+          DO 300 JEL=1,NBELEM1
+
+*----------------------------------------------------------------------*
+*           BOUCLE SUR LES DDLS de cet element de cette sous matrice
+*----------------------------------------------------------------------*
+            DO 400 I=1,NLIG1P
+
+c             recup du noeud + nom d'inconnue
+              INONO = DES1.NOELEP(I)
+              INONO2= DES1.NOELED(I)
+              MOPRI = DES1.LISINC(I)
+              MODUA = DES1.LISINC(I) 
+              IF(INONO.NE.INONO2) THEN
+c               La matrice de rigidite n'est pas carree 
+                CALL ERREUR(756)
+                RETURN
+              ENDIF
+c             rem : il faut aussi tester l'association primal-dual
+
+c         --- NUMEROTATION LOCALE DES NOEUD ---
+              IP    = IPT1.NUM(INONO,JEL)
+              IPLOC = ICPR(IP)
+c             NOUVEAU NOEUD : ON L'AJOUTE 
+              IF(IPLOC.EQ.0) THEN
+                NLOC =NLOC+1
+                IF(NLOC.GT.NINCO) THEN
+                  NINCO=NINCO+10
+                  SEGADJ,KINCO
+                ENDIF
+
+                IPLOC=NLOC
+                ICPR(IP)=IPLOC
+              ELSE
+
+c             NOEUD DEJA VU : IPLOC^ieme NOEUD LOCAL
+
+              ENDIF
+
+              
+c         --- NUMEROTATION LOCALE DES NOMS D'INCONNUES ---
+              DO 410 IILOC=1,JGM1
+                IF(MOPRI.EQ.MLMOT1.MOTS(IILOC)) GOTO 411
+c               NOM D'INCONNUE DEJA VU : IILOC^ieme INCONNUE
+ 410          CONTINUE
+c             NOUVEAU NOM D'INCONNUE : ON L'AJOUTE
+              JGM1 = JGM1 + 1
+              IF(JGM1.GT.MLMOT1.MOTS(/2)) THEN
+                JGM = MLMOT1.MOTS(/2) + 10
+                SEGADJ,MLMOT1,KINCO
+              ENDIF
+              IILOC= JGM1
+              MLMOT1.MOTS(IILOC)=MOPRI
+ 411          CONTINUE
+ 
+c         --- DDL = COUPLE NOEUD + NOM D'INCONNUE ---
+              IDDL=KINCO(IILOC,IPLOC)
+              IF(IDDL.EQ.0) THEN
+                NDDL=NDDL+1
+                IDDL=NDDL
+                KINCO(IILOC,IPLOC)=IDDL
+              ENDIF
+              
+c             ON REMPLIT LE MELEME DE POI1 + LE MLMOTS
+              IF(IDDL.gt.NBELEM) THEN
+                NBELEM=NBELEM+20
+                SEGADJ,MELEME
+                JGM=NBELEM
+                SEGADJ,MLMOTS
+                NLIGRD=NBELEM
+                NLIGRP=NLIGRD
+                SEGADJ,XMATR1,XMATR2                
+              ENDIF
+              NUM(1,IDDL)=IP
+              MOTS(IDDL)=MOPRI
+              
+c             ON REMPLIT AUSSI LE TABLEAU INVERSE KDDL
+              KDDL(I)=IDDL
+              
+
+
+ 400      CONTINUE
+*----------------------------------------------------------------------*
+*         FIN DE BOUCLE SUR LES DDLS
+*----------------------------------------------------------------------*
+
+          IF(AFFICH) THEN
+            WRITE(IOIMP,*) '+#DDL=',(KDDL(iou),iou=1,NLIG1P)
+c             WRITE(IOIMP,*) 'dim de XMATRI=',RE(/1),RE(/2),RE(/3)
+          ENDIF
+
+*         REMPLISSAGE DES XMATR1
+          DO J=1,NLIG1P
+            JDDL = KDDL(J)
+            DO I=1,NLIG1P
+              IDDL = KDDL(I)
+              XMATR1.RE(IDDL,JDDL,1)
+     &      = XMATR1.RE(IDDL,JDDL,1) + XCOEF*RE(I,J,JEL)
+            ENDDO
+          ENDDO
+
+ 300      CONTINUE
+*----------------------------------------------------------------------*
+*         FIN DE BOUCLE SUR LES ELEMENTS
+*----------------------------------------------------------------------*
+
+          SEGDES,DES1,IPT1,XMATRI
+
+ 200    CONTINUE
+*======================================================================*
+*       FIN DE BOUCLE SUR LES SOUS-RIGIDITES
+*======================================================================*
+
+        SEGDES,MRIGID
+
+
+*======================================================================*
+*     MENAGE
+*======================================================================*
+      SEGSUP,KINCO,MLMOT1
+*      do i=1,ICPR(/1)
+*        ICPR(i)=0
+*      enddo
+
+*======================================================================*
+*     FINALISATION DES OBJETS RESULTATS
+*======================================================================*
+
+      if(NDDL.gt.NDDMAX) then
+        WRITE(IOIMP,*) 'Probleme de grande taille (',NDDL,'ddls):'
+        WRITE(IOIMP,*) 'L execution risque de prendre du temps...'
+      endif
+      
+*     MISE A LA BONNE DIMENSION DES OBJETS MELEME MLMOTS
+      NBELEM=NDDL
+      SEGADJ,MELEME
+      JGM=NDDL
+      SEGADJ,MLMOTS
+
+*     MISE A LA BONNE DIMENSION DES OBJETS XMATR*
+      NLIGRD=NDDL
+      NLIGRP=NLIGRD
+      SEGADJ,XMATR1,XMATR2
+
+*     ECRITURE DE Id DANS XMATR2 (B)
+        DO IDDL=1,NDDL
+           XMATR2.RE(IDDL,IDDL,1) = 1.D0
+        ENDDO
+
+*     AFFICHAGE DES OBJETS RESULTATS
+      IF (AFFICH) THEN
+        WRITE(IOIMP,*) 'MATRICE A ='
+        WRITE(IOIMP,*) (NUM(1,iou),iou=1,NBELEM)
+        WRITE(IOIMP,*) (MOTS(iou),iou=1,JGM)
+        DO iou=1,NDDL
+           WRITE(IOIMP,*) (XMATR1.RE(iou,jou),jou=1,NDDL)
+        ENDDO
+        WRITE(IOIMP,*) 'MATRICE B ='
+        WRITE(IOIMP,*) (NUM(1,iou),iou=1,NBELEM)
+        WRITE(IOIMP,*) (MOTS(iou),iou=1,JGM)
+        DO iou=1,NDDL
+           WRITE(IOIMP,*) (XMATR2.RE(iou,jou),jou=1,NDDL)
+        ENDDO
+      ENDIF
+*
+*======================================================================*
+*     MENAGE
+*======================================================================*
+      SEGSUP,ICPR
+
+      RETURN
+      END
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 

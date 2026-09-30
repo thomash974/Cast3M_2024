@@ -1,0 +1,308 @@
+C OTTVAC    SOURCE    PV        21/10/28    21:15:06     11152          
+      SUBROUTINE OTTVAC(SIG,VAR1,XVAL,NDEF,VAR2,OO,
+     &     XCC,RCZ,KV0,KV1,TOL,IERUT)
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      PARAMETER (UN=1.D0, DEUX=2.D0, TROIS=3.D0, UNDEMI=0.5D0)
+      PARAMETER (XPI = 3.1415926535897931D0)
+      DIMENSION SIG(*),VAR1(*),XVAL(*),VAR2(*)
+      DIMENSION XCC(*),RCZ(*)
+      DIMENSION AA(3,3),BB(3),OO(3,3),S(6)
+*
+        IERUT=0
+        GO TO  (1,2,3,4,5,6,7,8,9,10),KV0
+*               
+ 1      CONTINUE
+          RTRAC  = XVAL(3)
+                  GFTR   = XVAL(4)
+          XNF1  = VAR2(4)
+                  FIL = VAR2(13)
+          IF(XNF1.EQ.0.D0) THEN
+            AA(1,1)=SIG(1)
+            AA(1,2)=SIG(4)
+            AA(1,3)=SIG(5)
+            AA(2,1)=SIG(4)
+            AA(2,2)=SIG(2)
+            AA(2,3)=SIG(6)
+            AA(3,1)=SIG(5)
+            AA(3,2)=SIG(6)
+            AA(3,3)=SIG(3)
+            CALL JACOB4(AA,3,BB,OO)
+            RCZ(KV0) = BB(1) - RTRAC
+          ELSE
+                        WO0= RTRAC*RTRAC/(2.D0*GFTR*FIL)                  
+            WO2= VAR1(2)
+            WO1= RTRAC - WO0 * WO2
+            WO1= MAX(WO1,0.D0)
+            RCZ(KV0) = SIG(1) - WO1 
+          ENDIF
+        GO TO 20
+*
+ 2      CONTINUE
+          RTRAC  = XVAL(3)
+                  GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO31= VAR1(1)
+          WO2= VAR1(2)
+
+          IF(WO2.GT.0.D0) THEN
+                        FIL  = VAR2(13)
+                        WO0= RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                    WO4= RTRAC - WO0 * WO2
+            WO4=  MAX(WO4,0.D0)
+            WO1= WO4*(BETA - WO31/WO2)/(1.-BETA)
+            IF(KV1.EQ.0) THEN
+              WO1 = MIN (WO1,0.D0)
+              RCZ(KV0) = -ABS(SIG(1)) - WO1
+            ELSE
+              RCZ(KV0) = -SIG(1) - WO1
+            ENDIF
+          ELSE
+            RCZ(KV0) = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 3      CONTINUE
+          RTRAC  = XVAL(3)
+          GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO31  = VAR1(1)
+          WO2 = VAR1(2)
+          IF(WO2.GT.0.D0) THEN      
+                    FIL= VAR2(13)
+                        WO0= RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                        WO4= RTRAC - WO0 * WO2
+            WO4=  MAX(WO4,0.D0)
+            WO1= WO4*(WO31/WO2-BETA)/(1.-BETA)
+            IF(KV1.EQ.0) THEN
+              WO1 = MAX (WO1,0.D0)
+              WO1 = MIN (WO1,WO4)
+            ENDIF
+            RCZ(KV0) = SIG(1) - WO1
+          ELSE
+            RCZ(KV0) = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 4      CONTINUE
+          RTRAC = XVAL(3)
+                  GFTR  = XVAL(4)                 
+          XNF1  = VAR2(4)
+          XNF2  = VAR2(8)
+                  FIL = VAR2(14)                  
+          IF(XNF1.EQ.0.D0) THEN
+            AA(1,1)=SIG(1)
+            AA(1,2)=SIG(4)
+            AA(1,3)=SIG(5)
+            AA(2,1)=SIG(4)
+            AA(2,2)=SIG(2)
+            AA(2,3)=SIG(6)
+            AA(3,1)=SIG(5)
+            AA(3,2)=SIG(6)
+            AA(3,3)=SIG(3)
+            CALL JACOB4(AA,3,BB,OO)
+            RCZ(KV0) = BB(2) - RTRAC
+          ELSE 
+            IF(XNF2.EQ.0.D0) THEN
+              CALL ZERO(AA,3,3)
+              AA(1,1)=SIG(2)
+              AA(1,2)=SIG(6)
+              AA(2,1)=SIG(6)
+              AA(2,2)=SIG(3)
+              CALL JACOB4(AA,2,BB,OO)
+              WO51= BB(1) - RTRAC 
+              WO52= BB(2) - RTRAC 
+              RCZ(KV0) = WO51
+              IF(WO51.LT.WO52) THEN
+                RCZ(KV0) = WO52
+                OO(1,1) = OO(2,1)
+                OO(2,1) = OO(2,2)
+              ENDIF
+            ELSE
+                          WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)    
+              WO2= VAR1(4)
+              WO1 = RTRAC - WO0 * WO2
+              WO1 = MAX(WO1,0.D0)
+              RCZ(KV0) = SIG(2) - WO1 
+            ENDIF
+          ENDIF
+        GO TO 20
+*
+ 5      CONTINUE
+          RTRAC  = XVAL(3)
+                  GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO31= VAR1(3)
+          WO2= VAR1(4)
+          IF(WO2.GT.0.D0) THEN      
+                    FIL  = VAR2(14)
+                        WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                    WO4 = RTRAC - WO0 * WO2
+            WO4=  MAX(WO4,0.D0)
+            WO1 = WO4*(BETA - WO31/WO2)/(1.-BETA)
+            IF(KV1.EQ.0) THEN
+              WO1 = MIN (WO1,0.D0)
+            RCZ(KV0) = -ABS(SIG(2)) - WO1
+            ELSE
+              RCZ(KV0) = -SIG(2) - WO1
+            ENDIF
+          ELSE
+            RCZ(KV0) = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 6      CONTINUE
+          RTRAC  = XVAL(3)
+                  GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO31= VAR1(3)
+          WO2= VAR1(4)
+          IF(WO2.GT.0.D0) THEN
+                        FIL  = VAR2(14)
+                        WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                        WO4 = RTRAC - WO0 * WO2
+            WO4=  MAX(WO4,0.D0)
+            WO1 = WO4*(WO31/WO2-BETA)/(1.-BETA)
+            IF(KV1.EQ.0) THEN
+              WO1 = MAX (WO1,0.D0)
+              WO1 = MIN (WO1,WO4)
+            ENDIF
+            RCZ(KV0) = SIG(2) - WO1
+          ELSE
+            RCZ(KV0) = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 7      CONTINUE
+          RTRAC = XVAL(3)
+                  GFTR  = XVAL(4)                 
+          XNF1  = VAR2( 4)
+          XNF2  = VAR2( 8)
+          XNF3  = VAR2(12)
+                  FIL = VAR2(15)
+          IF(XNF1.EQ.0.D0.AND.XNF2.EQ.0.D0) THEN
+            AA(1,1)=SIG(1)
+            AA(1,2)=SIG(4)
+            AA(1,3)=SIG(5)
+            AA(2,1)=SIG(4)
+            AA(2,2)=SIG(2)
+            AA(2,3)=SIG(6)
+            AA(3,1)=SIG(5)
+            AA(3,2)=SIG(6)
+            AA(3,3)=SIG(3)
+            CALL JACOB4(AA,3,BB,OO)
+            RCZ(KV0) = BB(3) - RTRAC
+          ELSE IF(XNF1.NE.0.D0) THEN
+            IF(XNF2.EQ.0.D0) THEN
+              CALL ZERO(AA,3,3)
+              AA(1,1)=SIG(2)
+              AA(1,2)=SIG(6)
+              AA(2,1)=SIG(6)
+              AA(2,2)=SIG(3)
+              CALL JACOB4(AA,2,BB,OO)
+              WO51= BB(1) - RTRAC 
+              WO52= BB(2) - RTRAC 
+              RCZ(KV0) = WO52
+              IF(WO51.LT.WO52) THEN
+                RCZ(KV0) = WO51
+              ENDIF
+            ELSE
+                          FIL = VAR2(15)
+                      IF(FIL.EQ.0.D0) THEN
+                        WO0 = 0.D0
+                      ELSE      
+                        WO0  = RTRAC*RTRAC/(2.D0*GFTR*FIL)
+              ENDIF     
+              WO2= VAR1(6)
+              WO1 = RTRAC - WO0 * WO2
+              WO1 = MAX(WO1,0.D0)
+              RCZ(KV0) = SIG(3) - WO1 
+            ENDIF
+          ENDIF
+        GO TO 20
+*               
+ 8      CONTINUE
+          RTRAC  = XVAL(3)
+          GFTR   = XVAL(4)
+          BETA   = XVAL(5)
+          WO31= VAR1(5)
+          WO2= VAR1(6)
+          IF(WO2.GT.0.D0) THEN              
+                    FIL= VAR2(15)
+                        WO0= RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                    WO4= RTRAC - WO0 * WO2
+            WO4=  MAX(WO4,0.D0)
+            WO1= WO4*(BETA - WO31/WO2)/(1.-BETA)
+            IF(KV1.EQ.0) THEN
+              WO1= MIN (WO1,0.D0)
+              RCZ(KV0) = -ABS(SIG(3)) - WO1
+            ELSE
+              RCZ(KV0) = -SIG(3) - WO1
+            ENDIF
+          ELSE
+            RCZ(KV0) = - RTRAC 
+          ENDIF
+        GO TO 20
+*               
+ 9      CONTINUE
+          RTRAC  = XVAL(3)
+                  GFTR   = XVAL(4)                
+          BETA   = XVAL(5)
+          WO31= VAR1(5)
+          WO2= VAR1(6)
+          IF(WO2.GT.0.D0) THEN              
+                        FIL= VAR2(15)
+                        WO0= RTRAC*RTRAC/(2.D0*GFTR*FIL)
+                        WO4= RTRAC - WO0 * WO2
+            WO4=  MAX(WO4,0.D0)
+            WO1= WO4*(WO31/WO2-BETA)/(1.-BETA)
+            IF(KV1.EQ.0) THEN
+              WO1 = MAX (WO1,0.D0)
+              WO1 = MIN (WO1,WO4)
+            ENDIF
+            RCZ(KV0) = SIG(3) - WO1
+          ELSE
+            RCZ(KV0) = - RTRAC 
+          ENDIF
+        GO TO 20
+*
+ 10     CONTINUE
+         XLC=VAR1(7)
+         RAC3=SQRT(TROIS)
+         EPCMAX=XCC(1)
+         EPCULT=XCC(2)
+         RCBI  =XCC(3)
+         XALFA =XCC(4)
+         XALFAG=XCC(5)
+         XDC   =XCC(6)
+         RCMAX =XCC(7)
+         XKC1  =XCC(8)
+         XBC   =XCC(9)
+         XFC0  =XCC(10)
+         IF(XLC.LE.XKC1) THEN
+           WO1=XFC0 + 2.*(RCMAX-XFC0)*XLC/XKC1/(1.+(XLC/XKC1)**2)
+         ELSE IF(XLC.GT.XKC1) THEN
+           WO1=RCMAX*(1.+XBC*(XLC-XKC1))*EXP(-XBC*(XLC-XKC1))
+         ENDIF
+         WO1=WO1*(1.-XALFA)
+         XI1=TRACE(SIG)
+         PP=XI1/TROIS
+         S(5)=0.D0
+         S(6)=0.D0
+         DO I=1,3
+            S(I)=SIG(I)-PP
+         ENDDO
+         DO I=4,NDEF
+            S(I)=SIG(I)
+         ENDDO
+         XJ2=UNDEMI*(S(1)*S(1) + S(2)*S(2) + S(3)*S(3))
+     &            +  S(4)*S(4) + S(5)*S(5) + S(6)*S(6)
+         TAU=SQRT(XJ2)
+         RCZ(KV0)=RAC3*TAU + XALFA*XI1 - WO1
+  20  CONTINUE 
+      RETURN
+      END
+
+ 
+ 

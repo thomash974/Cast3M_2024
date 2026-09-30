@@ -1,0 +1,216 @@
+C TOPDI2    SOURCE    GOUNAND   21/04/06    21:15:30     10940          
+      SUBROUTINE TOPDI2(TRAVJ,TRAVX)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPDI2
+C DESCRIPTION : Etant donné une liste de numéros d'éléments à
+C     extraire, on les retire d'une topologie et de son inverse.
+C
+C     On essaie d'accélérer TOPDIF lorsque nexto est grand car cela a
+C     ete identifie comme une source de lenteur par gprof
+C     repris de topdif
+C
+C     On utilise JNBL comme segment inverse de NEXTO      
+C       
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            : JELEM
+C ENTREES/SORTIES    : JCOORD, JTOPO
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 18/12/2017, version initiale
+C HISTORIQUE : v1, 18/12/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMLENTI
+      POINTEUR NEXTO.MLENTI
+      POINTEUR JNBL.MLENTI
+-INC SMELEME
+*
+*     Le nombre d'éléments de JTOPO et le nombre de points de JCOORD
+*     vont être variables. Pour ne pas avoir à ajuster ces segments en
+*     permanence, on va dimensionner plus large, mais du coup, il faut
+*     aussi maintenir à la main le nombre de noeuds et d'éléments
+*     courants.
+*
+*     Le nombre d'éléments courants est NVCOU et le nombre d'éléments
+*     max est NVMAX. Idem pour le nombre de noeuds courants et max :
+*     NPCOU et NPMAX.
+*      
+* Numerotation locale des éléments JTOPO.NUM(NBNN,NBELEM)
+*      INTEGER NVCOU,NVMAX
+      POINTEUR JTOPO.MELEME
+-INC TMATOP1
+*-INC STOPINV
+*-INC STRAVJ
+      POINTEUR TRAVX.TRAVJ
+*
+      logical lchang
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans topdi2.eso'
+
+*
+      JTOPO=TRAVJ.TOPO
+      TOPINV=TRAVJ.TOPI
+      NEXTO=TRAVX.NBL
+      JNBL=TRAVJ.NBL
+      IDIMP=IDIM+1
+      
+*tst         write(ioimp,*) 'DIFF avant'
+*tst         call ecmai1(jtopo,0)
+*tst      write(ioimp,*) 'Elements de la topologie extraits :'
+*tst      write(ioimp,187) (nexto.lect(I),I=1,travx.nvcou)
+*tst         segact jtopo*mod
+*tst         call ectopi(topinv,1)
+*tst         call ectopi(topinv,2)
+*     tst         segact topinv*mod
+* Init JNBL      
+      do ielx=1,travx.nvcou
+         jnbl.lect(nexto.lect(ielx))=1
+      enddo      
+         
+*     Mise à jour de TOPINV
+*     Seuls les noeuds appartenant à jexto sont susceptibles d'être
+*     impactés. On utilise le signe de ldg pour savoir si on a déjà
+*     corrigé la liste chaînée du noeud
+*     On parcourt les éléments à l'envers, comme la liste chaînée.         
+      do ielx=travx.nvcou,1,-1
+*      do ielx=1,travx.nvcou
+         do inox=1,IDIMP
+            ip=JTOPO.NUM(inox,nexto.lect(ielx))
+*     Parcours de la liste chaînée ip si pas deja fait
+            ldg=tdc(ip)
+*tst               write(ioimp,185) 'ip,ldg=',ip,ldg
+            if (ldg.gt.0) then
+               lastp=0
+               last=tic(ip)
+*               jelx=ielx
+*               nelx=nexto.lect(jelx)
+*     idgx=1
+               ldgx=ldg
+*tst                  write(ioimp,185) 'idg,lastp,last,nelx=',0,lastp,last
+*tst     $                 ,nelx
+               do 77 idg=1,ldg
+                  iel=((last-1)/idimp)+1
+*tst                     write(ioimp,185) 'idg,nelx,iel,last=',idg,nelx,iel
+*tst     $                    ,last
+                  if (jnbl.lect(iel).eq.1) then
+* 771              continue
+*                  if (iel.eq.nelx) then
+                     lastn=tlc(last)
+*tst                        write(ioimp,185) 'idg,nelx,lastp,last,lastn='
+*tst     $                       ,idg,nelx,lastp,last,lastn
+* suppression d'un indice de la chaîne
+                     if (lastp.eq.0) then
+                        tic(ip)=lastn
+                     else
+                        tlc(lastp)=lastn
+                     endif
+                     tlc(last)=0
+                     last=lastn
+                     ldgx=ldgx-1
+*                     jelx=jelx-1
+*                     if (jelx.lt.1) then
+*                        goto 78
+*                     else
+*                        nelx=nexto.lect(jelx)
+*                     endif
+*                  elseif (iel.lt.nelx) then
+*                     jelx=jelx-1
+*                     if (jelx.lt.1) then
+*                        goto 78
+*                     else
+*                        nelx=nexto.lect(jelx)
+*                     endif
+*                     goto 771
+*     Si nelx<iel                        
+                  else
+*     idgx=idgx+1
+                     lastp=last
+                     last=tlc(last)
+                  endif
+ 77            continue
+ 78            continue
+               tdc(ip)=-ldgx
+*                  goto 79
+            endif
+         enddo
+      enddo
+*     79      continue
+* Raz JNBL
+      do ielx=1,travx.nvcou
+         jnbl.lect(nexto.lect(ielx))=0
+      enddo      
+      
+*
+*     On annule les éléments de JTOPO qui appartenait à JEXTO
+*     et on remet tdc positif         
+*
+      do iel=1,travx.nvcou
+         do ino=1,IDIMP
+            ip=JTOPO.NUM(INO,nexto.lect(iel))
+            tdc(ip)=abs(tdc(ip))
+            JTOPO.NUM(INO,nexto.lect(iel))=0
+         enddo
+      enddo
+* On vérifie la consistance de la topologie inverse
+*tst         write(ioimp,*) 'Changement detecte TOPINV apres'
+*tst         call ectopi(topinv,1)
+*tst         call ectopi(topinv,2)
+      travj.nvzer=travj.nvzer+travx.nvcou
+*     critere de nettoyage
+      if (travj.nvzer.gt.int((0.3d0*nvmax)+0.5d0)) then
+         call topclv(travj,lchang)
+         if (ierr.ne.0) return
+         if (iveri.ge.2.and.lchang) call vetopi(travj
+     $        ,'topdi2 : Apres nettoyage elem auto')
+         if (ierr.ne.0) return
+         travj.nvzer=0
+      endif
+      
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 186  FORMAT ('Segment ',A6,' ',A6,' ajusté de ',I6,' à ',I6)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPDI2  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TOPDI2
+*
+      END
+
+ 

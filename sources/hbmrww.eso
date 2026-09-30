@@ -1,0 +1,32 @@
+C HBMRWW    SOURCE    FANDEUR   22/05/02    21:15:23     11359          
+       SUBROUTINE HBMRWW(NT,NDDL,Q1,PHI,XM,RwwPhi) 
+ 
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+ 
+       INTEGER NT,NHBM,NDDL,I,J
+       REAL*8 AA,Q1(NT),PHI(NT),AUX(NT),XM(NDDL,NDDL),RwwPhi
+
+C Fonctions BLAS/LAPACK
+       REAL*8    DDOT
+       EXTERNAL  DDOT
+*       
+       NHBM = (NT/NDDL - 1)/2
+*        
+*      Etape intermediaire: calcul de 2*(L^2(o)M)*Q1     
+       DO I = 1,NDDL 
+        AUX(I)=0.
+       ENDDO
+       DO J=2,2*NHBM,2
+         DO I=1,NDDL
+            AA = -2.*XM(I,1)*(J/2)**2
+            AUX(NDDL*(1+(J-2))+I) = AA*Q1(NDDL*(1+(J-2))+I)
+            AUX(NDDL*(1+(J-1))+I) = AA*Q1(NDDL*(1+(J-1))+I)            
+         ENDDO              
+       ENDDO
+*      Produit scalaire avec PHI
+       RwwPhi = DDOT(NT,AUX,1,PHI,1)
+
+       END
+ 
+ 

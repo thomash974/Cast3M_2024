@@ -1,0 +1,323 @@
+C FRENE0    SOURCE    CB215821  23/11/02    21:15:04     11779          
+
+      SUBROUTINE FRENE0(arc, repere)
+C ====================================================================
+C Sous-programme FRENE0 : calcul du repère de Frenet d'une ligne
+C
+C --------------------------
+C Paramètres Entrée/Sortie :
+C --------------------------
+C
+C E/  arc    : Ligne le long de laquelle on veut calculer le repère
+C
+C  /S repere : CHPOINT contenant les vecteurs du repère
+C ====================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+C --------------------------------------------------------------------
+C     Declarations
+C --------------------------------------------------------------------
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+-INC SMCHPOI
+-INC CCREEL
+
+      character*4 les_composantes(9)
+
+      data les_composantes/'TX', 'TY', 'TZ', 'NX', 'NY', 'NZ',
+     $                     'BX', 'BY', 'BZ'/
+
+      integer element, premier, dernier, composante_connexe, ecart
+
+      real*8 oa(3), ob(3), oc(3),
+     $       ab(3), bc(3), axe(3), test(3),
+     $       tangent(3), normal(3), binormal(3),
+     $       norme_ab, norme_bc, norme_bin
+
+      logical est_seg2, est_seg3, est_ouvert, est_transition,
+     $        sont_colineaires
+
+      segment nombre_occurences(nbpts)
+      segment numero_du_poi1(nbpts)
+      segment le_premier_element(0)
+      segment le_dernier_element(0)
+
+      pointeur repere.mchpoi
+      pointeur arc.meleme, arc_seg2.meleme, poi1_de_arc.meleme
+
+
+C --------------------------------------------------------------------
+C     Initialisations et preparation du travail
+C --------------------------------------------------------------------
+
+      poi1_de_arc = arc
+      call change(poi1_de_arc, 1)
+      if(ierr.ne.0) return
+
+      est_seg2 = (arc.itypel).eq.2
+      est_seg3 = (arc.itypel).eq.3
+      if(.not.(est_seg2.or.est_seg3)) then
+        call erreur(16)
+      endif
+
+      arc_seg2 = arc
+      if(est_seg3) then
+        call change(arc_seg2, 2)
+        if(ierr.ne.0) return
+      endif
+
+C      On verifie l'orientation des elements avec versen
+C      Pour ca on est oblige de faire des ecrobj/lirobj
+C      => Peut-etre faudrait-il creer un deuxieme niveau dans versen
+C      pour pouvoir l'appeler directement ?
+      call ecrobj('MAILLAGE', arc_seg2)
+      call versen
+      call lirobj('MAILLAGE', arc_seg2, 1, iretou)
+      if(ierr.ne.0) return
+
+C     On verifie que le contour est simple
+C     (un noeud appartient a au plus deux elements)
+C     On fait comme dans ligmai.eso
+      segini nombre_occurences
+      maxel = 0
+      nombre_de_seg2 = arc_seg2.num(/2)
+      do element=1,nombre_de_seg2
+        do noeud_du_seg=1,2
+          noeud = arc_seg2.num(noeud_du_seg, element)
+          nombre_occurences(noeud) = nombre_occurences(noeud) + 1
+          maxel = max(maxel, nombre_occurences(noeud))
+        enddo
+      enddo
+      segsup nombre_occurences
+      if(maxel.gt.2) call erreur(426)
+
+C     Initialisation du segment mpoval
+      nombre_noeuds = poi1_de_arc.num(/2)
+      n = nombre_noeuds
+      nombre_composantes = idim**2
+      nc = nombre_composantes
+      segini mpoval
+
+C     Initialisation et remplissage de numero_du_poi1 (numerotation globale/locale)
+      segini numero_du_poi1
+      do i=1,nombre_noeuds
+        numero_du_poi1(poi1_de_arc.num(1, i)) = i
+      enddo
+      segdes poi1_de_arc
+
+C     On compte le nombre de composantes connexes et on stocke
+C     les premier et dernier elements de chacune
+      segini le_premier_element, le_dernier_element
+      le_premier_element(**) = 1
+      do element=1,(nombre_de_seg2 - 1)
+        noeud_1 = arc_seg2.num(2, element)
+        noeud_2 = arc_seg2.num(1, element + 1)
+        est_transition = noeud_1.ne.noeud_2
+        if(est_transition) then
+          le_dernier_element(**) = element
+          le_premier_element(**) = element + 1
+        endif
+      enddo
+      le_dernier_element(**) = arc_seg2.num(/2)
+      nombre_composantes_connexes = le_premier_element(/1)
+
+
+C --------------------------------------------------------------------
+C     On fait le travail
+C --------------------------------------------------------------------
+
+C     Comme un noeud a ses coordonnees + sa densite il faut prendre
+C     dim + 1 pour obtenir ses coordonnees a partir de xcoor
+      idim1 = idim + 1
+
+      tangent = 0.D0
+      normal = 0.D0
+      binormal = (/ 0.D0, 0.D0, 1.D0 /)
+      ab = 0.D0
+      bc = 0.D0
+
+      SEGACT,MCOORD
+      do composante_connexe=1,nombre_composantes_connexes
+
+C     Travail sur tous les noeuds interieurs
+C     **************************************
+
+        premier = le_premier_element(composante_connexe)
+        dernier = le_dernier_element(composante_connexe)
+
+        nombre_iterations = dernier - premier + 1
+
+        noeud_debut = arc_seg2.num(1, premier)
+        noeud_fin = arc_seg2.num(2, dernier)
+        est_ouvert = noeud_debut.ne.noeud_fin
+        if(est_ouvert) nombre_iterations = nombre_iterations - 1
+
+        do element=premier,(premier + nombre_iterations - 1)
+C         Pour chaque 2eme noeud d'element on calcule d'abord le
+C         vecteur binormal, puis on estime le vecteur tangent,
+C         puis on calcule le vecteur normal par produit vectoriel,
+C         et enfin on recalcule le vecteur tangent par produit
+C         vectoriel pour etre sur que les 3 vecteurs sont orthogonaux
+
+          ia = arc_seg2.num(1, element)
+          ib = arc_seg2.num(2, element)
+          if(.not.est_ouvert.and.element.eq.dernier) then
+            ic = arc_seg2.num(2, premier)
+          else
+            ic = arc_seg2.num(2, element + 1)
+          endif
+
+          do i=1,idim
+            oa(i) = xcoor((ia-1)*idim1 + i)
+            ob(i) = xcoor((ib-1)*idim1 + i)
+            oc(i) = xcoor((ic-1)*idim1 + i)
+          enddo
+
+          if(idim.eq.3) then
+            do i=1,3
+              ab(i) = ob(i) - oa(i)
+              bc(i) = oc(i) - ob(i)
+            enddo
+            call provec(ab, bc, binormal)
+
+            call norme(ab, norme_ab)
+            call norme(bc, norme_bc)
+            call norme(binormal, norme_bin)
+            norme_bin = norme_bin + xpetit
+            sont_colineaires = norme_bin
+     $                              .le.(norme_ab*norme_bc*xzprec)
+            if(sont_colineaires) then
+C             On tente de prendre le vecteur binormal en A
+              do i=1,3
+                binormal(i) = vpocha(numero_du_poi1(ia), 6 + i)
+              enddo
+              call norme(binormal, norme_bin)
+              norme_bin = norme_bin + xpetit
+              if(.not.a_egale_b(norme_bin, 1.D0)) then
+C               Il n'y a pas de vecteur unitaire en A donc on appelle perpen
+                call perpen(ab, binormal)
+              endif
+            else
+              call normer(binormal)
+            endif
+          endif
+
+          do i=1,idim
+            tangent(i) = oc(i) - oa(i)
+          enddo
+          call provec(binormal, tangent, normal)
+          call normer(normal)
+
+          call provec(normal, binormal, tangent)
+
+          noeud = numero_du_poi1(ib)
+          do i=1,idim
+            vpocha(noeud, i) = tangent(i)
+            vpocha(noeud, idim + i) = normal(i)
+            if(idim.eq.3) vpocha(noeud, 6 + i) = binormal(i)
+          enddo
+
+        enddo
+
+C     Travail sur les extermites (si le contour est ouvert)
+C     ****************************************************
+
+        if(est_ouvert) then
+C         On fait une boucle pour traiter les deux extremites :
+C         - on calcule le vecteur tangent
+C         - on calcule la binormale si on est en 3D (par orthonormalisation
+C           de la valeur voisine ou en appelant perpen si contour = 1 element)
+C         - on calcule la normale par le produit vectoriel des deux vecteurs precedents
+C           (attention a la boucle, si contour = 1 element alors dernier - premier = 0 !)
+          ecart = max(1, dernier - premier)
+          do element=premier,dernier,ecart
+            ia = arc_seg2.num(1, element)
+            ib = arc_seg2.num(2, element)
+            if(element.eq.premier) then
+              noeud_calcul = ia
+              noeud_voisin = ib
+            else
+              noeud_calcul = ib
+              noeud_voisin = ia
+            endif
+
+            do i=1,idim
+              oa(i) = xcoor((ia-1)*idim1 + i)
+              ob(i) = xcoor((ib-1)*idim1 + i)
+              tangent(i) = ob(i) - oa(i)
+            enddo
+            call normer(tangent)
+
+            if(idim.eq.3) then
+              if(premier.ne.dernier) then
+                noeud = numero_du_poi1(noeud_voisin)
+                do i=1,3
+                  binormal(i) = vpocha(noeud, 6 + i)
+                enddo
+                call scal(tangent, binormal, t_scal_b)
+                do i=1,3
+                  binormal(i) = binormal(i) - t_scal_b * tangent(i)
+                enddo
+                call normer(binormal)
+              else
+                call perpen(tangent, binormal)
+              endif
+            endif
+
+            call provec(binormal, tangent, normal)
+
+            noeud = numero_du_poi1(noeud_calcul)
+            do i=1,idim
+              vpocha(noeud, i) = tangent(i)
+              vpocha(noeud, idim + i) = normal(i)
+              if(idim.eq.3) vpocha(noeud, 6 + i) = binormal(i)
+            enddo
+          enddo
+
+C         Si un seul element, on met les memes valeurs au deuxieme noeud
+          if(premier.eq.dernier) then
+            noeud = numero_du_poi1(noeud_voisin)
+            do i=1,idim
+              vpocha(noeud, i) = tangent(i)
+              vpocha(noeud, idim + i) = normal(i)
+              if(idim.eq.3) vpocha(noeud, 6 + i) = binormal(i)
+            enddo
+          endif
+        endif
+
+      enddo
+      SEGDES,MCOORD
+
+      segsup numero_du_poi1, arc_seg2
+      segsup le_premier_element, le_dernier_element
+
+C     On finalise les segments du CHPOINT
+      nsoupo = 1
+      nat = 1
+      segini repere
+      repere.jattri(1) = 1
+      repere.ifopoi = ifour
+      repere.mtypoi = ' '
+      repere.mochde = 'REPERE DE FRENET'
+      segini msoupo
+      repere.ipchp(1) = msoupo
+      igeoc = poi1_de_arc
+      do j=1,idim
+        do i=1,idim
+          nocomp(idim*(j-1) + i) = les_composantes(3*(j-1) + i)
+          noharm(idim*(j-1) + i) = nifour
+        enddo
+      enddo
+      ipoval = mpoval
+      segdes repere, msoupo, mpoval
+
+      END
+
+ 
+ 
+ 

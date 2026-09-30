@@ -1,0 +1,205 @@
+C ASPERT    SOURCE    FD218221  20/06/17    21:15:01     10630          
+      SUBROUTINE ASPERT(VAL,NUM,NN,NE,ITYP)
+C-----------------------------------------------------------------------
+C     Calcul de l'aspect ratio des elements d'un maillage elementaire
+C     Fonctionne pour les elements TRI3,TET4
+C
+C     L'aspect ratio est definit ainsi :
+C     coef * taille de la plus grande arete / taille de la plus petite hauteur
+C
+C     avec :  coef = SQRT(3)/2 pour les elements TRI3
+C             coef = SQRT(2/3) pour les elements TET4
+C
+C     Ainsi, pour un triangle/tetraedre regulier ASPE = 1
+C            les bornes : 1 < ASPE < +inf
+C
+C     Entrees :
+C        NUM(NN,NE) : tableau des numeros des elements du maillage
+C        NN         : nombre de noeuds par element
+C        NE         : nombre d'elements
+C        ITYP       : numero indiquant le type d'element
+C     Sorties :
+C        VAL(1,NE) : tableau des valeurs d'aspect ration pour les elements
+C                    du maillage (il s'agit du VELCHE d'un champ par elements)
+C-----------------------------------------------------------------------
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+C
+      DIMENSION VAL(1,*),NUM(NN,NE)
+C     Quelques nombres constants
+      R23=SQRT(2.D0/3.D0)
+      R3S2=0.5D0*SQRT(3.D0)
+C     La dimension de l'espace + 1
+      IDIMP1=IDIM+1
+C     Erreur si type d'element non prevu (normalement impossible de passer ici !)
+      IF ((ITYP.NE.4).AND.(ITYP.NE.23)) THEN
+         CALL ERREUR(16)
+         RETURN
+      ENDIF
+C     Boucle sur les elements du maillage
+      DO I=1,NE
+C        Cas des elements TRI3
+         IF (ITYP.EQ.4) THEN
+C           Numeros des 3 sommets
+            IA=NUM(1,I)
+            IB=NUM(2,I)
+            IC=NUM(3,I)
+C           Coordonnees des 3 sommets
+            XA=XCOOR((IA-1)*IDIMP1+1)
+            YA=XCOOR((IA-1)*IDIMP1+2)
+            XB=XCOOR((IB-1)*IDIMP1+1)
+            YB=XCOOR((IB-1)*IDIMP1+2)
+            XC=XCOOR((IC-1)*IDIMP1+1)
+            YC=XCOOR((IC-1)*IDIMP1+2)
+            IF (IDIM.EQ.3) THEN
+               ZA=XCOOR((IA-1)*IDIMP1+3)
+               ZB=XCOOR((IB-1)*IDIMP1+3)
+               ZC=XCOOR((IC-1)*IDIMP1+3)
+            ENDIF
+C           Tailles des 3 aretes
+            XBA=XB-XA
+            YBA=YB-YA
+            IF (IDIM.EQ.2) THEN
+               AB=SQRT(XBA*XBA+YBA*YBA)
+            ELSEIF (IDIM.EQ.3) THEN
+               ZBA=ZB-ZA
+               AB=SQRT(XBA*XBA+YBA*YBA+ZBA*ZBA)
+            ENDIF
+            XCA=XC-XA
+            YCA=YC-YA
+            IF (IDIM.EQ.2) THEN
+               AC=SQRT(XCA*XCA+YCA*YCA)
+            ELSEIF (IDIM.EQ.3) THEN
+               ZCA=ZC-ZA
+               AC=SQRT(XCA*XCA+YCA*YCA+ZCA*ZCA)
+            ENDIF
+            XCB=XC-XB
+            YCB=YC-YB
+            IF (IDIM.EQ.2) THEN
+               BC=SQRT(XCB*XCB+YCB*YCB)
+            ELSEIF (IDIM.EQ.3) THEN
+               ZCB=ZC-ZB
+               BC=SQRT(XCB*XCB+YCB*YCB+ZCB*ZCB)
+            ENDIF
+C           AB.AC
+            SABAC=XBA*XCA+YBA*YCA
+            IF (IDIM.EQ.3) SABAC=SABAC+ZBA*ZCA
+C           AB.BC
+            SABBC=XBA*XCB+YBA*YCB
+            IF (IDIM.EQ.3) SABBC=SABBC+ZBA*ZCB
+C           --> hauteur sous A
+            BH=-SABBC/BC
+            HA=SQRT(AB*AB-BH*BH)
+C           --> hauteur sous C
+            AH=SABAC/AB
+            HC=SQRT(AC*AC-AH*AH)
+C           --> hauteur sous B
+            AH=SABAC/AC
+            HB=SQRT(AB*AB-AH*AH)
+C           Valeur de l'aspect ratio
+            ASPE=R3S2*MAX(AB,AC,BC)/MIN(HA,HB,HC)
+C        Cas des elements TET4
+         ELSEIF (ITYP.EQ.23) THEN
+C           Numeros des 4 sommets
+            IA=NUM(1,I)
+            IB=NUM(2,I)
+            IC=NUM(3,I)
+            ID=NUM(4,I)
+C           Coordonnees des 4 sommets
+            XA=XCOOR((IA-1)*IDIMP1+1)
+            YA=XCOOR((IA-1)*IDIMP1+2)
+            ZA=XCOOR((IA-1)*IDIMP1+3)
+            XB=XCOOR((IB-1)*IDIMP1+1)
+            YB=XCOOR((IB-1)*IDIMP1+2)
+            ZB=XCOOR((IB-1)*IDIMP1+3)
+            XC=XCOOR((IC-1)*IDIMP1+1)
+            YC=XCOOR((IC-1)*IDIMP1+2)
+            ZC=XCOOR((IC-1)*IDIMP1+3)
+            XD=XCOOR((ID-1)*IDIMP1+1)
+            YD=XCOOR((ID-1)*IDIMP1+2)
+            ZD=XCOOR((ID-1)*IDIMP1+3)
+C           Tailles des 6 aretes
+            XBA=XB-XA
+            YBA=YB-YA
+            ZBA=ZB-ZA
+            AB=SQRT(XBA*XBA+YBA*YBA+ZBA*ZBA)
+            XCA=XC-XA
+            YCA=YC-YA
+            ZCA=ZC-ZA
+            AC=SQRT(XCA*XCA+YCA*YCA+ZCA*ZCA)
+            XDA=XD-XA
+            YDA=YD-YA
+            ZDA=ZD-ZA
+            AD=SQRT(XDA*XDA+YDA*YDA+ZDA*ZDA)
+            XCB=XC-XB
+            YCB=YC-YB
+            ZCB=ZC-ZB
+            BC=SQRT(XCB*XCB+YCB*YCB+ZCB*ZCB)
+            XDB=XD-XB
+            YDB=YD-YB
+            ZDB=ZD-ZB
+            BD=SQRT(XDB*XDB+YDB*YDB+ZDB*ZDB)
+            XDC=XD-XC
+            YDC=YD-YC
+            ZDC=ZD-ZC
+            CD=SQRT(XDC*XDC+YDC*YDC+ZDC*ZDC)
+C           Vecteurs normaux unitaires aux 4 plans
+C           --> AB^AC
+            XABAC=YBA*ZCA-ZBA*YCA
+            YABAC=ZBA*XCA-XBA*ZCA
+            ZABAC=XBA*YCA-YBA*XCA
+C           --> normale au plan ABC
+            SABC=SQRT(XABAC*XABAC+YABAC*YABAC+ZABAC*ZABAC)
+            XNABC=XABAC/SABC
+            YNABC=YABAC/SABC
+            ZNABC=ZABAC/SABC
+C           --> AB^AD
+            XABAD=YBA*ZDA-ZBA*YDA
+            YABAD=ZBA*XDA-XBA*ZDA
+            ZABAD=XBA*YDA-YBA*XDA
+C           --> normale au plan ABD
+            SABD=SQRT(XABAD*XABAD+YABAD*YABAD+ZABAD*ZABAD)
+            XNABD=XABAD/SABD
+            YNABD=YABAD/SABD
+            ZNABD=ZABAD/SABD
+C           --> AC^AD
+            XACAD=YCA*ZDA-ZCA*YDA
+            YACAD=ZCA*XDA-XCA*ZDA
+            ZACAD=XCA*YDA-YCA*XDA
+C           --> normale au plan ACD
+            SACD=SQRT(XACAD*XACAD+YACAD*YACAD+ZACAD*ZACAD)
+            XNACD=XACAD/SACD
+            YNACD=YACAD/SACD
+            ZNACD=ZACAD/SACD
+C           --> BC^BD
+            XBCBD=YCB*ZDB-ZCB*YDB
+            YBCBD=ZCB*XDB-XCB*ZDB
+            ZBCBD=XCB*YDB-YCB*XDB
+C           --> normale au plan BCD
+            SBCD=SQRT(XBCBD*XBCBD+YBCBD*YBCBD+ZBCBD*ZBCBD)
+            XNBCD=XBCBD/SBCD
+            YNBCD=YBCBD/SBCD
+            ZNBCD=ZBCBD/SBCD
+C           Hauteurs sous les 4 sommets
+            QBCD=-(XNBCD*XB+YNBCD*YB+ZNBCD*ZB)
+            HA=ABS(XNBCD*XA+YNBCD*YA+ZNBCD*ZA+QBCD)
+            QACD=-(XNACD*XA+YNACD*YA+ZNACD*ZA)
+            HB=ABS(XNACD*XB+YNACD*YB+ZNACD*ZB+QACD)
+            QABD=-(XNABD*XA+YNABD*YA+ZNABD*ZA)
+            HC=ABS(XNABD*XC+YNABD*YC+ZNABD*ZC+QABD)
+            QABC=-(XNABC*XA+YNABC*YA+ZNABC*ZA)
+            HD=ABS(XNABC*XD+YNABC*YD+ZNABC*ZD+QABC)
+C           Valeur de l'aspect ratio
+            ASPE=R23*MAX(AB,AC,AD,BC,BD,CD)/MIN(HA,HB,HC,HD)
+         ENDIF
+C        Ecriture dans le tableau
+         VAL(1,I)=ASPE
+      ENDDO
+C
+      RETURN
+      END
+ 

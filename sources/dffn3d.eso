@@ -1,0 +1,148 @@
+C DFFN3D    SOURCE    PV090527  23/02/06    21:15:02     11587          
+c***********************************************************************
+       subroutine dffn3d(sigm16,delta,rc_app,rt_app,xflu,
+     # ssfl,dfin,cmp1,dfmx2,hydr,hyds,err1)
+     
+c     endommagement asymptotique par fluage
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 tauflu,taulim_taucr,cmp1,xflu
+      real*8 dflu0,dflu1,dfin,ccmax,rc_app,dfmx2
+      real*8 delta
+      real*8 ssfl 
+      logical dciso
+      real*8 xmc,dcpp  
+      real*8 sigm16(6)  
+      integer err1
+
+      real*8 tau_sph,tau_dev      
+      
+      real*8 taucr,dflu,tauflu1,sigs,sig0,sigd6(6),sigeq,sigs3,taulim
+      real*8 taueq,tauflu0,tauseuil
+      integer i
+      real*8 xmax,coeff1
+      real*8 khi,x,xlim,xth,dcpp1,xcpp,xl,xcr,coeff
+      real*8 sigm33(3,3),sigm3(3),vsigm33(3,3),vsigm33t(3,3),sigm6p(6)
+      real*8 sigm6(6)
+c     multiplicateur non lineaire maxi de potentiel de fluage      
+      parameter (xmax=25.d0)
+
+c***********************************************************************      
+c    la non linearite est estimee avec le deviateur de la contrainte
+c    macroscopique apparente bornee à la nouvelle resistance en traction  
+c***********************************************************************
+c      on borne les valeurs princpales positive a rt_app car
+c      la contribution hydrique de pw a rt_app a pu changer depuis le pas precedent
+       call x6x33(sigm16,sigm33)       
+       call b3_v33(sigm33,sigm3,vsigm33)         
+       call traps1(vsigm33t,vsigm33,3) 
+       do i=1,3
+          sigm6p(i)=min(sigm3(i),rt_app)
+          sigm6p(3+i)=0.d0
+       end do 
+       call chrep6(sigm6p,vsigm33t,.false.,sigm6)
+       
+c     calcul du deviateur des contraintes macroscopiques
+      sigs=0.d0   
+c     partie spherique de la contrainte effective moyenne     
+      do i=1,3
+         sigs=sigs+sigm6(i)
+      end do
+      sigs3=sigs/3.d0   
+c     partie deviatorique      
+      sigeq=0.d0
+      do i=1,3
+         sigd6(i)=sigm6(i)-sigs3
+         sigeq=sigeq+sigd6(i)**2.d0
+      end do
+      do i=4,6
+         sigeq=sigeq+2.d0*(sigm6(i)**2.d0)
+      end do
+      sigeq=sqrt(sigeq/2.d0)
+      coeff1=(1.d0/sqrt(3.d0)-delta/3.d0)
+      taulim=rc_app*coeff1
+      tauseuil=ssfl*coeff1 
+      if(sigs3.le.0.) then      
+             taueq=min(sigeq+delta*sigs3,taulim)
+      else
+             taueq=sigeq
+      end if
+c      print*,'ds dffn3d'
+c      print*,rc_app,ssfl,sigm6
+c      print*,taueq
+c      print*,tauseuil,taulim 
+      khi=xflu
+      x=taueq
+      xl=taulim
+      xth=tauseuil
+     
+      
+c     au jeune age on utilise le coeff partant du seuil en cisaillement
+c     apres le seuil de percolation on utilise la fonction partant du seuil nul
+c     pondéré par le degré d'hydratation 
+c     estimation du comportement fluide a seuil
+      if(x.le.xth) then
+c        pas d ecoulement 
+         cmp1=0.d0
+      else
+c        prise en compte du seuil d ecoulement
+         if((xth.gt.0.).and.(x.gt.xth)) then
+             cmp1=(x-xth)/x
+         else if((xth.eq.0.).and.(x.gt.0.)) then
+             cmp1=1.d0
+         else if((xth.ge.0.).and.(x.lt.0.)) then
+             cmp1=0.d0
+         else
+             print*,'Valeur inattendue de x dans dffn3d',x
+             err1=1
+             return
+         end if
+      end if
+     
+c     pour le materiau durci on fractionne l amplification en fonction
+c     du taux d hydratation pour passer progressivement au materiau 
+c     totalement hydrate
+      if(hydr.gt.hyds) then
+c       coeff pour les cas d hydratation < 1
+        coeff=(hydr-hyds)/(1.d0-hyds)
+        if(khi.gt.1.) then
+          xcr = xl*(0.2D1*khi-0.1D1)/(khi-0.1D1)/0.3D1      
+          if(x.gt.0.) then
+c            coeff d amplification pour materiau hydrate
+             t2 = 0.3D1 * x
+             cmp2 = -0.1D1/(khi*(t2-0.2D1*xl)-t2+xl)*xl*khi
+c            remarque: risque de fluage tertiaire si cmp grand
+             cmp2=max(1.d0,cmp2)
+c            calcul de l endommagement final
+             dfin=coeff*min(dfmx2*x/xcr,0.999d0)              
+          else
+c            pas de fluage non lineaire              
+             cmp2=1.d0
+c            pas d'endommagement           
+             dfin=0.d0
+          end if         
+        else
+c         pas d'endommagement             
+          dfin=0.d0
+c         pas de fluage non lineaire          
+          cmp2=1.d0
+        end if
+      else
+c       coeff pour les cas d hydratation < seuil de percolation
+        coeff=1.d0
+c       pas d'endommagement en phase fluide             
+        dfin=0.d0
+c       pas de fluage non lineaire          
+        cmp2=1.d0        
+      end if
+c     combinaison des comportements pré et post seuil d hydratation      
+      cmp1=cmp1*(1.d0-coeff)+coeff*cmp2      
+
+c      print*,'dffn3d: cmp',cmp1,'dfin',dfin      
+      
+      return
+      end
+      
+ 
+ 

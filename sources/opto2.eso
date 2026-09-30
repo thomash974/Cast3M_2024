@@ -1,0 +1,417 @@
+C OPTO2     SOURCE    PV        22/07/28    21:15:06     11419          
+      SUBROUTINE OPTO2(TRAVJ,JELEM)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : OPTO2 (anciennement optt2c)
+C DESCRIPTION : Une implémentation de l'amélioration d'une topologie
+C               autour d'un élément. On reprend OPTITOPO pour le corps
+C     du programme. On reprend l'extraction et la topologie inverse de
+C     EXTO. Le point crucial sera d'implémenter la modification de la
+C     topologie : enlever les anciens éléments et mettre les nouveaux.
+C     
+C
+C     Ici, on est en numérotation locale et on fait l'extraction de la
+C     topologie proprement dite, son optimisation puis sa mise à jour.
+C     Les segments transmis sont supposés activés en *MOD
+C
+C     Le point important est de construire la topologie inverse.      
+C
+C     Le début est identique à exto2.eso
+C
+C     Repris de optt2b : on raccourcit la subroutine en externalisant
+C     des opérations en subroutines.
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : EXTO4C, OPTO3
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       : OPTO1
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            : JELEM
+C ENTREES/SORTIES    : JCOORD, JTOPO
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 17/10/2017, version initiale
+C HISTORIQUE : v1, 17/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC SMLENTI
+      POINTEUR JNBL.MLENTI
+      POINTEUR JNNO.MLENTI,KNNO.MLENTI
+      POINTEUR NEXTO.MLENTI
+-INC SMELEME
+*
+*     Le nombre d'éléments de JTOPO et le nombre de points de JCOORD
+*     vont être variables. Pour ne pas avoir à ajuster ces segments en
+*     permanence, on va dimensionner plus large, mais du coup, il faut
+*     aussi maintenir à la main le nombre de noeuds et d'éléments
+*     courants.
+*
+*     Le nombre d'éléments courants est NVCOU et le nombre d'éléments
+*     max est NVMAX. Idem pour le nombre de noeuds courants et max :
+*     NPCOU et NPMAX.
+*      
+* Numerotation locale des éléments JTOPO.NUM(NBNN,NBELEM)
+*      INTEGER NVCOU,NVMAX
+      POINTEUR JTOPO.MELEME
+*del      POINTEUR KTOPO.MELEME
+      POINTEUR JELEM.MELEME
+      POINTEUR JELEM1.MELEME
+      POINTEUR JEXTO.MELEME,KEXTO.MELEME
+      POINTEUR JTBES.MELEME
+-INC SMCOORD
+* Numerotation locale (de 1 à NBPTS)
+*      INTEGER NPCOU,NPMAX
+*del      POINTEUR JCOORD.MCOORD
+      POINTEUR KCOORD.MCOORD
+-INC TMATOP1      
+*-INC STOPINV
+*-INC SMETRIQ
+      POINTEUR JCMETR.METRIQ
+      POINTEUR KCMETR.METRIQ
+*-INC STRAVJ
+      POINTEUR TRAVK.TRAVJ
+*-INC STRAVL
+-INC SMLMOTS
+      POINTEUR JNMETR.MLMOTS
+      POINTEUR KNMETR.MLMOTS
+*     
+      POINTEUR TRAVX.TRAVJ
+*
+*-INC SMLENTX
+      POINTEUR ICPRX.MLENTX
+      POINTEUR IDCPX.MLENTX
+*-INC SMELEMX
+      POINTEUR KELEMX.MELEMX
+*
+      logical lchang
+*     
+* Executable statements
+*
+      if (impr.ge.4) WRITE(IOIMP,*) 'Entrée dans opto2.eso'
+*
+* Initialisation et extension des segments JTOPO et JCOORD
+*
+      IDIMP=IDIM+1
+      
+      JTOPO=TRAVJ.TOPO
+*
+* Initialisation de la topologie inverse
+*
+*      CALL INTOPI(NVMAX,NPMAX,TOPINV,IMPR)
+      CALL INTOP2(TRAVJ,IMPR)
+      IF (IERR.NE.0) RETURN
+*
+* Remplissage de la topologie inverse avec JTOPO
+*
+*      CALL RETOPI(JTOPO,NVCOU,TOPINV,IMPR)
+      CALL RETOP2(TRAVJ,IMPR)
+      IF (IERR.NE.0) RETURN
+*      
+      if (.false.) then
+         TOPINV=TRAVJ.TOPI
+         call ectopi(TOPINV,1)
+         call ectopi(TOPINV,2)
+      endif
+*
+* Segment de travail pour l'extraction des éléments
+*
+      JG=NVMAX
+      SEGINI JNBL
+      TRAVJ.NBL=JNBL
+      JG=NPMAX-NPINI
+      SEGINI JNNO
+      TRAVJ.NNO=JNNO
+*
+* Extraction de la topologie à optimiser
+*
+*     NELMOY=40
+      IF (IDIM.EQ.2) THEN
+         NELMOY=15
+         NPOMOY=10
+      ELSEIF (IDIM.EQ.3) THEN
+         NELMOY=40
+         NPOMOY=12
+*         NELMOY=40
+*         NPOMOY=25
+      ELSE
+         write(ioimp,*) 'idim=',idim
+         goto 9999
+      ENDIF
+*
+*!!!   A changer plus tard
+* 
+*      NVXMAX=0
+      SEGINI TRAVX
+*old      if (isgadj.gt.0) write(ioimp,185) 'TRAVJ,TRAVX=',TRAVJ,TRAVX
+      TRAVX.NVINI=0
+      TRAVX.NVCOU=0
+      TRAVX.NVMAX=NELMOY
+*      TRAVX.NVMAX=0
+      JG=TRAVX.NVMAX
+      SEGINI NEXTO
+      TRAVX.NBL=NEXTO
+*
+      
+      NBNN=IDIMP
+      NBELEM=TRAVX.NVMAX
+      NBSOUS=0
+      NBREF=0
+      SEGINI JEXTO
+      JEXTO.ITYPEL=JTOPO.ITYPEL
+      TRAVX.TOPO=JEXTO
+*     Boucle sur les éléments
+*      write(ioimp,*) 'opto2 jelem(nno,nbnn=)',jelem.num(/1)
+*     $     ,jelem.num(/2)
+      NBNN1=JELEM.NUM(/1)
+      NBNN=NBNN1
+      NBELEM=1
+      NBSOUS=0
+      NBREF=0
+      SEGINI JELEM1
+      JELEM1.ITYPEL=JELEM.ITYPEL
+
+*     Segment de travail TRAVK pour opto3 numérotation locale à
+*     l'élément extrait.
+      SEGINI TRAVK
+      TRAVK.NVINI=0
+      TRAVK.NVCOU=0
+      TRAVK.NVMAX=NELMOY
+* Important pour le segment NNO après      
+      TRAVK.NPINI=0
+      TRAVK.NPCOU=0
+      TRAVK.NPMAX=NPOMOY
+*      IF (IJOB.NE.0) TRAVK.NPMAX=TRAVK.NPMAX+MAX(10,NPTINI)
+*A changer !!!      IF (IJOB.NE.0) TRAVK.NPMAX=TRAVK.NPMAX+1
+*         IF (IJOB.NE.0) TRAVK.NPMAX=TRAVK.NPMAX+1
+* Topologie de TRAVK (KEXTO)
+      NBELEM=TRAVK.NVMAX
+      NBNN=IDIMP
+      NBSOUS=0
+      NBREF=0
+      SEGINI,KEXTO
+      KEXTO.ITYPEL=JEXTO.ITYPEL
+      TRAVK.TOPO=KEXTO
+*     Coordonnées de TRAVK (KCOORD)
+      NBPTS=TRAVK.NPMAX
+      SEGINI,KCOORD
+      TRAVK.COORD=KCOORD
+      JNMETR=TRAVJ.NMETR
+      IF (JNMETR.NE.0) THEN
+         SEGINI,KNMETR=JNMETR
+         TRAVK.NMETR=KNMETR
+      ENDIF
+      JCMETR=TRAVJ.CMETR
+      IF (JCMETR.NE.0) THEN
+         NNIN=JCMETR.XIN(/1)
+         NNNOE=TRAVK.NPMAX
+         SEGINI,KCMETR
+         TRAVK.CMETR=KCMETR
+      ENDIF
+*
+*     Segment de travail pour trouver les noeuds du contour ou de
+*     l'enveloppe pour étoiler dans topv2 
+*
+      JG=TRAVK.NPMAX-TRAVK.NPINI
+      SEGINI KNNO
+      TRAVK.NNO=KNNO
+*     Segment de travail TRAVL pour topv2
+      NNM=JEXTO.NUM(/1)
+      ITYP=JEXTO.ITYPEL
+*del         CALL TRLINI(NELMOY,JEXTO.NUM(/1),JEXTO.ITYPEL,TRAVL)
+      CALL TRLINI(NELMOY,NNM,ITYP,TRAVL)
+      if (iveri.ge.2) then
+         call trlver(travl,'opto2 : Apres initialisation TRAVL')
+         if (ierr.ne.0) return
+      endif
+*
+*     Segment de travail pour le changement de numérotation dans opto3
+*
+      JGMAX=NPOMOY
+      SEGINI ICPRX
+      CALL mtxadj(ICPRX,0,lchang,'opto2 : ICPRX_INI')
+      if (ierr.ne.0) return
+      SEGINI IDCPX
+      CALL mtxadj(IDCPX,0,lchang,'opto2 : IDCPX_INI')
+      if (ierr.ne.0) return
+*
+*     Segment de travail pour jelem en numérotation très locale dans
+*     opto3. Ce segment a un élément et peut-être moins de noeuds que JELEM1
+*     
+      NNMAX=JELEM.NUM(/1)
+      NLMAX=1
+      SEGINI KELEMX
+      KELEMX.ITYPEX=JELEM.ITYPEL
+      KELEMX.NLCOU=1
+
+      
+      DO IAPARC=1,JELEM.NUM(/2)
+         DO IBNN=1,NBNN1
+            JELEM1.NUM(IBNN,1)=JELEM.NUM(IBNN,IAPARC)
+         ENDDO
+         JPARCO=JPARCO+1
+         IF (IMPR.GE.4) THEN
+            write(ioimp,*) '  opto2 : Autour de l''element ',iaparc
+            call ecmai1(jelem1,0)
+            segact jelem1*mod
+         ENDIF
+*      
+         if (iveri.ge.2) call vetopi(travj,'Avant exto4')
+         if (ierr.ne.0) return
+*
+         CALL EXTO4c(JELEM1,TRAVJ,
+     $        TRAVX)
+*     verif que NBL est bien nettoyé
+         if (iveri.ge.2) call vetopi(travj,'Apres exto4')
+         if (ierr.ne.0) return
+*tst      write(ioimp,*) 'Elements de la topologie extraits :'
+*tst      write(ioimp,187) (nexto(I),I=1,travx.nvcou)
+
+      
+*     Mise à jour de jexto
+         nexto=travx.nbl
+         jexto=travx.topo
+         do iel=1,travx.nvcou
+            do ino=1,IDIMP
+               JEXTO.NUM(ino,iel)=JTOPO.NUM(INO,nexto.lect(iel))
+            enddo
+         enddo
+*
+* Optimisation de la topologie extraite
+*
+         IF (IMPR.GE.4) THEN
+            write(ioimp,*) 'opto2.eso : on a extrait la topologie : '
+            call ecmai1(jexto,0)
+            segact jexto
+         ENDIF
+*
+*     Init
+         
+         CALL OPTO3(TRAVJ,TRAVX,JELEM1,TRAVK,TRAVL,ICPRX,IDCPX,
+     $        KELEMX,
+     $        JTBES,JCAND)
+         IF (IERR.NE.0) RETURN
+         if (iveri.ge.2) call vetopi(travj,'Apres opto3')
+         IF (IERR.NE.0) RETURN
+
+         JEXPLO=JEXPLO+ABS(JCAND)
+         IF (IMPR.GE.4) THEN
+            IF (JEXTO.EQ.JTBES) THEN
+               WRITE(IOIMP,*) 'Pas damelioration JTBES=',JTBES
+            ELSE
+               WRITE(IOIMP,*) 'Topologie amelioree JTBES=',JTBES
+               CALL ECMAI1(JTBES,0)
+               segact jtbes
+            ENDIF
+         ENDIF
+*
+*     Si la topologie locale a été améliorée, on change la topologie
+*     globale en conséquence
+*      
+         IF (JEXTO.NE.JTBES) THEN
+            JCHANG=JCHANG+1
+*            CALL TOPDIF(TRAVJ,TRAVX)
+            CALL TOPDI2(TRAVJ,TRAVX)
+            if (ierr.ne.0) return
+            if (iveri.ge.2) call vetopi(travj,'Apres DIFF')
+            if (ierr.ne.0) return
+*     
+*     On ajoute les éléments de JTBES dans JTOPO
+*
+            CALL TOPFUS(TRAVJ,JTBES)
+            if (ierr.ne.0) return
+            if (iveri.ge.2) call vetopi(travj,'Apres ET')
+            if (ierr.ne.0) return
+         ENDIF
+*
+*     Nettoyage de NEXTO et JEXTO (normalement inutile mais utilisé pour
+*     vetopi)
+*
+         if (iveri.ge.1) then
+            nexto=travx.nbl
+            jexto=travx.topo
+            do iel=1,travx.nvcou
+               do ino=1,IDIMP
+                  JEXTO.NUM(ino,iel)=0
+                  nexto.lect(iel)=0
+               enddo
+            enddo
+            travx.nvcou=0
+         endif
+         
+* Fin boucle sur les éléments         
+      ENDDO
+*
+* Il faut appeler le nettoyage avant de sortir
+*
+      SEGSUP KELEMX
+      SEGSUP ICPRX
+      SEGSUP IDCPX
+      CALL TRLSUP(TRAVL)
+*      SEGSUP IPBTL
+      CALL TOPSUP(TRAVK)
+*tst      topinv=travj.topi
+*tst         write(ioimp,*) 'TOPINV Avant nettoyage elem TOPINV'
+*tst         call ectopi(topinv,1)
+*tst         call ectopi(topinv,2)
+      segsup jelem1
+      if (jtbes.ne.travx.topo) segsup jtbes
+      call topsup(travx)
+      
+*     Nettoyage des éléments vides
+*      impr=8
+      call topclv(travj,lchang)
+      if (ierr.ne.0) return
+      if (iveri.ge.2.and.lchang) call vetopi(travj
+     $     ,'Apres nettoyage elem')
+      if (ierr.ne.0) return
+*
+*     Nettoyage des noeuds non référencés dans la topologie mais
+*     seulement ceux ajoutés par nous, pas les autres !
+*
+      call topclp(travj,lchang)
+* verif          
+      if (iveri.ge.2.and.lchang) call vetopi(travj
+     $     ,'Apres nettoyage noeuds')
+      if (ierr.ne.0) return
+      
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 186  FORMAT ('Segment ',A6,' ',A6,' ajusté de ',I6,' à ',I6)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='OPTO2   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine OPTO2
+*
+      END
+
+ 
+ 

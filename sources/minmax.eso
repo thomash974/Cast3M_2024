@@ -1,0 +1,124 @@
+C MINMAX    SOURCE    SP204843  22/12/19    21:15:05     11532          
+      SUBROUTINE MINMAX (IPTR,CTYP,AMINI,AMAXI,IRET)
+*
+*=============================================================
+* IPTR (E/S) POINTEUR SUR UN LISTREEL ou LISTENTI
+* AMINI (S)  MINI DE LA LISTE
+* AMAXI (S)  MAXI DE LA LISTE
+* IRET = 0 si operation pas realisee
+*=============================================================
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Y)
+
+      CHARACTER*(*) CTYP
+
+      PARAMETER    (NLIST=3)
+      CHARACTER*(8) CLIST(NLIST)
+      DATA          CLIST /'LISTREEL','LISTENTI','LISTMOTS'/
+      MACRO ,              (LISTREEL , LISTENTI , LISTMOTS)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLREEL
+-INC SMLENTI
+-INC CCREEL
+
+      XGPOS = XGRAND
+      XGNEG =-XGRAND
+
+      IRET = 0
+
+      CALL PLAMO8(CLIST,NLIST,IPOS1,CTYP)
+      IF(IPOS1 .EQ. 0)THEN
+        MOTERR=CTYP
+        CALL ERREUR(39)
+        RETURN
+      ENDIF
+
+      CASE, IPOS1
+        WHEN, LISTREEL
+          MLREEL=IPTR
+          JG    =MLREEL.PROG(/1)
+        WHEN, LISTENTI
+          MLENTI=IPTR
+          JG    =MLENTI.LECT(/1)
+        WHENOTHERS
+          MOTERR=CTYP
+          CALL ERREUR(39)
+          RETURN
+      ENDCASE
+
+      IF (JG.EQ.0) RETURN
+
+*-----initialisation
+      IDEB = 0
+ 2    CONTINUE
+      IDEB = IDEB + 1
+      IF(IDEB.gt.JG) THEN
+        WRITE(IOIMP,*) 'le listreel ',IPTR,
+     &                 ' n a pas de valeur reelle finie !'
+        MOTERR(1:8)='EVOLUTIO'
+        CALL ERREUR(1012)
+        RETURN
+      ENDIF
+      CASE, IPOS1
+        WHEN, LISTREEL
+          XI=MLREEL.PROG(IDEB)
+        WHEN, LISTENTI
+          XI=FLOAT(MLENTI.LECT(IDEB))
+        WHENOTHERS
+          MOTERR=CTYP
+          CALL ERREUR(39)
+          RETURN
+      ENDCASE
+      IF((XI.LT.0.D0).EQV.(XI.GE.0.D0)) THEN
+         WRITE(IOIMP,*) IDEB,'eme valeur du listreel',IPTR,'est un NaN!'
+         GOTO 2
+      ENDIF
+      IF(XI.GT.XGPOS) GOTO 2
+      IF(XI.LT.XGNEG) GOTO 2
+
+      AMINI=XI
+      AMAXI=XI
+
+*-----on boucle sur les autres valeurs
+      IFIN=JG
+      IF(IDEB.GE.IFIN) RETURN
+
+      DO 1 I=IDEB+1,IFIN
+          CASE, IPOS1
+            WHEN, LISTREEL
+              XI=MLREEL.PROG(I)
+            WHEN, LISTENTI
+              XI=FLOAT(MLENTI.LECT(I))
+            WHENOTHERS
+              MOTERR=CTYP
+              CALL ERREUR(39)
+              RETURN
+          ENDCASE
+
+*         Verification que les valeurs entrees ne sont pas des NaN
+          IF((XI.LT.0.D0).EQV.(XI.GE.0.D0)) THEN
+            WRITE(IOIMP,*) I,'eme valeur du listreel',IPTR,'est un NaN!'
+            IF(IERPER.GE.3) GOTO 1
+            MOTERR(1:8)='EVOLUTIO'
+            CALL ERREUR(1012)
+            RETURN
+          ENDIF
+*         Si Infini, on ne prend pas en compte pour le min et max
+*         on prend XSGRAND et pas XGRAND car DESSIN en simple precision
+c           write(ioimp,*) I,XI,'>',XGPOS,(XI.GE.XGPOS)
+c           write(ioimp,*) I,XI,'<',XGNEG,(XI.GE.XGNEG)
+          IF(XI.GE.XGPOS) GOTO 1
+          IF(XI.LE.XGNEG) GOTO 1
+*         on realise ici le travail
+          IF(AMINI.GT.XI) AMINI=XI
+          IF(AMAXI.LT.XI) AMAXI=XI
+1     CONTINUE
+
+      IRET = 1
+
+      END
+ 
+ 

@@ -1,0 +1,131 @@
+C SIGMA     SOURCE    CB215821  23/01/25    21:15:34     11573          
+      SUBROUTINE SIGMA
+*_______________________________________________________________________
+*
+*            OPERATEUR DE CALCUL DES CONTRAINTES
+*
+*  Syntaxe :
+*  -------
+*       SIG1=SIGMA |('LINE')   MODL1  CAR1 (HOO1) CHP1 ;
+*                  | 'QUAD'  
+*                  | 'I' 
+*                  | 'II'
+*                  |'TRUE'
+*                  |'JAUM'
+*                  |'UTIL'
+*
+*  Input :
+*  -----
+*       LINE, QUAD... :  mots-cles indiquant que l'on veut  
+*                        les termes quadratiques ou pas
+*       MODL1 : modele de calcul
+*               type MMODEL  --> IPMODL
+*       CAR1  : champ par element de materiau (CARACTERISTIQUE)
+*               type MCHAML  --> IPCHE1
+*       HOO1  : champ par element de matrice de Hooke
+*               type MCHAML  --> IPCHE2
+*       CHP1  : CHPOINT de deplacement
+*               type CHPOINT --> ICHP1
+*
+*  Output :
+*  ------
+*       SIG1  : champ par element de contraintes
+*               type MCHAML  --> IPSTRS
+*_______________________________________________________________________
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+C
+      PARAMETER(NDERI=7)
+      CHARACTER*4 MODERI(NDERI)
+      CHARACTER*4 MONOER(1)
+C
+      DATA MODERI/'LINE','QUAD','I  ','II  ','TRUE','JAUM','UTIL'/
+c       -> IDERI =  1      2     1      2      3      4      5
+c          termes quad uniquement si IDERI=2
+      DATA MONOER/'NOER'/
+      
+C-----------------------------------------------------------------------
+
+      IPCHE1=0
+      IPCHE2=0
+      IPCHA1=0
+      IPCHA2=0
+C
+C     LECTURE DES MOT-CLE
+C
+      IDERI=0
+      INOER=0
+      
+c     option de calcul des deformations (par defaut lineaires)
+      CALL LIRMOT(MODERI,NDERI,IDERI,0)
+      IF(IDERI.EQ.0) IDERI=1
+      IF(IDERI.GE.3) IDERI=IDERI-2
+      
+c     'NOER'
+      CALL LIRMOT(MONOER,1,INOER,0)
+      IF (IERR.NE.0) RETURN
+C
+C     ON LIT UN CHAMP/POINT
+C
+      CALL LIROBJ('CHPOINT ',ICHP1,1,IRT1)
+      CALL ACTOBJ('CHPOINT ',ICHP1,1)
+      IF(IERR.NE.0) RETURN
+C
+C     LECTURE DU MODELE
+C
+      CALL LIROBJ('MMODEL',IPMODL,1,IRT1)
+      IF(IERR.NE.0) RETURN
+      CALL ACTOBJ('MMODEL  ',IPMODL,1)
+C
+C       LECTURE DU 1ER MCHAML
+C
+        CALL LIROBJ('MCHAML',IPCHA1,1,IRT1)
+        IF(IERR.NE.0) RETURN
+*  reduction du mchaml
+        CALL ACTOBJ('MCHAML  ',IPCHA1,1)
+        call reduaf(ipcha1,ipmodl,ipcha10,0,ier,ker)
+        if (ier.ne.1) call erreur(ker)
+        ipcha1=ipcha10
+C
+C       LECTURE DU 2EME MCHAML
+C
+        CALL LIROBJ('MCHAML',IPCHA2,0,IRT1)
+        if (irt1.ne.0) then
+*  reduction du mchaml
+        CALL ACTOBJ('MCHAML  ',IPCHA2,1)
+        call reduaf(ipcha2,ipmodl,ipcha20,0,ier,ker)
+        if (ier.ne.1) call erreur(ker)
+        ipcha2=ipcha20
+        endif
+        if (ierr.ne.0) return
+C
+        CALL RNGCHA(IPCHA1,IPCHA2,'CARACTERISTIQUES',
+     1                            'MATRICE DE HOOKE',IPCHE1,IPCHE2)
+        IF(IERR.NE.0) RETURN
+        IF (IPCHE2.EQ.0) THEN
+          IMAT=1
+        ELSE
+          IMAT=2
+        ENDIF
+C
+C     CALCUL DES CONTRAINTES
+C
+      segact mcoord
+      CALL SIGMAP(IDERI,IPMODL,ICHP1,IPCHE1,IPCHE2,IMAT,IPSTRS,IRET,
+     >      inoer)
+      segdes mcoord
+C
+C     ECRITURE DU RESULTAT
+C
+      IF(IRET.EQ.1) THEN
+        CALL ACTOBJ('MCHAML  ',IPSTRS,1)
+        CALL ECROBJ('MCHAML  ',IPSTRS)
+      ENDIF
+
+      END
+ 

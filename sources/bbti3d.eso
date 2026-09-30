@@ -1,0 +1,270 @@
+C BBTI3D    SOURCE    PV090527  23/01/27    21:15:09     11574          
+      subroutine bbti3d(NBRINC,NDIMG,ak,bk,am,dethi,dephi,
+     #dethm,dephm,ek0,ee0,deh,dbwPw,dbgVg,JEA,NGF,BB,ERR1,AFFICHE)
+      
+c     calcul du 2nd membre du syteme d equations pour le tir visco THM 
+c     lineaire avec une inclusion      
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      integer NDIMG,ERR1
+c     Jacobienne dVe/dVA
+      real*8 JEA(NDIMG,NDIMG+12)
+c     coeff de fluage      
+c     coeff de fluage      
+      integer NBRINC
+      logical affiche
+c     fluage
+      real*8 ak(NDIMG),bk(NDIMG),am(NDIMG)
+      real*8 ek0(NDIMG),ee0(NDIMG)        
+      real*8 dethi,dechi,dephi,dethm,dechm,dephm,deh(3)
+      integer ngf
+      real*8 bb(ngf)
+c     donnes poro-mechaniques (eau, gel, dechrage)      
+      real*8 dbwPw(0:NBRINC),dbgVg(0:NBRINC)
+      
+      if((ngf.lt.12).or.(NDIMG.ne.12)) then
+        print*,'Redimensionner ngf>12 dans incl3d pour bbti3d'
+        err1=1
+        return
+      end if        
+      t8 = JEA(1,1) + JEA(1,2) + JEA(1,3)
+      t11 = JEA(1,13) + JEA(1,14) + JEA(1,15)
+      t26 = JEA(1,18) * deh(3) + JEA(1,19) * dbwPw(1) + JEA(1,20) * dbgV
+     #g(1) + JEA(1,22) * dbwPw(0) + JEA(1,23) * dbgVg(0) + JEA(1,16) * d
+     #eh(1) + JEA(1,17) * deh(2) + dethi * t8 + dephi * t8 + dethm * t11
+     # + dephm * t11 - JEA(1,3) * bk(3) * ek0(3) - JEA(1,6) * bk(6) * ek
+     #0(6) - JEA(1,2) * bk(2) * ek0(2) - JEA(1,8) * bk(8) * ek0(8) - JEA
+     #(1,1) * bk(1) * ek0(1) - JEA(1,9) * bk(9) * ek0(9)
+      t37 = ak(7) + am(7)
+      t40 = ak(11) + am(11)
+      t43 = ak(3) + am(3)
+      t46 = ak(1) + am(1)
+      t49 = ak(4) + am(4)
+      t52 = ak(2) + am(2)
+      t55 = ak(8) + am(8)
+      t58 = ak(12) + am(12)
+      t61 = ak(9) + am(9)
+      t66 = ak(10) + am(10)
+      t69 = ak(5) + am(5)
+      t72 = ak(6) + am(6)
+      t75 = -JEA(1,10) * bk(10) * ek0(10) - JEA(1,11) * bk(11) * ek0(11)
+     # - JEA(1,12) * bk(12) * ek0(12) - JEA(1,5) * bk(5) * ek0(5) - JEA(
+     #1,4) * bk(4) * ek0(4) + ee0(7) * t37 * JEA(1,7) + ee0(11) * t40 * 
+     #JEA(1,11) + ee0(3) * t43 * JEA(1,3) + ee0(1) * t46 * JEA(1,1) + ee
+     #0(4) * t49 * JEA(1,4) + ee0(2) * t52 * JEA(1,2) + ee0(8) * t55 * J
+     #EA(1,8) + ee0(12) * t58 * JEA(1,12) + ee0(9) * t61 * JEA(1,9) - JE
+     #A(1,7) * bk(7) * ek0(7) + ee0(10) * t66 * JEA(1,10) + ee0(5) * t69
+     # * JEA(1,5) + ee0(6) * t72 * JEA(1,6)
+      t84 = JEA(2,1) + JEA(2,2) + JEA(2,3)
+      t87 = JEA(2,13) + JEA(2,14) + JEA(2,15)
+      t102 = JEA(2,16) * deh(1) + JEA(2,17) * deh(2) + JEA(2,18) * deh(3
+     #) + JEA(2,19) * dbwPw(1) + JEA(2,20) * dbgVg(1) + JEA(2,22) * dbwP
+     #w(0) + JEA(2,23) * dbgVg(0) + dethi * t84 + dephi * t84 + dethm * 
+     #t87 + dephm * t87 - JEA(2,1) * bk(1) * ek0(1) - JEA(2,2) * bk(2) *
+     # ek0(2) - JEA(2,3) * bk(3) * ek0(3) - JEA(2,4) * bk(4) * ek0(4) - 
+     #JEA(2,5) * bk(5) * ek0(5) - JEA(2,6) * bk(6) * ek0(6)
+      t139 = -JEA(2,7) * bk(7) * ek0(7) - JEA(2,8) * bk(8) * ek0(8) - JE
+     #A(2,9) * bk(9) * ek0(9) - JEA(2,10) * bk(10) * ek0(10) - JEA(2,11)
+     # * bk(11) * ek0(11) - JEA(2,12) * bk(12) * ek0(12) + ee0(1) * t46 
+     #* JEA(2,1) + ee0(4) * t49 * JEA(2,4) + ee0(6) * t72 * JEA(2,6) + e
+     #e0(5) * t69 * JEA(2,5) + ee0(3) * t43 * JEA(2,3) + ee0(7) * t37 * 
+     #JEA(2,7) + ee0(8) * t55 * JEA(2,8) + ee0(9) * t61 * JEA(2,9) + ee0
+     #(10) * t66 * JEA(2,10) + ee0(11) * t40 * JEA(2,11) + ee0(12) * t58
+     # * JEA(2,12) + ee0(2) * t52 * JEA(2,2)
+      t148 = JEA(3,1) + JEA(3,2) + JEA(3,3)
+      t151 = JEA(3,13) + JEA(3,14) + JEA(3,15)
+      t166 = JEA(3,20) * dbgVg(1) + JEA(3,22) * dbwPw(0) + JEA(3,23) * d
+     #bgVg(0) + JEA(3,16) * deh(1) + JEA(3,17) * deh(2) + JEA(3,18) * de
+     #h(3) + JEA(3,19) * dbwPw(1) + dethi * t148 + dephi * t148 + dethm 
+     #* t151 + dephm * t151 - JEA(3,1) * bk(1) * ek0(1) - JEA(3,2) * bk(
+     #2) * ek0(2) - JEA(3,3) * bk(3) * ek0(3) - JEA(3,4) * bk(4) * ek0(4
+     #) - JEA(3,5) * bk(5) * ek0(5) - JEA(3,6) * bk(6) * ek0(6)
+      t203 = -JEA(3,7) * bk(7) * ek0(7) - JEA(3,8) * bk(8) * ek0(8) - JE
+     #A(3,9) * bk(9) * ek0(9) - JEA(3,10) * bk(10) * ek0(10) - JEA(3,11)
+     # * bk(11) * ek0(11) - JEA(3,12) * bk(12) * ek0(12) + ee0(1) * t46 
+     #* JEA(3,1) + ee0(2) * t52 * JEA(3,2) + ee0(3) * t43 * JEA(3,3) + e
+     #e0(4) * t49 * JEA(3,4) + ee0(5) * t69 * JEA(3,5) + ee0(6) * t72 * 
+     #JEA(3,6) + ee0(7) * t37 * JEA(3,7) + ee0(8) * t55 * JEA(3,8) + ee0
+     #(9) * t61 * JEA(3,9) + ee0(10) * t66 * JEA(3,10) + ee0(11) * t40 *
+     # JEA(3,11) + ee0(12) * t58 * JEA(3,12)
+      t205 = JEA(4,1) + JEA(4,2) + JEA(4,3)
+      t208 = JEA(4,13) + JEA(4,14) + JEA(4,15)
+      t230 = dethi * t205 + dephi * t205 + dethm * t208 + dephm * t208 +
+     # JEA(4,16) * deh(1) + JEA(4,17) * deh(2) + JEA(4,18) * deh(3) + JE
+     #A(4,19) * dbwPw(1) + JEA(4,20) * dbgVg(1) + JEA(4,22) * dbwPw(0) +
+     # JEA(4,23) * dbgVg(0) - JEA(4,1) * bk(1) * ek0(1) - JEA(4,2) * bk(
+     #2) * ek0(2) - JEA(4,3) * bk(3) * ek0(3) - JEA(4,4) * bk(4) * ek0(4
+     #) - JEA(4,5) * bk(5) * ek0(5) - JEA(4,6) * bk(6) * ek0(6)
+      t267 = -JEA(4,7) * bk(7) * ek0(7) - JEA(4,8) * bk(8) * ek0(8) - JE
+     #A(4,9) * bk(9) * ek0(9) - JEA(4,10) * bk(10) * ek0(10) - JEA(4,11)
+     # * bk(11) * ek0(11) - JEA(4,12) * bk(12) * ek0(12) + ee0(1) * t46 
+     #* JEA(4,1) + ee0(2) * t52 * JEA(4,2) + ee0(3) * t43 * JEA(4,3) + e
+     #e0(4) * t49 * JEA(4,4) + ee0(5) * t69 * JEA(4,5) + ee0(6) * t72 * 
+     #JEA(4,6) + ee0(7) * t37 * JEA(4,7) + ee0(8) * t55 * JEA(4,8) + ee0
+     #(9) * t61 * JEA(4,9) + ee0(10) * t66 * JEA(4,10) + ee0(11) * t40 *
+     # JEA(4,11) + ee0(12) * t58 * JEA(4,12)
+      t276 = JEA(5,1) + JEA(5,2) + JEA(5,3)
+      t279 = JEA(5,13) + JEA(5,14) + JEA(5,15)
+      t294 = JEA(5,17) * deh(2) + JEA(5,18) * deh(3) + JEA(5,19) * dbwPw
+     #(1) + JEA(5,20) * dbgVg(1) + JEA(5,22) * dbwPw(0) + JEA(5,23) * db
+     #gVg(0) + JEA(5,16) * deh(1) + dethi * t276 + dephi * t276 + dethm 
+     #* t279 + dephm * t279 - JEA(5,10) * bk(10) * ek0(10) - JEA(5,11) *
+     # bk(11) * ek0(11) - JEA(5,12) * bk(12) * ek0(12) - JEA(5,1) * bk(1
+     #) * ek0(1) - JEA(5,2) * bk(2) * ek0(2) - JEA(5,3) * bk(3) * ek0(3)
+      t331 = -JEA(5,4) * bk(4) * ek0(4) - JEA(5,5) * bk(5) * ek0(5) - JE
+     #A(5,6) * bk(6) * ek0(6) - JEA(5,7) * bk(7) * ek0(7) - JEA(5,8) * b
+     #k(8) * ek0(8) - JEA(5,9) * bk(9) * ek0(9) + ee0(1) * t46 * JEA(5,1
+     #) + ee0(2) * t52 * JEA(5,2) + ee0(3) * t43 * JEA(5,3) + ee0(4) * t
+     #49 * JEA(5,4) + ee0(5) * t69 * JEA(5,5) + ee0(6) * t72 * JEA(5,6) 
+     #+ ee0(7) * t37 * JEA(5,7) + ee0(8) * t55 * JEA(5,8) + ee0(9) * t61
+     # * JEA(5,9) + ee0(10) * t66 * JEA(5,10) + ee0(11) * t40 * JEA(5,11
+     #) + ee0(12) * t58 * JEA(5,12)
+      t340 = JEA(6,1) + JEA(6,2) + JEA(6,3)
+      t343 = JEA(6,13) + JEA(6,14) + JEA(6,15)
+      t358 = JEA(6,17) * deh(2) + JEA(6,18) * deh(3) + JEA(6,19) * dbwPw
+     #(1) + JEA(6,20) * dbgVg(1) + JEA(6,22) * dbwPw(0) + JEA(6,23) * db
+     #gVg(0) + JEA(6,16) * deh(1) + dethi * t340 + dephi * t340 + dethm 
+     #* t343 + dephm * t343 - JEA(6,1) * bk(1) * ek0(1) - JEA(6,2) * bk(
+     #2) * ek0(2) - JEA(6,3) * bk(3) * ek0(3) - JEA(6,4) * bk(4) * ek0(4
+     #) - JEA(6,5) * bk(5) * ek0(5) - JEA(6,6) * bk(6) * ek0(6)
+      t395 = -JEA(6,7) * bk(7) * ek0(7) - JEA(6,8) * bk(8) * ek0(8) - JE
+     #A(6,9) * bk(9) * ek0(9) - JEA(6,10) * bk(10) * ek0(10) - JEA(6,11)
+     # * bk(11) * ek0(11) - JEA(6,12) * bk(12) * ek0(12) + ee0(1) * t46 
+     #* JEA(6,1) + ee0(2) * t52 * JEA(6,2) + ee0(3) * t43 * JEA(6,3) + e
+     #e0(4) * t49 * JEA(6,4) + ee0(5) * t69 * JEA(6,5) + ee0(6) * t72 * 
+     #JEA(6,6) + ee0(7) * t37 * JEA(6,7) + ee0(8) * t55 * JEA(6,8) + ee0
+     #(9) * t61 * JEA(6,9) + ee0(10) * t66 * JEA(6,10) + ee0(11) * t40 *
+     # JEA(6,11) + ee0(12) * t58 * JEA(6,12)
+      t404 = JEA(7,1) + JEA(7,2) + JEA(7,3)
+      t407 = JEA(7,13) + JEA(7,14) + JEA(7,15)
+      t422 = JEA(7,16) * deh(1) + JEA(7,17) * deh(2) + JEA(7,18) * deh(3
+     #) + JEA(7,19) * dbwPw(1) + JEA(7,20) * dbgVg(1) + JEA(7,22) * dbwP
+     #w(0) + JEA(7,23) * dbgVg(0) + dethi * t404 + dephi * t404 + dethm 
+     #* t407 + dephm * t407 - JEA(7,1) * bk(1) * ek0(1) - JEA(7,2) * bk(
+     #2) * ek0(2) - JEA(7,3) * bk(3) * ek0(3) - JEA(7,4) * bk(4) * ek0(4
+     #) - JEA(7,5) * bk(5) * ek0(5) - JEA(7,6) * bk(6) * ek0(6)
+      t459 = -JEA(7,7) * bk(7) * ek0(7) - JEA(7,8) * bk(8) * ek0(8) - JE
+     #A(7,9) * bk(9) * ek0(9) - JEA(7,10) * bk(10) * ek0(10) - JEA(7,11)
+     # * bk(11) * ek0(11) - JEA(7,12) * bk(12) * ek0(12) + ee0(6) * t72 
+     #* JEA(7,6) + ee0(7) * t37 * JEA(7,7) + ee0(8) * t55 * JEA(7,8) + e
+     #e0(9) * t61 * JEA(7,9) + ee0(10) * t66 * JEA(7,10) + ee0(11) * t40
+     # * JEA(7,11) + ee0(12) * t58 * JEA(7,12) + ee0(1) * t46 * JEA(7,1)
+     # + ee0(2) * t52 * JEA(7,2) + ee0(3) * t43 * JEA(7,3) + ee0(4) * t4
+     #9 * JEA(7,4) + ee0(5) * t69 * JEA(7,5)
+      t468 = JEA(8,1) + JEA(8,2) + JEA(8,3)
+      t471 = JEA(8,13) + JEA(8,14) + JEA(8,15)
+      t486 = JEA(8,23) * dbgVg(0) + JEA(8,16) * deh(1) + JEA(8,17) * deh
+     #(2) + JEA(8,18) * deh(3) + JEA(8,19) * dbwPw(1) + JEA(8,20) * dbgV
+     #g(1) + JEA(8,22) * dbwPw(0) + dethi * t468 + dephi * t468 + dethm 
+     #* t471 + dephm * t471 - JEA(8,10) * bk(10) * ek0(10) - JEA(8,11) *
+     # bk(11) * ek0(11) - JEA(8,12) * bk(12) * ek0(12) - JEA(8,1) * bk(1
+     #) * ek0(1) - JEA(8,2) * bk(2) * ek0(2) - JEA(8,3) * bk(3) * ek0(3)
+      t523 = -JEA(8,4) * bk(4) * ek0(4) - JEA(8,5) * bk(5) * ek0(5) - JE
+     #A(8,6) * bk(6) * ek0(6) - JEA(8,7) * bk(7) * ek0(7) - JEA(8,8) * b
+     #k(8) * ek0(8) - JEA(8,9) * bk(9) * ek0(9) + ee0(1) * t46 * JEA(8,1
+     #) + ee0(2) * t52 * JEA(8,2) + ee0(3) * t43 * JEA(8,3) + ee0(4) * t
+     #49 * JEA(8,4) + ee0(5) * t69 * JEA(8,5) + ee0(6) * t72 * JEA(8,6) 
+     #+ ee0(7) * t37 * JEA(8,7) + ee0(8) * t55 * JEA(8,8) + ee0(9) * t61
+     # * JEA(8,9) + ee0(10) * t66 * JEA(8,10) + ee0(11) * t40 * JEA(8,11
+     #) + ee0(12) * t58 * JEA(8,12)
+      t526 = JEA(9,1) + JEA(9,2) + JEA(9,3)
+      t529 = JEA(9,13) + JEA(9,14) + JEA(9,15)
+      t550 = JEA(9,22) * dbwPw(0) + dethi * t526 + dephi * t526 + dethm 
+     #* t529 + dephm * t529 + JEA(9,23) * dbgVg(0) + JEA(9,16) * deh(1) 
+     #+ JEA(9,17) * deh(2) + JEA(9,18) * deh(3) + JEA(9,19) * dbwPw(1) +
+     # JEA(9,20) * dbgVg(1) - JEA(9,1) * bk(1) * ek0(1) - JEA(9,2) * bk(
+     #2) * ek0(2) - JEA(9,3) * bk(3) * ek0(3) - JEA(9,4) * bk(4) * ek0(4
+     #) - JEA(9,5) * bk(5) * ek0(5) - JEA(9,6) * bk(6) * ek0(6)
+      t587 = -JEA(9,7) * bk(7) * ek0(7) - JEA(9,8) * bk(8) * ek0(8) - JE
+     #A(9,9) * bk(9) * ek0(9) - JEA(9,10) * bk(10) * ek0(10) - JEA(9,11)
+     # * bk(11) * ek0(11) - JEA(9,12) * bk(12) * ek0(12) + ee0(1) * t46 
+     #* JEA(9,1) + ee0(2) * t52 * JEA(9,2) + ee0(3) * t43 * JEA(9,3) + e
+     #e0(4) * t49 * JEA(9,4) + ee0(5) * t69 * JEA(9,5) + ee0(6) * t72 * 
+     #JEA(9,6) + ee0(7) * t37 * JEA(9,7) + ee0(8) * t55 * JEA(9,8) + ee0
+     #(9) * t61 * JEA(9,9) + ee0(10) * t66 * JEA(9,10) + ee0(11) * t40 *
+     # JEA(9,11) + ee0(12) * t58 * JEA(9,12)
+      t591 = JEA(10,1) + JEA(10,2) + JEA(10,3)
+      t594 = JEA(10,13) + JEA(10,14) + JEA(10,15)
+      t614 = JEA(10,18) * deh(3) + JEA(10,19) * dbwPw(1) + dethi * t591 
+     #+ dephi * t591 + dethm * t594 + dephm * t594 + JEA(10,22) * dbwPw(
+     #0) + JEA(10,23) * dbgVg(0) + JEA(10,20) * dbgVg(1) + JEA(10,16) * 
+     #deh(1) + JEA(10,17) * deh(2) - JEA(10,1) * bk(1) * ek0(1) - JEA(10
+     #,2) * bk(2) * ek0(2) - JEA(10,3) * bk(3) * ek0(3) - JEA(10,4) * bk
+     #(4) * ek0(4) - JEA(10,5) * bk(5) * ek0(5) - JEA(10,6) * bk(6) * ek
+     #0(6)
+      t651 = -JEA(10,7) * bk(7) * ek0(7) - JEA(10,8) * bk(8) * ek0(8) - 
+     #JEA(10,9) * bk(9) * ek0(9) - JEA(10,10) * bk(10) * ek0(10) - JEA(1
+     #0,11) * bk(11) * ek0(11) - JEA(10,12) * bk(12) * ek0(12) + ee0(1) 
+     #* t46 * JEA(10,1) + ee0(2) * t52 * JEA(10,2) + ee0(3) * t43 * JEA(
+     #10,3) + ee0(4) * t49 * JEA(10,4) + ee0(5) * t69 * JEA(10,5) + ee0(
+     #6) * t72 * JEA(10,6) + ee0(7) * t37 * JEA(10,7) + ee0(8) * t55 * J
+     #EA(10,8) + ee0(9) * t61 * JEA(10,9) + ee0(10) * t66 * JEA(10,10) +
+     # ee0(11) * t40 * JEA(10,11) + ee0(12) * t58 * JEA(10,12)
+      t660 = JEA(11,1) + JEA(11,2) + JEA(11,3)
+      t663 = JEA(11,13) + JEA(11,14) + JEA(11,15)
+      t678 = JEA(11,16) * deh(1) + JEA(11,17) * deh(2) + JEA(11,18) * de
+     #h(3) + JEA(11,19) * dbwPw(1) + JEA(11,20) * dbgVg(1) + JEA(11,22) 
+     #* dbwPw(0) + JEA(11,23) * dbgVg(0) + dethi * t660 + dephi * t660 +
+     # dethm * t663 + dephm * t663 - JEA(11,11) * bk(11) * ek0(11) - JEA
+     #(11,12) * bk(12) * ek0(12) - JEA(11,1) * bk(1) * ek0(1) - JEA(11,2
+     #) * bk(2) * ek0(2) - JEA(11,3) * bk(3) * ek0(3) - JEA(11,4) * bk(4
+     #) * ek0(4)
+      t715 = -JEA(11,5) * bk(5) * ek0(5) - JEA(11,6) * bk(6) * ek0(6) - 
+     #JEA(11,7) * bk(7) * ek0(7) - JEA(11,8) * bk(8) * ek0(8) - JEA(11,9
+     #) * bk(9) * ek0(9) - JEA(11,10) * bk(10) * ek0(10) + ee0(1) * t46 
+     #* JEA(11,1) + ee0(2) * t52 * JEA(11,2) + ee0(3) * t43 * JEA(11,3) 
+     #+ ee0(4) * t49 * JEA(11,4) + ee0(5) * t69 * JEA(11,5) + ee0(6) * t
+     #72 * JEA(11,6) + ee0(7) * t37 * JEA(11,7) + ee0(8) * t55 * JEA(11,
+     #8) + ee0(9) * t61 * JEA(11,9) + ee0(10) * t66 * JEA(11,10) + ee0(1
+     #1) * t40 * JEA(11,11) + ee0(12) * t58 * JEA(11,12)
+      t724 = JEA(12,1) + JEA(12,2) + JEA(12,3)
+      t727 = JEA(12,13) + JEA(12,14) + JEA(12,15)
+      t742 = JEA(12,23) * dbgVg(0) + JEA(12,16) * deh(1) + JEA(12,17) * 
+     #deh(2) + JEA(12,18) * deh(3) + JEA(12,19) * dbwPw(1) + JEA(12,20) 
+     #* dbgVg(1) + JEA(12,22) * dbwPw(0) + dethi * t724 + dephi * t724 +
+     # dethm * t727 + dephm * t727 - JEA(12,1) * bk(1) * ek0(1) - JEA(12
+     #,2) * bk(2) * ek0(2) - JEA(12,3) * bk(3) * ek0(3) - JEA(12,4) * bk
+     #(4) * ek0(4) - JEA(12,5) * bk(5) * ek0(5) - JEA(12,6) * bk(6) * ek
+     #0(6)
+      t779 = -JEA(12,7) * bk(7) * ek0(7) - JEA(12,8) * bk(8) * ek0(8) - 
+     #JEA(12,9) * bk(9) * ek0(9) - JEA(12,10) * bk(10) * ek0(10) - JEA(1
+     #2,11) * bk(11) * ek0(11) - JEA(12,12) * bk(12) * ek0(12) + ee0(1) 
+     #* t46 * JEA(12,1) + ee0(2) * t52 * JEA(12,2) + ee0(3) * t43 * JEA(
+     #12,3) + ee0(4) * t49 * JEA(12,4) + ee0(5) * t69 * JEA(12,5) + ee0(
+     #6) * t72 * JEA(12,6) + ee0(7) * t37 * JEA(12,7) + ee0(8) * t55 * J
+     #EA(12,8) + ee0(9) * t61 * JEA(12,9) + ee0(10) * t66 * JEA(12,10) +
+     # ee0(11) * t40 * JEA(12,11) + ee0(12) * t58 * JEA(12,12)
+      BB(1) = t26 + t75
+      BB(2) = t102 + t139
+      BB(3) = t166 + t203
+      BB(4) = t230 + t267
+      BB(5) = t294 + t331
+      BB(6) = t358 + t395
+      BB(7) = t422 + t459
+      BB(8) = t486 + t523
+      BB(9) = t550 + t587
+      BB(10) = t614 + t651
+      BB(11) = t678 + t715
+      BB(12) = t742 + t779
+
+
+      
+      if(affiche) then
+        print*,'dans bbti3d AK BK AM EK0 EE0  BB'
+        do i=1,NDIMG
+          write(*,'(6E10.3)') AK(i),BK(i),AM(i),EK0(i),EE0(i),BB(i)
+        end do  
+      end if            
+
+
+      
+      return
+      end
+      
+
+
+
+
+ 

@@ -1,0 +1,67 @@
+C CHPTCO    SOURCE    CB215821  20/11/25    13:19:37     10792          
+      SUBROUTINE CHPTCO(IVAL,IPOIN)
+      IMPLICIT INTEGER(I-N)
+      CHARACTER*12 CTEXT
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMELEME
+      logical ltelq      
+      
+      MCHPOI=IPOIN
+      SEGACT MCHPOI
+      NSOUPO=IPCHP(/1)
+C
+C CAS DU CHPOINT VIDE
+C
+      IF(NSOUPO.EQ.0) THEN
+        NAT=1
+        SEGINI,MCHPO1
+        MCHPO1.IFOPOI=IFOUR
+        MCHPO1.JATTRI(1)=1
+        CALL ACTOBJ('CHPOINT ',MCHPO1,1)
+        CALL ECROBJ('CHPOINT ',MCHPO1)
+
+        IF (IVAL.EQ.0) THEN
+          IF (IDIM.EQ.2) THEN
+            SEGINI,MCHPO2=MCHPO1
+            CALL ACTOBJ('CHPOINT',MCHPO2,1)
+            CALL ECROBJ('CHPOINT',MCHPO2)
+
+          ELSEIF (IDIM.EQ.3) THEN
+            SEGINI,MCHPO2=MCHPO1
+            CALL ACTOBJ('CHPOINT',MCHPO2,1)
+            CALL ECROBJ('CHPOINT',MCHPO2)
+            SEGINI,MCHPO3=MCHPO1
+            CALL ACTOBJ('CHPOINT',MCHPO3,1)
+            CALL ECROBJ('CHPOINT',MCHPO3)
+
+          ELSE
+            CALL ERREUR(832)
+            RETURN
+          ENDIF
+        ENDIF
+
+        RETURN
+      ENDIF
+C
+C CAS DU CHPOINT NON VIDE
+C
+      DO 1 I=1,NSOUPO
+        MSOUPO=IPCHP(I)
+        SEGACT MSOUPO
+        IF(I.EQ.1) THEN
+          IPGEO=IGEOC
+        ELSE
+          IPGE1=IPGEO
+          IPGE2=IGEOC
+          ltelq=.false.
+          CALL FUSE(IPGE1,IPGE2,IPGEO,ltelq)
+        ENDIF
+   1  CONTINUE
+      CALL CHPCOO(IVAL,IPGEO)
+      END
+
+ 
+ 

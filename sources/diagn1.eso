@@ -1,0 +1,155 @@
+C DIAGN1    SOURCE    PV        22/04/15    17:10:50     11344          
+      SUBROUTINE DIAGN1 (IPRIG0,INFER0)
+************************************************************************
+*
+*                             D I A G N 1
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     EXECUTER LA FONCTION ATTRIBUEE A L'OPERATEUR "DIAGNEG".
+*
+* MODE D'APPEL:
+* -------------
+*
+*     CALL DIAGN1 (IPRIGI,INFER0)
+*
+* PARAMETRES:  (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPRIGI  ENTIER    (E)  POINTEUR D'UNE 'RIGIDITE'.
+*     INFER0  ENTIER    (S)  NOMBRE DE TERMES DIAGONAUX NEGATIFS DE LA
+*                            MATRICE DIAGONALE "D" DE LA 'RIGIDITE'
+*                            DECOMPOSEE EN "L.D.LT"
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL MANIGOT     8 OCTOBRE 1984
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE + FORTRAN77
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMATRI
+-INC SMRIGID
+-INC SMTABLE
+-INC CCREEL
+*
+
+      SEGMENT IDEMEM(0)
+      SEGMENT IDEME0(IDEMEM(/1),2)
+      SEGMENT IDEME1(IDEMEM(/1),2)
+
+      integer insym
+      xspetl = xspeti
+      infer0 = 0
+      isupt = 0
+      insym = 0
+      
+*-----------------------------------------------------------------------
+* pb dec20: condensation d'une copie de la rigidite
+      SEGINI IDEMEM,IDEME0,IDEME1
+      IBIDON=0
+      CALL RIGELI(IPRIG0,0,0,IPRIGI,IBIDON,IBIDON,
+     &                       IDEMEM,IDEME0,IDEME1,IELIM)
+*-----------------------------------------------------------------------
+
+        
+      MRIGID = IPRIGI
+      SEGACT,MRIGID
+      isupt = isupeq
+**    write(6,*) ' isupt 1 dans diagn1 ',isupt
+*     write (6,*) ' isupeq 1 ',isupeq
+      ipoiri = jrcond
+      if (ipoiri.ne.0) then
+       mrigid = ipoiri
+       segact mrigid
+       if (isupt.eq.0) isupt = isupeq
+**    write(6,*) ' isupt 2 dans diagn1 ',isupt
+*     write (6,*) ' isupoq 2 ',isupeq
+      endif
+      NRG = IRIGEL(/1)
+      NBR = IRIGEL(/2)
+      if (nbr.eq.0) then
+       infer0 = 0
+       segdes mrigid
+       return
+      endif
+      IPMATR = ICHOLE
+      IF(NORINC.GT.0  .AND. NORIND.GT.0) THEN
+         INSYM = 1
+      ENDIF
+      IF (NRG.GE.7) THEN
+         DO  9 IN = 1,NBR
+            IANTI=IRIGEL(7,IN)
+            IF(IANTI.GT.0) THEN
+               INSYM = 1
+            ENDIF
+  9      CONTINUE
+      ENDIF
+**    SEGDES,MRIGID
+*
+      mrigid=iprigi
+      do ifois=1,29
+*     write(6,*) 'diagn1 ifois ipmatr mrigid ',ifois,ipmatr,mrigid
+      if (jrcond.ne.0) then
+      mrigid=jrcond
+      segact mrigid
+      nbr=irigel(/2)
+      if (nbr.eq.0) then
+       infer0 = 0
+*      write(6,*) ' diagn1 nbr 0 '
+       segdes mrigid
+       return
+      endif
+      if(isupt.eq.0) isupt=isupeq
+      endif
+      enddo
+      if (ichole.eq.0) then
+      IF (IPMATR .EQ. 0) THEN
+        IF (INSYM .EQ. 0) THEN
+         CALL TRIANG (mrigid,xspetl,0)
+        ELSE
+         CALL ldmt1(mrigid,xspetl)
+        ENDIF
+         IF (IERR .NE. 0) RETURN
+         MRIGID = IPRIGI
+         SEGACT,MRIGID
+         IPMATR = ICHOLE
+      END IF
+      endif
+      if (isupt.ne.0) then
+       mtable = isupt
+       segact mtable
+         CALL ACCTAB(mtable,'ENTIER',13,0.d0,' ',.true.,IP0,
+     &                   'ENTIER',infer0,X1,CHARRE,.true.,ITMOD)
+*      write (6,*) ' unilateral nbneg ',infer0
+       segdes mtable
+      END IF
+*
+
+      if (ichole.ne.0.and.isupt.eq.0) then
+      MMATRI = ichole
+      SEGACT,MMATRI
+      INFER0 = INEG
+      SEGDES,MMATRI
+      else
+***   infer0=0
+      endif
+*
+      END
+ 
+ 
+ 
+ 
+ 

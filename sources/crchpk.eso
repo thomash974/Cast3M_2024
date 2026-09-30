@@ -1,0 +1,54 @@
+C CRCHPK    SOURCE    FANDEUR   22/01/03    21:15:07     11136          
+      SUBROUTINE CRCHPK(TYPI,IGEOM,NC,MCHPOI,MOT)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+C*************************************************************************
+C
+C Ce SP cree un champoint type TRIO-EF
+C
+C*************************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMELEME
+
+      POINTEUR IGEOM.MELEME
+      CHARACTER*(*) TYPI,MOT(*)
+      CHARACTER*8 TYPE
+
+      TYPE='        '
+      TYPE=TYPI
+      MCHPOI=0
+      IF(IGEOM .LE. 0)THEN
+         NAT=1
+         NSOUPO=0
+         SEGINI MCHPOI
+         IFOPOI = IFOUR
+         JATTRI(1)=2
+         RETURN
+      ENDIF
+      SEGACT IGEOM
+      IF(IGEOM.ITYPEL.NE.1)THEN
+         WRITE(6,*)' Support geometrique incorrect '
+         RETURN
+      ENDIF
+      N=IGEOM.NUM(/2)
+      NSOUPO=1
+      NAT=1
+      SEGINI MCHPOI,MSOUPO,MPOVAL
+      JATTRI(1)=2
+      IFOPOI=IFOUR
+      MTYPOI=TYPE
+      MOCHDE='                                                  '
+      IPCHP(1)=MSOUPO
+      IGEOC=IGEOM
+      IPOVAL=MPOVAL
+      DO 2 I=1,NC
+         NOCOMP(I)=MOT(I)
+ 2    CONTINUE
+      END
+ 
+ 

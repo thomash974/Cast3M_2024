@@ -1,0 +1,77 @@
+C HHOIDC    SOURCE    OF166741  24/05/06    21:15:10     11082          
+C HHOidc    SOURCE    FANDEUR                                           
+
+C== FORMULATION HHO ====================================================
+
+      SUBROUTINE HHOidc (IPMODL,IPNOCA)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHHOPA
+
+-INC SMMODEL
+
+      imodel = IPMODL
+c*      segact,imodel*MOD   <- Actif en E/S
+
+      MELE = imodel.nefmod
+      IF (MELE .NE. HHO_NUM_ELEMENT) RETURN
+
+      mfr0 = nummfr(mele)
+      if (mfr0 .ne. HHO_MFR_ELEMENT) then
+        write(ioimp,*) 'HHOIDC : MFR0 incorrect !'
+        call erreur(5)
+        return
+      end if
+c-dbg        CALL HHONOB(IPMODL, nobHHO, iret)
+c-dbg        IF (nobHHO.LE.0)THEN
+c-dbg          write(ioimp,*) 'HHOIDC : IPMODL incorrect (not HHO)'
+c-dbg          CALL ERREUR(5)
+c-dbg          RETURN
+c-dbg        END IF
+
+C*=====================================================================*
+C*= FORMULATION HHO 'MECANIQUE'                                       =*
+C*= On ajoute aux composantes materiaux                               =*
+C*=   - le coefficient de stabilisation        'STAB' (cellule)       =*
+C*=   - le poids de chaque point d'integration 'PIHO' (PG & cellule)  =*
+C*=   - la matrice B pour la formulation HHO   'BHHO' (PG & cellule)  =*
+C*=   - la matrice de stabilisation            'SHHO' (cellule)       =*
+C*=====================================================================*
+      IF (imodel.FORMOD(1).EQ.'MECANIQUE') THEN
+
+        IF (IPNOCA.EQ.0) IPNOCA = imodel.lnomid(6)
+
+        nomid = IPNOCA
+        SEGACT,nomid
+        nbrob0 = nomid.lesobl(/2)
+        nbrfa0 = nomid.lesfac(/2)
+        nbrobl = nbrob0 + 4
+        nbrfac = nbrfa0
+C* Ou facultative ?        nbrobl = nbrob0
+C* Ou facultative ?        nbrfac = nbrfac + 4
+        SEGADJ,nomid
+        nomid.LESOBL(nbrob0+1) = 'STAB'
+        nomid.LESOBL(nbrob0+2) = 'PIHO'
+        nomid.LESOBL(nbrob0+3) = 'BHHO'
+        nomid.LESOBL(nbrob0+4) = 'SHHO'
+C* Ou facultative ?        nomid.LESFAC(nbrfa0+1) = 'STAB'
+C* Ou facultative ?        nomid.LESFAC(nbrfa0+2) = 'PIHO'
+C* Ou facultative ?        nomid.LESFAC(nbrfa0+3) = 'BHHO'
+C* Ou facultative ?        nomid.LESFAC(nbrfa0+4) = 'SHHO'
+c*        SEGDES,nomid   <- Actif en S
+        IPNOCA = nomid
+
+C*=====================================================================*
+C*= Autres formulations HHO que 'MECANIQUE'                           =*
+C*=====================================================================*
+      ELSE
+      END IF
+
+c*      RETURN
+      END
+
+ 

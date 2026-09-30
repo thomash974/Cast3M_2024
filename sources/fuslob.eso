@@ -1,0 +1,56 @@
+C FUSLOB    SOURCE    PASCAL    22/06/10    21:15:05     11377          
+      SUBROUTINE FUSLOB(MLOBJ1,MLOBJ2,MLOBJE)
+C
+C  =====================================================================
+C  =  CE SUBROUTINE REALISE L OPERATION "ET" SUR LES 2 OBJETS          =
+C  =  LISTOBJE MLOBJ1 ET MLOBJ2.LE RESULTAT EST RANGE DANS MLOBJE      =
+C  =                                                                   =
+C  =====================================================================
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      CHARACTER*8 TYPOB1,TYPOB2
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLOBJE
+
+C CAS DES LISTES VIDES
+      SEGACT,MLOBJ1
+      N1=MLOBJ1.LISOBJ(/1)
+      IF (N1.EQ.0) THEN
+        MLOBJE = MLOBJ2
+        RETURN
+      ENDIF
+      SEGACT,MLOBJ2
+      N2=MLOBJ2.LISOBJ(/1)
+      IF (N2.EQ.0) THEN
+        MLOBJE = MLOBJ1
+        RETURN
+      ENDIF
+
+C TEST TYPE OBJETS DES DEUX LISTES NON VIDES
+      TYPOB1 = MLOBJ1.TYPOBJ
+      TYPOB2 = MLOBJ2.TYPOBJ
+      IF (TYPOB1.NE.TYPOB2) THEN
+        MOTERR(1:8)='LISTOBJE'
+        CALL ERREUR(83)
+        RETURN
+      ENDIF
+
+C CONCATENATION DES DEUX LISTES
+      NOBJ=N1+N2
+      SEGINI,MLOBJE
+      TYPOBJ = TYPOB1
+      DO 10 I=1,N1
+         LISOBJ(I)=MLOBJ1.LISOBJ(I)
+   10 CONTINUE
+      DO 20 J=1,N2
+         I=N1+J
+         LISOBJ(I)=MLOBJ2.LISOBJ(J)
+   20 CONTINUE
+      END
+
+ 
+ 

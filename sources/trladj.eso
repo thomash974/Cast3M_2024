@@ -1,0 +1,168 @@
+C TRLADJ    SOURCE    GOUNAND   21/04/06    21:15:38     10940          
+      SUBROUTINE TRLADJ(TRAVL,NCDONN,NLDONN,lchang,mmot)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TRLADJ
+C DESCRIPTION : Ajustement (SEGADJ) du nombre de candidats d'un
+C     segment TRAVL et de ses éventuels sous-objets.
+C
+C     iopt=1 : on calcule un NCMAX automatiquement, éventuellement
+C     supérieur à la valeur NCDONN donnée et on modifie NCCOU qui
+C     devient égal à NCDONN
+C
+C Repris de topadv.eso      
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 31/10/2017, version initiale
+C HISTORIQUE : v1, 31/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP1      
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+-INC SMLENTI
+      POINTEUR LIDXCA.MLENTI
+      POINTEUR LOKVOL.MLENTI
+      POINTEUR LNQUAL.MLENTI
+      POINTEUR LINDI.MLENTI
+      POINTEUR LINDJ.MLENTI
+-INC SMLREEL
+      POINTEUR LQUALS.MLREEL
+-INC TMATOP2
+*-INC STRAVL
+      character*(*) mmot
+      logical lchang,lchan2
+      INTEGER IMPR,IRET
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans trladj.eso'
+*
+      lchang=.false.
+      NCMAXO=TRAVL.NCMAX
+      NCCOUO=TRAVL.NCCOU
+*
+      NCCOUN=NCDONN
+      IF (NCCOUN.LE.NCMAXO) THEN
+*     write(ioimp,*) 'pas besoin d''appeler trladj ???'
+*     goto 9999
+*         TRAVL.NCCOU=NCCOUN
+*         return
+      ELSE
+*     NCMAXN=NCDONN+0
+*     Stratégie d'augmentation
+         NCMAX1=NCDONN
+*     XCOF=1.414D0
+         XCOF=2.D0
+         NCMAX2=TRAVL.NCINI+INT(((NCMAXO-TRAVL.NCINI)*XCOF)+0.5D0)
+         NCMAXN=MAX(NCMAX1,NCMAX2)
+      
+         IF (NCCOUN.LT.NCCOUO.or.NCMAXN.LT.NCCOUO) THEN
+            write(ioimp,*) 'On ne peut pas redimensionner à une ',
+     $           'valeur plus petite que nccou' 
+            goto 9999
+         endif
+
+         lchang=.true.
+         TRAVL.NCMAX=NCMAXN
+         if (isgadj.gt.0)
+*     $        write(ioimp,486) TRAVL,NCMAXO,NCMAXN,NCCOUN
+     $        write(ioimp,486) mmot,NCMAXO,NCMAXN,NCCOUN
+*     
+         lidxca=travl.idxca
+         if (lidxca.ne.0) then
+            jg=ncmaxn+1
+            segadj lidxca
+         endif
+*     
+         lokvol=travl.okvol
+         if (lokvol.ne.0) then
+            jg=ncmaxn
+            segadj lokvol
+         endif
+*     
+         lnqual=travl.nqual
+         if (lnqual.ne.0) then
+            jg=ncmaxn
+            segadj lnqual
+         endif
+*     
+         lindi=travl.indi
+         if (lindi.ne.0) then
+            jg=ncmaxn
+            segadj lindi
+         endif
+*     
+         lindj=travl.indj
+         if (lindj.ne.0) then
+            jg=ncmaxn
+            segadj lindj
+         endif
+      ENDIF
+*     
+      lmcans=travl.mcans
+      if (lmcans.ne.0) then
+         call mlxadl(lmcans,nldonn,lchan2,mmot)
+         if (ierr.ne.0) return
+      endif
+*      
+      lquals=travl.quals
+      if (lquals.ne.0) then
+         if (lmcans.eq.0) then
+            write(ioimp,*) 'lquals existe mais pas lmcans'
+            goto 9999
+         endif
+         jg=lmcans.numx(/2)
+         segadj lquals
+      endif
+*
+      TRAVL.NCCOU=NCCOUN
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+* 486  FORMAT ('Segment TRAVL=',I8,' nbcand max ajusté de ',I6,' à ',I6,
+*     $     ' (nbcand. courant=',I6,')') 
+ 486  FORMAT (A25,' nbcand max ajusté de ',I6,' à ',I6,
+     $     ' (nbcand. courant=',I6,')') 
+* 187  FORMAT (5X,10I8)
+* 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+* 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+*     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TRLADJ  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TRLADJ
+*
+      END
+
+ 

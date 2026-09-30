@@ -1,0 +1,11 @@
+C MHPGR4    SOURCE    OF166741  24/03/28    21:15:08     11811          
+
+      SUBROUTINE mhpgr4
+
+      write(*,*) 'Subroutine MHPGR4 no longer used'
+      call erreur(5)
+
+c      return
+      END
+
+ 

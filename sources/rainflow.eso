@@ -1,0 +1,191 @@
+C RAINFLOW  SOURCE    BP208322  23/03/10    19:39:26     11626          
+    
+      SUBROUTINE RAINFLOW
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C
+C=======================================================================
+C    
+C   EFFECTUE LA DECOMPOSITION RAINFLOW D'UN SIGNAL
+C   DE CONTRAINTE DONNE PAR UNE LISTREEL.
+C   LE SIGNAL DE CONTRAINTE EN ENTREE DOIT ETRE AU PREALABLE SIMPLIFIE
+C   A LA SUCCESSION DE SES MAXIMA ET MINIMA. 
+C   LE RESULTAT EST UNE LISTREEL DONNANT L'AMPLITUDE
+C   DES CYCLES DE CONTRAINTE ET UNE LISTREEL DONNANT LE RESIDU, DEFINI
+C   COMME LES EXTREMA N'APPARTENANT A AUCUN CYCLE DE CONTRAINTE IDENTIFIE.                         
+C
+C   SYNTAXE : LAMPLI LRESID = RAIN LSIGNAL ;                    
+C       
+C   LSIGNAL : OBJET DE TYPE LISTREEL CONTENANT LE SIGNAL DE CONTRAINTE
+C             A TRAITER                                                               
+C   LAMPLI  : OBJET DE TYPE LISTREEL RESULTAT CONTENANT L'AMPLITUDE
+C             DES CYCLES DE CONTRAINTE
+c   LRESID  : OBJET DE TYPE LISTREEL RESULTAT CONTENANT LE RESIDU 
+C             (LES EXTREMA NON INCLUS DANS UN CYCLE DE CONTRAINTE)                                    
+C                                                                    
+C=======================================================================
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMEVOLL
+-INC SMLREEL
+-INC SMLENTI
+-INC CCREEL
+
+      SEGMENT MLLOGI
+        LOGICAL PRLO(JG)
+      ENDSEGMENT
+      LOGICAL ZS2,ZS3,ZS4
+
+C=======================================================================
+C     PREPARATION OBJETS ENTREE/SORTE
+C=======================================================================
+
+C     LECTURE ENTREE
+      CALL LIROBJ('LISTREEL',IPREEL,1,IRET)
+      IF(IERR.NE.0) RETURN
+      MLREEL=IPREEL
+      SEGACT MLREEL
+      L1=PROG(/1)
+
+C     ERREUR SI LONGUEUR<4
+      IF(L1.LT.4) THEN
+        CALL ERREUR (725)
+        RETURN
+      ENDIF
+
+C     PREPARATION SORTIE
+      JG = L1
+      SEGINI,MLREE1,MLREE2
+      IPOR1 = MLREE1 
+      IPOR2 = MLREE2
+
+C     CREATION LISTE ENTIER (0 SI ACTIF, 1 SI INACTIF)
+      JG = L1
+      SEGINI,MLLOGI
+      IPORL=MLLOGI
+      DO I = 1,L1
+        MLLOGI.PRLO(I)=.TRUE.
+      ENDDO
+
+C=======================================================================
+C     COMPTAGE RAINFLOW
+C=======================================================================
+
+C     INITIALISATION COMPTEURS
+      INDEX=1
+      NCYCLE=0
+
+C     BOUCLE TANT QUE LA FIN N'EST PAS ATTEINTE
+      DO WHILE ((INDEX+3).LE.L1)
+        
+C       VERIFICATION SI INDEX ACTIF
+        IF (MLLOGI.PRLO(INDEX)) THEN
+
+C         LECTURE DU SIGNAL A INDEX
+          SIGMA1 = PROG(INDEX)
+
+C         RECUPERATION DES 3 INDICES ACTIFS SUIVANTS
+          INDEX2 = INDEX
+          ZS2 = .FALSE.
+          ZS3 = .FALSE.
+          ZS4 = .FALSE.
+          
+C         ON PARCOURT LE SIGNAL DEVANT INDEX
+ 10       CONTINUE
+
+          DO WHILE (INDEX2.LT.L1)
+            INDEX2 = INDEX2 + 1
+
+C           SI ACTIF, ON ECRIT DANS SIGMA2/3/4
+            IF (MLLOGI.PRLO(INDEX2)) THEN
+C             EN PREMIER -> SIGMA2
+              IF (.NOT.ZS2) THEN
+                ZS2 = .TRUE.
+                INDSIGMA2 = INDEX2
+                SIGMA2 = PROG(INDEX2)
+                GOTO 10
+              ENDIF
+C             PUIS -> SIGMA3
+              IF (.NOT.ZS3) THEN
+                ZS3 = .TRUE.
+                INDSIGMA3 = INDEX2
+                SIGMA3 = PROG(INDEX2)
+                GOTO 10
+              ENDIF
+C             ENFIN -> SIGMA4
+              IF (.NOT.ZS4) THEN
+                ZS4=.TRUE.
+                SIGMA4=PROG(INDEX2)
+                GOTO 20
+              ENDIF
+            ENDIF
+
+          ENDDO
+C         FIN RECUPERATION
+
+ 20       CONTINUE
+
+C         SI 4 INDICES RECUPERES, EVALUATION CRITERE RAINFLOW
+          IF (ZS4) THEN
+            DSIGMA1 = ABS(SIGMA2-SIGMA1)
+            DSIGMA2 = ABS(SIGMA3-SIGMA2)
+            DSIGMA3 = ABS(SIGMA4-SIGMA3)
+
+            IF ((DSIGMA2.LE.DSIGMA1).AND.(DSIGMA2.LE.DSIGMA3)) THEN 
+C             INCREMENTE NB DE CYCLE ET ECRIT AMPLITUDE
+              NCYCLE = NCYCLE+1
+              MLREE1.PROG(NCYCLE) = DSIGMA2
+C             DESACTIVE SIGMA2 ET SIGMA3
+              MLLOGI.PRLO(INDSIGMA2) = .FALSE.
+              MLLOGI.PRLO(INDSIGMA3) = .FALSE.
+C             RECULE DE 2 INDICES ACTIFS
+              CPT = 0
+              DO WHILE (INDEX.GT.1)
+                INDEX = INDEX - 1
+                IF (MLLOGI.PRLO(INDEX)) CPT = CPT + 1
+                IF (CPT.EQ.2) GOTO 30
+              ENDDO
+
+ 30           CONTINUE
+
+            ELSE
+              INDEX = INDEX + 1
+            ENDIF
+
+C         SINON -> FIN DE LA BOUCLE
+          ELSE
+            GOTO 100
+          ENDIF
+
+C       SI INACTIF, ON AVANCE         
+        ELSE
+          INDEX = INDEX + 1
+        ENDIF
+
+      ENDDO
+
+ 100  CONTINUE
+
+C     AJUSTEMENT DE LA LONGUEUR DE MLREE1
+      JG=NCYCLE
+      SEGADJ MLREE1
+
+C     CREATION LISTE RESIDU (SIGNAL ENCORE ACTIF)
+      ICPT = 0
+      DO I = 1,L1
+        IF (MLLOGI.PRLO(I)) THEN
+          ICPT = ICPT + 1
+          MLREE2.PROG(ICPT) = MLREEL.PROG(I)
+        ENDIF
+      ENDDO 
+      JG = ICPT
+      SEGADJ MLREE2
+
+C     SORTIE MLREE1 ET MLREE2
+      CALL ECROBJ('LISTREEL',IPOR2)
+      CALL ECROBJ('LISTREEL',IPOR1)
+      SEGDES MLREEL,MLREE1,MLLOGI,MLREE2
+
+      END 

@@ -1,0 +1,897 @@
+C VIDE      SOURCE    PASCAL    22/06/10    21:15:07     11377          
+C***********************************************************************
+C NOM         : VIDE
+C DESCRIPTION : Crée des objets vides de types/sous-types donnés
+C***********************************************************************
+C HISTORIQUE :  13/03/2012 : JCARDO : création de l'opérateur
+C HISTORIQUE :  17/04/2012 : JCARDO : ajout de SMDEFOR et SMVECTE
+C HISTORIQUE :  12/10/2012 : JCARDO : ajout de SMCHARG
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS DE COMPLÉTER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELÉ PAR : pilot.eso
+C***********************************************************************
+C ENTRÉES :: aucune
+C SORTIES :: aucune
+C***********************************************************************
+C SYNTAXE (GIBIANE) : VOIR NOTICE
+C
+C        OBJ1,...,OBJn = VIDE [GROUPE1,...,GROUPEn]
+C
+C    ou  TAB1 = VIDE ('TABULER' ( |LENTI1| ) ) [GROUPE1,...,GROUPEn]
+C                                 |LREEL1|
+C                                 |LMOTS1|
+C
+C
+C    avec GROUPEi de la forme :  MOTAi(/MOTBi)(*ENTIi)
+C
+C***********************************************************************
+      SUBROUTINE VIDE
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC CCGEOME
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMELEME
+-INC SMCHPOI
+-INC SMCHAML
+-INC SMMODEL
+-INC SMRIGID
+-INC SMEVOLL
+-INC SMLENTI
+-INC SMLREEL
+-INC SMLMOTS
+-INC SMLCHPO
+-INC SMTABLE
+-INC SMDEFOR
+-INC SMVECTE
+-INC SMCHARG
+-INC SMNUAGE
+-INC SMANNOT
+-INC SMLOBJE
+
+      LOGICAL LOG1
+      CHARACTER*20 MARG
+      CHARACTER*8 CHAI,TYIN,TYOB,CTYP
+      CHARACTER*4 CHAA
+
+      CHARACTER*4 MSPE(2)
+      DATA MSPE/'*   ','/   '/
+
+      PARAMETER (LMTYP=17)
+      CHARACTER*8 MTYP(LMTYP)
+      DATA MTYP/'MAILLAGE',
+     .          'CHPOINT ',
+     .          'MCHAML  ',
+     .          'MMODEL  ',
+     .          'RIGIDITE',
+     .          'EVOLUTIO',
+     .          'LISTENTI',
+     .          'LISTREEL',
+     .          'LISTMOTS',
+     .          'LISTCHPO',
+     .          'TABLE   ',
+     .          'DEFORME ',
+     .          'VECTEUR ',
+     .          'CHARGEME',
+     .          'NUAGE   ',
+     .          'ANNOTATI',
+     .          'LISTOBJE'/
+
+      CHARACTER*4 MNAT(2)
+      DATA MNAT/'DIFF','DISC'/
+
+
+C     On crée le segment IPSORT pour que l'ordre des objets en sortie
+C     corresponde bien à celui des arguments en entrée (ordre inverse)
+C     => MOINS UTILE POUR L'OPTION 'TABULER' (MAIS QUAND MÊME UTILISÉ)
+      SEGMENT IPSORT
+          INTEGER IPOOBJ(NOBJ)
+          CHARACTER*8 MTYPOB(NOBJ)
+      ENDSEGMENT
+
+
+C     BRANCHEMENT 2e SYNTAXE :
+C     Test type argument : si pas MOT => 2e syntaxe
+      CALL QUETYP(CTYP,0,IRETOU)
+C     write(6,*) 'CTYP =',CTYP
+      IF (IRETOU.EQ.0) THEN
+         CALL ERREUR(533)
+         RETURN
+      ENDIF
+      CALL PLACE(MTYP,LMTYP,ITYP,CTYP)
+C     write(6,*) 'ITYP =',ITYP
+      IF (ITYP.NE.0) GOTO 1000
+
+
+C----------------------------------------------------------------------C
+C                       CREATION D'UN OBJET VIDE                       C
+C----------------------------------------------------------------------C
+C
+C     NOBJ = nombre d'objets vides créés au total par cette subroutine
+      NOBJ=0
+      SEGINI IPSORT
+
+
+
+C     **************************************************************
+C     DÉTERMINATION DU MODE D'ÉCRITURE EN SORTIE
+C     **************************************************************
+C
+C     Deux possibilités pour sortir les résultats :
+C
+C      - Option 'TABU' => les objets sont placés dans une table dont
+C                         les indices peuvent être choisis soit par
+C                         l'utilisateur, soit automatiquement
+C
+C                         ITAB  |   IRET         |   TYIN
+C                      ---------+----------------+---------------
+C                          1    |   0            |   ENTIER
+C                          2    |   -> LISTENTI  |   ENTIER
+C                          3    |   -> LISTREEL  |   FLOTTANT
+C                          4    |   -> LISTMOTS  |   MOT
+C
+C      - Par défaut => on sort les objets séparément
+C
+      CALL LIRCHA(CHAA,1,LCHTA)
+
+C     =============
+C     OPTION 'TABU'
+C     =============
+      IF (CHAA.EQ.'TABU') THEN
+          ITAB=1
+          TYIN='ENTIER  '
+
+C         L'utilisateur a-t-il transmis une liste d'indices ?
+          CHAI='        '
+          CALL LIRABJ(CHAI,IRET,0,IRETOU)
+          IF (IRETOU.EQ.1) THEN
+
+C          => OUI : objet LISTENTI, LISTREEL ou LISTMOTS
+              IF (CHAI.EQ.'LISTENTI') THEN
+                  ITAB=2
+                  TYIN='ENTIER  '
+                  MLENT1=IRET
+                  SEGACT MLENT1
+              ELSEIF (CHAI.EQ.'LISTREEL') THEN
+                  ITAB=3
+                  TYIN='FLOTTANT'
+                  MLREE1=IRET
+                  SEGACT MLREE1
+              ELSEIF (CHAI.EQ.'LISTMOTS') THEN
+                  ITAB=4
+                  TYIN='MOT     '
+                  MLMOT1=IRET
+                  SEGACT MLMOT1
+
+C          => NON : autres objets
+              ELSEIF (CHAI.EQ.'MOT') THEN
+                  CALL REFUS
+              ELSE
+C                 ERREUR CRITIQUE 39 (On ne veut pas d'objet de type %m1:8)
+                  MOTERR(1:8)=CHAI
+                  CALL ERREUR(39)
+                  WRITE(IOIMP,*) '(l''option TABU requiert ',
+     &                           'éventuellement un objet de type ',
+     &                           'LISTENTI, LISTREEL ou LISTMOTS)'
+              ENDIF
+
+          ENDIF
+
+C     =================
+C     OPTION PAR DÉFAUT
+C     =================
+      ELSE
+          ITAB=0
+
+C         Le MOT qu'on a lu n'était pas censé être lu maintenant...
+          CALL REFUS
+      ENDIF
+
+
+
+
+
+
+C     **************************************************************
+C     LECTURE DU TYPE D'OBJET VIDE À CRÉER
+C     **************************************************************
+C
+C     On cherche des triplets de la forme ITYP[/MARG][*NLIR]
+C                (l'ordre des options * et / est indifférent)
+C
+C      - ITYP correspond au type d'objet à créer (position dans MTYP)
+C      - MARG contient parfois le sous-type (par défaut = '        ')
+C      - NLIR indique le nombre d'objets à créer (par défaut = 1)
+C
+
+      NLIR=0
+      ICOD=1
+C     (ICOD permet d'obliger l'utilisateur à entrer au moins un MOT)
+
+
+    1 IF (NLIR.EQ.0) THEN
+
+C         Lecture du type d'objet à créer. Si aucun => fin subroutine
+          CALL LIRCHA(CHAI,ICOD,LCHAI)
+          IF (LCHAI.EQ.0) GOTO 999
+
+C         On vérifie que ce type d'objet est prévu dans MTYP
+          CALL OPTLI(ITYP,MTYP,CHAI,LMTYP)
+          IF (ITYP.EQ.0) THEN
+C             ERREUR CRITIQUE 9 (Objet inconnu %m1:8)
+              MOTERR(1:8)=CHAI
+              CALL ERREUR(9)
+              WRITE(IOIMP,*) '(on ne sait pas créer ce type',
+     &                       ' d''objet vide)'
+              RETURN
+          ENDIF
+
+C         On a trouvé un MOT correct.
+          NLIR=1
+
+C         On cherche les éventuels caractères * ou /
+          IARG=0
+          MARG='        '
+          ISPA=0
+          DO 2 J=1,2
+              CALL LIRMOT(MSPE,2,ISPE,0)
+              IF (ISPE.EQ.0) GOTO 2
+C             (Rmq: LIRMOT appelle REFUS si aucun mot ne correspond)
+
+              IF (ISPA.EQ.ISPE) THEN
+C                 ERREUR CRITIQUE 880 (Syntaxe incorrecte, voir notice)
+                  CALL ERREUR(880)
+                  CHAI=MSPE(ISPE)
+                  WRITE(IOIMP,*) '(le caractère spécial ',CHAI(1:1),
+     &                           ' apparait 2 fois)'
+                  RETURN
+              ENDIF
+
+C             Caractère * trouvé => mise à jour de NLIR
+              IF (ISPE.EQ.1) THEN
+                CALL LIRENT(NLIR,1,IRET)
+C             Caractère / trouvé => mise à jour de MARG
+              ELSE IF (ISPE.EQ.2) THEN
+                  IARG=1
+                  CALL LIRCHA(MARG,1,LMARG)
+              ENDIF
+
+              ISPA=ISPE
+    2     CONTINUE
+      ENDIF
+
+
+C     **************************************************************
+C     INITIALISATION D'UN SEGMENT VIDE POUR LE TYPE D'OBJET DÉSIRÉ
+C     **************************************************************
+
+      GOTO (10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170),
+     &      ITYP
+
+
+C     ===============================
+C     Objet MAILLAGE
+C     ===============================
+C     => MARG correspond au type d'élément (variable ITYPEL)
+
+   10 ITEL=ILCOUR
+      IF (IARG.EQ.1) THEN
+          CALL CHRMOT(NOMS,100,MARG(1:4),ITEL)
+          IF (ITEL.EQ.0) THEN
+C             ERREUR CRITIQUE 16 (Type d'élément incorrect)
+              CALL ERREUR(16)
+              WRITE(IOIMP,*) '(le nom ',MARG(1:4),
+     &                       ' ne correspond à aucun élément connu)'
+              RETURN
+          ENDIF
+      ENDIF
+
+      NBELEM=0
+      NBSOUS=0
+      NBREF=0
+      NBNN=NBNNE(ITEL)
+      IF (NOMS(ITEL).EQ.'POLY') THEN
+          NBNN = 14
+      ELSE IF (NOMS(ITEL).EQ.'MULT') THEN
+          NBNN = 9999
+      ENDIF
+
+      SEGINI MELEME
+      ITYPEL=ITEL
+
+      IOBJ=MELEME
+      GOTO 900
+
+
+C     ===============================
+C     Objet CHPOINT
+C     ===============================
+C     => MARG donne la nature du champ par points (variable JATTRI(1))
+
+   20 NAT=1
+      NSOUPO=0
+
+      IJAT1 = 0
+      IF (IARG.EQ.1) THEN
+          CALL CHRMOT(MNAT,2,MARG(1:4),IJAT1)
+          IF (IJAT1.EQ.0) THEN
+C             ERREUR CRITIQUE 881 (Syntaxe incorrecte : on attend %m1:30)
+              MOTERR(1:30)='soit DISCRET, soit DIFFUS     '
+              CALL ERREUR(881)
+              WRITE(IOIMP,*) '(le mot ',MARG(1:LMARG),' ne désigne pas',
+     &                       ' une nature valide)'
+              RETURN
+          ENDIF
+      ENDIF
+
+C     Creation du CHPOINT + Definition du Type, Titre et Attribut du CHPOINT
+      SEGINI,MCHPOI
+      IFOPOI=IFOUR
+      MTYPOI   = ' '
+      MOCHDE   = 'CHPOINT CREE PAR VIDE'
+      JATTRI(1)=  IJAT1
+
+      IOBJ     = MCHPOI
+      GOTO 900
+
+
+C     ===============================
+C     Objet MCHAML
+C     ===============================
+C     => MARG n'est pas utilisé
+
+   30 N1=0
+      N3=0
+      L1=8
+
+      SEGINI MCHELM
+      IFOCHE=IFOMOD
+      TITCHE='        '
+
+      IOBJ=MCHELM
+      GOTO 900
+
+
+C     ===============================
+C     Objet MMODEL
+C     ===============================
+C     => MARG n'est pas utilisé
+
+   40 N1=0
+
+      SEGINI MMODEL
+
+      IOBJ=MMODEL
+      GOTO 900
+
+
+C     ===============================
+C     Objet RIGIDITE
+C     ===============================
+C     => MARG indique le type de matrice (variable MTYMAT)
+
+   50 NRIGEL=0
+
+      SEGINI MRIGID
+      MTYMAT=MARG(1:8)
+      IFORIG=IFOUR
+
+      IOBJ=MRIGID
+      GOTO 900
+
+
+C     ===============================
+C     Objet EVOLUTIO
+C     ===============================
+C     => MARG indique le type d evolution (REEL ou COMPLEXE)
+
+   60 N=0
+
+      SEGINI MEVOLL
+      ITYEVO=MARG(1:8)
+      IEVTEX='        '
+C      write(ioimp,*) 'ITYEVO=', ITYEVO
+
+      IOBJ=MEVOLL
+      GOTO 900
+
+
+C     ===============================
+C     Objet LISTENTI
+C     ===============================
+C     => MARG n'est pas utilisé
+
+   70 JG=0
+
+      SEGINI MLENTI
+
+      IOBJ=MLENTI
+      GOTO 900
+
+
+C     ===============================
+C     Objet LISTREEL
+C     ===============================
+C     => MARG n'est pas utilisé
+
+   80 JG=0
+
+      SEGINI MLREEL
+
+      IOBJ=MLREEL
+      GOTO 900
+
+
+C     ===============================
+C     Objet LISTMOTS
+C     ===============================
+C     => MARG n'est pas utilisé
+
+   90 JGN=4
+      JGM=0
+
+      SEGINI MLMOTS
+
+      IOBJ=MLMOTS
+      GOTO 900
+
+
+C     ===============================
+C     Objet LISTCHPO
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  100 N1=0
+
+      SEGINI MLCHPO
+
+      IOBJ=MLCHPO
+      GOTO 900
+
+
+C     ===============================
+C     Objet TABLE
+C     ===============================
+C     => MARG donne le sous-type de la table (indice 'SOUSTYPE')
+
+  110 M=0
+
+      SEGINI MTABLE
+      IF (IARG.EQ.1) THEN
+          CALL ECCTAB(MTABLE,'MOT',0,0.D0,'SOUSTYPE',.TRUE.,0,
+     &                       'MOT',0,0.D0,MARG(1:8) ,.TRUE.,0)
+      ENDIF
+
+      IOBJ=MTABLE
+      GOTO 900
+
+
+C     ===============================
+C     Objet DEFORME
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  120 NDEF=0
+
+      SEGINI MDEFOR
+
+      IOBJ=MDEFOR
+      GOTO 900
+
+
+C     ===============================
+C     Objet VECTEUR
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  130 NVEC=0
+      ID=0
+
+      SEGINI MVECTE
+
+      IOBJ=MVECTE
+      GOTO 900
+
+
+C     ===============================
+C     Objet CHARGEME
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  140 N=0
+
+      SEGINI MCHARG
+
+      IOBJ=MCHARG
+      GOTO 900
+
+
+C     ===============================
+C     Objet NUAGE
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  150 NVAR  =0
+      NBCOUP=0
+
+      SEGINI MNUAGE
+
+      IOBJ=MNUAGE
+      GOTO 900
+
+
+C     ===============================
+C     Objet ANNOTATI
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  160 NBANNO=0
+  
+      SEGINI,MANNOT
+
+      IOBJ=MANNOT
+      GOTO 900
+
+
+C     ===============================
+C     Objet LISTOBJE
+C     ===============================
+C     => MARG n'est pas utilisé
+
+  170 NOBJ = 0
+
+      SEGINI,MLOBJE
+      TYPOBJ = '        '
+
+      IOBJ=MLOBJE
+      GOTO 900
+
+
+
+
+C     **************************************************************
+C     FIN DE LA CRÉATION D'UN OBJET
+C     **************************************************************
+
+  900 CONTINUE
+
+C     S'il y avait plusieurs objets de même type à créer, en voilà un de moins
+      NLIR=NLIR-1
+
+C     On mémorise son pointeur et son type dans le segment IPSORT
+      NOBJ=NOBJ+1
+      SEGADJ IPSORT
+      IPOOBJ(NOBJ)=IOBJ
+      MTYPOB(NOBJ)=MTYP(ITYP)
+
+C     On remonte là-haut pour voir s'il y a d'autres objets à créer
+C     (cette fois, ce ne sera plus obligatoire)
+      ICOD=0
+      GOTO 1
+
+
+
+
+
+C     **************************************************************
+C     FIN DE LA SUBROUTINE
+C     **************************************************************
+C
+C     On écrit sur la sortie les objets stockés dans IPSORT :
+C      - Option 'TABU' => les objets sont placés dans une table
+C      - Par défaut    => on sort les objets séparément
+C
+
+  999 CONTINUE
+
+C     =============================================
+C     SORTIE SOUS FORME DE PLUSIEURS OBJETS SÉPARÉS
+C     =============================================
+      IF (ITAB.EQ.0) THEN
+*         Il faut inverser l'ordre pour ECROBJ
+          DO IA=1,NOBJ
+              IB=NOBJ-IA+1
+              IPOO=IPOOBJ(IB)
+              TYOB=MTYPOB(IB)
+              CALL ACTOBJ(TYOB,IPOO,1)
+              CALL ECROBJ(TYOB,IPOO)
+          ENDDO
+
+
+C     =====================================
+C     SORTIE SOUS FORME D'UNE TABLE INDICÉE
+C     =====================================
+C     Si l'objet LISTENTI/LISTREEL/LISTMOTS définissant les indices à
+C     utiliser est trop court, les indices manquants seront des entiers
+C     correspondant à l'ordre de création de l'objet
+      ELSE
+          M=NOBJ
+          SEGINI MTAB1
+
+          CHAI='        '
+          IVAL=0
+          XVAL=0.D0
+
+          LONGLI=NOBJ
+          IF (ITAB.EQ.2) LONGLI=MLENT1.LECT(/1)
+          IF (ITAB.EQ.3) LONGLI=MLREE1.PROG(/1)
+          IF (ITAB.EQ.4) LONGLI=MLMOT1.MOTS(/2)
+
+          DO IA=1,NOBJ
+              IF (IA.GT.LONGLI) THEN
+C                 L'objet LIST**** est trop petit, on change de mode
+C                 d'indexation
+                  ITAB=1
+                  TYIN='ENTIER  '
+              ENDIF
+
+              IF (ITAB.EQ.1) IVAL=IA
+              IF (ITAB.EQ.2) IVAL=MLENT1.LECT(IA)
+              IF (ITAB.EQ.3) XVAL=MLREE1.PROG(IA)
+              IF (ITAB.EQ.4) CHAI(1:4)=MLMOT1.MOTS(IA)
+
+              IPOO=IPOOBJ(IA)
+              TYOB=MTYPOB(IA)
+              CALL ECCTAB(MTAB1,TYIN,IVAL,XVAL,CHAI,.TRUE.,0,
+     &                          TYOB,0   ,0.D0,' ' ,.TRUE.,IPOO)
+          ENDDO
+
+          SEGDES MTAB1
+          CALL ECROBJ('TABLE',MTAB1)
+      ENDIF
+
+      SEGSUP IPSORT
+      GOTO 1099
+
+C----------------------------------------------------------------------C
+C                          TEST SI OBJET VIDE                          C
+C----------------------------------------------------------------------C
+ 1000 CONTINUE
+
+      GOTO (1010,1020,1030,1040,1050,1060,1070,1080,1090,
+     .      1100,1110,1120,1130,1140,1150,1160,1170),ITYP
+      
+C---- MAILLAGE VIDE ?
+ 1010 CONTINUE
+
+      CALL LIROBJ('MAILLAGE',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MAILLAGE',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MELEME = IPOBJ1
+      LOG1 = NUM(/2).EQ.0.AND.LISOUS(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- CHPOINT  VIDE ?
+ 1020 CONTINUE
+
+      CALL LIROBJ('CHPOINT ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('CHPOINT ',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MCHPOI = IPOBJ1
+      LOG1 = IPCHP(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- MCHAML   VIDE ?
+ 1030 CONTINUE
+
+      CALL LIROBJ('MCHAML  ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MCHAML  ',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MCHELM = IPOBJ1
+      LOG1 = IMACHE(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- MMODEL   VIDE ?
+ 1040 CONTINUE
+
+      CALL LIROBJ('MMODEL  ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MMODEL  ',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MMODEL = IPOBJ1
+      LOG1 = KMODEL(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- RIGIDITE VIDE ?
+ 1050 CONTINUE
+
+      CALL LIROBJ('RIGIDITE',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MRIGID = IPOBJ1
+      SEGACT, MRIGID
+      LOG1 = IRIGEL(/2).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- EVOLUTIO VIDE ?
+ 1060 CONTINUE
+
+      CALL LIROBJ('EVOLUTIO',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('EVOLUTIO',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MEVOLL = IPOBJ1
+      LOG1 = IEVOLL(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- LISTENTI VIDE ?
+ 1070 CONTINUE
+
+      CALL LIROBJ('LISTENTI',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('LISTENTI',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MLENTI = IPOBJ1
+      LOG1 = LECT(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- LISTREEL VIDE ?
+ 1080 CONTINUE
+
+      CALL LIROBJ('LISTREEL',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('LISTREEL',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MLREEL = IPOBJ1
+      LOG1 = PROG(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- LISTMOTS VIDE ?
+ 1090 CONTINUE
+
+      CALL LIROBJ('LISTMOTS',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('LISTMOTS',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MLMOTS = IPOBJ1
+      LOG1 = MOTS(/2).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- LISTCHPO VIDE ?
+ 1100 CONTINUE
+
+      CALL LIROBJ('LISTCHPO',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('LISTCHPO',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MLCHPO = IPOBJ1
+      LOG1 = ICHPOI(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- TABLE    VIDE ?
+ 1110 CONTINUE
+
+      CALL LIROBJ('TABLE   ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MTABLE = IPOBJ1
+      SEGACT, MTABLE
+      LOG1 = MLOTAB.EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- DEFORME  VIDE ?
+ 1120 CONTINUE
+
+      CALL LIROBJ('DEFORME ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MDEFOR = IPOBJ1
+      SEGACT, MDEFOR
+      LOG1 = AMPL(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- VECTEUR  VIDE ?
+ 1130 CONTINUE
+
+      CALL LIROBJ('VECTEUR ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MVECTE = IPOBJ1
+      SEGACT, MVECTE
+      LOG1 = IGEOV(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- CHARGEME VIDE ?
+ 1140 CONTINUE
+
+      CALL LIROBJ('CHARGEME',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('CHARGEME',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MCHARG = IPOBJ1
+      LOG1 = KCHARG(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- NUAGE    VIDE ?
+ 1150 CONTINUE
+
+      CALL LIROBJ('NUAGE   ',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('NUAGE   ',IPOBJ1,1)
+      IF (IERR.NE.0) RETURN
+
+      MNUAGE = IPOBJ1
+      LOG1 = NUAPOI(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- ANNOTATI VIDE ?
+ 1160 CONTINUE
+
+      CALL LIROBJ('ANNOTATI',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MANNOT = IPOBJ1
+      SEGACT,MANNOT
+      LOG1 = ICLAS(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+      GOTO 1099
+
+C---- LISTOBJE VIDE ?
+ 1170 CONTINUE
+
+      CALL LIROBJ('LISTOBJE',IPOBJ1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      MLOBJE = IPOBJ1
+      SEGACT,MLOBJE
+      LOG1 = LISOBJ(/1).EQ.0
+      CALL ECRLOG(LOG1)
+
+
+ 1099 CONTINUE
+      RETURN
+      END
+
+ 
+ 

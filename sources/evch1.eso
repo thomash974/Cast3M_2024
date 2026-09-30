@@ -1,0 +1,110 @@
+C EVCH1     SOURCE    CB215821  21/01/28    21:15:00     10867          
+      SUBROUTINE EVCH1(NBTHL,ITHR,ICPR1,MCHPOI,CMOT1)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCNOYAU
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCHPOI
+
+      CHARACTER*(*) CMOT1
+      CHARACTER*8   TYP1
+
+      SEGMENT ICPR1
+        INTEGER           IBIN1(nbpts),IBIN2(nbpts)
+        REAL*8            XVAL1(nbpts)
+        CHARACTER*(LONOM) CNOM2(nbpts)
+      ENDSEGMENT
+
+C     Mise en forme du CHPOINT en ICPR1
+      NSOUPO=MCHPOI.IPCHP(/1)
+      DO 10 ISOUP = 1,NSOUPO
+        MSOUPO = MCHPOI.IPCHP(ISOUP)
+        NC     = MSOUPO.NOCOMP(/2)
+
+        DO 20 INC = 1,NC
+          IF(MSOUPO.NOCOMP(INC) .EQ. CMOT1)THEN
+            MPOVAL = MSOUPO.IPOVAL
+            IPT1   = MSOUPO.IGEOC
+            NNC    = IPT1.NUM(/2)
+
+C           On assure le travail contigu en mémoire
+            IF(NBTHL .EQ. 1)THEN
+              IDEB  = 1
+              IFIN  = NNC
+            ELSE
+              NBTHR=MIN(NNC,NBTHL)
+              IF(ITHR .GT. NBTHR) GOTO 20
+              IRES = MOD(NNC,NBTHR)
+              IF(IRES  .EQ. 0)THEN
+                ILON  = NNC / NBTHR
+                IDEB  = (ITHR-1)* ILON + 1
+              ELSE
+                IF (ITHR .LE. IRES) THEN
+                  ILON  = (NNC / NBTHR) + 1
+                  IDEB  = (ITHR-1)* ILON + 1
+                ELSE
+                  ILON  = NNC / NBTHR
+                  IDEB  = (IRES * (ILON+1)) + (ITHR-IRES-1)* ILON + 1
+                ENDIF
+              ENDIF
+              IFIN  = IDEB + ILON - 1
+            ENDIF
+
+C           Boucle qui réalise le travail de IDEB à IFIN
+            DO INBEL= IDEB,IFIN
+              INOE  = IPT1.NUM(1,INBEL)
+              ICPR1.IBIN1(INOE) = 1
+              ICPR1.XVAL1(INOE) = MPOVAL.VPOCHA(INBEL,INC)
+            ENDDO
+          ENDIF
+ 20     CONTINUE
+ 10   CONTINUE
+
+
+C     Repertorie tous les points nommes
+      NNC=IOUEP2(/1)
+
+C     On assure le travail contigu en mémoire
+      IF(NBTHL .EQ. 1)THEN
+        IDEB  = 1
+        IFIN  = NNC
+      ELSE
+        NBTHR=MIN(NNC,NBTHL)
+        IF(ITHR .GT. NBTHR) RETURN
+        IRES = MOD(NNC,NBTHR)
+        IF(IRES  .EQ. 0)THEN
+          ILON  = NNC / NBTHR
+          IDEB  = (ITHR-1)* ILON + 1
+        ELSE
+          IF (ITHR .LE. IRES) THEN
+            ILON  = (NNC / NBTHR) + 1
+            IDEB  = (ITHR-1)* ILON + 1
+          ELSE
+            ILON  = NNC / NBTHR
+            IDEB  = (IRES * (ILON+1)) + (ITHR-IRES-1)* ILON + 1
+          ENDIF
+        ENDIF
+        IFIN  = IDEB + ILON - 1
+      ENDIF
+
+      DO 30 IOP=IDEB,IFIN
+        TYP1=INOOB2(IOP)
+        IF(TYP1.EQ.'POINT   ') THEN
+          INOE  =IOUEP2(IOP)
+          IP    =INOOB1(IOP)
+          IDEBCH=IPCHAR(IP)
+          IFINCH=IPCHAR(IP+1)-1
+          IF (ICHARA(IDEBCH:IDEBCH).NE.' ') THEN
+            IF (ICHARA(IDEBCH:IDEBCH).NE.'#') THEN
+              ICPR1.IBIN2(INOE)= 1
+              ICPR1.CNOM2(INOE)= ICHARA(IDEBCH:IFINCH)
+            ENDIF
+          ENDIF
+        ENDIF
+ 30   CONTINUE
+      END
+ 

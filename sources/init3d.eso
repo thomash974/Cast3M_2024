@@ -1,0 +1,85 @@
+C INIT3D    SOURCE    FD218221  24/02/07    21:15:16     11834          
+      subroutine init3d(xmat,nmat,vnmat,nstype,nbelas,var0,varf,
+     # nvari,vnvari,ndtens,ierr1)
+
+c     copie des var0 dans les varf en tenant compte d une dilution
+c     eventuelle pour les variables scalaire
+
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+
+       integer nmat,nstype,nbelas,nvari,ndtens,ierr1
+       real*8 xmat(nmat),var0(nvari),varf(nvari)
+       integer vnmat(nstype),vnvari(nstype,2)
+
+c     fraction inerte du solide (dont les varible internes  sont a zero)
+      real*8 finr0,finr1,coeffd
+      logical log_diss
+      integer numx,ivar,itype,i
+
+
+c     copie des var0 sur les varf en prenant en compte la variation de
+c     la fraction inerte pour les vari scalaires pas actuel
+      call xmat3d(FINR1,xmat,nmat,vnmat,nstype,nbelas,1,8)
+c     fraction inerte pas precedent
+      call xvar3d(FINR0,numx,var0,nvari,vnvari,nstype,ndtens,1,9)
+c     stockage fraction inerte pour pas suivant
+      varf(numx)=finr1
+c     coeff de reduction des variabes internes par dilution simple
+      if(finr1.ne.finr0) then
+c       la dilution evolue
+        if(finr1.ne.1.) then
+c           calcul du coeff de dilution
+            coeffd=(1.d0-finr0)/(1.d0-finr1)
+            log_diss=.true.
+        else
+            print*,'Passage de FINER a un impossible pour fluiso3d !'
+            ierr1=1
+            return
+        end if
+      else
+c       pas d effet de dilution
+        coeffd=1.d0
+        log_diss=.false.
+      end if
+c     compteur de numero de vari
+      ivar=0
+c     compteur type vari
+      do itype=1,NSTYPE
+c       copie des variables scalaires avec ou sans dilution
+        do i=1,VNVARI(itype,1)
+            ivar=ivar+1
+c           l effet de dilution ne s applique jamais du ivari(1) est le controle premier pas
+            if(log_diss.and.(ivar.ne.1)) then
+                varf(ivar)=var0(ivar)*coeffd
+            else
+                varf(ivar)=var0(ivar)
+            end if
+        end do
+c       copie des variables avec ou sans sans dilution
+        do itens=1,VNVARI(itype,2)
+c           on ne modifie que les valeurs principales des tenseurs
+c           boucle sur les valeurs principales
+            do i=1,ndtens
+                ivar=ivar+1
+                if(log_diss) then
+c                   les tenseurs visco elastiques sont traites dans hydr3d
+                    if((itype.le.4).or.(i.gt.3)) then
+c                       pas de dilution de cette variable                
+                        varf(ivar)=var0(ivar)
+                    else
+c                       les valeurs principales des def plastiques sont affectes par la dilution
+                        varf(ivar)=var0(ivar)*coeffd
+                    end if
+                else
+c                   pas de dilution
+                    varf(ivar)=var0(ivar)
+                end if
+            end do
+        end do
+      end do
+
+      return 
+      end
+
+ 

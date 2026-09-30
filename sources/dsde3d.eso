@@ -1,0 +1,24 @@
+C DSDE3D    SOURCE    PV090527  23/01/27    21:15:27     11574          
+      SUBROUTINE DSDE3D(dS3,deps3,K,G)
+c     ds=E*depse
+c     (A.Sellier 2021/04/23)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 dS3(3),deps3(3),K,G
+
+      t3 = 0.2D1 * deps3(2)
+      t4 = 0.2D1 * deps3(3)
+      t9 = K * (deps3(1) + deps3(2) + deps3(3))
+      t11 = 0.2D1 * deps3(1)
+      dS3(1) = G * (  0.4D1 * deps3(1) - t3 - t4) / 0.3D1 + t9
+      dS3(2) = G * (-t11 + 0.4D1 * deps3(2) - t4) / 0.3D1 + t9
+      dS3(3) = G * (-t11 - t3 + 0.4D1 * deps3(3)) / 0.3D1 + t9
+            
+c      print*,'dans dsde3d:',dS3,deps3,K,G      
+      return
+      end
+      
+
+
+ 

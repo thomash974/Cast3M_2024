@@ -1,0 +1,53 @@
+C IFT       SOURCE    BP208322  20/09/18    21:17:02     10718          
+        
+        SUBROUTINE IFT(XF,NT,NDDL,NHBM,NFFT,GAM,XT) 
+        
+*=======================================================================
+* IFT: Transformee de Fourier Inverse
+*
+* Entrée: XF , coefficients de Fourier 
+*        GAM , opérateur IFT discret 
+* Sortie: XT , déplacements temporaux 
+*
+*=======================================================================
+     
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+       REAL*8 XF(NT),XT(NDDL,NFFT)
+       REAL*8 GAM(NFFT,2*NHBM+1)
+*
+*      Boucle sur le temps
+       DO K = 1,NFFT 
+*          Boucle sur les DDL 
+           DO J=1,NDDL
+*             harmonique 0
+              XT(J,K) = XF(J)
+*             Boucle sur les harmoniques > 0 
+              DO I = 2,2*NHBM+1
+                 XT(J,K)=XT(J,K)+GAM(K,I)*XF(NDDL*(I-1)+J)
+              ENDDO
+           ENDDO                               
+       ENDDO
+*
+*  tentative ci-apres moins performante :( 
+c *      harmonique 0
+c        DO K=1,NFFT 
+c        DO J=1,NDDL
+c           XT(J,K) = XF(J)
+c        ENDDO       
+c        ENDDO       
+c *      Boucle sur les harmoniques > 0 
+c        DO I = 2,2*NHBM+1
+c *         Boucle sur le temps
+c           DO K = 1,NFFT 
+c *            Boucle sur les DDL 
+c              DO J=1,NDDL
+c                  XT(J,K)=XT(J,K)+GAM(K,I)*XF(NDDL*(I-1)+J)
+c              ENDDO                               
+c           ENDDO       
+c        ENDDO
+       
+       END
+ 
+ 

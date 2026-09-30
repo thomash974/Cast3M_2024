@@ -1,0 +1,123 @@
+C HHOPAR    SOURCE    OF166741  24/05/06    21:15:13     11082          
+C HHOPAR    SOURCE                                                      
+
+      SUBROUTINE HHOPAR (modlHHO, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMMODEL
+-INC SMELEME
+-INC SMLENTI
+
+      CHARACTER*(4)  motOPT
+
+      iret = 0
+
+      imodel = modlHHO
+      SEGACT,imodel*MOD
+
+      CALL HHONOB(modlHHO, nobHHO, iret)
+      IF (nobHHO.LE.0) THEN
+        write(ioimp,*) 'HHOPAR: nobHHO undefined'
+        CALL ERREUR(5)
+        RETURN
+      END IF
+
+      mailHHO = imodel.IMAMOD
+c*      meleme  = mailHHO
+c*      segact,meleme*nomod (segment actif en entree)
+
+c== Segment lentHHO :
+      JG = 10
+      SEGINI,mlent2
+      DO i = 1, JG
+        mlent2.lect(i) = -999
+      END DO
+      lentHHO = mlent2
+
+C= Remplissage de segments :
+      IPOSR = 0
+      INDSR = 0
+      NMAXR = MAX(NISFHO,NISCHO)
+      i_z = 0
+      CALL HHOLI2('INIT_IPOS',i_z,IPOSR,i_z,iret)
+      if (iret.ne.0) return
+      CALL HHOLI2('INIT_INDS',i_z,NMAXR,INDSR,iret)
+      if (iret.ne.0) return
+      mlent2.lect(6) = IPOSR
+      mlent2.lect(7) = INDSR
+
+C= On recherche les faces du maillage dans sa totalite :
+      CALL ECROBJ('MAILLAGE',mailHHO)
+      IF (IDIM.EQ.2) THEN
+        CALL CHANLG
+      ELSE 
+        CALL ECRCHA('NOID')
+        CALL ENVVO2(1)
+      END IF
+      CALL LIROBJ('MAILLAGE',mailSQE,1,iretc)
+      IF (IERR.NE.0) THEN
+        iret = 21
+        RETURN
+      END IF
+
+c-dbg      write(ioimp,*) 'HHOPAR - mailHHO'
+c-dbg      CALL ecmail(mailhho,0)
+c-dbg      write(ioimp,*) 'HHOPAR - mailSQE'
+c-dbg      CALL ecmail(mailSQE,0)
+
+      CALL ACTOBJ('MAILLAGE',mailHHO,1)
+
+      motOPT = 'CELL'
+      CALL HHOLIM(motOPT,mailHHO,lentHHO,iret)
+      IF (iret.NE.0) RETURN
+
+      motOPT = 'FAEL'
+      CALL HHOLIM(motOPT,mailHHO,lentHHO,iret)
+      IF (iret.NE.0) RETURN
+
+      CALL ACTOBJ('MAILLAGE',mailSQE,1)
+
+      motOPT = 'FACE'
+      CALL HHOLIM(motOPT,mailSQE,lentHHO,iret)
+      IF (iret.NE.0) RETURN
+
+C= On stocke dans le IMODEL les informations mises a jour 
+c* Pour memoire      mlent2 = lentHHO
+C Liste entiers de chaque arete de la zone 
+      imodel.TYMODE(nobHHO+2) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+2) = mlent2.lect( 8)
+
+C Liste entiers donnant les aretes pour chaque cellule de la zone
+      imodel.TYMODE(nobHHO+3) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+3) = mlent2.lect( 9)
+
+C Liste entiers donnant les cellules de la zone
+      imodel.TYMODE(nobHHO+4) = 'LISTENTI'
+      imodel.IVAMOD(nobHHO+4) = mlent2.lect(10)
+
+c-dbgC Construction du maillage des points supports des faces :
+c-dbg      mlent3 = mlent2.lect(8)
+c-dbg      CALL HHOMPO('FACE',mlent3,ipt3)
+c-dbg      imodel.TYMODE(nobHHO+5) = 'MAILLAGE'
+c-dbg      imodel.IVAMOD(nobHHO+5) = ipt3
+c-dbg
+c-dbgC Construction du maillage des points supports des cellules :
+c-dbg      mlent3 = mlent2.lect(10)
+c-dbg      CALL HHOMPO('CELL',mlent3,ipt3)
+c-dbg      imodel.TYMODE(nobHHO+6) = 'MAILLAGE'
+c-dbg      imodel.IVAMOD(nobHHO+6) = ipt3
+
+      SEGACT,imodel*NOMOD
+
+c**      RETURN
+      END
+
+ 

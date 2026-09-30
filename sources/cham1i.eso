@@ -1,0 +1,59 @@
+C CHAM1I    SOURCE    CB215821  20/11/25    13:19:14     10792          
+      SUBROUTINE CHAM1i(ith)
+      
+      COMMON/cham1c/IPARA1,IPARA2
+      
+      SEGMENT SPARA1
+        INTEGER NBTHR1
+        INTEGER IPCH1
+        INTEGER IPTP1
+        INTEGER IPTR1
+      ENDSEGMENT
+
+      SEGMENT SPARA2
+        INTEGER NBTHRD
+        INTEGER IISUP
+        INTEGER IPSAU
+        INTEGER IPMOD
+        INTEGER IPCHE
+        INTEGER IPTPR
+        INTEGER IPTRA
+      ENDSEGMENT
+
+      IF(IPARA1 .NE. 0 .AND. IPARA2 .EQ. 0)THEN
+C       Pour effectuer le remplissage du MTRA2  en parallele
+C       Recupere le SEGMENT dans le COMMON/cham1c
+        SPARA1=IPARA1
+        
+        NBTHR =SPARA1.NBTHR1
+        MCHPOI=SPARA1.IPCH1
+        ICPR  =SPARA1.IPTP1
+        MTRA2 =SPARA1.IPTR1
+
+C       Appel de la SUBROUTINE qui fait le travail
+        CALL CHAM11(NBTHR,ith,MCHPOI,ICPR,MTRA2)
+
+      ELSEIF(IPARA1 .EQ. 0 .AND. IPARA2 .NE. 0)THEN
+C       Pour effectuer le remplissage du MCHAML en parallele
+C       Recupere le SEGMENT dans le COMMON/cham1c
+        SPARA2=IPARA2
+
+        NBTHR =SPARA2.NBTHRD
+        ISUP  =SPARA2.IISUP
+        ISAUT =SPARA2.IPSAU
+        MMODEL=SPARA2.IPMOD
+        MCHELM=SPARA2.IPCHE
+        ICPR  =SPARA2.IPTPR
+        MTRA2 =SPARA2.IPTRA
+
+C       Appel de la SUBROUTINE qui fait le travail
+        CALL CHAM12(NBTHR,ith,ISUP,ISAUT,MMODEL,MCHELM,ICPR,MTRA2)
+      ELSE
+        CALL ERREUR(5)
+
+      ENDIF
+
+      END
+
+ 
+ 

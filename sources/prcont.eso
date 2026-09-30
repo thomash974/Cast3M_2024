@@ -1,0 +1,146 @@
+C PRCONT    SOURCE    GOUNAND   21/04/07    21:15:06     10943          
+************************************************************************
+*     NOM         : PRCONT
+*     DESCRIPTION : Construit le contour d'un objet maillage
+*     (fonctionne suivant un principe inspire de TRAC)
+************************************************************************
+*     APPELE PAR : pilot.eso
+************************************************************************
+*     ENTREES :: aucune
+*     SORTIES :: aucune
+************************************************************************
+*     SYNTAXE (GIBIANE) :
+*     
+*     GEO1 = CONTOUR ('NOID') (|'EXTE'|) GEO2 ;
+*     |'INTE'|
+*     |'TOUT'|
+*     
+************************************************************************
+      SUBROUTINE PRCONT
+      
+      IMPLICIT INTEGER(I-N)
+      
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMELEME
+-INC SMCOORD
+-INC CCASSIS
+
+      SEGMENT ICPR(nbpts)
+      SEGMENT IDCP(ITE)
+      SEGMENT KON(NBCON,NMAX,3)
+      
+      CHARACTER*8 CHAIN1
+      
+      PARAMETER(NMOT1=3,NMOT2=1)
+      CHARACTER*4 LMOT1(NMOT1),LMOT2(NMOT2)
+      DATA LMOT1/'EXTE','INTE','TOUT'/
+      DATA LMOT2/'NOID'/ 
+      
+      
+*     +---------------------------------------------------------------+
+*     |           L E C T U R E   D E S   A R G U M E N T S           |
+*     +---------------------------------------------------------------+
+      
+*     LECTURE DES MOTS-CLES FACULTATIFS
+      CALL LIRMOT(LMOT1,NMOT1,IMOT1,0)
+      IF (IMOT1.EQ.0) IMOT1=1
+      CALL LIRMOT(LMOT2,NMOT2,IMOT2,0)
+      
+*     LECTURE DU MAILLAGE
+      CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+      CALL ACTOBJ('MAILLAGE',MELEME,1)
+      IF (IERR.NE.0) RETURN
+      IPT8=MELEME
+      
+*     ON VA VERIFIER QUE LE CONTOUR DEMANDE N'A PAS DEJA ETE CONSTRUIT
+      IF (LISREF(/1).EQ.1.AND.IMOT1.EQ.1) THEN
+         IPT1=LISREF(1)
+         CALL ECROBJ('MAILLAGE',IPT1)
+         RETURN
+      ENDIF
+      
+*     +---------------------------------------------------------------+
+*     |        C O N N E C T I V I T E   D U   M A I L L A G E        |
+*     +---------------------------------------------------------------+
+*     
+*     REMPLISSAGE DES TABLEAUX DE CORRESPONDANCE LOCALE/GLOBALE AVEC
+*     SEULEMENT LES NOEUDS SOMMETS (i.e. PAS DE NOEUDS MILIEUX)
+*     **************************************************************
+
+      igr=nbpts+1
+      SEGINI,ICPR
+      ITE=0
+      IPT1=MELEME
+      DO 3 I=1,MAX(1,LISOUS(/1))
+         IF (LISOUS(/1).NE.0) THEN
+            IPT1=LISOUS(I)
+         ENDIF
+         K=IPT1.ITYPEL
+         
+*     Le test ci-dessous filtre les elements non surfaciques
+         IF (K.NE.KSURF(K)) GOTO 8
+         
+*     Parcours des noeuds situes aux sommets de tous les elements
+         IDEP=NSPOS(K)
+         IF (NBSOM(K).GT.0) THEN
+            IFEP=IDEP+NBSOM(K)-1
+         ELSE
+*     Cas particulier de l'element POLYgone
+            IFEP=IDEP+IPT1.NUM(/1)-1
+         ENDIF
+         IF (IFEP.LT.IDEP) GOTO 8
+         DO 4 JJ=IDEP,IFEP
+            J=IBSOM(JJ)
+            DO 401 K=1,IPT1.NUM(/2)
+               IPOIT=IPT1.NUM(J,K)
+               IF (ICPR(IPOIT).NE.0) GOTO 7
+               ITE=ITE+1
+               ICPR(IPOIT)=ITE
+ 7             CONTINUE
+ 401        CONTINUE
+ 4       CONTINUE
+ 8       CONTINUE
+ 3    CONTINUE
+*     
+      IF (ITE.EQ.0) THEN
+         SEGSUP,ICPR
+         CALL ERREUR(16)
+         RETURN
+      ENDIF
+*     
+      SEGINI,IDCP
+      DO 40 I=1,ICPR(/1)
+         IF (ICPR(I).EQ.0) GOTO 40
+         IDCP(ICPR(I))=I
+ 40   CONTINUE
+
+      CALL CONTOU(MELEME,0,0,ICPR,IDCP,ITE,IMOT1,IMOT2,MELCON)
+
+      SEGSUP,IDCP
+      SEGSUP,ICPR
+      IF (IERR.NE.0) RETURN
+      
+      MELEME=MELCON
+      CALL ACTOBJ('MAILLAGE',MELEME,1)
+      CALL ECROBJ('MAILLAGE',MELEME)
+      
+*     ON INSCRIT SEULEMENT LE CONTOUR EXTERIEUR DANS LES
+*     REFERENCES DU MAILLAGE INITIAL
+      IF (IPT8.LISREF(/1).EQ.0.AND.IMOT1.EQ.1) THEN
+         NBREF=1
+         NBNN=IPT8.NUM(/1)
+         NBELEM=IPT8.NUM(/2)
+         NBSOUS=IPT8.LISOUS(/1)
+         SEGADJ,IPT8
+         IPT8.LISREF(1)=MELEME
+      ENDIF
+      SEGACT,IPT8*NOMOD
+      RETURN
+      END
+
+ 
+ 
+ 
+ 

@@ -1,0 +1,366 @@
+C PROG      SOURCE    SP204843  23/02/16    21:15:05     11600          
+C     FABRIQUE UN OBJET DE TYPE LISTREEL (SUITE DE REELS)
+C
+      SUBROUTINE PROG
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLREEL
+-INC CCREEL
+      CHARACTER*4 MOTC(2),MOTD(6),MOTE(2),MOTF(2),MOTG(2)
+      DATA MOTC/'PAS ','*   '/
+      DATA MOTD/'SINU','EXPO','LOGA','LINE','TABL','PROG'/
+      DATA MOTE/'PHAS','AMPL'/
+      DATA MOTF/'NPAS','GEOM'/
+      DATA MOTG/'A   ','B   '/
+C
+      XCONV=180.D0/XPI
+      CALL LIRMOT(MOTD,5,IFONC,0)
+      IF(IFONC.NE.0) GOTO (110,210,210,210,600) IFONC
+C
+C ***** ON FABRIQUE UNE SUITE DE REELS *****
+C
+   1  CONTINUE
+      IPRIM=0
+      X0=0.
+      JG=0
+      SEGINI MLREEL
+  99  CONTINUE
+      CALL LIRREE(X,IPRIM,IRETOU)
+      IF(IRETOU.EQ.0) GOTO 30
+C
+C  LECTURE D'UN FLOTTANT
+C
+ 100  CONTINUE
+      X0=X
+      JG=JG+1
+      SEGADJ,MLREEL
+      PROG(JG)=X
+      GOTO 99
+  30  CONTINUE
+      CALL LIRMOT(MOTC,2,IRET,0)
+      IF(IRET.EQ.0) GOTO 20
+      IF(IRET.EQ.2) GOTO 50
+C
+C  LECTURE DU MOT "PAS "
+C
+      CALL LIRREE(XPAS,1,IRETOU)
+      IF(IERR.NE.0)RETURN
+      if (abs(xpas).lt.xpetit) xpas=sign(xpetit,xpas)
+C
+C  LECTURE DE X1
+C
+      IGEOM = 0
+      CALL LIRREE(X1,0,IRETOU)
+      IF(IRETOU.EQ.1) GOTO 10
+C
+C  LECTURE DU MOT "NPAS" OU "GEOM"
+C
+      CALL LIRMOT(MOTF,2,INPA,1)
+      IF(IERR.NE.0)RETURN
+
+C---- MOT-CLE "NPAS"
+      IF (INPA.EQ.1) THEN
+C
+C     LECTURE DU NOMBRE DE PAS
+        CALL LIRENT(NP,1,IRETOU)
+        IF(IERR.NE.0)RETURN
+        NP=MAX(0,NP)
+        VX0=X0
+        VXPAS=XPAS
+        JG0=JG
+        JG=JG+NP
+        SEGADJ,MLREEL
+        DO 11 IJ=1,NP
+          PROG(JG0+IJ)=DBLE(IJ)*VXPAS+VX0
+  11    CONTINUE
+
+C     ON DOIT LIRE UN FLOTTANT OU RIEN
+        CALL LIRREE(X,0,IRETOU)
+        IF(IRETOU.EQ.1) GOTO 100
+        GOTO 20
+
+C---- MOT-CLE "GEOM"
+      ELSEIF (INPA.EQ.2) THEN
+        IGEOM = 1
+C
+C     LECTURE DE LA RAISON GEOMETRIQUE
+        CALL LIRREE(R1,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+
+        IF (R1.LE.0.D0) THEN
+          REAERR(1) = R1
+          CALL ERREUR(1009)
+          RETURN
+        ENDIF
+        IF (R1.EQ.1.D0) IGEOM = 0 
+
+C       LECTURE BORNE SUP DE L'INTERVALLE
+        CALL LIRREE(X1,0,IRETOU)
+        IF(IRETOU.EQ.1) GOTO 10
+
+C     SINON, LECTURE DE "NPAS"
+        CALL LIRMOT(MOTF(1),1,INPA,1)
+        IF(IERR.NE.0)RETURN
+        CALL LIRENT(NP,1,IRETOU)
+        IF(IERR.NE.0)RETURN
+
+        IF (NP.EQ.0) GOTO 13 
+
+        NP=MAX(0,NP)
+        VX0=X0
+        JG0=JG
+        JG=JG+NP
+        SEGADJ,MLREEL
+        DO 12 IJ=1,NP
+          VXPAS=XPAS*(R1**(IJ-1))
+          VX0 = VX0 + VXPAS
+          PROG(JG0+IJ) = VX0
+  12    CONTINUE
+
+C     ON DOIT LIRE UN FLOTTANT OU RIEN
+  13    CONTINUE
+        CALL LIRREE(X,0,IRETOU)
+        IF(IRETOU.EQ.1) GOTO 100
+        GOTO 20
+
+      ELSE
+        MOTERR(5:12) = MOTF(1)(1:4)//MOTF(2)(1:4)
+        CALL ERREUR(1052)
+        RETURN
+      ENDIF
+C
+C  PAS DE NOMBRE DE PAS; VOIR SI X1 EST SUIVI PAR *
+C
+  10  CONTINUE
+      IRF=0
+      CALL LIRREE(X2,0,IRETX)
+      IF (IRETX.EQ.1) GOTO 60
+      CALL LIRMOT(MOTC(2),1,IRF,0)
+      IF (IRF.EQ.0) GOTO 60
+      NFOIS=nint(X1)
+      CALL LIRREE(X1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+C
+C  DECOUPAGE DE L'INTEVRALLE [X0;X1]
+C
+  60  CONTINUE
+      X=XPAS*(X1-X0)
+
+C     PAS DE MOT-CLE "GEOM"
+      IF (IGEOM.EQ.0) THEN
+        XNBELE=(X1-X0)/XPAS
+        IQ=nint(XNBELE)
+        IF(IQ.GE.0.AND.XNBELE.NE.0.)THEN
+          IQ=MAX(1,IQ)
+          IF (XNBELE/IQ.GT.(IQ+1)/XNBELE) IQ=IQ+1
+        ELSE
+          IQ=1
+        ENDIF
+        XPAS =(X1-X0)/REAL(IQ)
+
+C     OPTION "GEOM"
+      ELSEIF (IGEOM.EQ.1) THEN
+
+        XNBELE = (X1-X0)/XPAS
+        XNBELE = 1.D0 + ABS(XNBELE)*(R1-1.D0)
+C
+C     TEST CAS OU R1 < 1
+        IF (XNBELE.LE.XPETIT) THEN
+          REAERR(1) = R1
+          CALL ERREUR(1009)
+          RETURN
+        ENDIF
+        XNBELE = LOG(XNBELE) / LOG(R1)
+        IQ = INT(XNBELE)
+        IQ = MAX(1,IQ)
+        XS = (R1**IQ - 1.D0) / (R1 - 1.D0)
+        XPAS = (X1-X0) / XS
+C     write(6,*) 'IQ,XS,XPAS',IQ,XS,XPAS
+
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+
+      X=X0
+      JG0=JG
+      JG=JG+IQ
+      SEGADJ,MLREEL
+      DO 8 IA=1,IQ
+        IF (IGEOM.EQ.1) THEN
+          VXPAS=XPAS*(R1**(IA-1))
+          X=X+VXPAS
+        ELSE
+          X=X+XPAS
+        ENDIF
+        PROG(JG0+IA)=X
+   8  CONTINUE
+      prog (jg0+iq)= X1
+      X0=X1
+      X=X2
+      IF (IRF.EQ.1) GOTO 65
+      IF (IRETX.EQ.1) GOTO 100
+      GO TO 99
+  50  CONTINUE
+C
+C  LECTURE DU MOT "*   "
+C
+      IMAX=PROG(/1)
+      NFOIS=nint(PROG(IMAX))
+      CALL LIRREE(X0,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      PROG(IMAX)=X0
+  65  CONTINUE
+      IF (NFOIS.LE.0) THEN
+        CALL ERREUR(36)
+        RETURN
+      ENDIF
+      NF=NFOIS-1
+      IF (NF.EQ.0) GOTO 99
+      JG0=JG
+      JG=JG+NF
+      SEGADJ,MLREEL
+      DO 52 I=1,NF
+        PROG(JG0+I)=X0
+  52  CONTINUE
+      GOTO 99
+C
+  20  CONTINUE
+      SEGACT,MLREEL*NOMOD
+      CALL ECROBJ('LISTREEL',MLREEL)
+      IF(IFONC.EQ.0) RETURN
+      GOTO 160
+C
+C ***** ON LIT LES COEFFICIENT POUR LE SINUS ********
+C
+ 110  CONTINUE
+      FREQ=0.D0
+      PHI=0.D0
+      AMPLI=1.D0
+      CALL LIRREE(Y1,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IF(Y1 .GT. 0.D0) GOTO 121
+C      IF(Y1) 120,120,121
+ 120  CONTINUE
+      CALL ERREUR(36)
+      RETURN
+
+ 121  CONTINUE
+      FREQ=Y1
+      CALL LIRMOT(MOTE,2,IREP,0)
+      IF(IREP.EQ.0) GOTO 150
+      IF(IREP.EQ.2) GOTO 140
+      CALL LIRREE(Y2,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      PHI=Y2
+      CALL LIRMOT(MOTE(2),1,IREP,0)
+      IF(IREP.EQ.0) GOTO 150
+ 140  CONTINUE
+      CALL LIRREE(Y3,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IF(Y3 .GE. 0.D0) GOTO 122
+C      IF(Y3) 120,122,122
+      GOTO 120
+      
+ 122  CONTINUE
+      AMPLI=Y3
+      GOTO 150
+C
+C ***** ON LIT LES COEFFICIENTS POUR LES AUTRES FONCTIONS ****
+C
+ 210  CONTINUE
+      PENTE=1.D0
+      ORDOR=0.D0
+      CALL LIRMOT(MOTG,2,IRET,0)
+      IF(IRET.EQ.0) GOTO 150
+      IF(IRET.EQ.0) GOTO 220
+      CALL LIRREE(PENTE,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      CALL LIRMOT(MOTG(2),1,IRET,0)
+      IF(IRET.EQ.0) GOTO 150
+ 220  CONTINUE
+      CALL LIRREE(ORDOR,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+C
+ 150  CONTINUE
+      CALL LIRMOT(MOTD(6),1,IRAP,0)
+      IF(IRAP.EQ.1) GOTO 1
+C
+ 160  CONTINUE
+      CALL LIROBJ('LISTREEL',KK,1,IRETOU)
+      IF(IERR.NE.0) RETURN
+      MLREEL=KK
+      SEGACT,MLREEL
+      NN=PROG(/1)
+      JG=NN
+      SEGINI,MLREE1
+C
+C ***** FONCTION SINUS ********************
+C
+      IF(IFONC.NE.1) GOTO 260
+      DO 170 N=1,NN
+        X=PROG(N)
+        Y=2.D0*XPI*FREQ*X+PHI/XCONV
+        Y=AMPLI*SIN(Y)
+        MLREE1.PROG(N)=Y
+ 170  CONTINUE
+      GOTO 500
+C
+C ***** FONCTION EXPONENTIELLE ************
+C
+ 260  CONTINUE
+      IF(IFONC.NE.2) GOTO 360
+      DO 270 N=1,NN
+        X=PROG(N)
+        Y=PENTE*X+ORDOR
+        Y=EXP(Y)
+        MLREE1.PROG(N)=Y
+ 270  CONTINUE
+      GOTO 500
+C
+C ***** FONCTION LOGARITHME ***************
+C
+ 360  CONTINUE
+      IF(IFONC.NE.3) GOTO 460
+      DO 370 N=1,NN
+        X=PROG(N)
+        Y=PENTE*X+ORDOR
+        IF(Y.GT.0.D0) GOTO 365
+        CALL ERREUR (36)
+        RETURN
+ 365    CONTINUE
+        Y=LOG(Y)
+        MLREE1.PROG(N)=Y
+ 370  CONTINUE
+      GOTO 500
+C
+C ***** FONCTION LINEAIRE******************
+C
+ 460  CONTINUE
+      DO 470 N=1,NN
+        X=PROG(N)
+        Y=PENTE*X+ORDOR
+        MLREE1.PROG(N)=Y
+ 470  CONTINUE
+C
+ 500  CONTINUE
+      SEGACT,MLREE1*NOMOD
+      CALL ECROBJ('LISTREEL',MLREE1)
+      RETURN
+
+C
+C ***** OPTION TABLE **********************
+C
+ 600  CONTINUE
+      CALL PRGTAB
+      RETURN
+
+      END
+
+ 
+ 
+ 

@@ -1,0 +1,38 @@
+C BARLAB    SOURCE    PV        22/04/21    22:38:00     11344          
+C
+      SUBROUTINE BARLAB(XMAT,XCAR,DEPST,SIG0,VAR0,SIGF,VARF,DEFP)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      DIMENSION XMAT(13),VAR0(8),VARF(8),depst(*),xsig0(3),xsigf(3)
+C----------------------------------------------------------------------
+C     Didier COMBESCURE
+C
+C     DRIVER MODELE BETON UNILATERAL
+C
+C----------------------------------------------------------------------
+C
+C
+C----------------------------------------------------------------------
+*
+C
+       XSECT = XCAR
+       XSIG0(1) = SIG0/XSECT
+C
+C
+C
+       CALL LABORD(XMAT,DEPST,XSIG0,VAR0,XSIGF,VARF)
+C
+C
+       SIGF = XSECT*XSIGF(1)
+C
+C
+       RETURN
+       END
+
+
+
+
+ 
+ 
+ 

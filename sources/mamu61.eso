@@ -1,0 +1,46 @@
+C MAMU61    SOURCE    PV        20/02/22    21:15:22     10531          
+      subroutine mamu61(long,val11,     val1,lpl,pt)
+      implicit real*8 (a-h,o-z)
+      real*8 val11(*),val1(*)
+      real*8 pt(36)
+           id2=lpl
+           id3=lpl+ lpl+1
+           id4=lpl+ lpl+1 +lpl+2
+           id5=lpl+ lpl+1 +lpl+2 +lpl+3
+           id6=lpl+ lpl+1 +lpl+2 +lpl+3 +lpl+4
+           pt1=pt(1)
+           pt7=pt(2)
+           pt13=pt(3)
+           pt19=pt(4)
+           pt25=pt(5)
+           pt31=pt(6)
+           do 110 i=1,long
+              xval1=val1(i)
+              xval2=val1(i+id2)
+              xval3=val1(i+id3)
+              xval4=val1(i+id4)
+              xval5=val1(i+id5)
+              xval6=val1(i+id6)
+              xval11=val11(i)
+              pt1=pt1+xval1*xval11
+              pt7=pt7+xval2*xval11
+              pt13=pt13+xval3*xval11
+              pt19=pt19+xval4*xval11
+              pt25=pt25+xval5*xval11
+              pt31=pt31+xval6*xval11
+ 110       continue
+           pt(1)=pt1
+           pt(2)=pt7
+           pt(3)=pt13
+           pt(4)=pt19
+           pt(5)=pt25
+           pt(6)=pt31
+
+           end
+
+ 
+ 
+ 
+ 
+ 
+ 

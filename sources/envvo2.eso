@@ -1,0 +1,45 @@
+C ENVVO2    SOURCE    GOUNAND   21/04/07    21:15:05     10943          
+      SUBROUTINE ENVVO2(icle)
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+*
+*     20160713 : SG nouvelle programmation de envvol, simplifiée, en vue
+*                de traiter les faces TRI7/QUA9 nouvellement rajoutées 
+*     dans le bdata. La simplification sera egalement utile pour
+*     les subroutines inspirees de envvol : faced2, faced, envel1,
+*     dicho3
+*     icle=0 : renvoie l'enveloppe (operateur ENVE)
+*     icle=1 : renvoie les face (operateur CHAN FACE)
+*
+*     2021/04/06 : SG decoupage ENVVO2 en ENVVO2 + ENVVO3
+*                  ENVVO2 : interface à ENVVO3
+*                  ENNVO3 : fait le travail, est appelé aussi
+*                  directement par le mailleur topologique (topv3.eso)
+*     
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+      character*4 lnoid(1)
+      data lnoid/'NOID'/
+
+*dbg      write(ioimp,*) 'coucou envvo2 IIMPI=',IIMPI
+c==== LECTURE ET OUVERTURE DU MELEME ==================================
+c     et eventuelle boucle 10 sur les ojbets meleme elementaires
+      CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+      CALL ACTOBJ('MAILLAGE',MELEME,1)
+      IF (IERR.NE.0) RETURN
+      call lirmot(lnoid,1,inoid,0)
+*      
+      CALL ENVVO3(MELEME,0,0,icle,inoid,IPT5)
+      IF (IERR.NE.0) RETURN
+*
+      CALL ACTOBJ('MAILLAGE',IPT5,1)
+      CALL ECROBJ('MAILLAGE',IPT5)
+
+      RETURN
+      END
+
+ 
+ 

@@ -1,0 +1,129 @@
+C DPIN3D    SOURCE    PV090527  23/01/27    21:15:26     11574          
+        subroutine dpin3d(NBRINC,NCMAX,NDIMG,IPHASE,
+     #  BETA,DELTA,COHE,RTP,SEFF3,FC1,DPFCDS3,DGFCDS3,
+     #  ACTIFC1,FTH3,PRECISION3D,AFFICHE,ERR1)
+
+c       critere de cisaillement icr avec les contraintes demarrant a 
+c       idebut
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+
+        integer NBRINC,NCMAX,IPHASE,icr,NBRACC,ndimg,err1
+        real*8 SEFF3(3)
+        real*8 FTH3(3)
+        real*8 BETA(0:NBRINC),DELTA(0:NBRINC),COHE(0:NBRINC)
+        real*8 RTP(0:NBRINC)
+        real*8 FC1
+        real*8 precision3d
+        real*8 DPFCDS3(3),DGFCDS3(3)
+        logical affiche,ACTIFC1
+
+
+        real*8 press,dilatance,cohesion,frottement,taueq,press_lim
+        integer idir
+        real*8 x3(3),y3(3),resc_lim,som,cohe_min
+        logical affiche_local
+        
+        
+        affiche_local=affiche
+c        affiche_local=.true.
+        if(affiche_local) then
+            print*,'On est dans dpin3d'
+        end if
+        
+        
+c       calul de la pression effective
+        press=0.d0
+        do idir=1,3  
+c           x3(idir)=min(SEFFG(idir),RTP(iphase))
+            x3(idir)=SEFF3(idir)
+            press=press-x3(idir)
+        end do
+c       on prend la convention MMC des pressions
+        press=press/3.d0 
+c       pression limite du critere jamais atteinte car coupure par 
+c       rankine  
+        dilatance=BETA(iphase)            
+        frottement=DELTA(iphase)         
+        cohesion=COHE(iphase)
+
+        cohe_min=max(
+     #  RTP(iphase)*(1/sqrt(3.d0)+frottement/3.d0),
+     #  RTP(iphase)*frottement)
+     
+c       verif coherence des donnes     
+        if(cohesion.le.cohe_min) then
+            print*,'Cohesion incoherente / traction dans Dpinc3d'
+            print*,'Il faut une cohession minimale de:',cohe_min
+            print*,'pour la phase', iphase
+            err1=1
+            return
+        end if
+   
+        press_lim=-RTP(iphase)/3.d0  
+c       DP activable que si press> press_lim        
+        if(press.gt.press_lim) then       
+          taueq=0.d0            
+          do idir=1,3
+            y3(idir)=x3(idir)+press
+            taueq=taueq+y3(idir)**2
+          end do
+          taueq=sqrt(taueq/2.d0)
+c         cisaillement limite            
+          taulim=frottement*press+cohesion 
+c         residu en cisaillement pour cette phase
+          FC1=taueq-taulim
+c         valeur limite du residu en cisaillement pour cette phase            
+          resc_lim=cohesion*precision3d
+c         initialisation direction ecoulement non associe         
+          if(FC1.gt.resc_lim) then          
+             if(affiche_local) then
+                 write(*,'(A39,1X,A23,E10.3)') 
+     #           'Plasticite en cisaillement dans dpin3d',
+     #           'Residu de cisaillement:', FC1
+             end if                
+c            direction de l ecoulement non associe
+             do idir=1,3
+                DPFCDS3(idir)=(y3(idir)/taueq)/2.d0
+                DGFCDS3(idir)=DPFCDS3(idir)
+                if(Dilatance.ge.0.d0) then
+                     DGFCDS3(idir)=DGFCDS3(idir)+Dilatance/3.d0          
+                end if
+                if(frottement.ge.0.d0) then
+                     DPFCDS3(idir)=DPFCDS3(idir)+frottement/3.d0               
+                end if                       
+             end do                  
+             ACTIFC1=.true.             
+          end if
+        
+        end if
+            
+        if(affiche_local) then
+            if(ACTIFC1) then
+                 write(*,'(A20,I2)') 
+     #          ' Cisaillement phase:',iphase                  
+                 write(*,'(A3,E10.3,1X,A5,E10.3,1X,A3,E10.3)')
+     #          'TAU',taueq,'PRESS',press,'FC',FC1
+                 do idir=1,3
+                    write(*,'(A6,I2,A2,E10.3)')
+     #              'Seffg(',idir,')=',SEFF3(idir)         
+                 end do     
+                 do idir=1,3
+                     write(*,'(2(A7,I2,A2,E10.3,1X))')
+     #               'DPFCDS(',idir,')=',DPFCDS3(idir),
+     #               'DGFCDS(',idir,')=',DGFCDS3(idir)
+                 end do      
+                 read*
+             else
+                write(*,'(A27,I2)') 
+     #          ' Pas de cisaillement phase:',iphase
+            end if
+        end if 
+
+        
+        return
+        end
+        
+        
+ 

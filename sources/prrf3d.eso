@@ -1,0 +1,33 @@
+C PRRF3D    SOURCE    FD218221  24/02/07    21:15:24     11834          
+        subroutine prrf3d(dalpr,teta1,teta2,tetaref,epst06,epst033,
+     #  epstf6,epstf33,epspmf6,epspt6,epspmf33)
+c       A.Sellier 09:13 02/07/2023 
+c       prepparation des donnees pour calcul des renforts
+        implicit real*8(a-h,m-z)
+        implicit integer(i-l)
+
+        real*8 dalpr,teta1,teta2,tetaref
+        real*8 epst06(6),epst033(3,3),epstf6(6),epstf33(3,3)
+        real*8 epspmf6(6),epspt6(6),epspmf33(3,3)
+
+        integer i,j,k
+
+                              
+c       recuperation du tenseur des deformations totales
+        call x6x33(epst06,epst033)
+        call x6x33(epstf6,epstf33)
+c       correction def thermique differentielle 
+        do i=1,3
+             epst033(i,i)=epst033(i,i)-dalpr*(teta1-tetaref)
+             epstf33(i,i)=epstf33(i,i)-dalpr*(teta2-tetaref)
+        end do             
+c       recuperation du tenseur des deformation localisee dans la matrice
+        do i=1,6
+             epspmf6(i)=epspt6(i)
+        end do
+        call x6x33(epspmf6,epspmf33)
+
+        return
+        end
+
+ 

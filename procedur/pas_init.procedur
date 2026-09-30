@@ -1,0 +1,572 @@
+$$$$ PAS_INIT
+* PAS_INIT  PROCEDUR  JK148537  23/11/20    21:15:10     11790          
+'DEBPROC' PAS_INIT   PRECED*'TABLE'  ;
+* cette procedure cree l'etat initial des inconnues, le met dans conti.
+* initialise au passage les tables de sorties en mettant l'etat
+* initial sous l'indice 0
+* on fait complique car on veut pouvoir continuer des
+* calculs sauvegardes avant que la table de continuation n'existe
+WTAB = PRECED.'WTABLE';
+
+TABSAUV=WTAB.'TABSAUV';
+'SI' ('EXIS' PRECED 'CONTINUATION');
+   conti=PRECED.'CONTINUATION';
+   inouv=faux;
+   WTAB.'TEMPS0'=conti.'TEMPS';
+'SINON';
+*  il suffit d'initialiser a zero ou de reprendre ce qui est donne
+*  par l'utilisateur ( vitesses initiales ,temperatuires initiales etc..
+   conti='TABL';
+   inouv=vrai;
+   PRECED.'CONTINUATION'= CONTI;
+'FINSI';
+
+*---------- initialisation du temps et table sortie temps
+'SI' ('EXIS' PRECED 'TEMPS') ;
+   NSOR= ('DIME' (PRECED . 'TEMPS' )) - 1;
+   WTAB.'NSOR'=NSOR;
+  'SI' ('EXIS' conti 'TEMPS');
+     WTAB.'TEMPS0'=conti.'TEMPS';
+     TEMP0=WTAB.'TEMPS0';
+  'SINON';
+    TEMP0=PRECED.'TEMPS' . NSOR;
+    WTAB.'TEMPS0'=TEMP0;
+  'FINSI';
+'SINON';
+   NSOR= 0;   PRECED.'TEMPS'='TABLE';
+      'SI' WTAB.'FREQUENTIEL' ;
+   TEMP0 = WTAB.'TEMPS0' ;
+      'SINON' ;
+   TEMP0 = 0.D0 ;
+      'FINSI' ;
+   PRECED.'TEMPS' . 0 = TEMP0 ;
+   WTAB.'TEMPS0'=TEMP0;
+   WTAB.'NSOR'=NSOR;
+'FINSI';
+conti.'TEMPS'=WTAB.'TEMPS0';
+
+* Cas de MODELEs passe dans un CHARGEMENT : indice MODELES
+'SI' (WTAB.'CHAR_MODE') ;
+  'SI' ('NON' ('EXIS' PRECED 'MODELES')) ;
+     PRECED.'MODELES'     = 'TABLE' ;
+     PRECED.'MODELES' . 0 = WTAB.'MODELE' ;
+*     PRECED.'MAILLAGES'     = 'TABLE' ;
+*     PRECED.'MAILLAGES' . 0 = 'EXTR' (PRECED.'MODELES' . 0) 'MAIL' ;
+  'FINSI' ;
+  'SI' inouv ;
+     conti.'MODELES'   = PRECED.'MODELES' . NSOR ;
+*     conti.'MAILLAGES' = PRECED.'MAILLAGES' . NSOR ;
+  'FINSI' ;
+'FINSI' ;
+
+************************************************************************
+*--------  pour la mecanique
+************************************************************************
+'SI' WTAB.'FOR_MECA' ;
+   MO_TOT=WTAB.'MO_TOT';
+*---------- initialisation du deplacement et table sortie
+  'SI' ('NON' ('EXIS' PRECED 'DEPLACEMENTS' ));
+     DDDD = 'ZERO' MO_TOT 'DEPLACEM';
+     DEP_COUR = 'CHANGER' 'CHPO'  MO_TOT DDDD;
+     'DETRUIRE' DDDD;
+     PRECED.'DEPLACEMENTS' = 'TABLE';
+     PRECED.'DEPLACEMENTS'. 0 = DEP_COUR;
+  'FINSI';
+*  WTAB.'FOR'= 'FORM' PRECED.'DEPLACEMENTS'. NSOR ;
+  'FORM' WTAB.'FOR0';
+  'SI' inouv;
+     conti.'DEPLACEMENTS'= PRECED. 'DEPLACEMENTS' . NSOR;
+*    conti.'GEODEB'=WTAB.'FOR';conti.'GEOFIN'=conti.'GEODEB';
+  'FINS';
+*--------- initialisation des contraintes et table de sortie
+  'SI' ('NON' ('EXIS' PRECED 'CONTRAINTES'));
+      SIG_COUR = 'ZERO' MO_TOT 'CONTRAIN';
+      PRECED.'CONTRAINTES' = 'TABLE';
+      PRECED.'CONTRAINTES'. 0 = SIG_COUR;
+  'FINSI';
+  'SI' inouv;
+     conti.'CONTRAINTES' = PRECED.'CONTRAINTES'.NSOR;
+  'FINS';
+*---------  initialisation des vitesses et table de sortie
+  'SI' (WTAB.'DYNAMIQUE' 'OU' ('EXISTE' WTAB 'MOD_LIA'));
+    'SI'  ('EXISTE' PRECED 'VITESSES')  ;
+       TABINT=INDEX (PRECED.'VITESSES');
+       IND0=TABINT.('DIME' TABINT);
+       VIT_COUR=PRECED.'VITESSES' . IND0;
+    'SINON';
+       DDDD = 'ZERO' MO_TOT 'DEPLACEMENTS';
+       VIT_COUR = 'CHANGER' 'CHPO'  MO_TOT DDDD;
+       'DETRUIRE' DDDD;
+       PRECED.'VITESSES'=TABLE;
+       PRECED.'VITESSES'. 0 = VIT_COUR;
+    'FINSI';
+    'SI' inouv;
+       conti.'VITESSES'=VIT_COUR;
+    'FINS';
+  'FINSI';
+  'SI' WTAB.'DYNAMIQUE';
+    'SI'  ('EXISTE' PRECED 'ACCELERATIONS') ;
+       TABINT=INDEX (PRECED.'ACCELERATIONS') ;
+       IND0=TABINT.('DIME' TABINT);
+       ACC_COUR=PRECED.'ACCELERATIONS' . IND0;
+    'SINON';
+       DDDD = 'ZERO' MO_TOT 'DEPLACEMENTS';
+       ACC_COUR = 'CHANGER' 'CHPO'  MO_TOT DDDD;
+       'DETRUIRE' DDDD;
+       PRECED.'ACCELERATIONS'=TABLE;
+       PRECED.'ACCELERATIONS'. 0 = ACC_COUR;
+    'FINSI';
+    'SI' inouv;
+       conti.'ACCELERATIONS'=ACC_COUR;
+    'FINS';
+  'FINSI';
+*----------  REACTIONS  et table de sortie
+  'SI' ('NON' ('EXIS' PRECED 'REACTIONS'));
+    'SI' ('NEG' WTAB.'BLOCAGES_MECANIQUES' 'INCONNU');
+     REA_COUR='REAC' WTAB.'BLOCAGES_MECANIQUES' conti.'DEPLACEMENTS';
+    'SINON' ;
+     REA_COUR = 'CHAN' 'CHPO' MO_TOT ('ZERO'  MO_TOT 'FORCES') ;
+    'FINSI' ;
+     PRECED.'REACTIONS' = TABLE;
+     PRECED.'REACTIONS' . 0 = REA_COUR;
+  'FINSI';
+  'SI' inouv;
+     conti.'REACTIONS'=PRECED.'REACTIONS'.NSOR;
+  'FINS';
+*------------ variables_internes et table de sortie
+  'SI' WTAB.'IPLAVI';
+    'SI' ('EXIS' PRECED 'VARIABLES_INTERNES' );
+       TABINT  =INDEX (PRECED.'VARIABLES_INTERNES');
+       IND0    =TABINT.('DIME' TABINT) ;
+       VAR_COUR=PRECED.'VARIABLES_INTERNES' . IND0;
+    'SINON';
+       VAR_COUR='ZERO' MO_TOT 'VARINTER';
+       PRECED.'VARIABLES_INTERNES'    = 'TABL';
+       PRECED.'VARIABLES_INTERNES'. 0 = VAR_COUR;
+    'FINSI';
+    'SI' inouv;
+       conti.'VARIABLES_INTERNES'=VAR_COUR;
+    'FINS';
+  'FINSI';
+  
+*----------  Parametre de pilotage indirect et table de sortie
+  'SI' WTAB.'CHAR_PILO'; 
+    'SI' ('NON' ('EXIS' PRECED 'COEFFICIENT_DE_PILOTAGE'));
+       PRECED.'COEFFICIENT_DE_PILOTAGE' = PROG 0. ;
+    'FINSI';
+  'FINSI' ;
+  
+*--------- initialisation des tables pour un tracking
+  'SI' ('EXIS' WTAB.'MODELE' 'MATE' 'EFEM');
+    'SI' ('EXIS' PRECED 'TRACKING');
+      'SI' (PRECED.'TRACKING');
+         'SI' ('NON' ('EXIS' PRECED 'PROOTS'));
+             PRECED.'PROOTS' = 'TABLE';
+             PRECED.'PROOTS'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'PROOTS' = PRECED.'PROOTS'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'EROOTS'));
+             PRECED.'EROOTS' = 'TABLE';
+             PRECED.'EROOTS'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'PROOTS' = PRECED.'PROOTS'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'NROOTS'));
+             PRECED.'NROOTS' = 0;
+         'FINSI';
+*         'SI' inouv; conti.'EROOTS' = PRECED.'EROOTS'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'TABISO'));
+             PRECED.'TABISO' = 'TABLE';
+             PRECED.'TABISO'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'TABISO' = PRECED.'TABISO'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'RESTH'));
+             PRECED.'RESTH' = 'TABLE';
+             PRECED.'RESTH'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'RESTH' = PRECED.'RESTH'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'ISOTEST'));
+             PRECED.'ISOTEST' = 'TABLE';
+             PRECED.'ISOTEST'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'ISOTEST' = PRECED.'ISOTEST'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'ISOTOT'));
+             PRECED.'ISOTOT' = 'TABLE';
+             PRECED.'ISOTOT'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'ISOTOT' = PRECED.'ISOTOT'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'MESH_ISO'));
+             PRECED.'MESH_ISO' = 'TABLE';
+             PRECED.'MESH_ISO'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'MESH_ISO' = PRECED.'MESH_ISO'.NSOR;'FINS';
+         'SI' ('NON' ('EXIS' PRECED 'MESH'));
+             PRECED.'MESH' = 'TABLE';
+             PRECED.'MESH'. 0 = 0.;
+         'FINSI';
+*         'SI' inouv; conti.'MESH' = PRECED.'MESH'.NSOR;'FINS';
+      'FINSI';
+    'FINSI';
+  'FINSI';
+*--------- initialisation de table pour non-local HELM
+  'SI' WTAB.'NLOC' ;
+    'SI' ('EGA' WTAB.'NON_LOCAL' 'HELM');
+       WTAB.'HELMHOLTZ' = 'TABLE' ;
+       MOLVIA = 'EXTR' WTAB.'NLOC_MODL' 'NLOC' ;
+       NHELM = 'DIME' MOLVIA ;
+       WTAB.'HELMHOLTZ' . 'N_VARI_NL'= NHELM ;
+       GEOHELM = 'EXTR' WTAB.'NLOC_MODL' 'MAIL' ;
+       MAHELM = 'REDU' WTAB.'CARACTERISTIQUES' WTAB.'NLOC_MODL' ;
+*     liste des parametres variables       
+       DDVA = 'EXTR' MAHELM 'COVA' ;
+       WTAB.'HELMHOLTZ' . 'NLOC_COVA'= DDVA ; 
+      'REPE' BH NHELM ;
+         WTAB.'HELMHOLTZ'. &BH  = 'TABLE' ;
+         LEMO  = 'EXTR' MOLVIA &BH ;
+         chaih1=chai 'pas_init: Helmholtz pour :' LEMO;
+*        mess chaih1;
+         WTAB.'HELMHOLTZ'. &BH. 'NOM' = LEMO ;
+        'SI' ('EXIS' DDVA LEMO) ;
+           WTAB.'HELMHOLTZ'. &BH. 'CTE' = FAUX ;
+        'SINON' ;
+           WTAB.'HELMHOLTZ'. &BH. 'CTE' = VRAI ;
+        'FINSI' ;
+         LEMOD = 'MODE' GEOHELM 'THERMIQUE' 'ANISOTROPE' ;
+         WTAB.'HELMHOLTZ'. &BH . 'H_MODELE' = LEMOD ;
+*        non linearite par defaut des helmholtz (sellier )
+         WTAB.'HELMHOLTZ'. &BH . 'LINEAIRE' = FAUX ;    
+      'FIN' BH ;
+    'FINSI';
+  'FINSI';
+*---------- deformations inelastiques et table de sortie
+  'SI' ('EXISTE' PRECED 'DEFORMATIONS_INELASTIQUES');
+     TABINT=INDEX (PRECED.'DEFORMATIONS_INELASTIQUES');
+     IND0=TABINT.('DIME' TABINT);
+     DEI_COUR=PRECED.'DEFORMATIONS_INELASTIQUES' . IND0;
+  'SINON';
+     DEI_COUR = 'ZERO' MO_TOT 'DEFINELA';
+    'SI' ('EXIS' TABSAUV  'DEFIN');
+      'SI' TABSAUV.'DEFIN';
+         PRECED.'DEFORMATIONS_INELASTIQUES'    ='TABLE';
+         PRECED.'DEFORMATIONS_INELASTIQUES' . 0=DEI_COUR;
+      'FINSI';
+    'FINSI';
+  'FINSI';
+  'SI' inouv;
+     conti.'DEFORMATIONS_INELASTIQUES'=DEI_COUR;
+  'FINS';
+*-----------  deformations  totales et table de sortie
+  'SI' ('EXISTE' PRECED 'DEFORMATIONS');
+     TABINT=INDEX (PRECED.'DEFORMATIONS');
+     IND0=TABINT.('DIME' TABINT);
+     DEF_COUR=PRECED.'DEFORMATIONS' . IND0;
+  'SINON';
+     DEF_COUR = 'ZERO' MO_TOT 'DEFORMATIONS';
+    'SI' ('EXIS' TABSAUV  'DEFTO');
+      'SI' TABSAUV.'DEFTO';
+         PRECED.'DEFORMATIONS'    ='TABLE';
+         PRECED.'DEFORMATIONS' . 0=DEF_COUR;
+      'FINSI';
+    'FINSI';
+  'FINSI';
+  'SI' inouv;
+     conti.'DEFORMATIONS'=DEF_COUR;
+  'FINS';
+
+*  - Initialisation des deformations apport
+   'SI' ('EXISTE' PRECED 'DEFORMATIONS_APPORT');
+     TABINT = INDEX (PRECED.'DEFORMATIONS_APPORT');
+     IND0   = TABINT.('DIME' TABINT);
+     DEF_APPO = PRECED.'DEFORMATIONS_APPORT' . IND0;
+   'SINON';
+     DEF_APPO = 'ZERO' MO_TOT 'DEFORMATIONS';
+     'SI' ('EXIS' TABSAUV  'DEFAP');
+       'SI' TABSAUV.'DEFAP';
+         PRECED.'DEFORMATIONS_APPORT'     = 'TABLE';
+         PRECED.'DEFORMATIONS_APPORT' . 0 = DEF_APPO;
+       'FINSI';
+     'FINSI';
+   'FINSI';
+   'SI' inouv;
+     conti.'DEFORMATIONS_APPORT' = DEF_APPO;
+   'FINS';
+
+*  en cas de chargement thermique initialisation de wtab.tet1 et wtab.tet2
+  'SI' WTAB.'CHAR_THE';
+     WTAB.'TET1' = 'TIRE' WTAB.'CHARGEMENT' 'T' TEMP0;
+     WTAB.'TET2' = WTAB.'TET1';
+  'FINSI';
+*  en cas de chargement de deformations initiales initialisation de defor1 et defor2
+  'SI' WTAB.'CHAR_DEFI';
+     WTAB.'DEFOR1' = 'TIRE' WTAB.'CHARGEMENT' 'DEFI' WTAB.'TEMPS0';
+     WTAB.'DEFOR2' =  WTAB.'DEFOR1';
+  'FINSI';
+*  En presence de THERMIQUE (CHARGEMENT ou FORMULATION) initialisation de TEMPERATURE_REFERENCE
+  'SI' (WTAB.'CHAR_THE' 'OU'  WTAB.'FOR_THER') ;
+*    On prend la temperature de reference dans le MATERIAU
+     'SI' ('EXIS' WTAB.'MA_TOT' 'TREF');
+        TREF = 'ZERO' WTAB.'MO_TOT' 'TEMPERAT' ;
+        TSZ = 'EXTR' WTAB.'MO_TOT' 'ZONE' ;
+        ISZ = 1 ;
+        'REPE' BSZ (('DIME' TSZ) / 2) ;
+           MOSZI = TSZ . ISZ ;
+           MOTSTEMP = 'EXTR' MOSZI 'TEMP' ;
+           'REPE' BMO ('DIME' MOTSTEMP) ;
+              MOTEMPI = 'EXTR' MOTSTEMP &BMO ;
+              TREFI = 'CHAN' 'STRESSES' MOSZI ('EXCO' ('REDU' WTAB.'MA_TOT' MOSZI) 'TREF' MOTEMPI) ;
+              TREF = TREF + TREFI ;
+           'FIN' BMO ;
+           ISZ = ISZ + 2 ;
+        'FIN' BSZ ;
+        WTAB.'TEMPERATURE_REFERENCE' = 'CHAN' 'TYPE' TREF 'TEMPERATURES' ;
+     'SINO';
+        ERREUR 77 'AVEC' ('MOT' 'TREF') ('MOT' 'de MATERIAU');
+     'FINS';
+*
+***  Desormias initialise dans PASAPAS, au meme endroit que ETREF
+***  'SI' ('EGA' WTAB.'ETHER1' 'INCONNU');
+***     On initialise les deformations thermiques a ZERO
+***     WTAB.'ETHER1' = 'ZERO' MO_TOT 'DEFORMATIONS' ;
+***     CB215821 : Pour une reprise propre, il faudrait mettre DEFORMATION_THERMIQUE dans CONTI
+***  'FINS' ;
+  'FINS';
+'FINS';
+
+
+'SI' WTAB.'NVSTNL'                          ;
+  'SI' ('EXISTE' PRECED 'VITESSES_FLUIDE')  ; 
+     TABINT=INDEX (PRECED.'VITESSES_FLUIDE');
+     IND0=TABINT.('DIME' TABINT)            ;
+     VFL_COUR=PRECED.'VITESSES_FLUIDE' . IND0;
+  'SINON'                                   ;
+     DDDD = 'ZERO' WTAB.'MOD_NSL' 'DEPLACEMENTS'     ;
+     VFL_COUR = 'CHANGER' 'CHPO' WTAB.'MOD_NSL' DDDD ;
+     'DETRUIRE' DDDD                                 ;
+     TABSAUV.'VITESSES_FLUIDE' = 'TABLE'             ;
+     TABSAUV.'VITESSES_FLUIDE'. 0  = VFL_COUR        ;
+  'FINSI'                                   ;
+  'SI' inouv                                ;
+    conti.'VITESSES_FLUIDE' = VFL_COUR      ;
+  'FINSI'                                   ;
+'FINSI'                                     ;
+************************************************************************
+*-----------pour la formulation THERMIQUE
+************************************************************************
+'SI' WTAB.'FOR_THER';
+*---------- initialisation de la temperatuure et table de sortie
+  'SI' ('EXISTE' PRECED 'TEMPERATURES');
+     TABINT  = INDEX (PRECED.'TEMPERATURES');
+     IND0    = TABINT.('DIME' TABINT );
+     TH_COUR = PRECED.'TEMPERATURES' . IND0;
+    'SI' (IND0 '>EG' 2) ;
+       WTAB.'TET0'=PRECED.'TEMPERATURES' . (IND0 - 2);
+    'FINSI';
+  'SINON';
+     'SI' ('EXIS' WTAB.'MAT_T' 'TINI') ;
+       MOTSTEMP = 'EXTR' WTAB.'MOD_T' 'DEPL' ;
+       DDDD = VIDE 'MCHAML' ;
+       'REPE' BMO ('DIME' MOTSTEMP) ;
+         MOTEMPI = 'EXTR' MOTSTEMP &BMO ;
+         DDDD = DDDD ET ('EXCO' WTAB.'MAT_T' 'TINI' MOTEMPI) ;
+       'FIN' BMO ;
+     'SINO' ;
+       DDDD = 'ZERO' WTAB.'MOD_T' 'TEMPERAT' ;
+     'FINS' ;
+     TH_COUR = 'CHANGER' 'CHPO' WTAB.'MOD_T' DDDD;
+     PRECED.'TEMPERATURES'    = 'TABL';
+     PRECED.'TEMPERATURES'. 0 = TH_COUR;
+  'FINSI';
+  'SI' INOUV ;
+     CONTI.'TEMPERATURES' ='CHAN' 'ATTRIBUT' TH_COUR 'NATURE' 'DIFFUS';
+  'FINS';
+   WTAB.'TET1'   = TH_COUR;
+   WTAB.'TET2'   = TH_COUR;
+  'SI' ('NON' ('EXIS' PRECED 'REACTIONS_THERMIQUES')) ;
+    'SI' ('NEG' WTAB.'BLOCAGES_THERMIQUES' 'INCONNU') ;
+       QTH_COUR ='REAC' WTAB.'BLOCAGES_THERMIQUES' TH_COUR ;
+    'SINON' ;
+       QTH_COUR ='CHAN' 'CHPO' WTAB.'MOD_T' ('ZERO' WTAB.'MOD_T' 'FORCES') ;
+    'FINSI' ;
+     PRECED.'REACTIONS_THERMIQUES'     ='TABL'    ;
+     PRECED.'REACTIONS_THERMIQUES' . 0 = QTH_COUR ;
+  'FINS' ;
+  'SI' inouv;
+    conti.'REACTIONS_THERMIQUES' = PRECED.'REACTIONS_THERMIQUES'.NSOR ;
+  'FINS';
+
+* Inidice 'TEMPERATURES_APPORT' de la table de sortie :
+   'SI' WTAB.'CHAR_MODE' ;
+     'SI' ('NON' ('EXIS' PRECED 'TEMPERATURES_APPORT')) ;
+       PRECED.'TEMPERATURES_APPORT'     = TABLE ;
+       NBT1     = 'DIME' PRECED.'TEMPERATURES' ;
+       'REPE' BTAPP1 NBT1 ;
+         IBT1     = &BTAPP1 - 1 ;
+         PRECED.'TEMPERATURES_APPORT' . IBT1 = PRECED.'TEMPERATURES' . IBT1 ;
+       'FIN' BTAPP1 ;
+     'FINSI' ;
+     'SI' INOUV ;
+       conti.'TEMPERATURES_APPORT' = PRECED.'TEMPERATURES_APPORT'. NSOR ;
+     'FINSI';
+   'FINSI' ;
+'FINS';
+
+************************************************************************
+*-----------pour la formulation METALLURGIE (T.L. en juin 2018)
+************************************************************************
+'SI' WTAB.'FOR_METALLU' ;
+*  PROPORTIONS de PHASES metallurgique
+  'SI' ('EXIS' PRECED 'PROPORTIONS_PHASES') ;
+     TAB_PROP ='INDE' (PRECED.'PROPORTIONS_PHASES');  'COMM' 'TAB_PROP est une table dan le quel on range les NOMS des indexs de la table PRECED.PROPORTIONS_PHASES';
+     IND0     = TAB_PROP. ('DIME' TAB_PROP)        ;  'COMM' 'IND0  = le nom du dernier index de la table PRECED.PROPORTIONS_PHASES';
+     CHMET0   = PRECED.'PROPORTIONS_PHASES'.IND0   ;  'COMM' 'CHMET0= la valeur du dernier indice de PRECED.PROPORTIONS_PHASES';
+  'SINO' ;
+*    Valeurs par defaut : ZERO pour toutes les phases sauf la premiere : 1.D0
+     CHMET0  ='ZERO' WTAB.'MOD_MET' 'VARINTER';
+     LISCO   ='EXTR' WTAB.'MOD_MET' 'VARI';
+     CMP1    ='EXCO' CHMET0 ('EXTR' LISCO 1) ('EXTR' LISCO 1);
+     CHMET0  = CHMET0 + (CMP1 + 1.D0);
+     PRECED.'PROPORTIONS_PHASES'    ='TABL' ;
+     PRECED.'PROPORTIONS_PHASES'. 0 = CHMET0;
+  'FINS' ;
+  CHTPOI0  = ('ZERO' WTAB.'MOD_MET' 'TEMPERATURES') 'NOMC' 'TPOI' ;
+  CHTPOI0  = 'CHAN' 'CHPO' WTAB.'MOD_MET' CHTPOI0 ;
+  WTAB . 'T_POINT0' = CHTPOI0 ;
+*  'SI' ('EXIS' PRECED 'T_POINT') ;
+*    TAB_TPOI = 'INDE' (PRECED.'T_POINT')   ;
+*    IND0     = TAB_TPOI. ('DIME' TAB_TPOI) ;
+*    CHTPOI0  = PRECED.'T_POINT'.IND0       ;
+*  'SINO' ;
+*    CHTPOI0  = ('ZERO' WTAB.'MOD_MET' 'TEMPERATURES') 'NOMC' 'TPOI' ;
+*    CHTPOI0  = 'CHAN' 'CHPO' WTAB.'MOD_MET' CHTPOI0 ;
+*    PRECED.'T_POINT'     = 'TABLE' ;
+*    PRECED.'T_POINT' . 0 = CHTPOI0 ;
+*  'FINS' ;
+  'SI' INOUV ;
+     conti . 'PROPORTIONS_PHASES' = CHMET0 ;
+*     conti . 'T_POINT'            = CHTPOI0 ;
+  'FINS' ;
+'FINSI' ;
+
+
+************************************************************************
+*-----------pour la formulation DIFFUSION
+************************************************************************
+'SI' WTAB.'FOR_DIFF' ;
+  'SI' ('EXIS' PRECED 'CONCENTRATIONS') ;
+    TABIND0  = 'INDE' (PRECED.'CONCENTRATIONS') ;
+    IND0     = TABIND0 . ('DIME' TABIND0) ;
+    CHCO0    = PRECED. 'CONCENTRATIONS' . IND0 ;
+  'SINO' ;
+    CHCO0    = 'ZERO' WTAB. 'MOD_DIF' 'DEPLACEMENTS' ;
+    CHCO0    = 'CHAN' 'CHPO' WTAB. 'MOD_DIF' CHCO0   ;
+    PRECED.'CONCENTRATIONS'    = 'TABL' ;
+    PRECED.'CONCENTRATIONS'. 0 = CHCO0  ;
+  'FINS' ;
+  'SI' INOUV ;
+    CONTI . 'CONCENTRATIONS' ='CHAN' 'ATTRIBUT' CHCO0  'NATURE' 'DIFFUS';
+  'FINS' ;
+  WTAB . 'CO1' = CHCO0 ;
+  WTAB . 'CO2' = CHCO0 ;
+  'SI' ('NON' ('EXIS' PRECED 'REACTIONS_DIFFUSIONS')) ;
+    'SI' ('NEG' WTAB.'BLOCAGES_DIFFUSIONS' 'INCONNU') ;
+      QDI_COUR = 'REAC' WTAB.'BLOCAGES_DIFFUSIONS' CHCO0 ;
+    'SINON' ;
+      QDI_COUR = 'CHAN' 'CHPO' WTAB.'MOD_DIF'
+        ('ZERO' WTAB.'MOD_DIF' 'FORCES') ;
+    'FINSI' ;
+    PRECED.'REACTIONS_DIFFUSIONS'   = 'TABL' ;
+    PRECED.'REACTIONS_DIFFUSIONS' . 0 = QDI_COUR ;
+  'FINS' ;
+  'SI' INOUV ;
+    CONTI . 'REACTIONS_DIFFUSIONS' =
+      PRECED . 'REACTIONS_DIFFUSIONS'. NSOR ;
+  'FINS' ;
+'FINS' ;
+
+************************************************************************
+*-----------pour la formulation CHANGEMENT_PHASE (CB215821 2019)
+*-----------Doit etre place en dernier car peut necessiter les autres
+*-----------champs
+************************************************************************
+'SI' WTAB.'PHASE';
+   MO_COVA ='EXTR' WTAB.'MAT_PHA' 'COVA';
+  'SI' (('DIME' MO_COVA) > 0);
+     CHAI1 ='CHAI' ' Le materiau du modele CHANGEMENT_PHASE ne peut pas varier';
+    'ERRE' CHAI1 ;
+  'FINS';
+ 
+  'SI' ( 'EXISTE' PRECED 'PROPORTIONS_PHASE')  ;
+     TABINT = INDEX (PRECED.'PROPORTIONS_PHASE');
+     IND0   = TABINT.('DIME' TABINT)            ;
+     CHPHA0 ='REDU' WTAB.'MOD_PHA' PRECED.'PROPORTIONS_PHASE'.IND0 ;
+  'SINON';
+*    On met un etat qui a du sens physique pour la proportion de phases
+     TABPHA ='EXTR' WTAB.'MOD_PHA' 'ZONE';
+     CHPHA0 ='VIDE' 'MCHAML';
+    'REPE' SURi (('DIME' TABPHA) / 2);
+*      Boucle sur les modeles CHANGEMENT_PHASE
+       MODEi  = TABPHA.((&SURi-1)*2 + 1) ;
+       MATEi  =('REDU' MODEi WTAB.'MAT_PHA' ) 'EXCO' 'PRIM';
+       LMOPRIM='EXTR' MODEi 'DEPL';
+       MOPRIM ='EXTR' LMOPRIM 1;
+      'SI' ('EXIS' WTAB.'CHARGEMENT' MOPRIM);
+*        On regarde dans le CHARGEMENT si la PRIMALE existe
+         CHPRIM ='TIRE' WTAB.'CHARGEMENT' MOPRIM TEMP0;
+        'SI' ('EXIS' ('EXTR' CHPRIM 'COMP') MOPRIM);
+           CHPRIM='CHAN'  'CHAM'  CHPRIM MODEi 'NOEUD';
+           CHPRIM= CHPRIM 'NOMC' 'PRIM';
+           CHPHAi=('MASQ' (MATEi-CHPRIM) 'EGINFE' 0.D0) 'NOMC' 'PPHA';
+           CHPHA0= CHPHAi 'ET' CHPHA0;
+          'ITER' SURi ;
+        'FINS';
+      'FINS';
+ 
+*      On regarde dans les indices connus de la TABLE PRECED
+      'SI' ('EXIS' PRECED 'TEMPERATURES');
+         CHPRIM = TH_COUR;
+        'SI' ('EXIS' ('EXTR' CHPRIM 'COMP') MOPRIM);
+           CHPRIM='CHAN'  'CHAM'  CHPRIM MODEi 'NOEUD';
+           CHPRIM= CHPRIM 'NOMC' 'PRIM';
+           CHPHAi=('MASQ' (MATEi-CHPRIM) 'EGINFE' 0.D0) 'NOMC' 'PPHA';
+           CHPHA0= CHPHAi 'ET' CHPHA0;
+          'ITER' SURi ;
+        'FINS';
+      'FINS';
+ 
+      'SI' ('EXIS' PRECED 'CONCENTRATIONS');
+         CHPRIM = CHCO0;
+        'SI' ('EXIS' ('EXTR' CHPRIM 'COMP') MOPRIM);
+           CHPRIM='CHAN'  'CHAM'  CHPRIM MODEi 'NOEUD';
+           CHPRIM= CHPRIM 'NOMC' 'PRIM';
+           CHPHAi=('MASQ' (MATEi-CHPRIM) 'EGINFE' 0.D0) 'NOMC' 'PPHA';
+           CHPHA0= CHPHAi 'ET' CHPHA0;
+          'ITER' SURi ;
+        'FINS';
+      'FINS';
+ 
+*      Si on arrive ici c'est qu'on n'a pas trouve le champ primal : on met zero
+       CHPHAi='ZERO' MODEi 'VARINTER';
+       CHPHA0= CHPHAi 'ET' CHPHA0;
+    'FIN'  SURi;
+ 
+     PRECED.'PROPORTIONS_PHASE'     ='TABL' ;
+     PRECED.'PROPORTIONS_PHASE' . 0 = CHPHA0;
+  'FINSI';
+ 
+  'SI' INOUV;
+     conti.'PROPORTIONS_PHASE'=CHPHA0;
+  'FINS';
+   WTAB.'PROPPHAS' = CHPHA0               ;
+   WTAB.'BLO_PHASE'='PMAT' WTAB.'MOD_PHA' ;
+'FINSI';
+
+'SI' WTAB.'SOLUBILITE';
+   WTAB.'BLO_SOL'='PMAT' WTAB.'MOD_SOL' ;
+'FINSI';
+
+ PRECED.'ESTIMATION'='COPIER' conti;
+'FINP';
+ 
+ 
+ 
+ 
+ 

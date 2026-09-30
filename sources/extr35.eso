@@ -1,0 +1,85 @@
+C EXTR35    SOURCE    KICH      22/02/17    21:15:02     11282          
+      SUBROUTINE EXTR35(IPMODL,IPCHE1,IPLSTM)
+*_____________________________________________________________________
+*
+*     Extrait les constituants d'un MCHAML
+*
+*  Entrees :
+*  ---------
+*
+*     IPMODL  Pointeur sur un MMODEL
+*     IPCHE1  Pointeur sur un MCHAML
+*
+*  Sortie :
+*  --------
+*     IPLSTM  Pointeur sur un LISTMOTS
+*
+*  JM CAMPENON le 07/91
+*_____________________________________________________________________
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      PARAMETER (NCONCS=16)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMMODEL
+-INC SMLMOTS
+*
+      SEGMENT IPT(0)
+*
+      IPLSTM=0
+      JGN=NCONCS
+      JGM=0
+      MMODEL=IPMODL
+      SEGACT MMODEL
+      NSOUS=KMODEL(/1)
+*
+      MCHELM=IPCHE1
+      SEGACT MCHELM
+*
+      SEGINI,IPT
+      ITAIL = 0
+      DO 100 ISOUS=1,NSOUS
+         IMODEL=KMODEL(ISOUS)
+         SEGACT IMODEL
+         IPMAIL=IMAMOD
+*
+         DO 200 IA=1,ICHAML(/1)
+          IF (IMACHE(IA).EQ.IPMAIL.AND.CONCHE(IA).EQ.CONMOD) GOTO 300
+ 200     CONTINUE
+*
+*        Pas de sous zone dans le MCHAML qui corresponde au MMODEL
+*
+         CALL ERREUR(472)
+         SEGSUP,IPT
+         RETURN
+*
+ 300     CONTINUE
+         IPT(**)=IA
+         ITAIL = ITAIL + 1
+ 100  CONTINUE
+      SEGINI MLMOTS
+      IPLSTM=MLMOTS
+*
+      DO 40 K=1,ITAIL
+        IA = ipt(k)
+        if (conche(IA)(1:NCONCS).eq.'    ') call erreur (-328)
+        if (jgm.gt.0) then
+         DO 50 J=1,JGM
+           IF (MLMOTS.MOTS(J).EQ.CONCHE(K)(1:NCONCS)) GOTO 40
+ 50      CONTINUE
+         JGM=JGM+1
+         SEGADJ MLMOTS
+        else
+         jgm = 1
+         segadj mlmots
+        endif
+        MLMOTS.MOTS(JGM)=CONCHE(IA)(1:NCONCS)
+ 40   CONTINUE
+
+      END
+ 
+ 

@@ -1,0 +1,60 @@
+C MUFLRI    SOURCE    FANDEUR   22/01/19    21:15:11     11256          
+      SUBROUTINE MUFLRI(IPO1,XFLOT,IRET,IEPS)
+C=====================================================================
+C
+C     MULTIPLIE UN OBJET RIGIDITE PAR XFLO
+C     L'OBJET RIGIDITE RESULTANT VOIT SON POINTEUR STOCKE DANS IRET
+C     ENTREES
+C       IPO1=POINTEUR SUR L'OBJET RIGIDITE
+C       XFLOT=SCALAIRE
+C       IEPS = 1  MULTIPLICATION   = -1 DIVISION
+C     SORTIES
+C       IRET=POINTEUR SUR L'OBJET   RIGI*XFLOT ou /XFLOT
+C
+C=====================================================================
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCREEL
+-INC SMRIGID
+      REAL*8 XFLOT,XFLOL
+
+C On "recopie" XFLOT dans XFLOL pour ne pas le modifier
+      IF (IEPS.EQ.-1) THEN
+        XFLOL = 1.D0/XFLOT
+      ELSE
+        XFLOL = XFLOT
+      ENDIF
+
+      RI1=IPO1
+      SEGACT,RI1
+C Cas du XFLOL=0.D0 : RIGIDITE VIDE
+      IF(ABS(XFLOL) .LT. XPETIT)THEN
+        NRIGEL=0
+        SEGINI,MRIGID
+        MTYMAT=RI1.MTYMAT
+        IFORIG=RI1.IFORIG
+      ELSE
+        NRIGE =RI1.IRIGEL(/1)
+        NRIGEL=RI1.IRIGEL(/2)
+        SEGINI,MRIGID
+        MTYMAT=RI1.MTYMAT
+        IFORIG=RI1.IFORIG
+        ICHOLE=0
+        IMGEO1=RI1.IMGEO1
+        IVECRI=RI1.IVECRI
+        DO IA=1,NRIGEL
+          DO J =1,NRIGE
+            IRIGEL(J,IA)=RI1.IRIGEL(J,IA)
+          ENDDO
+          COERIG(IA)=RI1.COERIG(IA)*XFLOL
+        ENDDO
+      ENDIF
+c-dbg      write(6,*) 'muflri',ri1,'"'//MTYMAT//'"',mrigid
+
+      SEGACT,MRIGID*NOMOD
+      IRET  =MRIGID
+
+      END
+
+ 

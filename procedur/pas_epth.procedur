@@ -1,0 +1,38 @@
+$$$$ PAS_EPTH
+* PAS_EPTH  PROCEDUR  CB215821  20/07/29    21:16:00     10668          
+'DEBP' PAS_EPTH   PRECED*TABLE MODEVAL*MMODEL MATEVAL*MCHAML TEVAL*MCHAML ;
+************************************************************************
+* Cette procedure calcule les contraintes thermiques pour les modeles
+* poreux
+*
+* PRECED : La TABLE donnee en entree de PASAPAS. On a besoin des indices
+*           - WTAB.'TEMPERATURE_REFERENCE'
+* MODEVAL: Modele    d'entree
+* MATEVAL: Materiaux d'entree
+*
+* TEVAL : Temperature (MCHAML) a laquelle est evalué EPSILON_THERMIQUE
+*         Type MCHAML Obligatoire pour les JOINTS
+*         Necessaire  pour certains éléments linéiques
+*
+* Le resultat est :
+* MSRTHER2 : contraintes thermiques de dilatation
+************************************************************************
+
+   WTAB = PRECED. 'WTABLE';
+  
+   MOPOR    =  'EXTR' MODEVAL 'FORM' 'POREUX'                       ;
+   MAPOR    =  'REDU' MATEVAL MOPOR                                 ;
+   ZALM     = ('EXCO' 'ALPM' MAPOR 'MSR0') 'CHAN' 'TYPE' 'SCALAIRE' ;
+   ZBI      = ('EXCO' 'COB'  MAPOR 'MSR0') 'CHAN' 'TYPE' 'SCALAIRE' ;
+   ZALPH    = ('EXCO' 'ALPH' MAPOR 'MSR0') 'CHAN' 'TYPE' 'SCALAIRE' ;
+  
+   ZFAC = 3.D0 '*' ( ZALM '-' ( ZBI '*' ZALPH ) );
+   ZFAC = ZFAC  'CHAN' 'TYPE' 'SCALAIRE';
+  
+   ZDT  = 'REDU' (TEVAL '-' WTAB.'TEMPERATURE_REFERENCE') WTAB.'MAI_POR';
+   ZDDT = 'CHAN' 'CHAM' ZDT MOPOR 'STRESSES' 'SCALAIRE';
+   ZFAC = 'CHAN' 'STRESSES' MOPOR ZFAC                 ;
+  
+   MSRTHER2    = ZFAC  '*' ZDDT ;
+
+'FINP' MSRTHER2;

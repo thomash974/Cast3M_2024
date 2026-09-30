@@ -1,0 +1,58 @@
+C MODE24    SOURCE    PV090527  23/05/09    21:15:06     11666          
+      SUBROUTINE MODE24(LESPRO,NBPRO,LESTEF,NBTEF,N1MAX,N2MAX)
+*----------------------------------------------------------------------
+*    OBJET MODELE  -  CAS DE LA FORMULATION 'CONTRAINTE'
+*    DEFINITION DES NOMS DE MODELES DE CONTACT
+*            ET DES NOMS DE TYPES D'ELEMENTS FINIS
+*----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+*
+      CHARACTER*16 MOMODL(100)
+*
+      CHARACTER*16 LESPRO(*)
+      CHARACTER*4 LESTEF(*)
+*
+*  NOMS DES MODELES DE contraintes         
+*  -------------------------------
+      CALL MODCLI (MOMODL,NMOD)
+*
+      DO 1 I=1,NMOD
+         LESPRO(I)=MOMODL(I)
+ 1    CONTINUE
+      NBPRO=NMOD
+*      write(6,*) 'lespro ',( lespro(i),i=1,nmod)
+*
+      IF(NBPRO.GT.N1MAX) THEN
+        CALL ERREUR(5)
+        GO TO 99
+      END IF
+*
+*  NOMS DE TYPES D'ELEMENTS FINIS
+*  ------------------------------
+      IF(IDIM.EQ.2) THEN
+          NBTEF=1
+          IF(NBTEF.GT.N2MAX) THEN
+            CALL ERREUR(5)
+            GO TO 99
+          END IF
+          LESTEF(1)='MULT'
+      ELSE IF(IDIM.EQ.3) THEN
+          NBTEF=1
+          IF(NBTEF.GT.N2MAX) THEN
+            CALL ERREUR(5)
+            GO TO 99
+          END IF
+          LESTEF(1)='MULT'
+      ENDIF
+      RETURN
+  99  CALL ERREUR(5)
+      RETURN
+      END
+
+
+
+
+ 

@@ -1,0 +1,45 @@
+C HBMDMAT   SOURCE    BP208322  20/09/18    21:16:39     10718          
+
+        SUBROUTINE HBMDMAT(NT,NDDL,OMEG,Ms)
+        
+*=======================================================================
+*  Derivation dans le domaine frequentiel : cas matriciel
+*                         Ms = w*Me*kron(L,In)
+*       e  NT,NDDL      : nombre de coefficients, ddl
+*       es  Me/Ms       : matrices d'entree/sortie
+*       e   OMEG        : coefficient
+*=======================================================================
+        
+        IMPLICIT INTEGER(I-N)
+        IMPLICIT REAL*8(A-H,O-Z)
+        REAL*8 Me(NT,NT), Ms(NT,NT)
+
+        NHBM = ((NT/NDDL)-1)/2
+c       copie locale :  Ms(:,:) --> Me(:,:)
+        CALL COPYMAT(NT,Ms,Me)
+
+c       Premiere colonne de blocs: termes statiques 
+        DO I = 1,NT
+           DO J = 1,NDDL
+            Ms(I,J) = 0.D0
+           ENDDO    
+        ENDDO
+c       Boucle sur les lignes de blocs 
+        DO I = 1,2*NHBM+1 
+c         Boucle sur les harmoniques (colonnes)
+          DO J = 2,2*NHBM,2
+            Cf = OMEG*(J/2)
+c           Permutation des blocs
+            DO II = 1,NDDL
+               DO JJ=1,NDDL
+                Ms((I-1)*NDDL+II,(J-1)*NDDL+JJ) = 
+     &                                -Cf*Me((I-1)*NDDL+II,J*NDDL+JJ)
+                Ms((I-1)*NDDL+II,J*NDDL+JJ) =
+     &                                Cf*Me((I-1)*NDDL+II,(J-1)*NDDL+JJ)
+               ENDDO
+            ENDDO
+          ENDDO
+        ENDDO
+        END
+ 
+ 

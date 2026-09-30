@@ -1,0 +1,17 @@
+C BBCAL2    SOURCE    OF166741  23/04/25    21:15:04     11608          
+
+      SUBROUTINE BBCAL2
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+      write(ioimp,*) 'BBCAL2 N EST PLUS UTILISEE/NO MORE USED'
+      call erreur(5)
+
+c      RETURN
+      END
+
+ 

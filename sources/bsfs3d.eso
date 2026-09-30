@@ -1,0 +1,31 @@
+C BSFS3D    SOURCE    PV090527  23/01/27    21:15:10     11574          
+       subroutine bsfs3d(epspt6,epspt60,depspt3,
+     # vdepspt33,vdepspt33t)
+      
+c     base principale de devellopement des fissures      
+c     Sellier 26/04/2021
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 depspt6(6),epspt6(6),epspt60(6),depspt3(3)
+      real*8 vdepspt33(3,3),vdepspt33t(3,3)
+      
+      integer i
+      real*8 depspt33(3,3)
+      
+c     increment de plasticite      
+      do i=1,6
+        depspt6(i)=epspt6(i)-epspt60(i)
+      end do
+c     passage 33      
+      call x6x33(depspt6,depspt33)      
+c     diagonalisation  
+C       print*,'ds bsfs3d depspt33'
+C       call afic33(depspt33)
+      call b3_v33(depspt33,depspt3,vdepspt33)
+c     construction matrice de passage inverse         
+      call traps1(vdepspt33t,vdepspt33,3)
+      return
+      end
+      
+ 

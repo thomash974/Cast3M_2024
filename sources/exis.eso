@@ -1,0 +1,449 @@
+C EXIS      SOURCE    PASCAL    22/06/27    21:15:01     11394          
+
+      SUBROUTINE EXIS
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+
+-INC SMSOLUT
+-INC SMLMOTS
+-INC SMLENTI
+-INC SMLREEL
+-INC SMCHARG
+-INC SMMODEL
+-INC SMNUAGE
+
+      PARAMETER (NBFORM=20)
+      PARAMETER (NLOMAX=5)
+      CHARACTER*4 MNLOCA(NLOMAX)
+      CHARACTER*(LOCOMP) CMOT
+      CHARACTER*8 MOTYP,TYPOBJ,MOTYP1,MONU1
+      CHARACTER*(LCONMO) MOFORM(NBFORM)
+      CHARACTER*(LOCHAI) ICHAI,CHARRE,CCHAI
+      LOGICAL IRET,IBOOL,LOGRE
+      INTEGER ICLE
+*
+      PARAMETER (LSOL = 1)
+      CHARACTER*4 MOTSOL(LSOL)
+      DATA MOTSOL/'CONT'/
+
+      PARAMETER (LMOD = 5)
+      CHARACTER*(4) MOTMOD(LMOD)
+      DATA MOTMOD/'FORM','CONS','ELEM','MATE','NON_'/
+      MACRO,(FORMULATION,CONSTITUANT,ELEMENT,MATERIAU,NON_LOCAL)
+*
+      PARAMETER (NCLE=2)
+      CHARACTER*2 LCLE(NCLE)
+      DATA LCLE/'OU','ET'/
+
+      PARAMETER (MCLE=1)
+      CHARACTER*1 MOTCLE(MCLE)
+      DATA MOTCLE/'*'/
+      LOGICAL LDUM
+*
+      ICLE=0
+      ILE=1
+      IOBJLU=0
+      CALL LIROBJ('OBJET   '  ,MTABLE,0,IRETOU)
+      IF(IRETOU.NE.0) THEN
+        IOBJLU=1
+      ELSE
+        CALL LIROBJ('TABLE   ',MTABLE,0,IRETOU)
+      ENDIF
+
+      IF (IRETOU.NE.0) THEN
+c       traitement special pour les objets de type TABLE
+  4     CONTINUE
+        CALL QUETYP(MOTYP,0,IRETOU)
+        IF( IRETOU.NE.0) THEN
+          IF    (MOTYP.EQ.'ENTIER  ') THEN
+             CALL LIRENT(IVAL,1,IRETOU)
+             IF(IERR.NE.0) RETURN
+          ELSEIF(MOTYP.EQ.'MOT     ')THEN
+             CALL LIRCHA(ICHAI,1,ILE)
+             IF(IERR.NE.0) RETURN
+          ELSEIF(MOTYP.EQ.'LOGIQUE ') THEN
+             CALL LIRLOG(IBOOL,1,IRETOU)
+             IF(IERR.NE.0) RETURN
+          ELSEIF(MOTYP.EQ.'FLOTTANT') THEN
+             CALL LIRREE(XRET,1,IRETOU)
+             IF(IERR.NE.0) RETURN
+          ELSE
+             CALL LIROBJ(MOTYP,IOBJ,1,IRETOU)
+             IF(IERR .NE. 0) RETURN
+             CALL ACTOBJ(MOTYP,IOBJ,1)
+          ENDIF
+          TYPOBJ=' '
+          CALL ACCTAB(MTABLE,MOTYP,IVAL,XRET,ICHAI(1:ILE),IBOOL,
+     $         IOBJ,TYPOBJ,IVALRE,XVALRE,CHARRE,LOGRE,IOBRE)
+          IF( TYPOBJ.EQ.'        '.AND.MOTYP.EQ.'MOT     '.
+     $    AND.IOBJLU.EQ.1) CALL ACCTAB (MTABLE,'METHODE ',IVAL,
+     $      XRET,ICHAI(1:ILE),IBOOL,IOBJ,TYPOBJ,
+     $      IVALRE,XVALRE,CHARRE,LOGRE,IOBRE)
+          MTABLE = IOBRE
+          IRET=.TRUE.
+          IF(TYPOBJ.EQ.'TABLE   ') GOTO 4
+          IF(TYPOBJ.EQ.'        ') IRET = .FALSE.
+          GOTO 100
+
+        ELSE
+          IRET=.TRUE.
+          GOTO 100
+        ENDIF
+
+      ELSE
+         IRET =.TRUE.
+         CALL QUETYP(MOTYP,0,IRETOU)
+         IF (IRETOU.EQ.0) THEN
+           IRET = .FALSE.
+           GOTO 100
+         ENDIF
+
+
+         CALL LIROBJ(MOTYP,IVAL,1,IRETOU)
+         IF(IERR .NE. 0) RETURN
+         CALL ACTOBJ(MOTYP,IVAL,1)
+
+C        Verification que l'objet demande etait du type demande : toto*'MAILLAGE' par exemple
+         CALL LIRMOT(MOTCLE,MCLE,IR,0)
+         IF (IR.GT.0) THEN
+           CALL LIRCHA(TYPOBJ,1,IRETOU)
+           IF (IERR.NE.0) RETURN
+           IF (TYPOBJ .EQ. 'FICHIER ')THEN
+C            Cas du test d'existence d'un fichier
+             IF(MOTYP .NE. 'MOT     ')THEN
+               IRET = .FALSE.
+
+             ELSE
+               CALL QUEVAL(IVAL,'MOT',IRET1,ILON1,XDUM,CCHAI,LDUM,IDUM)
+C               PRINT *,'EXIS:',MOTYP,IVAL,':',CCHAI(1:ILON1),':'
+               INQUIRE( FILE=CCHAI(1:ILON1), EXIST=IRET )
+             ENDIF
+
+           ELSEIF (TYPOBJ .NE. MOTYP) THEN
+             IRET = .FALSE.
+           ENDIF
+           GOTO 100
+
+         ELSEIF (MOTYP.NE.'CHPOINT ' .AND. MOTYP.NE.'MCHAML  '.AND.
+     &           MOTYP.NE.'MMODEL  ' .AND. MOTYP.NE.'LISTMOTS'.AND.
+     &           MOTYP.NE.'LISTENTI' .AND. MOTYP.NE.'LISTREEL'.AND.
+     &           MOTYP.NE.'NUAGE   ' .AND. MOTYP.NE.'CHARGEME' ) THEN
+
+            IF (MOTYP.EQ.'ANNULE  ') THEN
+               IRET = .FALSE.
+
+            ELSEIF (MOTYP.EQ.'SOLUTION') THEN
+               CALL LIRMOT(MOTSOL,LSOL,IPOS,0)
+               IF (MOTSOL(IPOS).EQ.'CONT') THEN
+                  MSOLUT = IVAL
+                  SEGACT MSOLUT
+                  MSOLEN = MSOLIS(6)
+                  SEGDES MSOLUT
+                  IF (MSOLEN.EQ.0) THEN
+                     IRET = .FALSE.
+                  ENDIF
+               ENDIF
+            ENDIF
+            GOTO 100
+         ENDIF
+      ENDIF
+c
+c  existence d une composante dans un mchaml ou un champoint
+c
+      IF (MOTYP.EQ.'CHPOINT '.OR.MOTYP.EQ.'MCHAML  ') THEN
+        CALL LIRCHA(CMOT,0,IRETOU)
+        if (IRETOU.EQ.0) then
+          if (MOTYP.EQ.'MCHAML  ') then
+              CALL QUETYP(MOTYP1,0,IRETO1)
+              IF (IRETO1.NE.0) THEN
+                  IF (MOTYP1.NE.'MAILLAGE'.AND.MOTYP1.NE.'MMODEL') THEN
+                      MOTERR(1:8)=MOTYP1
+                      CALL ERREUR(39)
+                      RETURN
+                  ENDIF
+                  call exiszo(ival,iret)
+                  IF (IERR.NE.0) RETURN
+                  GOTO 100
+              ELSE
+                  GOTO 122
+              ENDIF
+          else
+              GOTO 122
+          endif
+        endif
+        CALL EXISCO(MOTYP,IVAL,CMOT,IRET)
+        IF(IERR.NE.0) RETURN
+        GOTO 100
+c
+c  existence d'un mot/listmots dans un listmots
+c
+      ELSEIF (MOTYP.EQ.'LISTMOTS') THEN
+        MLMOTS=IVAL
+        SEGACT,MLMOTS
+        JGN   =MOTS(/1)
+        JGM   =MOTS(/2)
+        ILON  =JGN
+        CALL LIROBJ('LISTMOTS',MLMOT1,0,IRETO1)
+        IF (IRETO1.NE.0) THEN
+            SEGACT MLMOT1
+            NTEST=MLMOT1.MOTS(/2)
+            IF (NTEST.EQ.0) THEN
+                MOTERR(1:8)='LISTMOTS'
+                INTERR(1)=MLMOT1
+                CALL ERREUR(356)
+                RETURN
+            ENDIF
+            CALL LIRMOT(LCLE,NCLE,ICLE,0)
+        ELSE
+            CALL LIRCHA(CCHAI,0,ILON)
+            IF (ILON.EQ.0) GOTO 122
+            NTEST=1
+
+            IF(ILON .GT. JGN)THEN
+              MOTERR   =CCHAI
+              INTERR(1)=JGN
+              CALL ERREUR(-371)
+              ILON     =JGN
+            ENDIF
+        ENDIF
+
+        DO 22 I=1,NTEST
+            IRET=.FALSE.
+            IF (IRETO1.NE.0) CCHAI=MLMOT1.MOTS(NTEST+1-I)
+            DO 20 J=1,JGM
+                IF (MOTS(J).EQ.CCHAI(1:ILON)) THEN
+                    IRET=.TRUE.
+                    IF (ICLE.EQ.0) THEN
+                        CALL ECRLOG(IRET)
+                    ELSEIF (ICLE.EQ.1) THEN
+*                       Mot-clé 'OU' : un mot trouve => on peut sortir
+                        GOTO 21
+                    ENDIF
+                    GOTO 22
+                ENDIF
+  20        CONTINUE
+            IF (ICLE.EQ.0) THEN
+                CALL ECRLOG(IRET)
+            ELSEIF (ICLE.EQ.2) THEN
+*               Mot-clé 'ET' : un mot non trouve => on peut sortir
+                GOTO 21
+            ENDIF
+  22    CONTINUE
+  21    IF (ICLE.EQ.0) RETURN
+        GOTO 100
+c
+c  existence d'un entier dans un listenti
+c
+      ELSEIF (MOTYP.EQ.'LISTENTI') THEN
+        CALL LIRENT(ITEST,0,IRETOU)
+        IF (IRETOU.EQ.0) GOTO 122
+        IRET=.FALSE.
+        MLENTI=IVAL
+        SEGACT MLENTI
+        JG=LECT(/1)
+        DO 30 J=1,JG
+          IF(LECT(J).EQ.ITEST) THEN
+          IRET=.TRUE.
+          GOTO 100
+          ENDIF
+  30    CONTINUE
+        GOTO 100
+c
+c  existence d'un reel dans un listreel
+c
+      ELSEIF (MOTYP.EQ.'LISTREEL') THEN
+        CALL LIRREE(XTEST,0,IRETOU)
+        IF (IRETOU.EQ.0) GOTO 122
+*       lecture eventuelle d une tolerance
+        CALL LIRREE(XTOL,0,IRETOU)
+        IRET=.FALSE.
+        MLREEL=IVAL
+        SEGACT MLREEL
+        JG=PROG(/1)
+        IF (IRETOU.EQ.0) THEN
+          DO 40 J=1,JG
+            IF(PROG(J).EQ.XTEST) THEN
+            IRET=.TRUE.
+            GOTO 100
+            ENDIF
+  40      CONTINUE
+        ELSE
+          DO 42 J=1,JG
+            IF(abs(PROG(J)-XTEST).LE.XTOL) THEN
+            IRET=.TRUE.
+            GOTO 100
+            ENDIF
+  42      CONTINUE
+        ENDIF
+        GOTO 100
+c
+c  existence d'une formulation ou un constituant dans
+c                     un mmodel
+c
+      ELSEIF (MOTYP.EQ.'MMODEL  ') THEN
+        CALL LIRMOT(MOTMOD,LMOD,IRETOU,0)
+        IF (IRETOU.EQ.0) GOTO 122
+        CMOT=MOTMOD(LMOD)
+        ICOND=1
+        INFOR=1
+119     call lircha(moform(infor),icond,ireto)
+        IF(IERR.NE.0) RETURN
+        ICOND=0
+        IF(IRETO.NE.0) THEN
+          INFOR=INFOR+1
+          IF(INFOR.GT.NBFORM) THEN
+            CALL ERREUR(5)
+            RETURN
+          ENDIF
+          GOTO 119
+        ENDIF
+        INFOR=INFOR-1
+
+C       Extension du MMODEL en cas de modele de MELANGE
+        CALL MODETE(IVAL,mmodel,IMELAN)
+        NSOUS=KMODEL(/1)
+        IF(NSOUS .EQ. 0)THEN
+          CALL ERREUR(21)
+          RETURN
+        ENDIF
+
+        DO 1119 I=1,NSOUS
+          IMODEL=KMODEL(I)
+
+C         =============================================================
+          CASE, IRETOU
+C         -------------------------------------------------------------
+          WHEN,FORMULATION
+C         -------------------------------------------------------------
+           NFOR=FORMOD(/2)
+           IF(NFOR.NE.INFOR) GOTO 1119
+           IF(NFOR.EQ.1) THEN
+            IF(MOFORM(1).EQ.FORMOD(1)) GOTO 1118
+           ELSEIF(NFOR.EQ.2) THEN
+            IF(((MOFORM(1).EQ.FORMOD(1)).AND.(MOFORM(2).EQ.FORMOD(2))).
+     &      OR.((MOFORM(1).EQ.FORMOD(2)).AND.(MOFORM(2).EQ.FORMOD(1))))
+     &      GOTO 1118
+           ENDIF
+
+C         -------------------------------------------------------------
+          WHEN,CONSTITUANT
+C         -------------------------------------------------------------
+           DO 425 IJ=1,INFOR
+             IF(MOFORM(IJ).EQ.CONMOD) GOTO 1118
+ 425       CONTINUE
+C         -------------------------------------------------------------
+          WHEN,ELEMENT
+C         -------------------------------------------------------------
+           DO 426 IJ=1,INFOR
+             IF(MOFORM(IJ)(1:4).EQ.NOMTP(NEFMOD)) GOTO 1118
+ 426       CONTINUE
+C         -------------------------------------------------------------
+          WHEN,MATERIAU
+C         -------------------------------------------------------------
+           NMAT=MATMOD(/2)
+           DO 427 IJ=1,INFOR
+             IBOOL = .TRUE.
+             DO 4275 JJ=1,NMAT
+               IBOOL = (MATMOD(JJ).NE.MOFORM(IJ)).AND. IBOOL
+ 4275        CONTINUE
+             IF (IBOOL) GOTO 1119
+ 427       CONTINUE
+           GOTO 1118
+C         -------------------------------------------------------------
+          WHEN,NON_LOCAL
+C         -------------------------------------------------------------
+           MN3=INFMOD(/1)
+           IF(MN3.LE.12) GOTO 1119
+           INLOC=-1*INFMOD(13)
+           IF(INLOC.EQ.0) GOTO 1119
+           CALL MODNLO(MNLOCA,NLODIM)
+           DO 428 IJ=1,INFOR
+             IF(MNLOCA(INLOC).EQ.MOFORM(IJ)(1:4)) GOTO 1118
+ 428       CONTINUE
+C         -------------------------------------------------------------
+          ENDCASE
+C         =============================================================
+
+1119      continue
+*
+        IRET=.FALSE.
+        GOTO 100
+*
+1118    continue
+        IRET=.TRUE.
+        GOTO 100
+c
+c       cas de l'objet chargeme
+c
+      ELSEIF (MOTYP.EQ.'CHARGEME') THEN
+        CALL LIRCHA(CMOT,0,IRETOU)
+        IF (IRETOU.EQ.0) GOTO 122
+        IRETO2 = 0
+        CALL LIRCHA(MOTYP1,0,IRETO2)
+        IRET = .FALSE.
+        MCHARG = IVAL
+        SEGACT MCHARG
+        IDIM1 = KCHARG(/1)
+        IF (CMOT.EQ.'LIBR'.OR.CMOT.EQ.'LIE ') THEN
+          DO 302 I=1,IDIM1
+             IF (CMOT.EQ.CHALIE(I)) THEN
+               IRET = .TRUE.
+               GOTO 301
+             ENDIF
+ 302      CONTINUE
+        ELSE
+          DO 300 I=1,IDIM1
+             IF (CMOT.EQ.CHANOM(I)) THEN
+               IF (IRETO2.EQ.0) THEN
+                 IRET = .TRUE.
+                 GOTO 301
+               ENDIF
+               ICHARG=KCHARG(I)
+               SEGACT,ICHARG
+               IF (MOTYP1.EQ.CHATYP) THEN
+                 IRET = .TRUE.
+                 GOTO 301
+               ENDIF
+             ENDIF
+ 300      CONTINUE
+        ENDIF
+ 301    CONTINUE
+        GOTO 100
+c
+c       cas de l'objet nuage
+c
+      ELSE
+        CALL LIRCHA(MONU1,0,IRETOU)
+        IF (IRETOU.EQ.0) GOTO 122
+        IRET=.FALSE.
+        MNUAGE=IVAL
+        SEGACT MNUAGE
+        IDIM1 = NUANOM(/2)
+        DO 200 I=1,IDIM1
+           IF (MONU1.EQ.NUANOM(I)) THEN
+             IRET = .TRUE.
+             GOTO 201
+           ENDIF
+ 200    CONTINUE
+ 201    CONTINUE
+        GOTO 100
+      ENDIF
+c
+ 122  CONTINUE
+      IRET=.TRUE.
+      IF(MOTYP.NE.'ANNULE  ') GOTO 100
+      IRET=.FALSE.
+ 100  CONTINUE
+      CALL ECRLOG(IRET)
+      END
+
+
+
+ 
+ 

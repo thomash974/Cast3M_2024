@@ -1,0 +1,103 @@
+C MONDE1    SOURCE    PV        20/09/27    08:43:14     10725          
+      SUBROUTINE MONDE1 (IPPVV,VECTBB,VAL,IVPO,
+     >                   NA,IPREL,MULRE,INC,dnorm)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      DIMENSION VECTBB(*),VAL(*),IVPO(*),IPPVV(*)
+**  experimental: on annule les termes resultants exclusivement d'une erreur d'arrondi
+**  ca permet a certains cas test de passer
+
+-INC CCREEL
+
+*  nombres de groupes (incluant la diagonale)
+      nbg=ippvv(2)-1
+*  longueur de la premiere ligne
+      lpl=ivpo(2*(nbg+1))-ivpo(2*1)
+      lpl1=lpl-1
+*  nb termes premiere ligne
+      nval=ivpo(2*(nbg+1)-1)-ivpo(2*1-1)
+*  la partie triangulaire = le dernier groupe
+      do 200 k=0,(mulre-1)*inc,inc
+      ig=nbg
+      iprelk =iprel+k
+      iprelkm=iprelk-1
+      iprelk1=iprelk+1
+      iprelk2=iprelk+2
+      iprelk3=iprelk+3
+      iprelk4=iprelk+4
+      iprelk5=iprelk+5
+      iposb=-nval+iprelk
+      do 120 ilm=na,1,-1
+          ii=iprel-1+ilm
+          vkon=vectbb(ii+k)
+          if (abs(vkon).lt.dnorm) goto 120
+          ildeb=ivpo(2*ig)
+          ilfin=ildeb+ilm-1
+          ideb=ivpo(2*ig-1)
+          ifin=ideb+ilfin-ildeb
+*  dans le groupe
+          jdec=-ideb+ildeb+lpl*(ilm-1)+((ilm-1)*(ilm-2))/2
+          do 130 j=ifin-1,ideb,-1
+* on force la nullite de vectbb si il n'est pas significatif
+           vini=vectbb(iposb+j)
+           vfin=vini-vkon*val(jdec+j)
+           if(abs(vfin).le.abs(vini)*xzprec) vfin=0.d0
+           vectbb(iposb+j)=vfin
+ 130      continue
+ 120  continue
+*  les groupes (hors groupe diagonal)
+**    jdecb = lpl*na+((na)*(na-1))/2
+      ilfin=ivpo(2*1)-1
+      do 10 ig=1,nbg-1
+*       ildeb=ivpo(2*ig)
+        ildeb=ilfin+1
+        ilfin=ivpo(2*(ig+1))-1
+        ideb=ivpo(2*ig-1)
+        ifin=ilfin+ideb-ildeb
+*  les lignes
+*  dans le groupe
+          jdec =      -(ideb-ildeb)
+          do 30 j=ideb,ifin
+           ipos=j-nval+iprel
+           p1=vectbb(ipos+k)
+           p1c=abs(p1*xzprec)
+           jpos=j+jdec
+*  unrolling a la main. En general na <=6
+        p1=p1-vectbb(iprelk   )*val(jpos)
+        if (na.eq.1) goto 31
+          jpos=jpos+lpl1+1
+        p1=p1-vectbb(iprelk1)*val(jpos)
+        if (na.eq.2) goto 31
+          jpos=jpos+lpl1+2
+        p1=p1-vectbb(iprelk2)*val(jpos)
+        if (na.eq.3) goto 31
+          jpos=jpos+lpl1+3
+        p1=p1-vectbb(iprelk3)*val(jpos)
+        if (na.eq.4) goto 31
+          jpos=jpos+lpl1+4
+        p1=p1-vectbb(iprelk4)*val(jpos)
+        if (na.eq.5) goto 31
+          jpos=jpos+lpl1+5
+        p1=p1-vectbb(iprelk5)*val(jpos)
+        if (na.eq.6) goto 31
+          jpos=jpos+lpl1+6
+        do 20 ilm=7,na
+          ii=iprelkm+ilm
+           p1=p1-vectbb(ii)*val(jpos)
+          jpos=jpos+lpl1+ilm
+  20    continue
+  31      continue
+         vectbb(ipos+k)=p1
+         if(abs(p1).le.p1c) vectbb(ipos+k)=0.d0
+  30      continue
+  10  continue
+ 200  continue
+      return
+      end
+
+
+
+ 
+ 
+ 
+ 

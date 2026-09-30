@@ -1,0 +1,148 @@
+C DFGD3D    SOURCE    PV090527  23/01/27    21:15:24     11574          
+      subroutine dfgd3d(NBRINC,NDIMG,FRAC,GCH,DFGDS,AFFICHE)
+c     d Fthg/d sigma (Hessian de la dissipation en deformation)
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     nombre maxi d inclusion consideree pour les declarations locales      
+      integer NBRINC      
+c     indicateur de diffusion produits chimiques dans fissure
+      real*8 GCH(0:NBRINC) 
+c     fractions volumiques des phases      
+      real*8 FRAC(0:NBRINC) 
+c     derivee des criteres par rapport aux contrainte effectives
+      real*8 DFGDS(NDIMG,NDIMG)
+      logical AFFICHE
+      
+      f=FRAC(1)
+      do i=1,ndimg
+         do j=1,ndimg
+           dfgds(i,j)=0.d0
+         end do
+      end do
+
+      t1 = 0.1D1 - f
+      t1 = 0.1D1 / t1
+      t2 = Gch(0) ** 2
+      t3 = f ** 2
+      t4 = t1 ** 2
+      t2 = f * (-t2 * t3 * t4 / 0.18D2 + 0.2D1 + t2 * f * t4 * (-0.4D1 /
+     # 0.9D1 * f + 0.1D1 / 0.2D1))
+      t4 = f * (-0.4D1 / 0.3D1 * Gch(1) - 0.2D1 / 0.3D1 * Gch(0) * f * t
+     #1)
+      t5 = Gch(0) * f * t1 * (-0.5D1 / 0.6D1 * f + 0.1D1 / 0.3D1)
+      t6 = -0.2D1 * t5
+      t7 = Gch(0) * t3 * t1 / 0.6D1
+      t3 = Gch(0) * t3 * t1 / 0.3D1
+      t1 = (0.2D1 / 0.3D1 * Gch(1) + Gch(0) * f * t1 / 0.3D1) * f
+      t8 = 0.17D2 / 0.35D2 * f
+      t9 = 0.6D1 / 0.35D2 * f
+      t10 = 0.12D2 / 0.35D2 * f
+      t11 = Gch(1) ** 2
+      t11 = f * (0.2D1 * t11 + 0.16D2 / 0.7D1)
+      t12 = -0.22D2 / 0.35D2 * f
+      t13 = -0.34D2 / 0.7D1 * f + 0.2D1
+      dfgds(1,1) = t2
+      dfgds(1,4) = t7
+      dfgds(1,5) = -t3
+      dfgds(1,6) = -t3
+      dfgds(1,7) = t1
+      dfgds(1,8) = t4
+      dfgds(1,9) = t4
+      dfgds(1,10) = t5
+      dfgds(1,11) = t6
+      dfgds(1,12) = t6
+      dfgds(2,2) = t2
+      dfgds(2,4) = -t3
+      dfgds(2,5) = t7
+      dfgds(2,6) = -t3
+      dfgds(2,7) = t4
+      dfgds(2,8) = t1
+      dfgds(2,9) = t4
+      dfgds(2,10) = t6
+      dfgds(2,11) = t5
+      dfgds(2,12) = t6
+      dfgds(3,3) = t2
+      dfgds(3,4) = -t3
+      dfgds(3,5) = -t3
+      dfgds(3,6) = t7
+      dfgds(3,7) = t4
+      dfgds(3,8) = t4
+      dfgds(3,9) = t1
+      dfgds(3,10) = t6
+      dfgds(3,11) = t6
+      dfgds(3,12) = t5
+      dfgds(4,1) = t7
+      dfgds(4,2) = -t3
+      dfgds(4,3) = -t3
+      dfgds(4,4) = t9
+      dfgds(4,7) = t10
+      dfgds(4,10) = t8
+      dfgds(5,1) = -t3
+      dfgds(5,2) = t7
+      dfgds(5,3) = -t3
+      dfgds(5,5) = t9
+      dfgds(5,8) = t10
+      dfgds(5,11) = t8
+      dfgds(6,1) = -t3
+      dfgds(6,2) = -t3
+      dfgds(6,3) = t7
+      dfgds(6,6) = t9
+      dfgds(6,9) = t10
+      dfgds(6,12) = t8
+      dfgds(7,1) = t1
+      dfgds(7,2) = t4
+      dfgds(7,3) = t4
+      dfgds(7,4) = t10
+      dfgds(7,7) = t11
+      dfgds(7,10) = t12
+      dfgds(8,1) = t4
+      dfgds(8,2) = t1
+      dfgds(8,3) = t4
+      dfgds(8,5) = t10
+      dfgds(8,8) = t11
+      dfgds(8,11) = t12
+      dfgds(9,1) = t4
+      dfgds(9,2) = t4
+      dfgds(9,3) = t1
+      dfgds(9,6) = t10
+      dfgds(9,9) = t11
+      dfgds(9,12) = t12
+      dfgds(10,1) = t5
+      dfgds(10,2) = t6
+      dfgds(10,3) = t6
+      dfgds(10,4) = t8
+      dfgds(10,7) = t12
+      dfgds(10,10) = t13
+      dfgds(11,1) = t6
+      dfgds(11,2) = t5
+      dfgds(11,3) = t6
+      dfgds(11,5) = t8
+      dfgds(11,8) = t12
+      dfgds(11,11) = t13
+      dfgds(12,1) = t6
+      dfgds(12,2) = t6
+      dfgds(12,3) = t5
+      dfgds(12,6) = t8
+      dfgds(12,9) = t12
+      dfgds(12,12) = t13
+
+
+
+      
+ 
+      if(affiche) then
+        print*,'DFGDS dans DFGD3D'
+        do i=1,18
+            write(*,'(18(1X,E10.3))')
+     #      (dfgds(i,j),j=1,18) 
+        end do
+       end if        
+
+
+      
+      return
+      end
+      
+ 

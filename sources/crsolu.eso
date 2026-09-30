@@ -1,0 +1,179 @@
+C CRSOLU    SOURCE    BP208322  19/04/29    21:15:11     10213          
+************************************************************************
+*
+*                                CRSOLU
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     CONSTRUCTION D'UN OBJET SOLUTION, A PARTIR DE LA LISTE
+*     DES FREQUENCES PROPRES ET DE CELLE DES MODES PROPRES.
+*     LES LISTES SONT SUPPOSES TRIEES par lambda croissant,
+*     LES FREQUENCES SHIFTEES ET LES MODES ORTHONORMALISES.
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPLVAL  ENTIER    (E)  POINTEUR DE L'OBJET 'LISTREEL' CONTENANT
+*                            LA SUITE DES FREQUENCES PROPRES.
+*     IPLVEC  ENTIER    (E)  POINTEUR DE L'OBJET 'LISTCHPO' CONTENANT
+*                            LA SUITE DES MODES PROPRES.
+*     NBMOD   ENTIER    (E)  NOMBRE DE MODES A INSERER DANS LA SOLUTION
+*                            ON A: NBMOD .LE. DIMENSION( IPLVAL )
+*     IPKW2M, IPMASS    (E)  MATRICES DE RIGIDITE (DECALEE) ET DE MASSE
+*     W2      REEL      (E)  DECALAGE
+*     IPSOLU  ENTIER    (S)  POINTEUR SUR LA SOLUTION CREE.
+*
+************************************************************************
+
+      SUBROUTINE CRSOLU (W2,IPLVAL,IPLVEC,NBMOD,IPKW2M,IPMASS,IPSOLU)
+     
+************************************************************************
+*     DECLARATIONS 
+************************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLCHPO
+-INC SMLREEL
+-INC SMLMOTS
+-INC CCREEL
+
+*     -- CONSTANTES --
+      PARAMETER (LPROPR = 5)
+      PARAMETER (DEUXPI = (2.D0*XPI))
+
+*     -- ARGUMENTS --
+      POINTEUR IPLVEC.MLCHPO, IPLVAL.MLREEL
+      INTEGER NBMOD, IPKW2M, IPMASS, IPSOLU
+
+*     -- VARIABLES LOCALES --
+      POINTEUR IPLMD.MLMOTS, IPLMF.MLMOTS
+      INTEGER  IPMX, IPMODE, IPSOL1
+      REAL*8   OMEGA2, PROPRE(LPROPR), FREQ, XXTMX
+
+
+************************************************************************
+*     LES MODES PROPRES CORRESPONDENT AUX COUPLES : 
+*     ( IPLVAL(I) , IPLVEC(I) )  avec  I = 1, NBMOD
+************************************************************************
+
+      SEGACT ,IPLVEC, IPLVAL
+
+
+************************************************************************
+*     TRAVAIL PRELIMINAIRE POUR LA BONNE NUMEROTATION DES MODES 
+************************************************************************
+
+      CALL DIAGN1 (IPMASS,nvp0M)
+      CALL DIAGN1 (IPKW2M,IND0)
+      
+cTODO       if(IFLU.gt.0) nvp0M=0
+c     cas d'une matrice M non definie positive : modif de IND0
+      if(nvp0M.ne.0) then
+        if (W2.gt.0.D0) then
+          IND0=nvp0M+IND0
+        elseif (W2.lt.0.D0) then
+          IND0=nvp0M-IND0
+        else
+          IND0=nvp0M
+        endif
+      endif
+c     calcul de IREP 
+      FSHIFT=SQRT(ABS(W2))/DEUXPI
+      FSHIFT=SIGN(FSHIFT,W2)      
+      FMIN = IPLVAL.PROG(1)
+      FMAX = IPLVAL.PROG(NBMOD)
+      if (FSHIFT.lt.FMIN) then
+        IREP=1
+        IND0=IND0+1
+      elseif(FSHIFT.gt.FMAX) then
+        IREP=NBMOD
+      else
+        do 1 ishift=2,NBMOD
+           F1=IPLVAL.PROG(ishift-1)
+           F2=IPLVAL.PROG(ishift)
+           if(FSHIFT.ge.F1.and.FSHIFT.le.F2) goto 2
+1       continue 
+        call erreur(5)
+2       continue 
+        IREP=ishift-1
+      endif
+      
+      
+************************************************************************
+*     BOUCLE SUR LES MODES
+************************************************************************
+      
+cbp2019      NBNEG = 1
+cbp2019      NBPOS = 0
+
+      DO 100 IB100 = 1, NBMOD
+      
+         IPVECP = IPLVEC.ICHPOI(IB100)
+         CALL XTMX ( IPVECP, IPMASS, XXTMX )
+         IF ( IERR .NE. 0 ) RETURN
+         CALL MUCPRI ( IPVECP, IPMASS, IPMX )
+         IF ( IERR .NE. 0 ) RETURN
+         IF ( IB100 .EQ. 1 ) THEN
+*           -- NOM DES COMPOSANTES: --
+            CALL CORRSP ( ipmass, IPVECP, IPMX, IPLMD, IPLMF )
+            IF ( IERR .NE. 0 ) RETURN
+         ENDIF
+         
+         PROPRE(1) = IPLVAL.PROG(IB100)
+         PROPRE(2) = XXTMX
+cbp2019         XLAMBR = sign( ((DEUXPI*PROPRE(1))**2) , PROPRE(1) )         
+cbp2019         if(XLAMBR .lt. W2) then
+cbp2019            NBNEG = NBNEG - 1
+cbp2019            NUMOD2 = NBNEG
+cbp2019         else
+cbp2019            NBPOS = NBPOS + 1
+cbp2019            NUMOD2 = NBPOS
+cbp2019         endif
+         NUMOD2 = IND0-IREP+IB100         
+         
+         CALL MASGEN ( IPVECP, PROPRE )
+         IF ( IERR .NE. 0 ) RETURN
+         CALL DEPGEN ( IPMASS, IPVECP, PROPRE, IPMX, IPLMD, IPLMF)
+         IF ( IERR .NE. 0 ) RETURN
+         
+c *         CALL CREMOD ( PROPRE,IPVECP,IPKW2M,INF0,FREQ,NUMOD2,IPMODE)
+c          CALL CREMOD ( PROPRE,IPVECP,IPKW2M,INF0,NUMOD2,IPMODE)
+         CALL MANUSO('MODE    ',NUMOD2,PROPRE(1),PROPRE(2),PROPRE(3),
+     &               PROPRE(4),PROPRE(5),IPVECP,0,0,IPMODE)         
+         IF ( IERR .NE. 0 ) RETURN
+         
+*        -- AFFICHAGE DE LA SOLUTION --
+         IF ( IIMPI .EQ. 2 ) CALL ECMODE ( IPMODE )
+         IF (IB100 .EQ. 1) THEN
+            IPSOLU = IPMODE
+         ELSE
+            CALL FUSOLU( IPSOLU, IPMODE, IPSOL1 )
+            IF ( IERR .NE. 0 ) RETURN
+            CALL DESOLU( IPMODE )
+            IF ( IERR .NE. 0 ) RETURN
+            CALL DESOLU( IPSOLU )
+            IF ( IERR .NE. 0 ) RETURN
+            IPSOLU = IPSOL1
+         ENDIF
+         
+         CALL DTCHPO ( IPMX )
+         IF ( IERR .NE. 0 ) RETURN
+         
+ 100  CONTINUE
+
+      IPMODE = IPSOLU
+      SEGDES ,IPLVEC, IPLVAL
+      SEGSUP ,IPLMD , IPLMF
+
+      RETURN
+      END
+
+
+ 

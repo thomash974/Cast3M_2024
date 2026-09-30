@@ -1,0 +1,36 @@
+C RECM3D    SOURCE    PV090527  23/01/27    21:16:01     11574          
+        subroutine recm3d(iphase,itps,xc6,xp3,x6,v33,v33t)
+        
+c       re construction du tenseur complet dans la base fixe->xc6         
+c       recuperation des increment en base prin et complemantaire en base fixe
+
+c       tables de dimension fixe pour resolution des systemes lineaires 
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+
+        integer NBRINCMAX,iphase,itps
+        parameter (NBRINCMAX=1)
+       
+        real*8 x6(-1:NBRINCMAX,6,0:1)
+        real*8 xp3(-1:NBRINCMAX,3),xc6(-1:NBRINCMAX,6)
+        real*8 v33(3,3),v33t(3,3)
+                
+        real*8 x06(6),x03(3),x16(6)
+        integer  j
+        
+        if((iphase.lt.-1).or.(iphase.gt.NBRINCMAX)) then
+          print*,'Pb dans incl3d'
+          print*,'redimensionner NBRINCMAX dans recm3d'
+          stop
+        end if
+        do j=1,3
+           x03(j)=xp3(iphase,j)
+        end do
+        call inpr3d(x03,v33t,x16,.false.)
+        do j=1,6         
+            x6(iphase,j,itps)=xc6(iphase,j)+x16(j)
+        end do
+        return
+        end
+         
+ 

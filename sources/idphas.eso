@@ -1,0 +1,189 @@
+C IDPHAS    SOURCE    SP204843  23/03/10    19:39:23     11625          
+      SUBROUTINE IDPHAS(MFR,IPMODL,IPCOMP,NBROBL,NBRFAC)
+*--------------------------------------------------------------------*
+*                                                                    *
+*    RECHERCHE DES NOMS DE COMPOSANTES DES VARIABLES MICROSTRUCTURES *
+*    ________________________________________________________        *
+*                                                                    *
+*    ENTREES:                                                        *
+*                                                                    *
+*        MFR       NUMERO DE LA FORMULATION                          *
+*        IPMODL    OBJET MODEL ELEMENTAIRE ( SEGMENT ACTIF )         *
+*                                                                    *
+*    SORTIES:                                                        *
+*                                                                    *
+*        IPCOMP    POINTEUR SUR LES LISTES DE NOMS DE COMPOSANTES    *
+*                  obligatoires et facultatives                      *
+*                                                                    *
+*        NBROBL    nombre de composantes obligatoires                *
+*                                                                    *
+*        NBRFAC    nombre de composantes facultatives                *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+      IMPLICIT INTEGER(I-N)
+-INC SMMODEL
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+*
+      CHARACTER*16 MOMODL(100)
+      logical lozut
+*
+      NBROBL=0
+      NBRFAC=0
+      SEGINI NOMID
+      IPCOMP = NOMID
+C
+      IMODEL=IPMODL
+      NMAT=MATMOD(/2)
+      NFOR=FORMOD(/2)
+      MELE=NEFMOD
+      
+C
+      CALL PLACE(FORMOD,NFOR,ICONV,'MELANGE')
+c      write(6,*) 'idph-1', iconv
+      IF (ICONV.EQ.0) RETURN
+
+      if (nmat.lt.1) then
+       call erreur(5)
+       return
+      endif
+      
+      CALL MODMEL (MOMODL,NMOD)
+  50  CONTINUE
+
+        CALL PLACE (MOMODL,NMOD,IPLAC,MATMOD(1))
+c      write(6,*) 'idph-2', iplac,matmod(1)
+      IF (IPLAC.EQ.1) THEN
+* CEREM
+          JGA=LESOBL(/2)
+          JGB=LESFAC(/2)
+          NBROBL=JGA+4
+          NBRFAC=JGB+0
+          segadj nomid
+         LESOBL(JGA+1)= 'AUST'
+         LESOBL(JGA+2)= 'FERR'
+         LESOBL(JGA+3)= 'BAIN'
+         LESOBL(JGA+4)= 'MART'
+*
+      ELSE IF (IPLAC.EQ.2) THEN
+* ZTMAX
+          JGA=LESOBL(/2)
+          JGB=LESFAC(/2)
+          NBROBL=JGA+2
+          NBRFAC=JGB+0
+          segadj nomid
+         LESOBL(JGA+1)= 'PHA1'
+         LESOBL(JGA+2)= 'PHA2'
+*
+      ELSEIF (iplac.eq.3.or.iplac.eq.4) THEN
+* PARALLELE ou SERIE : recupere les noms de phase
+          JGOBL = imodel.ivamod(/1)
+c      write(6,*) 'idph-jgobl', jgobl
+          JGA=LESOBL(/2)
+          JGB=LESFAC(/2)
+          NBROBL = JGA + JGOBL
+          NBRFAC = JGB
+          segadj nomid
+          kc1 = 0
+          do ic1 = 1,JGOBL
+           if (tymode(ic1).eq.'IMODEL') then
+             imode2 = ivamod(ic1)
+             segact imode2
+             lozut = .false.
+             if (kc1.ge.1) then
+              do kkc1 = 1, kc1
+                if (imode2.conmod(17:24).eq.LESOBL(kkc1)) then
+                  lozut = .true.
+C          write(6,*) 'noms de phase redondants '
+                  call erreur(21)
+                  return
+                endif
+              enddo
+             endif
+             if (.not.lozut) then
+               kc1 = kc1 + 1
+               LESOBL(kc1) = imode2.conmod(17:24)
+             endif
+           endif
+          enddo
+          NBROBL = JGA + kc1
+          NBRFAC = JGB
+          segadj nomid
+c      write(6,*) 'idph-kc1', kc1
+*
+      ELSE IF (IPLAC.EQ.6) THEN
+* TMM_LMT2
+          JGA=LESOBL(/2)
+          JGB=LESFAC(/2)
+          NBROBL=JGA+5
+          NBRFAC=JGB+0
+          segadj nomid
+         LESOBL(JGA+1)= 'PHA1'
+         LESOBL(JGA+2)= 'PHA2'
+         LESOBL(JGA+3)= 'PHA3'
+         LESOBL(JGA+4)= 'PHA4'
+         LESOBL(JGA+5)= 'PHA5'
+*
+*
+      ELSE IF (IPLAC.EQ.99) THEN
+* LEBLOND
+          IPCOMP = NOMID
+*
+      ELSE IF (IPLAC.EQ.99) THEN
+* MGRAIN
+          JGA=LESOBL(/2)
+          JGB=LESFAC(/2)
+          NBROBL=JGA+0
+          NBRFAC=JGB+0
+          IPCOMP = NOMID
+*
+      ELSE
+*
+      ENDIF
+*
+      NBROBL=LESOBL(/2)
+      NBRFAC=LESFAC(/2)
+      SEGDES NOMID
+      RETURN
+
+C
+      END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 

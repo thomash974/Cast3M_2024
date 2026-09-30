@@ -1,0 +1,435 @@
+C HHOSIG    SOURCE    OF166741  24/05/06    21:15:15     11082          
+C HHOSIG    SOURCE    FANDEUR                                           
+
+*----------------------------------------------------------------------*
+*   CALCUL DES CONTRAINTES POUR LA FORMULATION 'HHO'                   *
+*----------------------------------------------------------------------*
+*   ENTREES :                                                          *
+*        MATE     Numero du materiau                                   *
+*        IVAMAT   Pointeur sur un segment MPTVAL pour le materiau      *
+*        NVMAT    Nombre de composantes obligatoires materiau          *
+*                                                                      *
+*   SORTIES :                                                          *
+*----------------------------------------------------------------------*
+
+      SUBROUTINE HHOSIG(imoHHO, ichDEP,nmoDEP,
+     &                  IIPDPG,UZDPG,RYDPG,RXDPG,
+     &                  MATE,IVAMAT,NVMAT, IPMINT, NBPTEL,
+     &                  IVASTR,NCSTR, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMCHAML
+-INC SMELEME
+-INC SMINTE
+-INC SMLENTI
+      POINTEUR mlent4.mlenti
+-INC SMLMOTS
+-INC SMLREEL
+      POINTEUR mlrdef.mlreel, mlrdec.mlreel, mlrmbh.mlreel
+-INC SMMODEL
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS)
+        INTEGER IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      SEGMENT MWKMAT
+        REAL*8 VALMAT(NTMAT), HOELAS(lhook,lhook)
+c**        REAL*8 XLOC(3,3),XGLOB(3,3),TXR(IDIM,IDIM)
+      ENDSEGMENT
+
+      SEGMENT MWKHHO
+        INTEGER TABINT(NBINT)
+        REAL*8  TABFLO(NBFLO)
+      ENDSEGMENT
+
+      DIMENSION UDPGE(3)
+
+      iret = 0
+
+      imodel = imoHHO
+c*      segact,imodel <- actif en entree/sortie
+
+C- Premieres verifications :
+      CALL HHONOB(imoHHO, nobHHO, iret)
+      IF (nobHHO.LE.0) THEN
+        write(ioimp,*) 'HHOSIG: IMODEL incorrect (not HHO)'
+        iret = 5
+        return
+      END IF
+
+C- Introduction du point autour duquel se fait le mouvement
+C  de la section en defo plane generalisee
+C  IIPDPG = numero du noeud/point support si defini pour le modele
+C  NDPGE > 0 si prise en compte du point support
+      IF (IIPDPG.GT.0) THEN
+        write(ioimp,*) 'HHOSIG: 2D PLAN GENE mode not implemented!'
+        iret = 5
+        return
+        IF (IFOUR.EQ.-3) THEN
+          NDPGE = 3
+          UDPGE(1) = UZDPG
+          UDPGE(2) = RYDPG
+          UDPGE(3) = RXDPG
+C          SEGACT,MCOORD
+          IREF = (IIPDPG-1)*(IDIM+1)
+          XDPGE = mcoord.XCOOR(IREF+1)
+          YDPGE = mcoord.XCOOR(IREF+2)
+        ELSE IF (IFOUR.EQ.11) THEN
+          NDPGE = 2
+          UDPGE(1) = UZDPG
+          UDPGE(2) = RXDPG
+          UDPGE(3) = XZero
+          XDPGE = XZero
+          YDPGE = XZero
+        ELSE IF (IFOUR.EQ. 7 .OR. IFOUR.EQ. 8 .OR. IFOUR.EQ. 9 .OR.
+     &           IFOUR.EQ.10 .OR. IFOUR.EQ.14) THEN
+          NDPGE = 1
+          UDPGE(1) = UZDPG
+          UDPGE(2) = XZero
+          UDPGE(3) = XZero
+          XDPGE = XZero
+          YDPGE = XZero
+        else
+          write(ioimp,*) 'HHOSIG: ERREUR NDPGE'
+          iret = 5
+          return
+        END IF
+      ELSE
+        NDPGE = 0
+        UDPGE(1) = XZero
+        UDPGE(2) = XZero
+        UDPGE(3) = XZero
+        XDPGE = XZero
+        YDPGE = XZero
+      END IF
+
+C- Recuperation des donnees du modele en entree
+c*      MELE   = imodel.NEFMOD
+c*      MFR    = imodel.infele(13)
+      meleme = imodel.IMAMOD
+      NBNOE  = meleme.NUM(/1)
+      NBELT  = meleme.NUM(/2)
+
+      mlenti = imodel.IVAMOD(nobHHO+1)
+c*      segact,mlenti
+      mlent3 = imodel.IVAMOD(nobHHO+3)
+c*      segact,mlent3
+      mlent4 = imodel.IVAMOD(nobHHO+4)
+c*      segact,mlent4
+
+c*      n_o_face = mlenti.lect(2)
+      n_d_face = mlenti.lect(3)
+c*      n_o_cell = mlenti.lect(4)
+      n_d_cell = mlenti.lect(5)
+      nb_faces = mlenti.lect(7)
+      NBPGAU   = mlenti.lect(8)
+      idifo    = mlenti.lect(9)
+      NBDDL    = mlenti.lect(11)
+      NDEPF    = idifo * n_d_face
+      NDEPC    = idifo * n_d_cell
+      lhook = 9
+
+      nbel3 = mlent3.lect(/1) / 2
+      nbfa3 = 2 * nb_faces
+      nbel4 = mlent4.lect(/1) / 2
+
+      IF (mlenti.lect(6).NE.NBNOE) THEN
+        write(ioimp,*) 'HHOSIG: Bizarre nb_vertices'
+      END IF
+      IF (NBDDL .NE. imodel.INFELE(9)) then
+        write(ioimp,*) 'HHOSIG: Bizarre NBDDL'
+      END IF
+c NBPGAU =? (NBPTEL = imodel.INFELE(4))
+      IF (NBPGAU .NE. imodel.INFELE(4)) then
+        write(ioimp,*) 'HHOSRIG: Bizarre nb.p.gau(1)'
+      END IF
+c NBPGAU =? minte.POIGAU(/1)
+      minte = IPMINT
+c*      SEGACT minte <- actif en E/S
+      if (NBPGAU .NE. minte.POIGAU(/1)) then
+        write(ioimp,*) 'HHOSIG: Bizarre nb.p.gau (2)'
+      end if
+c-dbg      write(ioimp,*) 'HHOSIG:',nb_faces,NBDDL,NBPGAU
+      if (nbel3.NE.(NBELT*nb_faces)) then
+        write(ioimp,*) 'HHOSIG: Bizarre nbel3'
+      end if
+      if (nbel4.NE.NBELT) then
+        write(ioimp,*) 'HHOSIG: Bizarre nbel4'
+      end if
+
+      ivid = 1
+C- Deplacements des faces et des cellules :
+      nomid = nmoDEP
+c*      segact,nomid
+      JGN = nomid.lesobl(/1)
+c-dbg      write(ioimp,*) 'HHOSIG=',NDEPC,NDEPF,lesobl(/2),lesfac(/2)
+      nfac = 0
+C Deplacements des cellules - Points supports des cellules
+      JGM = NDEPC + nfac
+      SEGINI,mlmots
+      DO i = 1, NDEPC
+        mlmots.MOTS(i)(1:JGN) = nomid.lesobl(i)(1:JGN)
+      END DO
+c*      DO i = 1, nfac
+c*        mlmots.MOTS(NDEP+i)(1:JGN) = nomid.lesfac(i)(1:JGN)
+c*      END DO
+      CALL EXTR23(ichDEP,mlmots,MPCHHO,mlrDEC,ivid)
+      SEGACT,mlrDEC
+c*      IF (IERR.NE.0) THEN
+c*        iret = 21
+c*        return
+c*      END IF
+
+c-dbg      write(ioimp,*) 'mlmots DEPC ',(mots(i),i=1,mots(/2))
+c-dbg      write(ioimp,*) 'U.CELL',mlrdec.prog(/1),NCEHHO,NDEPC
+c-dbg      write(ioimp,*) '      ',(mlrdec.prog(i),i=1,mlrdec.prog(/1))
+c-dbg      write(ioimp,*)
+
+C  Deplacements des faces - Points supports des faces
+      JGM = NDEPF + nfac
+      SEGADJ,mlmots
+      DO i = 1, NDEPF
+        mlmots.MOTS(i)(1:JGN) = nomid.lesobl(NDEPC+i)(1:JGN)
+      END DO
+c*      DO i = 1, nfac
+c*        mlmots.MOTS(NDEP+i)(1:JGN) = nomid.lesfac(i)(1:JGN)
+c*      END DO
+      CALL EXTR23(ichDEP,mlmots,MPFHHO,mlrDEF,ivid)
+      SEGACT,mlrDEF
+c*      IF (IERR.NE.0) THEN
+c*        iret = 21
+c*        return
+c*      END IF
+
+c-dbg      write(ioimp,*) 'MLMOTS DEPF ',(mots(i),i=1,mots(/2))
+c-dbg      write(ioimp,*) 'U.FACE',mlrDEF.prog(/1),NFAHHO,NDEPF
+c-dbg      write(ioimp,*) '      ',(mlrDEF.prog(i),i=1,mlrDEF.prog(/1))
+c-dbg      write(ioimp,*)
+
+C- Verification des proprietes materielles : Champ CONSTANT par ELEMENT !
+      mptval = IVAMAT
+      NTMAT = mptval.IVAL(/1)
+      NUMAT = NTMAT - 4
+
+C- Tableau de stockage des proprietes materielles
+      MWKMAT = 0
+      SEGINI,MWKMAT
+      IWKMAT = MWKMAT
+
+      isz = 0
+      iunif = 0
+      DO is = 1, NTMAT
+        IF (is.LE.(NVMAT-4) .OR. is.GT.NVMAT) THEN
+          melval = mptval.IVAL(is)
+          IGMN = melval.VELCHE(/1)
+          IEMN = melval.VELCHE(/2)
+          IF (IGMN.NE.1) isz = isz + 1
+          IF (IGMN.EQ.1 .AND. IEMN.EQ.1) iunif = iunif + 1
+          VALMAT(is) = melval.VELCHE(1,1)
+        END IF
+      END DO
+      IF (isz.NE.0) THEN
+        write(ioimp,*) 'HHOSIG: Material properties must be constant ',
+     &                 'by element (for the moment) !'
+        iret = 21
+        RETURN
+      END IF
+* Le champ de proprietes est completement uniforme :
+      IF (iunif.NE.NUMAT) iunif = 0
+
+C- Materiau isotrope et proprietes uniformes : -> calcul de HOELAS
+      IF (MATE.EQ.1 .AND. iunif.NE.0) THEN
+        CALL DOHMAS(VALMAT,'ISOTROPE',IFOUR,lhook,1,HOELAS,iretc)
+        r_z = HOELAS(4,4) * 2.D0
+        DO i = 4, lhook
+          HOELAS(i,i) = r_z
+        END DO
+      END IF
+C - Materiaux orthotrope et anisotrope
+      IF (MATE.EQ.2.OR.MATE.EQ.3) THEN
+C** AFAIRE !!!        
+      END IF
+
+C- Les donnees liees a la formulation HHO :
+      IVMBHO = mptval.IVAL(NVMAT-1)
+      melval = IVMBHO
+      IGMB = melval.IELCHE(/1)
+      IEMB = melval.IELCHE(/2)
+c-dbg      write(ioimp,*) 'IVMBHO',melval,igmb,iemb,tyval(nvmat-1)
+      mlrmbh = melval.IELCHE(1,1)
+c*      segact,mlrmbh
+c*      write(ioimp,*) 'HHOSIG MBHHO SIZE:',mlrmbh.prog(/1),
+c*     &                NBDDL,9*NBDDL,mlenti.lect(14)
+      IF ((mlrmbh.prog(/1).NE.(9*NBDDL)) .OR. 
+     &    (mlrmbh.prog(/1).NE.mlenti.lect(14))) THEN
+        write(ioimp,*) 'HHOSIG: BHHO matrix size incorrect'
+        iret = 21
+        RETURN
+      END IF
+
+C- Indices et tableau de travail
+      ir_coo =          0
+c* si besoin des coordonnees      ir_eps = ir_coo + (IDIM*NBNOE)
+      ir_eps = ir_coo + 0
+      ir_sig = ir_eps + lhook
+      ir_uce = ir_sig + lhook
+      ir_ufa = ir_uce + NDEPC
+      ir_uge = ir_ufa + (NDEPF*nb_faces)
+      ir_fin = ir_uge + NDPGE
+
+      NBINT = 1
+      NBFLO = ir_fin
+      SEGINI,MWKHHO
+
+      IF (NDPGE.GT.0) THEN
+        DO ic = 1, NDPGE
+          TABFLO(ir_uge+ic) = UDPGE(ic)
+        END DO
+      END IF
+c* si besoin des coordonnees        SEGACT,MCOORD*NOMOD
+
+C-------------------------
+C Boucle sur les cellules du modele
+C-------------------------
+      DO IEL = 1,NBELT
+
+C- Recuperation des coordonnees des noeuds de l element IEL
+c*        CALL HHOCOO(meleme.num,NBNOE, mcoord.xcoor, IEL,
+c*    &               TABFLO(ir_coo+1), iret)
+c*        IF (iret.NE.0) RETURN
+
+C- Valeurs des inconnues primales pour l'element IEL (cell+faces)
+        in1 = IEL * 2
+        je = mlent4.lect(in1-1)
+        ip = mlent4.lect(in1)
+      if (ip.le.0) write(ioimp,*) 'HHOSIG ICEL Bizarre...',iel,je,ip
+        jp = ip + NBCHHO(je-1)
+        DO ic = 1, NDEPC
+          jc = NCEHHO * (ic - 1)
+          TABFLO(ir_uce + ic) = mlrDEC.prog(jp + jc)
+        END DO
+c-dbg      write(ioimp,*) 'HHOSIG ICEL',iel,je,ip,jp,ir_uce
+c-dbg      write(ioimp,*) (TABFLO(ir_uce+ic),ic=1,ndepc)
+
+        in1 = (IEL-1) * nbfa3
+        ir_kc = ir_ufa
+        DO j1 = 1, nb_faces
+          in2 = in1 + (2 * j1)
+          je = mlent3.lect(in2-1)
+          ip = ABS(mlent3.lect(in2))
+      if (ip.eq.0) write(ioimp,*) 'HHOSIG IFAE Bizarre...',iel,j1,je,ip
+          jp = ip + NBFHHO(je-1)
+          DO ic = 1, NDEPF
+            jc = NFAHHO * (ic - 1)
+            TABFLO(ir_kc + ic) = mlrDEF.prog(jp + jc)
+          END DO
+c-dbg      write(ioimp,*) 'HHOSIG IFAE',iel,j1,je,ip,jp,ir_kc
+c-dbg      write(ioimp,*) (TABFLO(ir_kc+ic),ic=1,ndepf)
+          ir_kc = ir_kc + NDEPF
+        END DO
+
+c-dbg      write(ioimp,*) 'HHOSIG ...',ir_uce,ir_kc,NBDDL
+
+C- Recuperation des proprietes constantes par element :
+        IF (iunif.EQ.0) THEN
+          DO is = 1, NVMAT
+            IF (is.LE.(NVMAT-4) .OR. is.GT.NVMAT) THEN
+              melval = mptval.IVAL(is)
+              VALMAT(is) = melval.VELCHE(1,IEL)
+            END IF
+          END DO
+        END IF
+C- Materiau isotrope
+        IF (MATE.EQ.1 .AND. iunif.EQ.0) THEN
+          CALL DOHMAS(VALMAT,'ISOTROPE',IFOUR,lhook,1,HOELAS,iretc)
+          r_z = HOELAS(4,4) * 2.D0
+          DO i = 4, lhook
+            HOELAS(i,i) = r_z
+          END DO
+        ENDIF
+C - Calcul des axes locaux dans les cas orthotrope et anisotrope
+        IF (MATE.EQ.2.OR.MATE.EQ.3) THEN
+        ENDIF
+
+        JEMB = MIN(IEL,IEMB)
+C--  --  --  --  --  --  --  --  --
+C - Boucle sur les points de Gauss
+C--  --  --  --  --  --  --  --  --
+        DO IGAU = 1, NBPGAU
+
+C-AFAIRE C -- Recuperation des proprietes materielles (IGAU)
+C-AFAIRE           DO is = 1, NVMAT
+C-AFAIRE             IF (is.LE.(NVMAT-4) .OR. is.GT.NVMAT) THEN
+C-AFAIRE               melval = mptval.IVAL(is)
+C-AFAIRE               JEMN = MIN(IEL ,melval.VELCHE(/2))
+C-AFAIRE               JGMN = MIN(IGAU,melval.VELCHE(/1))
+C-AFAIRE               VALMAT(is) = melval.VELCHE(JGMN,JEMN)
+C-AFAIRE             END IF
+C-AFAIRE           END DO
+C-AFAIREC- Materiau isotrope
+C-AFAIRE           IF (MATE.EQ.1) THEN
+C-AFAIRE             CALL DOHMAS(VALMAT,'ISOTROPE',IFOUR,lhook,1,HOELAS,iretc)
+C-AFAIRE             r_z = HOELAS(4,4) * 2.D0
+C-AFAIRE             DO i = 4, lhook
+C-AFAIRE               HOELAS(i,i) = r_z
+C-AFAIRE             END DO
+C-AFAIRE           END IF
+
+          melval = IVMBHO
+          JGMB = MIN(IGAU,IGMB)
+          mlrmbh = melval.IELCHE(JGMB,JEMB)
+c*          segact,mlrmbh
+c* !! matrice BHHO stockee colonne par colonne : lhook*NBDDL
+          DO ic = 1, lhook
+            r_z = XZero
+            DO jc = 1, NBDDL
+              jnc = lhook * (jc-1)
+              r_z = r_z + mlrmbh.prog(ic + jnc) * TABFLO(ir_uce + jc)
+            END DO
+            TABFLO(ir_eps + ic) = r_z
+          END DO
+          DO ic = 1, lhook
+            r_z = XZero
+            DO jc = 1, lhook
+              r_z = r_z + HOELAS(ic,jc) * TABFLO(ir_eps + jc)
+            END DO
+            TABFLO(ir_sig + ic) = r_z
+          END DO
+
+C -- Remplissage du segment contenant les "contraintes"
+c* A voir selon ordre - permutation :
+          mptval = IVASTR
+          DO ic = 1, NCSTR
+            melval = mptval.IVAL(ic)
+            melval.velche(IGAU,IEL) = TABFLO(ir_sig + ic)
+          END DO
+
+C--  --  --  --  --  --  --  --  --
+        END DO
+C--  --  --  --  --  --  --  --  --
+C-------------------------
+      END DO
+C-------------------------
+
+      IF (MATE.EQ.2.OR.MATE.EQ.3) THEN
+      ENDIF
+      SEGSUP,MWKMAT,MWKHHO
+      SEGSUP,mlrDEC,mlrDEF
+      SEGSUP,mlmots
+
+c*      RETURN
+      END
+
+ 

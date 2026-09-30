@@ -1,0 +1,292 @@
+C EXTO4C    SOURCE    GOUNAND   21/04/06    21:15:10     10940          
+      SUBROUTINE EXTO4C(JELEM,TRAVJ,
+     $     TRAVX)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : EXTO4C
+C DESCRIPTION : Extraction de la topologie locale proprement dite
+C     On utilise un segment de travail TRAVV dans le cas où JELEM de
+C     dimension le nombre d'éléments de JTOPO lorsque JELEM a plus d'un
+C     noeud. Ici, on retourne les éléments de JTOPO (même si ici, on ne
+C     connaît que TOPINV) à extraire dans le tableau NEXTO du segment de
+C     travail TRAVX 
+C           
+C      On a repris la programmation de EXTO3
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            : JELEM, TOPINV, TRAVV
+C ENTREES/SORTIES    : TRAVX
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 11/10/2017, version initiale
+C HISTORIQUE : v1, 11/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLENTI
+      POINTEUR JNBL.MLENTI
+      POINTEUR NEXTO.MLENTI
+-INC SMELEME
+*
+*     Le nombre d'éléments de JTOPO et le nombre de points de JCOORD
+*     vont être variables. Pour ne pas avoir à ajuster ces segments en
+*     permanence, on va dimensionner plus large, mais du coup, il faut
+*     aussi maintenir à la main le nombre de noeuds et d'éléments
+*     courants.
+*
+*     Le nombre d'éléments courants est NVCOU et le nombre d'éléments
+*     max est NVMAX. Idem pour le nombre de noeuds courants et max :
+*     NPCOU et NPMAX.
+*      
+* Numerotation locale des éléments JTOPO.NUM(NBNN,NBELEM)
+*del      POINTEUR JTOPO.MELEME
+      POINTEUR JELEM.MELEME
+*del      POINTEUR JEXTO.MELEME
+-INC TMATOP2
+-INC TMATOP1
+*-INC STOPINV
+*-INC STRAVJ
+      POINTEUR TRAVX.TRAVJ
+*
+*del      INTEGER IMPR,IRET
+      logical lchang
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans exto4c.eso'
+*
+      IDIMP=IDIM+1
+      TOPINV=TRAVJ.TOPI
+      NEXTO=TRAVX.NBL
+*     On gère le cas où certains noeuds de JELEM sont nuls ou ne sont
+*     plus dans la topologie
+      NPOJEL=0
+      IP1=0
+      DO IPO=1,JELEM.NUM(/1)
+         IP=JELEM.NUM(IPO,1)
+         IF (IP.NE.0) THEN
+            IF (TDC(IP).NE.0) THEN
+               NPOJEL=NPOJEL+1
+               IF (IP1.EQ.0) IP1=IP
+            ENDIF
+         ENDIF
+      ENDDO
+*
+*     Dans le cas où NPOJEL=0 : maillage vide
+*
+      IF (NPOJEL.EQ.0) THEN
+         NVXCOU=0
+         TRAVX.NVCOU=NVXCOU
+*
+*     Dans le cas où NPOJEL=1, on peut extraire tout de suite
+*
+      ELSEIF (NPOJEL.EQ.1) THEN
+         IP=IP1
+         NVXCOU=TDC(IP)
+         CALL TOPADV(TRAVX,NVXCOU,1,lchang,'exto4c : TRAVX npojel=1')
+         if (ierr.ne.0) return
+         if (iveri.ge.2.and.lchang) then
+            call vetopi(travx,'exto4c : Apres extension travx npojel=1')
+            if (ierr.ne.0) return
+         endif
+*         
+*
+         LAST=TIC(IP)
+         LDG=TDC(IP)
+         DO IDG=1,LDG
+            IL=((LAST-1)/IDIMP)+1
+*     Remplissage à l'envers (inverse l'ordre des éléments par rapport a
+*     JTOPO)
+*            IEL=IDG
+*     Remplissage à l'endroit (garde l'ordre des éléments par rapport a
+*     JTOPO) 
+            IEL=LDG+1-IDG
+            NEXTO.LECT(IEL)=IL
+            LAST=TLC(LAST)
+         ENDDO
+      ELSE
+*
+*     Recherche du noeud de JELEM appartenant au plus petit nombre
+*     d'éléments 
+*
+         NLMIN=0
+         IMIN=0
+         DO IPOJEL=1,NPOJEL
+            IP=JELEM.NUM(IPOJEL,1)
+            IF (IP.NE.0) THEN
+               IDIP=TDC(IP)
+c$$$               IF (IDIP.LE.0) THEN
+c$$$                  write(ioimp,*) 'pas normal '
+c$$$                  write(ioimp,185) 'nvini,nvcou,nvmax=',nvini,nvcou
+c$$$     $                 ,nvmax
+c$$$                  write(ioimp,185) 'npini,npcou,npmax=',npini,npcou
+c$$$     $                 ,npmax
+c$$$                  write(ioimp,*) 'jelem(nno,nbnn=)',jelem.num(/1)
+c$$$     $                 ,jelem.num(/2)
+c$$$                  call ecmai1(jelem,0)
+c$$$                  write(ioimp,*) 'jtopo'
+c$$$                  jtopo=travj.topo
+c$$$                  call ecmai1(jtopo,0)
+c$$$                  segact jtopo*mod
+c$$$                  call ectopi(topinv,1)
+c$$$                  call ectopi(topinv,2)
+c$$$                  goto 9999
+c$$$  ENDIF
+               IF(IDIP.NE.0) THEN
+                  IF (NLMIN.EQ.0) THEN
+                     NLMIN=IDIP
+                     IMIN=IPOJEL
+                  ELSE
+                     IF (IDIP.LT.NLMIN) THEN
+                        NLMIN=IDIP
+                        IMIN=IPOJEL
+                     ENDIF
+                  ENDIF
+               ENDIF
+            ENDIF
+         ENDDO
+         IF (IMIN.EQ.0) THEN
+            write(ioimp,*) 'Maillage JELEM vide non prevu ici'
+            goto 9999
+         ENDIF
+*     if (impr.gt.2) write(ioimp,*) 'Le noeud ',IMIN,'/',NPOJEL
+*     $     ,' de IELEM de numero ',JELEM.NUM(IMIN,1)
+*     $     ,' a le plus petit nb de voisins :',NLMIN
+         if (impr.gt.2) write(ioimp,189) IMIN,NPOJEL,JELEM.NUM(IMIN,1)
+     $        ,NLMIN 
+*
+*     Quels sont les éléments appartenant à ce noeud minimal (on les
+*     note par 1 dans NBL de TRAVJ)
+*
+         JNBL=TRAVJ.NBL
+* Fait dans exto2         SEGINI TRAVV
+         IP=JELEM.NUM(IMIN,1)
+*     
+         LAST=TIC(IP)
+         LDG=TDC(IP)
+         DO IDG=1,LDG
+            IL=((LAST-1)/IDIMP)+1
+            JNBL.LECT(IL)=1
+            LAST=TLC(LAST)
+         ENDDO
+         if (impr.gt.2) then
+*            write(ioimp,*) 'Apres point IELEM(',IMIN,',1)=',IP,' ; NBL='
+*            write(ioimp,187)  (JNBL.LECT(I),I=1,jnbl.lect(/1))
+            write(ioimp,188) IMIN,IP
+            write(ioimp,187)  (JNBL.LECT(I),I=1,jnbl.lect(/1))
+         endif
+*
+*     Les éléments des autres noeuds de JELEM
+*     + on compte le nombre d'éléments à construire         
+*      
+         NLEXT=0
+         DO IPOJEL=1,NPOJEL
+            IF (IPOJEL.NE.IMIN) THEN
+               IP=JELEM.NUM(IPOJEL,1)
+               IF (IP.NE.0) THEN
+                  LAST=TIC(IP)
+                  LDG=TDC(IP)
+                  DO IDG=1,LDG
+                     IL=((LAST-1)/IDIMP)+1
+                     IF (JNBL.LECT(IL).GT.0) THEN
+                        JNBL.LECT(IL)=JNBL.LECT(IL)+1
+                        IF (JNBL.LECT(IL).EQ.NPOJEL) NLEXT=NLEXT+1
+                     ENDIF
+                     LAST=TLC(LAST)
+                  ENDDO
+                  if (impr.gt.2) then
+*                  write(ioimp,*) 'Apres point IELEM(',IPOJEL,',1)=',IP
+*     $                 ,' ; NBL='
+                     write(ioimp,188) IPOJEL,IP
+                     write(ioimp,187)  (JNBL.LECT(I),I=1,jnbl.lect(/1))
+                  endif
+               ENDIF
+            ENDIF
+         ENDDO
+*
+*     On parcourt une dernière fois le IMIN pour construire le maillage
+*     extrait et mettre à zéro TRAVV
+*         
+         IP=JELEM.NUM(IMIN,1)
+*
+         NVXCOU=NLEXT
+         CALL TOPADV(TRAVX,NVXCOU,1,lchang,'exto4c : TRAVX npojel>1')
+         if (ierr.ne.0) return
+         if (iveri.ge.2.and.lchang) then
+            call vetopi(travx,'exto4c : Apres extension travx npojel>1')
+            if (ierr.ne.0) return
+         endif            
+*
+         NEXTO=TRAVX.NBL
+*     
+         LAST=TIC(IP)
+         LDG=TDC(IP)
+         IELL=1
+         DO IDG=1,LDG
+            IL=((LAST-1)/IDIMP)+1
+*            write(ioimp,*) 'idg=',idg,' last=',last,' il=',il
+            IF (JNBL.LECT(IL).EQ.NPOJEL) THEN
+*     Remplissage à l'envers (inverse l'ordre des éléments par rapport a
+*     JTOPO)
+*               IEL=IELL
+*     Remplissage à l'endroit (garde l'ordre des éléments par rapport a
+*     JTOPO) 
+               IEL=NLEXT+1-IELL
+               nexto.lect(iel)=il
+               IELL=IELL+1
+            ENDIF
+* Nettoyage TRAVV NBL
+            JNBL.LECT(IL)=0
+            LAST=TLC(LAST)
+         ENDDO
+
+*         SEGSUP TRAVV
+      ENDIF
+      if (impr.gt.2) then
+         write(ioimp,*)
+     $        'Elements de la topologie extraits :'
+         write(ioimp,187)  (nexto.lect(I),I=1,nvxcou)
+      endif
+*      JEXTO=JTOPO
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 186  FORMAT ('Segment ',A6,' ',A6,' ajusté de ',I6,' à ',I6)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='EXTO4C  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine EXTO4C
+*
+      END
+
+ 

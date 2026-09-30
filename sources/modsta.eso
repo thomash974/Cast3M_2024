@@ -1,0 +1,147 @@
+C MODSTA    SOURCE    JK148537  23/08/21    21:15:19     11723          
+      SUBROUTINE MODSTA(IPMOD,IPTABM,ipmod1)
+C
+      implicit real*8(a-h,o-z) 
+-INC PPARAM      
+-INC CCOPTIO
+-INC SMMODEL
+      POINTEUR IMODE3.IMODEL
+-INC SMTABLE
+-INC SMELEME
+
+      logical login,lobre
+      character*8 charin, charre, tapind,typobj
+
+      mmodel = ipmod
+      segact mmodel*mod
+      is0 = kmodel(/1)
+c      write(6,*) 'modsta',ipmod,iptabm,is0
+      isk = is0 
+      isa = 1
+      isb = is0
+      
+      IVALIN = 1
+* continue la liste des maillages
+ 10   CONTINUE
+*
+      n1 = kmodel(/1)
+      if (isk + is0 .ge. n1) then
+        n1 = n1 + is0 + 1000
+        segadj mmodel
+      endif
+*
+        IVALIN=IVALIN + 1
+        XVALIN=REAL(0.D0)
+        LOGIN=.TRUE.
+        IOBIN=0
+        TAPIND='ENTIER  '
+        CHARIN='MAILLAGE'
+        TYPOBJ=' '
+        CALL ACCTAB(IPTABM,TAPIND,IVALIN,XVALIN,CHARIN,LOGIN,IOBIN,
+     .                     TYPOBJ,IVALRE,XVALRE,CHARRE,LOGRE,IOBRE)
+c        write(6,*)'bsta',ivalin,iobre,typobj,ierr
+        IF (IERR.NE.0) RETURN
+        if (typobj.ne.'MAILLAGE'.or.iobre.le.0) goto 100    
+
+        ktabm = 0
+* traiter les maillages elementaires      
+        MELEME = IOBRE
+        segact meleme*nomod
+        NSOU  = MELEME.LISOUS(/1)
+        NSOU1 = MAX(1,NSOU)
+        DO 80 IM=1,NSOU1
+          IF (NSOU.EQ.0) THEN
+            IPT1  =MELEME
+          ELSE
+            IPT1  =MELEME.LISOUS(IM)
+            SEGACT,IPT1
+          ENDIF
+          ITYP1 =IPT1.ITYPEL
+          NBNN  =IPT1.NUM(/1)
+          NBELEM  = IPT1.NUM(/2) 
+
+* chercher modele elementaire
+          do is = isa,isb
+            imode1 = kmodel(is)
+            ipt2 = imode1.imamod
+            ityp2 = ipt2.itypel
+            nbn2 = ipt2.num(/1)
+            nbele2 = ipt2.num(/2)
+      if (ityp2.eq.ityp1.and.nbn2.eq.nbnn.and.nbele2.eq.nbelem) then
+               ktabm = ktabm + 1
+               goto 60
+      endif
+          enddo 
+* pb : pas trouve de zone jumelle
+*        write(6,*) 'pas de zone jumelle tranche ',ivalin,' zone ',im 
+        call erreur(5)
+        return      
+          
+ 60     CONTINUE
+* dupliquer modele elementaire
+        segini,imodel=imode1
+        isk = isk + 1
+        kmodel(isk) = imodel
+*        segact imodel*mod
+        imamod = ipt1
+        do ity = 1,ivamod(/1)
+         if (tymode(ity).eq.'STATIO') goto 70
+        enddo
+*        write(6,*) 'pas d entree STATIO tranche ',IVALIN,' zone ',im
+        call erreur(5)
+        return
+ 70     ivamod(ity) = imode1  
+C ... voir modif constituant
+        if (cmatee.eq.'PARALLEL') then
+          if (ipmod1.eq.0) then
+*           write(6,*) 'donnees stationnaire parallele incompletes'
+           call erreur(21)
+           return
+          else
+           mmode1 = ipmod1
+          endif
+           
+          do ity = 1,ivamod(/1)
+           if (tymode(ity).eq.'IMODEL') then
+             imode2 = ivamod(ity)
+          do immel = 1,mmode1.kmodel(/1)
+            imode3 = mmode1.kmodel(immel)
+            if (imode3.imamod.eq.imamod) then
+              if (imode3.cmatee.eq.imode2.cmatee.and.
+     & imode3.imatee.eq.imode2.imatee.and.
+     & imode3.inatuu.eq.imode2.inatuu) goto 177
+            endif
+          enddo
+*           write(6,*) 'donnees stationnaire parallele incorrectes'
+           call erreur(21)
+           return
+              
+ 177        continue
+            ivamod(ity) = imode3
+             
+           endif
+          enddo
+        
+        endif
+ 80     CONTINUE       
+
+        if (ktabm.ne.is0) then
+*         write(6,*) 'tranche ', ivalin,' non homologue'
+         call erreur(5)
+         return
+        endif 
+* on limite la recherche à la tranche précédente 
+        isa = isb + 1
+        isb = isk
+        GOTO 10
+      
+ 100  CONTINUE
+      
+      n1 = isk
+      segadj mmodel
+      
+      
+      RETURN
+      END
+ 
+ 

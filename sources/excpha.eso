@@ -1,0 +1,548 @@
+C EXCPHA    SOURCE    FANDEUR   22/03/01    21:15:04     11301          
+      subroutine excpha
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMCHPOI
+-INC SMMODEL
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+
+      segment icpr  (NCPR)
+      segment icpr1 (NCPR)
+      segment icpr2 (NCPR)
+
+      SEGMENT SEXCP
+        REAL*8  tdebu (node)
+        REAL*8  tprop (node)
+        REAL*8  qrest (node)
+        REAL*8  qtot  (node)
+        REAL*8  qsecon(node)
+        INTEGER iact  (node)
+      ENDSEGMENT
+
+      CHARACTER*(LOCOMP) MOCOMP
+      LOGICAL     LOG1
+
+C Un peu de marge sur la precision des calculs (pb aix)
+      XZPREL=XZPREC*1.D2
+
+C lecture du modele
+      call lirobj('MMODEL  ',mmodel,1,iretou)
+      call actobj('MMODEL  ',mmodel,1)
+      if(ierr.ne.0) return
+
+C lecture du materiau
+      call lirobj('MCHAML  ',IPIN,1,iretou)
+      call actobj('MCHAML  ',IPIN,1)
+      if(ierr.ne.0) return
+      CALL REDUAF(IPIN,mmodel,mchelm,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+
+C lecture des proportions de phase
+      call lirobj('MCHAML  ',IPIN,1,iretou)
+      call actobj('MCHAML  ',IPIN,1)
+      if(ierr.ne.0) return
+      CALL REDUAF(IPIN,mmodel,mchel1,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+
+C lecture des chaleur latentes reduies aux noeuds
+      call lirobj('MCHAML  ',IPIN,1,iretou)
+      call actobj('MCHAML  ',IPIN,1)
+      if(ierr.ne.0) return
+      CALL REDUAF(IPIN,mmodel,mchel2,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+
+C lecture du chpoint de temperatures initiales
+      call lirobj('CHPOINT ',mchpoi,1,iretou)
+      CALL ACTOBJ('CHPOINT ',mchpoi,1)
+      if(ierr.ne.0) return
+
+C lecture du chpoint d'increment de temperatures proposées
+      call lirobj('CHPOINT ',mchpo1,1,iretou)
+      CALL ACTOBJ('CHPOINT ',mchpo1,1)
+      if(ierr.ne.0) return
+
+C fin des lectures
+
+C Un petit test de coherence mais sans consequence :
+      ifopo3=mchpoi.ifopoi
+      if (mchpoi.ifopoi .ne. mchpo1.ifopoi) then
+        interr(1)=mchpoi.ifopoi
+        interr(2)=mchpo1.ifopoi
+        interr(3)=ifour
+c-dbg      write(ioimp,*) '1132 excpha',mchpoi,mchpo1
+        call erreur(1132)
+        ifopo3=ifour
+      end if
+
+      XUN  =1.D0
+      NCPR=nbpts                   
+      segini,icpr,icpr1,icpr2
+
+C algorithmes on boucle sur les sous-modeles
+C puis si la rigidite avait ete prise en compte on teste le sens
+C et la valeur de la chaleur latente proposee
+C sinon on teste la non traverse de la temperature de changement de
+C phase et au besoin on active le blocage (temperature imposee et
+C flux de chaleur latente limite)
+
+* +--------------------------------------------------------------------+
+* |    Preparation de QSECOND :                                        |
+* |     CHPOINT de 'LX'                                                |
+* |     Remplace les chaleurs latentes dans RESO : UNILATER            |
+* +--------------------------------------------------------------------+
+      N1    = mmodel.kmodel(/1)
+      ib    = 0
+      do 200 meri = 1,N1
+        imodel = mmodel.kmodel(meri)
+
+        nfor=imodel.formod(/2)
+        call place(imodel.formod,nfor,iplac,'CHANGEMENT_PHASE')
+        if  (iplac .eq. 0) goto 200
+        if(tymode(2) .ne. 'MAILLAGE')then
+          call erreur(5)
+        endif
+        ipt2=ivamod(2)
+        do 201 nel=1,ipt2.num(/2)
+C         Noeud 1 : 'LX'
+C         Noeud 2 : 'Inconnues classiques'
+          ia = ipt2.num(1,nel)
+          if(icpr2(ia).eq.0) then
+            ib       = ib+1
+            icpr2(ia)= ib
+          endif
+  201   continue
+  200 continue
+      node = ib
+
+* +--------------------------------------------------------------------+
+* |    NOEUDS du CHPOINT debu et proposé                               |
+* +--------------------------------------------------------------------+
+      segini,icpr
+      ib = 0
+      do 80 I=1,mchpoi.ipchp(/1)
+        msoupo=mchpoi.ipchp(i)
+C       Le 'LX' du champ debut ne nous interesse pas
+        if (msoupo.nocomp(1) .EQ. 'LX  ') goto 80
+        ipt1  =msoupo.igeoc
+        mpoval=msoupo.ipoval
+        do 81 j=1,ipt1.num(/2)
+          ia = ipt1.num(1,j)
+          if(icpr(ia).eq.0) then
+            ib = ib +1
+            icpr(ia)=ib
+          endif
+   81   continue
+   80 continue
+      node=max(node,ib)
+
+      ib = 0
+      segini,icpr1
+      do 90 I=1,mchpo1.ipchp(/1)
+        msoupo=mchpo1.ipchp(i)
+        ipt1  =msoupo.igeoc
+        do 91 j=1,ipt1.num(/2)
+          ia = ipt1.num(1,j)
+          if(icpr1(ia).eq.0) then
+            ib       = ib +1
+            icpr1(ia)= ib
+          endif
+   91   continue
+   90 continue
+      node=max(node,ib)
+
+      segini,SEXCP
+
+* +--------------------------------------------------------------------+
+* |    Boucle sur les SOUS-ZONES du MODELE                             |
+* +--------------------------------------------------------------------+
+      do 100 mo=1,N1
+        imodel = mmodel.kmodel(mo)
+        meleme = imodel.imamod
+
+        nfor=imodel.formod(/2)
+        call place(imodel.formod,nfor,iplac,'CHANGEMENT_PHASE')
+        if  (iplac .eq. 0) goto 100
+
+*       +------------------------------------------------------------------------+
+*       |    Recherche des composantes PRIMALE + 'LX' du CHPOINT debu et propose |
+*       +------------------------------------------------------------------------+
+        nomid=imodel.lnomid(1)
+        MOCOMP=nomid.lesobl(1)
+
+C       remise a zero qui va bien
+        IF(mo .GT. 1)THEN
+          CALL ZERO(tdebu(1),node,1)
+          CALL ZERO(tprop(1),node,1)
+        ENDIF
+
+        do 82 I=1,mchpoi.ipchp(/1)
+          msoupo=mchpoi.ipchp(i)
+C         Le 'LX' du champ debut ne nous interesse pas
+          if (msoupo.nocomp(1) .EQ. 'LX  ') goto 82
+          call place(msoupo.nocomp,msoupo.nocomp(/2),iplac,MOCOMP)
+          if  (iplac .eq. 0) then
+            moterr = MOCOMP
+            call erreur(181)
+            return
+          endif
+          ipt1  =msoupo.igeoc
+          mpoval=msoupo.ipoval
+          do 85 k=1,ipt1.num(/2)
+            ia             = ipt1.num(1,k)
+            tdebu(icpr(ia))= mpoval.vpocha(k,iplac)
+   85     continue
+   82   continue
+
+        do 92 I=1,mchpo1.ipchp(/1)
+          msoup1= mchpo1.ipchp(i)
+          iplac = 1
+          if (msoup1.nocomp(1) .EQ. 'LX  ') goto 94
+          call place(msoup1.nocomp,msoup1.nocomp(/2),iplac,MOCOMP)
+          if  (iplac .eq. 0) then
+            moterr = MOCOMP
+            call erreur(181)
+            return
+          endif
+   94     continue
+          ipt1  = msoup1.igeoc
+          mpova1= msoup1.ipoval
+          do 95 k=1,ipt1.num(/2)
+            ia       = ipt1.num(1,k)
+            if(icpr(ia) .EQ. 0)then
+C             Cas des 'LX'
+              tprop(icpr1(ia))= mpova1.vpocha(k,iplac)
+            else
+              tprop(icpr1(ia))= mpova1.vpocha(k,iplac) + tdebu(icpr(ia))
+            endif
+   95     continue
+   92   continue
+
+*       +--------------------------------------------------------------+
+*       |    Recherche du MCHAML correspondant a 'PRIM'                |
+*       +--------------------------------------------------------------+
+        do 51 mchm=1,imache(/1)
+          if(conche(mchm) .ne. conmod) goto 51
+          if(imache(mchm) .eq. meleme) then
+            mchaml=ichaml(mchm)
+            goto 52
+          endif
+   51   continue
+        call erreur(472)
+        return
+   52   continue
+
+        do 56 n2=1,nomche(/2)
+          if(nomche(n2).eq.'PRIM') then
+            if (typche(n2).ne.'REAL*8') then
+              moterr(1:16)  = typche(n2)
+              moterr(17:20) ='PPHA'
+              moterr(21:36) = mchelm.titche
+              call erreur(552)
+              RETURN
+            endif
+            melval=ielval(n2)
+            goto 57
+          endif
+   56   continue
+        moterr(1:8) = 'PRIM'
+        call erreur(677)
+        return
+
+   57   continue
+C       On suppose 'PRIM' constant par sous-modele : verification
+        IF(velche(/1) .NE. 1 .AND. velche(/2).NE. 1)THEN
+          MOTERR(1:4)='PRIM'
+          L1          =mchelm.TITCHE(/1)
+          L2          =MIN(20,L1)
+          MOTERR(5:L2)=mchelm.TITCHE
+          CALL ERREUR(1065)
+          RETURN
+        ENDIF
+
+        T_chph = melval.velche(1,1)
+
+*       +--------------------------------------------------------------+
+*       |    Recherche du MCHAML correspondant a 'PPHA'                |
+*       +--------------------------------------------------------------+
+        do 61 mchm=1,mchel1.imache(/1)
+          if(mchel1.conche(mchm) .ne. conmod) goto 61
+          if(mchel1.imache(mchm) .eq. meleme) then
+            mcham1=mchel1.ichaml(mchm)
+            goto 62
+          endif
+   61   continue
+        call erreur(472)
+        return
+
+   62   continue
+        do 66 n2=1,mcham1.nomche(/2)
+          if(mcham1.nomche(n2).eq.'PPHA') then
+            if (typche(n2).ne.'REAL*8') then
+              moterr(1:16)  = mcham1.typche(n2)
+              moterr(17:20) ='PPHA'
+              moterr(21:36) = mchel1.titche
+              call erreur(552)
+              RETURN
+            endif
+            melva1=mcham1.ielval(n2)
+            goto 67
+          endif
+   66   continue
+        moterr(1:8) = 'PPHA'
+        call erreur(677)
+        return
+   67   continue
+
+*       +---------------------------------------------------------------------+
+*       |    Recherche du MCHAML correspondant au flux equivalent (aux NOEUDS)|
+*       +---------------------------------------------------------------------+
+        do 71 mchm=1,mchel2.imache(/1)
+          if(mchel2.conche(mchm) .ne. conmod) goto 71
+          if(mchel2. imache(mchm) .eq. meleme) then
+            mcham2=mchel2.ichaml(mchm)
+            goto 72
+          endif
+   71   continue
+        call erreur(472)
+        return
+   72   continue
+
+        nomid = lnomid(2)
+        do 76 n2=1,mcham2.nomche(/2)
+          if(mcham2.nomche(n2).eq.nomid.lesobl(1)) then
+            if (mcham2.typche(n2).ne.'REAL*8') then
+              moterr(1:16)  = mcham2.typche(n2)
+              moterr(17:20) = nomid.lesobl(1)
+              moterr(21:36) = mchel2.titche
+              call erreur(552)
+              RETURN
+            endif
+            melva2=mcham2.ielval(n2)
+            goto 77
+          endif
+   76   continue
+        moterr(1:8) =nomid.lesobl(1)
+        call erreur(677)
+        return
+   77   continue
+
+C       remise a zero qui va bien
+        IF(mo .GT. 1)THEN
+          CALL ZERO(qrest(1),node,1)
+          CALL ZERO(qtot(1) ,node,1)
+        ENDIF
+
+C       Fabrication de qtot : chaleur latente totale   cumulee par point
+C       Fabrication de qrest: chaleur latente restante cumulee par point
+        noMAX1=melva1.velche(/1)
+        meMAX1=melva1.velche(/2)
+        noMAX2=melva2.velche(/1)
+        meMAX2=melva2.velche(/2)
+        do 110 mel=1,meleme.num(/2)
+          do 111 nod = 1,meleme.num(/1)
+            ia        = meleme.num(nod,mel)
+            ib        = icpr(ia)
+            pp        = melva1.velche(MIN(nod,noMAX1),MIN(mel,meMAX1))
+            umpp      = MAX(MIN(XUN-pp,XUN),XZERO)
+            ql        = melva2.velche(min(nod,noMAX2),min(mel,meMAX2))
+            IF(ql .EQ. XZERO)THEN
+C             Protection pour les chaleurs latentes strictement egales a 0.D0 !!
+              ql      = XPETIT/XZPREL
+            ENDIF
+            qr        = ql*umpp
+
+            qrest(ib) = qrest(ib) + qr
+            qtot (ib) = qtot (ib) + ql
+  111     continue
+  110   continue
+
+        ipt2   = imodel.ivamod(2)
+        do 120 iel=1,ipt2.num(/2)
+C         Noeud 1 : 'LX'
+C         Noeud 2 : 'Inconnues classiques'
+          No_LX = ipt2.num(1,iel)
+          No_INC= ipt2.num(2,iel)
+
+          iex   = icpr1(No_LX)
+          iri   = icpr2(No_LX)
+          ideb  = icpr(No_INC)
+          ipro  = icpr1(No_INC)
+
+          tdeb  = tdebu(ideb)
+          IF(ipro .NE. 0)THEN
+            tpro  = tprop(ipro)
+          ELSE
+C           Cas a la 1ere iteration
+            tpro  = tdeb
+          ENDIF
+
+          q_tot = qtot(ideb)
+          q_res = qrest(ideb)
+          q_dej = q_tot-q_res
+          q_pre = q_tot*XZPREL
+
+C         Pour eviter les soucis de denormalisation si T_chph ~ XZERO
+          LOG1  =(tdeb.EQ.T_chph) .OR.
+     &      (ABS(T_chph-tdeb).LT.MAX(XZPREL*ABS(TDEB+T_chph),XPETIT))
+          ibloc = 0
+
+          if(iex .ne. 0) then
+*           +----------------------------------------------------------+
+*           |    Le 'LX' existe dans T proposée sur le noeud No_LX     |
+*           +----------------------------------------------------------+
+            rea_LX= tprop(iex)
+            if(LOG1) then
+C             Temperature initiale = T_chph
+              if    (rea_LX.GT.XZERO .AND. q_res.GT.q_pre) then
+C               la temperature cherche a monter
+C               PRINT*,'-E:',No_LX,tdeb,T_chph,tpro
+                ibloc =-1
+              elseif(rea_LX.LT.XZERO .AND. q_dej.GT.q_pre) then
+C               la temperature cherche a descendre
+C               PRINT*,'-F:',No_LX,tdeb,T_chph,tpro
+                ibloc = 1
+              endif
+
+            elseif(rea_LX.GT.XZERO) then
+C             La temperature cherche a monter
+              if(tdeb.LT.T_chph) then
+C               PRINT*,'-G:',No_LX,tdeb,tpro,q_tot,q_res,q_pre
+                ibloc =-1
+              endif
+
+            elseif(rea_LX.LT.XZERO) then
+C             la temperature cherche a descendre
+              if(tdeb .GT. T_chph) then
+C               PRINT*,'-G:',No_LX,tdeb,tpro,q_tot,q_dej,q_pre
+                ibloc = 1
+              endif
+            endif
+
+          else
+*           +-------------------------------------------------------------+
+*           |    Le 'LX' n''existe pas dans T proposée sur le noeud No_LX |
+*           +-------------------------------------------------------------+
+            if(LOG1) then
+C             Temperature initiale = T_chph
+              tsens = tpro - T_chph
+              if    (tsens.GT.XZERO .AND. q_res.GT.q_pre) then
+C               La temperature cherche a monter
+                ibloc =-1
+C               PRINT*,'-AA:',No_LX,tdeb,T_chph,tpro,q_tot,q_res,q_res
+              elseif(tsens.LT.XZERO .AND. q_dej.GT.q_pre) then
+C               la temperature cherche a descendre
+                ibloc = 1
+C               PRINT*,'-BB:',No_LX,tdeb,T_chph,tpro,q_tot,q_res,q_res
+              endif
+
+            elseif((T_chph-tdeb) * (T_chph-tpro) .LT. XZERO) then
+C             tdeb et tprop de chaque cote de T_chph : blocage actif
+              if    (tdeb .LT. T_chph) then
+                ibloc =-1
+C               PRINT*,'-C:',No_LX,(T_chph-tdeb),(T_chph-tpro)
+              elseif(tdeb .GT. T_chph) then
+                ibloc = 1
+C               PRINT*,'-D:',No_LX,tdeb,T_chph,tpro
+              else
+                CALL ERREUR(5)
+              endif
+
+            elseif(tdeb.LT.T_chph .AND. q_dej.GT.q_pre)then
+C             apparemment il reste de la phase
+              ibloc = 1
+C             PRINT*,'-A:',No_LX,tdeb,T_chph,tpro,q_tot,q_res,q_res
+
+            elseif(tdeb.GT.T_chph .AND. q_res.GT.q_pre)then
+C             apparemment on n'a pas tout consomme
+              ibloc =-1
+C             PRINT*,'-B:',No_LX,tdeb,T_chph,tpro,q_tot,q_res,q_res
+            endif
+          endif
+
+C         Les conditions mises sont unilaterales, RESO s'en sort en ne
+C         gardant que la premiere 'excitee' dans le sens en question
+          IF    (ibloc.EQ. 1)THEN
+            iact(iri)     = No_LX
+            qsecon(iri)   = q_dej
+C           PRINT*,'iact(iri)',No_LX,ibloc,iact(iri),qsecon(iri)
+          ELSEIF(ibloc.EQ.-1)THEN
+            iact(iri)     = No_LX
+            qsecon(iri)   =-q_res
+C           PRINT*,'iact(iri)',No_LX,ibloc,iact(iri),qsecon(iri)
+          ELSE
+            iact(iri)     = 0
+            qsecon(iri)   = XZERO
+          ENDIF
+
+C         fin de la boucle sur les elements du MAILLAGE de la rigidite
+  120   continue
+C       fin de la boucle sur les sous-modeles
+  100 continue
+
+*    +--------------------------------------------------------------+
+*    | Creation du resultat : CHPOINT de 'LX'                       |
+*    |   on dispose maintenant du tableau qsecon qui donne la       |
+*    |   chaleur latente a mettre en 'LX' sur les noeuds de iact    |
+*    +--------------------------------------------------------------+
+      nbelem = 0
+      do 300 ia=1,node
+        if(iact(ia) .ne. 0) nbelem = nbelem + 1
+  300 continue
+
+      nbref  = 0
+      nbsous = 0
+      nat    = 1
+      if(nbelem .eq. 0) then
+        nbnn   = 0
+        nsoupo = 0
+        segini,mchpo3
+
+      else
+        nbnn   = 1
+        segini,ipt4
+        ipt4.itypel = 1
+
+        nsoupo = 1
+        nc     = 1
+        n      = nbelem
+        segini,mchpo3,msoupo,mpoval
+        mchpo3.ipchp(1)    = msoupo
+        msoupo.nocomp(1)   ='LX'
+        msoupo.igeoc       = ipt4
+        msoupo.ipoval      = mpoval
+
+        ipo=0
+        do 301,ia=1,node
+          iact1 = iact(ia)
+          if (iact1 .eq. 0) goto 301
+          ipo             = ipo + 1
+          ipt4.num(1,ipo) = iact1
+          vpocha(ipo,1)   = qsecon(icpr2(iact1))
+ 301    continue
+      endif
+
+      mchpo3.mochde(1:72)='chpoint cree par EXCP'
+      mchpo3.mtypoi      ='contmult'
+      mchpo3.jattri(1)   = 2
+      mchpo3.ifopoi      = ifopo3
+
+      segsup icpr,icpr1,icpr2,SEXCP
+
+      call actobj('CHPOINT ',mchpo3,1)
+      call ecrobj('CHPOINT ',mchpo3)
+
+c      return
+      end
+ 
+ 

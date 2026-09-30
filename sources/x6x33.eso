@@ -1,0 +1,15 @@
+C X6X33     SOURCE    PV090527  23/01/27    21:16:10     11574          
+c*************************************************************************************
+c     passage vecteur 6 matrice 33 symetrique
+      subroutine x6x33(x6,x33)
+      real*8 x6(6),x33(3,3)
+      integer i,k,l
+      do i=1,6
+       call indce0(i,k,l)
+       x33(k,l)=x6(i)
+       if(k.ne.l) x33(l,k)=x33(k,l)
+      end do
+      return
+      end
+      
+ 

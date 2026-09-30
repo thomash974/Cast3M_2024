@@ -1,0 +1,126 @@
+C COMRED    SOURCE    PV090527  23/01/27    21:15:16     11574          
+
+      SUBROUTINE COMRED(ich1)
+
+C---------------------------------------------------------------
+C  reduit la taille d'un melval s'il est constant
+C
+C  ich1  segment de type MELVAL (ACTIF en E/S)
+C        nouveau segment si necessaire
+C---------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC SMCHAML
+-INC CCREEL
+
+      melval = ich1
+
+C Valeurs reelles :
+C -----------------
+      n1ptel = velche(/1)
+      n1el   = velche(/2)
+      if (n1el.gt.1 .or. n1ptel.gt.1) then
+        n1pteo=n1ptel
+        n1elo =n1el
+
+C       ymaxe* : min et max generaux
+        ymaxe1 = xgrand
+        ymaxe2 = -xgrand
+
+C       Cas general :
+        if (n1ptel .gt. 1) then
+C         Est-on constant par element ?
+          do ipel = 1, n1el
+C           ymaxd* : min et max sur l'element
+            ymaxd1 =  xgrand
+            ymaxd2 = -xgrand
+            do igel = 1, n1ptel
+              valu1  = velche(igel,ipel)
+              ymaxd1 = min(valu1,ymaxd1)
+              ymaxd2 = max(valu1,ymaxd2)
+            enddo
+C           Est-on constant sur l'element ipel ?
+C           Utilisation de la MACRO A_EGALE_B pour uniformiser le test d'egalite de flottants (CCREEL)
+            if (.NOT. A_EGALE_B(ymaxd2,ymaxd1)) return
+            ymaxe1=min(ymaxe1,ymaxd1)
+            ymaxe2=max(ymaxe2,ymaxd2)
+          enddo
+C         Ici, on est a minima constant par element :
+          n1ptel = 1
+C         Est-on uniforme ?
+C         Utilisation de la MACRO A_EGALE_B pour uniformiser le test d'egalite de flottants (CCREEL)
+          if (A_EGALE_B(ymaxe2,ymaxe1)) n1el = 1
+C         Cas particulier : le champ est deja constant par element (n1ptel=1)
+
+        else
+          do ipel = 1, n1el
+            valu1 = velche(1,ipel)
+            ymaxe1=min(ymaxe1,valu1)
+            ymaxe2=max(ymaxe2,valu1)
+          enddo
+
+C         Est-on uniforme ?
+          ymaxr=max(max(abs(ymaxe1),abs(ymaxe2))*xzprec,xpetit)
+          if (.NOT. A_EGALE_B(ymaxe2,ymaxe1)) return
+          n1el = 1
+        endif
+
+        n2ptel = 0
+        n2el   = 0
+        if (n1ptel.ne.n1pteo.or.n1el.ne.n1elo) then
+           segadj,melval
+        endif
+      endif
+
+
+C Valeurs de type pointeur :
+C --------------------------
+      n2ptel = ielche(/1)
+      n2el   = ielche(/2)
+      if (n2el.gt.1 .or. n2ptel.gt.1) then
+        n2pteo=n2ptel
+        n2elo=n2el
+        jalu1 = ielche(1,1)
+        maxd1 = 0
+C Cas general :
+        if (n2ptel.gt.1) then
+          do ipel = 1, n2el
+            jalu2 = ielche(1,ipel)
+C   Est-on constant sur l'element ipel ?
+            maxd2 = 0
+            do igel = 2, n2ptel
+              jiff  = abs(ielche(igel,ipel) - jalu2)
+              maxd2 = max(jiff,maxd2)
+            enddo
+            if (maxd2.ne.0) return
+            jiff  = abs(jalu2 - jalu1)
+            maxd1 = max(jiff,maxd1)
+          enddo
+C   Ici, on est a minima constant par element :
+          n2ptel = 1
+C   Est-on uniforme ?
+          if (maxd1.eq.0) n2el = 1
+C Cas particulier : le champ est deja constant par element (n2ptel=1)
+        else
+          do ipel = 2, n2el
+            jalu2 = ielche(1,ipel)
+            jiff  = abs(jalu2 - jalu1)
+            maxd1 = max(jiff,maxd1)
+          enddo
+C   Est-on uniforme ?
+          if (maxd1.gt.0) return
+          n2el = 1
+        endif
+        n1ptel = 0
+        n1el   = 0
+         if (n2ptel.ne.n2pteo.or.n2el.ne.n2elo) then
+            segadj,melval
+            segact melval
+         endif
+      endif
+
+      END
+ 
+ 

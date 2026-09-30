@@ -1,0 +1,23 @@
+C PRMAT     SOURCE    BP208322  20/09/18    21:17:09     10718          
+        SUBROUTINE PRMAT(NT,A,B,C)
+c-----------------------------------------------------------------------        
+c      Calcul du produit de 2 matrices reelles carrees de taille NT.
+c      Le resultat est la matrice C: C(I,J) = sum(K=1,NT){A(I,K)*B(K,J)}
+c-----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      
+        INTEGER NT,I,J,K
+        REAL*8 A(NT,NT),B(NT,NT),C(NT,NT)
+*
+        DO I=1,NT
+          DO J=1,NT
+            C(I,J) = 0.
+            DO K=1,NT
+               C(I,J) = C(I,J) + A(I,K)*B(K,J)
+            ENDDO
+          ENDDO          
+        ENDDO        
+        END 
+ 

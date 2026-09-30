@@ -1,0 +1,266 @@
+C INTGRA    SOURCE    CB215821  23/05/02    21:15:03     11661          
+
+C---------------------------------------------------------------------
+C
+C                         OPERATEUR INTG
+C
+C---------------------------------------------------------------------
+C
+C     SYNTAXES : voir notice INTG.
+C
+C---------------------------------------------------------------------
+
+      SUBROUTINE INTGRA
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMCOORD
+-INC SMLREEL
+-INC SMLENTI
+
+      CHARACTER*(LOCOMP) MACOMP,MOT1
+      CHARACTER*8 CHBOR
+      CHARACTER*4 MOTB(4)
+      LOGICAL     BDARCY
+      INTEGER     IDARC
+      DATA MOTB/'INDI','BORN','ELEM','ABSO'/
+
+      ilenta=0
+C---------------------------------------------------------------------
+C     SYNTAXE 1 (par defaut)
+C---------------------------------------------------------------------
+      IDARC  = 0
+      IELEM  = 0
+      IRET   = 0
+      IPIN   = 0
+      IPMODL = 0
+      IPCHB1 = 0
+      IPCHE2 = 0
+      IR     = 0
+      KERRE  = 0
+      IRT3   = 0
+      IPCHE1 = 0
+      IPINT  = 0
+      XRET   =REAL(0.D0)
+      MOT1   ='    '
+
+C- Lecture eventuelle du mot cle 'ELEM'
+      CALL LIRMOT(MOTB(3),1,IELEM,0)
+      IF (IERR.NE.0) RETURN
+
+C- Lecture du modele (facultative pour permettre la syntaxe 2)
+      CALL LIROBJ('MMODEL  ',IPMODL,0,IRET)
+      IF (IERR.NE.0) RETURN
+C---- ABSENCE DU MODELE => ON VA TESTER LA SYNTAXE 2 (INTG evol1 ...)
+      IF(IRET.EQ.0) GOTO 100
+      CALL ACTOBJ('MMODEL  ',IPMODL,1)
+
+C- Lecture du MCHAML
+      CALL LIROBJ('MCHAML  ',IPIN,1,IRET)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MCHAML  ',IPIN,1)
+      IF (IERR.NE.0) RETURN
+
+      CALL REDUAF(IPIN,IPMODL,IPCHB1,0,IR,KERRE)
+      IF(IR.NE.1) CALL ERREUR(KERRE)
+      IF (IERR.NE.0) RETURN
+
+C- Lecture eventuelle du nom de la composante du MCHAML a considerer
+      CALL LIRCHA(MACOMP,0,IRT3)
+      IF (IERR.NE.0) RETURN
+
+C- Lecture facultative du MCHAML de CARACTERISTIQUES
+      CALL LIROBJ('MCHAML',IPIN,0,IRET)
+      IPCHE2=IPIN
+      IF((IRET .EQ.1) .AND. (IDARC .EQ. 0))THEN
+        CALL ACTOBJ('MCHAML  ',IPIN,1)
+        CALL REDUAF(IPIN,IPMODL,IPCHE2,0,IR,KERRE)
+        IF(IR.NE.1) CALL ERREUR(KERRE)
+        IF (IERR.NE.0) RETURN
+      ENDIF
+      IF (IERR.NE.0) RETURN
+
+C- Dans le cas ou le MCHAML a plus d'une composante
+C- on impose la donnee du nom de la composante a traiter.
+      IF (IRT3.EQ.0) THEN
+        MCHELM=IPCHB1
+        N1=ICHAML(/1)
+        DO i=1,N1
+          MCHAML=ICHAML(I)
+          N2=IELVAL(/1)
+          IF (N2.GT.1) THEN
+            MOTERR(1:8)=' MCHAML '
+            INTERR(1)=N2
+            CALL ERREUR(761)
+            RETURN
+          ENDIF
+        ENDDO
+      ENDIF
+
+C- Dans le cas ou le nom de la composante du MCHAML
+C- a considerer est precise, on l'extrait du MCHAML.
+      IPCHE1=IPCHB1
+      IF (IRT3.NE.0) THEN
+        MOT1='SCAL'
+        CALL EXCOC1(IPCHB1,MACOMP,IPCHE1,MOT1,0)
+        IF (IERR.NE.0) RETURN
+      ENDIF
+
+C- Calcul de l'integrale
+      SEGACT,MCOORD
+      CALL INTGCA(IPMODL,IPCHE1,IPCHE2,IELEM,IRET,XRET,IPINT)
+      SEGDES,MCOORD
+      IF (IERR.NE.0) RETURN
+
+C- Ecriture du resultat et menage
+      IF (IPINT.EQ.0) THEN
+        CALL ECRREE(XRET)
+      ELSE
+        CALL ACTOBJ('MCHAML  ',IPINT,1)
+        CALL ECROBJ('MCHAML  ',IPINT)
+      ENDIF
+
+      RETURN
+
+
+C---------------------------------------------------------------------
+C     SYNTAXE 2
+C---------------------------------------------------------------------
+ 100  CONTINUE
+
+C---  INITIALISATIONS ---
+      IABSO      = 0
+      IA         = 0
+      IB         = 0
+      ILENTA     = 0
+      ILENTB     = 0
+      CHBOR(1:8) ='        '
+      IPINT      = 0
+      XA         = 0.D0
+      XB         = 0.D0
+      XINT       = 0.D0
+
+C---  LECTURE DES OBJETS EN ENTREE  ---
+
+C- Lecture eventuelle du mot cle 'ABS'
+      CALL LIRMOT(MOTB(4),-1,IABSO,0)
+      IF (IERR.NE.0) RETURN
+
+C- Lecture de l'evolution
+      CALL LIROBJ('EVOLUTIO',IPEVO,0,IRET)
+      IF (IERR.NE.0) RETURN
+c---- ABSENCE DE MODELE ET D'EVOLUTION => ERREUR
+      IF(IRET.EQ.0) GOTO 998
+
+C- Lecture eventuelle des bornes d'integration (de meme type)
+      CALL LIRMOT(MOTB,2,ICAS,0)
+
+      IF (ICAS.EQ.0) THEN
+        ILENTA = 0
+        ILENTB = 0
+        ILREEA = 0
+        ILREEB = 0
+
+C     Definition bornes avec indices LISTREEL en abscisses
+      ELSEIF (ICAS.EQ.1) THEN
+        CALL LIRENT(IA,0,IRETA)
+        IF (IRETA.EQ.1) THEN
+          CALL LIRENT(IB,1,IRETB)
+          IF (IERR.NE.0) RETURN
+
+C     Construction de 2 LISTENTI de dime 1
+          JG = 1
+          SEGINI, MLENT1,MLENT2
+          MLENT1.LECT(1) = IA
+          MLENT2.LECT(1) = IB
+          ILENTA = MLENT1
+          ILENTB = MLENT2
+          ILREEA = 0
+          ILREEB = 0
+
+          CHBOR(1:6)='ENTIER'
+          GOTO 101
+        ELSE
+          CALL LIROBJ('LISTENTI',ILENTA,1,IRETA)
+          IF (IERR.NE.0) RETURN
+          CALL LIROBJ('LISTENTI',ILENTB,1,IRETB)
+          IF (IERR.NE.0) RETURN
+          CHBOR(1:8)='LISTENTI'
+          GOTO 101
+        ENDIF
+
+C     Definition bornes avec FLOTTANT ou LISTREEL
+      ELSEIF (ICAS.EQ.2) THEN
+        CALL LIRREE(XA,0,IRETA)
+        IF (IRETA.EQ.1) THEN
+          CALL LIRREE(XB,1,IRETB)
+          IF (IERR.NE.0) RETURN
+
+C     Construction de 2 LISTREEL de dime 1
+          JG = 1
+          SEGINI, MLREE1,MLREE2
+          MLREE1.PROG(1) = XA
+          MLREE2.PROG(1) = XB
+          ILREEA = MLREE1
+          ILREEB = MLREE2
+          ILENTA = 0
+          ILENTB = 0
+
+          CHBOR(1:8)='FLOTTANT'
+          GOTO 101
+        ELSE
+          CALL LIROBJ('LISTREEL',ILREEA,1,IRETA)
+          IF (IERR.NE.0) RETURN
+          CALL LIROBJ('LISTREEL',ILREEB,1,IRETB)
+          IF (IERR.NE.0) RETURN
+          CHBOR(1:8)='LISTREEL'
+          GOTO 101
+        ENDIF
+
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+
+C---  CALCUL DE L'INTEGRALE ---
+
+ 101  CONTINUE
+      IK = 0
+C     write(6,*) 'ilenta ilentb avant intgev ',ilenta,ilentb
+      CALL INTGEV(IPEVO,IABSO,ILENTA,ILENTB,ILREEA,ILREEB,XINT,IPINT,IK)
+      IF (IERR.NE.0) RETURN
+
+C---  ECRITURE DU RESULTAT ET MENAGE  ---
+      IF (IK.EQ.1) THEN
+        CALL ECRREE(XINT)
+      ELSEIF (IK.EQ.2.AND.IPINT.NE.0) THEN
+        CALL ECROBJ('LISTREEL',IPINT)
+      ELSEIF (IK.EQ.3.AND.IPINT.NE.0) THEN
+        CALL ECROBJ('NUAGE',IPINT)
+      ELSE
+        CALL ERREUR(5)
+      ENDIF
+      RETURN
+
+
+C---------------------------------------------------------------------
+C     SYNTAXE 3 et ...
+C---------------------------------------------------------------------
+C     ...
+
+
+C---------------------------------------------------------------------
+C     ERREURS
+C---------------------------------------------------------------------
+
+* /!\ ERREUR : AUCUN OBJET COMPATIBLE TROUVE
+ 998  MOTERR(1:16)='MODELE  EVOLUTIO'
+      CALL ERREUR(471)
+      RETURN
+
+      END
+ 

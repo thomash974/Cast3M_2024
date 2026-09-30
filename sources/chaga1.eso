@@ -1,0 +1,304 @@
+C CHAGA1    SOURCE    CB215821  20/11/04    21:15:28     10766          
+
+C=======================================================================
+C=                            C H A G A 1                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=                                                                     =
+C=  Creation du MCHAML de SOURCE de chaleur GAUSSIENNE decrit par les  =
+C=  caracteristiques du modele passees en entree.                      =
+C=                                                                     =
+C=                                                                     =
+C=  Entrees :                                                          =
+C=  ---------                                                          =
+C=                                                                     =
+C=  IPMCHA : pointeur sur segment MCHAML de la sous-zone traitee       =
+C=                                                                     =
+C=  IPMAIL : pointeur sur segment MELEME du maillage ou creer la       =
+C=           source de chaleur                                         =
+C=                                                                     =
+C=  IPINTE : pointeur sur segment MINTE de l'element finis             =
+C=                                                                     =
+C=  IK     : indicateur du "type" de distribution gaussienne :         =
+C=           IK = 1 : source gaussienne ISOTROPE                       =
+C=           IK = 2 : source gaussienne ISOTROPE-TRANSVERSE            =
+C=                                                                     =
+C=                                                                     =
+C=  Sortie :                                                           =
+C=  --------                                                           =
+C=                                                                     =
+C=  IPQGAU : pointeur sur segment MELVAL des valeurs de la source de   =
+C=           chaleur GAUSSIENNE                                        =
+C=                                                                     =
+C=  XQ0    : valeur de la quantite de chaleur imposee, utilisee en     =
+C=           sortie dans chamas pour "renormaliser" le champ a QTOT    =
+C=                                                                     =
+C=======================================================================
+
+      SUBROUTINE CHAGA1(IPMCHA,IPMAIL,IPINTE,IK,IPQGAU,XQ0)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+-INC SMCHAML 
+-INC SMINTE  
+
+      REAL*8      XCO1(3),XCD1(3),XCX1(3)
+      CHARACTER*8 TYPC1
+      CHARACTER*4 MOCAR(5)
+      CHARACTER*(LOCOMP) NOMC1
+
+      DATA MOCAR /'QTOT','ORIG','RGAU','DIRE','ZGAU'/
+
+
+      IPQGAU = 0
+
+C==== Recuperation des caracteristiques de la source de chaleur
+C
+C     Initialisation des valeurs des parametres de la source
+C     XQ0 : valeur de QTOT
+C     NPO1, NPD1 : numeros points origine & direction
+C     RX0,  ZX0  : valeurs de RGAU et ZGAU
+      XQ0  = 0.D0
+      NPO1 = 0
+      NPD1 = 0
+      RX0  = 0.D0
+      ZX0  = 0.D0
+C
+C     NCAR1 : nombre de caracteristiques a lire
+      NCAR1  = 3
+      IF (IK.EQ.2) NCAR1 = 5
+C
+      MCHAM1=IPMCHA
+C     SEGACT,MCHAM1
+      NCO1 = MCHAM1.IELVAL(/1)
+      DO 100 I=1,NCAR1
+        NOMC1 = MOCAR(I)
+        CALL PLACE(MCHAM1.NOMCHE,NCO1,IPLAC,NOMC1)
+c     write(6,*) 'NONC1 =',NOMC1
+c     write(6,*) 'MCHAM1.NOMCHE =',(MCHAM1.NOMCHE(ii),ii=1,NCO1)
+        IF (IPLAC.EQ.0) THEN
+          GOTO 997
+        ELSE
+          TYPC1 = MCHAM1.TYPCHE(IPLAC)(1:8)
+          MELVA1 = MCHAM1.IELVAL(IPLAC)
+          IF (MELVA1.VELCHE(/1).GT.1
+     &    .OR.MELVA1.VELCHE(/2).GT.1) GOTO 999
+C
+C         Lecture QTOT
+          IF (I.EQ.1) THEN
+            IF (TYPC1.NE.'REAL*8  ') GOTO 998
+            SEGACT,MELVA1
+            XQ0 =  MELVA1.VELCHE(1,1)
+C           SEGDES,MELVA1
+C
+C         Lecture ORIG
+          ELSEIF (I.EQ.2) THEN
+            IF (TYPC1.NE.'POINTEUR') GOTO 998
+            MELVA1 = MCHAM1.IELVAL(IPLAC)
+            SEGACT,MELVA1
+            NPO1 =  MELVA1.IELCHE(1,1)
+C           SEGDES,MELVA1
+C
+C         Lecture RGAU
+          ELSEIF (I.EQ.3) THEN
+            IF (TYPC1.NE.'REAL*8  ') GOTO 998
+            MELVA1 = MCHAM1.IELVAL(IPLAC)
+            SEGACT,MELVA1
+            RX0 = MELVA1.VELCHE(1,1)
+C           SEGDES,MELVA1
+C
+C         Lecture DIRE
+          ELSEIF (I.EQ.4) THEN
+            IF (TYPC1.NE.'POINTEUR') GOTO 998
+            MELVA1 = MCHAM1.IELVAL(IPLAC)
+            SEGACT,MELVA1
+            NPD1 =  MELVA1.IELCHE(1,1)
+C           SEGDES,MELVA1
+C
+C         Lecture ZGAU
+          ELSEIF (I.EQ.5) THEN
+            IF (TYPC1.NE.'REAL*8  ') GOTO 998
+            MELVA1 = MCHAM1.IELVAL(IPLAC)
+            SEGACT,MELVA1
+            ZX0 = MELVA1.VELCHE(1,1)
+C           SEGDES,MELVA1
+          ENDIF
+        ENDIF
+ 100  CONTINUE
+C     SEGDES,MCHAM1
+C
+C     Remplissage du vecteur de coordonnes de ORIG
+      IDIMP1 = IDIM+1
+      IF (NPO1.EQ.0.OR.NPO1.GT.nbpts) THEN
+        NOMC1='ORIG'
+        GOTO 998
+      ELSE
+        DO 120 ID1=1,IDIM
+          XCO1(ID1)=XCOOR((NPO1-1)*IDIMP1+ID1)
+ 120    CONTINUE
+      ENDIF
+C
+C     Remplissage du vecteur de coordonnes de DIRE
+C     XN1 : norme de DIRE au carre
+      XN1 = 1.D0
+      IF (IK.EQ.1) THEN
+        ZX0 = RX0
+        XCD1(1)=1.D0
+        IF (IDIM.GT.1) THEN
+          DO 130 ID1=2,IDIM
+            XCD1(ID1)=0.D0
+ 130      CONTINUE
+        ENDIF
+      ELSEIF (IK.EQ.2) THEN
+        XN1  = 0.D0
+        DO 140 ID1=1,IDIM
+          XCD1(ID1)=XCOOR((NPD1-1)*IDIMP1+ID1)
+          XN1 = XCD1(ID1) ** 2 + XN1
+ 140    CONTINUE
+      ELSE
+        WRITE(IOIMP,*) ' *** Dans CHAGA1, cas (IK) non prevu'
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+C     write(6,*) 'XQ0 =',XQ0
+C     write(6,*) 'RX0 =',RX0
+C     write(6,*) 'ZX0 =',ZX0
+C     write(6,*) 'NPO1 =',NPO1
+C     write(6,*) 'NPD1 =',NPD1
+C     write(6,*) 'XCO1 =',(XCO1(i),i=1,IDIM)
+C     write(6,*) 'XCD1 =',(XCD1(i),i=1,IDIM)
+
+
+C==== Construction du MELVAL de la distribution Gaussienne de chaleur
+
+C     Activation du maillage
+      IPT1 = IPMAIL
+      SEGACT,IPT1
+      NBPT1 = IPT1.NUM(/1)
+      NBEL1 = IPT1.NUM(/2)
+
+C     Petite verif. sous-zone elementaire
+      NBS1 = IPT1.LISOUS(/1)
+      IF (NBS1.NE.0) THEN
+        WRITE(6,*) 'Dans CHAGA1 : le maillage a plusieurs sous-zones ?'
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+C
+C     Activation du segment MINTE
+C     write(6,*) 'IPINTE=',IPINTE
+      MINTE1 = IPINTE
+      SEGACT,MINTE1
+
+C     Creation du MELVAL
+      N1PTEL = MINTE1.POIGAU(/1)
+      N1EL   = NBEL1
+      N2PTEL = 0
+      N2EL   = 0
+      SEGINI,MELVA2
+
+C     Facteur de normalisation de la puissance :
+      IF (IDIM.EQ.2.AND.IFOUR.NE.0) THEN
+        XQ1    = 4.D0 * XQ0 / (RX0 * ZX0 * XPI)
+      ELSEIF (IDIM.EQ.2.AND.IFOUR.EQ.0) THEN
+C       write (6,*) ' *** Cas axis' 
+        RC2    = SQRT (2.D0)
+        RCPI   = SQRT (XPI)
+        XIK1   = 0.25D0 * RX0 * RX0
+        XIK1   = XIK1 * EXP(-2.D0 * XCO1(1) * XCO1(1) / RX0 / RX0)
+        XIK2   = 0.5D0 * RX0 * XCO1(1) * RCPI / RC2
+        XIK3   = RX0 * XCO1(1) * RCPI / (RC2 * RC2 * RC2)
+        XIK3   = XIK3 * ERF(XCO1(1) * RC2 / RX0)
+        XQ1    = XPI * ZX0 * RCPI / RC2 
+        XQ1    = XQ1 * (XIK1 + XIK2 + XIK3)
+        XQ1    = XQ0 / XQ1
+      ELSEIF (IDIM.EQ.3) THEN
+        RX1    = RX0 * RX0 * ZX0
+        XQ1    = SQRT ((2.D0 ** 5) / (XPI ** 3))
+        XQ1    = XQ1 * XQ0 / RX1 
+      ELSE
+        GOTO 996
+      ENDIF
+
+C     Boucle sur les elements du maillage
+      DO 200 IEL1=1,NBEL1
+C
+C       Boucle sur les pts de Gauss
+C       et calcul de la fonction Gaussienne
+C       RR1 : distance a l'origine ORIG au carre
+C       ZX1 : distance a la direction DIRE au carre
+C       RX1 : rayon dans le plan orthog. a DIRE au carre
+        DO 201 IG1=1,N1PTEL
+          RR1  = 0.D0
+          RX1  = 0.D0
+          ZX1  = 0.D0
+          DO 203 ID1=1,IDIM
+C           XPG1 : coordonnees ID1 du Pt de Gauss
+            XPG1 = 0.D0
+            DO 202 JPT1=1,NBPT1
+              NPTJM1 = IPT1.NUM(JPT1,IEL1)-1
+              XPTJ1  = XCOOR(NPTJM1*IDIMP1+ID1)
+              VNJ1   = MINTE1.SHPTOT(1,JPT1,IG1)
+              XPG1   = XPG1 + XPTJ1*VNJ1
+ 202        CONTINUE
+            XCX1(ID1) = XPG1 - XCO1(ID1)
+            RR1 = XCX1(ID1) ** 2 + RR1
+            ZX1 = XCX1(ID1) * XCD1(ID1) + ZX1
+ 203      CONTINUE
+          ZX1 = ZX1 * ZX1 / XN1 
+          RX1 = RR1 - ZX1
+c         write(6,*) 'RR1,ZX1,RX1=',RR1,ZX1,RX1
+c         write(6,*) 'XCX1(i)=',(XCX1(i),i=1,idim)
+          XS1 = RX1 / RX0 / RX0
+          XS1 = ZX1 / ZX0 / ZX0 + XS1
+          XS1 = EXP(-2.D0 * XS1)
+          MELVA2.VELCHE(IG1,IEL1) = XS1 * XQ1
+ 201    CONTINUE
+ 200  CONTINUE
+C     SEGDES,IPT1,MINTE1,MELVA2
+C
+C==== Affectation du resultat et sortie
+      IPQGAU = MELVA2
+C
+      RETURN
+
+C==== Gestion erreurs et fin
+
+C     Option indisponible
+ 996  CONTINUE
+      INTERR(1) = IDIM
+      CALL ERREUR(709)
+      RETURN
+
+C     Il manque la donnee d'une composante
+ 997  CONTINUE
+      CALL ERREUR(80)
+      RETURN
+
+C     Le type de la composante NOMC1 n'est pas celui attendu
+ 998  CONTINUE
+      MOTERR(1:8)=NOMC1
+      CALL ERREUR(679)
+      RETURN
+
+C     La composante est attendue constante par sous-zones
+ 999  CONTINUE
+      MOTERR(1:4)=NOMC1
+      MOTERR(5:20)='CARACTERISTIQUES'
+      CALL ERREUR(1065)
+      RETURN
+
+      END
+
+ 
+ 
+ 
+ 

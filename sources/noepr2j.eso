@@ -1,0 +1,58 @@
+C NOEPR2J   SOURCE    PV        20/01/16    21:15:11     10501          
+      subroutine noepr2j(ith)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      common/cnumop/fcout2c(64),fcoutc(64),iadjc,jadjcc,nrelongc,
+     >   noelonc,isensc(64),dimlonc(64),masqc,nodesc,iposc,nbtotc,
+     >   lfrontc(64),londimc,lpivc(64),ipointc,noel2c,
+     >   boolc(64),ldim2c(64),nbthrc,pivotc(50,64),npointc(64),
+     >   npoint2c(64),imaxc,lfronc(64),iccon,ncouch
+      integer dimlon,dimlonc,pivotc,boolc,pivot(50)
+      segment iadj(0)
+      segment jadjc(0)
+      segment nrelong(0)
+      segment noelon(0)
+      segment londim(0)
+      segment ipos(0)
+      segment noel2(0)
+**    write (6,*) ' noepr2j ith ',ith
+      iadj=iadjc
+      jadjc=jadjcc
+      nrelong=nrelongc
+      noelon=noelonc
+      noel2=noel2c
+      isens=isensc(ith)
+      dimlon=dimlonc(ith)
+      nodes=nodesc
+      ipos=iposc
+      nbtot=nbtotc
+      londim=londimc
+      ipoint=ipointc
+      nbthr=nbthrc
+      lfron=lfronc(ith)
+      icco=iccon
+      icouch=ncouch
+      call noepr2(iadj(1),jadjc(1),pivotc(1,ith),
+     >  nrelong(1+(ith-1)*nodes),
+     >  noelon(1+(ith-1)*nodes),isensc(ith),dimlonc(ith),
+     >  nodes,ipos(1),nbtot,lfrontc(ith),lfronc(ith),
+     >  londim(1+(ith-1)*nodes),fcoutc(ith),lpivc(ith),
+     >  icco,icouch)
+      end
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 

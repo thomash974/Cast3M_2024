@@ -1,0 +1,115 @@
+C DQRLSS    SOURCE    PV090527  23/02/07    11:58:37     11592          
+      subroutine dqrlss ( a, lda, m, n, kr, b, x, r, jpvt, qraux )
+      
+c*****************************************************************************80
+c
+c! DQRLSS solves a linear system in a least squares sense.
+c
+c  Discussion:
+c
+c    DQRLSS must be preceeded by a call to DQRANK.
+c
+c    The system is to be solved is
+c      A * X = B
+c    where
+c      A is an M by N matrix with rank KR, as determined by DQRANK,
+c      B is a given M-vector,
+c      X is the N-vector to be computed.
+c
+c    A solution X, with at most KR nonzero components, is found which
+c    minimizes the 2-norm of the residual (A*X-B).
+c
+c    Once the matrix A has been formed, DQRANK should be
+c    called once to decompose it.  Then, for each right hand
+c    side B, DQRLSS should be called once to obtain the
+c    solution and residual.
+c
+c  Modified:
+c
+c    15 April 2012
+c
+c  Parameters:
+c
+c    Input, real*8 A(LDA,N), the QR factorization information
+c    from DQRANK.  The triangular matrix R of the QR factorization is
+c    contained in the upper triangle and information needed to recover
+c    the orthogonal matrix Q is stored below the diagonal in A and in
+c    the vector QRAUX.
+c
+c    Input, integer LDA, the leading dimension of A, which must
+c    be at least M.
+c
+c    Input, integer M, the number of rows of A.
+c
+c    Input, integer N, the number of columns of A.
+c
+c    Input, integer KR, the rank of the matrix, as estimated
+c    by DQRANK.
+c
+c    Input, real*8 B(M), the right hand side of the linear system.
+c
+c    Output, real*8 X(N), a least squares solution to the
+c    linear system.
+c
+c    Output, real*8 R(M), the residual, B - A*X.  R may
+c    overwite B.
+c
+c    Input, integer JPVT(N), the pivot information from DQRANK.
+c    Columns JPVT(1), ..., JPVT(KR) of the original matrix are linearly
+c    independent to within the tolerance TOL and the remaining columns
+c    are linearly dependent.
+c
+c    Input, real*8 QRAUX(N), auxiliary information from DQRANK
+c    defining the QR factorization.
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+        integer lda
+        integer m
+        integer n
+      
+        real*8 a(lda,n)
+        real*8 b(m)
+        integer info
+        integer j
+        integer job
+        integer jpvt(n)
+        integer k
+        integer kr
+        real*8 qraux(n)
+        real*8 r(m)
+        real*8 t
+        real*8 x(n)
+      
+        if ( kr /= 0 ) then
+          job = 110
+          call dqrsl ( a, lda, m, kr, qraux, b, r, r, x, r, r, job,info)
+        end if
+      
+        jpvt(1:n) = - jpvt(1:n)
+      
+        x(kr+1:n) = 0.0D+00
+      
+        do j = 1, n
+      
+          if ( jpvt(j) .le. 0 ) then
+      
+            k = -jpvt(j)
+            jpvt(j) = k
+      
+            do while ( k /= j )
+              t = x(j)
+              x(j) = x(k)
+              x(k) = t
+              jpvt(k) = -jpvt(k)
+              k = jpvt(k)
+            end do
+      
+          end if
+      
+        end do
+      
+        return
+      end
+ 

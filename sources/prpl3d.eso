@@ -1,0 +1,128 @@
+C PRPL3D    SOURCE    PV090527  23/01/27    21:15:59     11574          
+       subroutine prpl3d(NDIMG,NBRCT,ninc,NBRACTT,ACTIFT,FTR,LNUMCRT,
+     #  LNCRT,REST,ACTIF_T,dfdst,AUX_DFDST,dirt,AUX_DIRT,affiche,err1)
+       
+c      preparation de l ecoulement plastique de traction en fonctions
+c      de l ordre et de l activite des criteres
+
+
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+       
+       integer NDIMG,NBRCT,ninc,err1
+       integer NBRACTT,LNCRT(NBRCT),LNUMCRT(NDIMG)
+       real*8 FTR(NDIMG),REST(NBRCT),dirt(NBRCT,3),dfdst(NBRCT)
+       logical ACTIF_T(NBRCT),ACTIFT(NDIMG)
+       real*8 AUX_DFDST(NDIMG),AUX_DIRT(NDIMG)
+       logical affiche
+       
+       
+       real*8 fmax
+       integer iphase,idebut,icrt,idir
+       logical affiche_local
+       affiche_local=affiche
+
+       if (NBRACTT.ge.1) then
+c           critere le plus grand        
+            fmax=FTR(LNUMCRT(1))
+            fmin=FTR(LNUMCRT(NBRACTT))
+c           choix des criteres a resoudre            
+            do iphase=0,ninc
+            
+c               --------criteres radiaux dans la phase------------------ 
+       
+                if(iphase.eq.0) then
+c                   direction globale                
+                    idebut=9*ninc
+c                   numero du critere pour l ecoulement                    
+                    icrt=3*ninc+1
+                else
+c                   direction globale                   
+                    idebut=(iphase-1)*9
+c                   numero du critere radial pour l ecoulement                     
+                    icrt=(iphase-1)*3+1
+                end if
+c               initialisation des directions et des activites
+                REST(icrt)=fmax
+c               activite du groupe de critere                
+                ACTIF_T(icrt)=.false. 
+                LNCRT(icrt)=idebut+1 
+                DFDST(icrt)=0.d0
+                do idir=1,3
+c                   on conserve tous les ecoulemnts actifs                
+                    dirt(icrt,idir)=AUX_DIRT(idebut+idir)                   
+                    if(ACTIFT(idebut+idir)) then
+                        ACTIF_T(icrt)=.true.
+                        if(FTR(idebut+idir).le.REST(icrt)) then
+                            REST(icrt)=FTR(idebut+idir)
+                            LNCRT(icrt)=idebut+idir                            
+                            dfdst(icrt)=AUX_DFDST(idebut+idir)
+                        end if
+                    end if
+                end do
+                
+                if (iphase.ne.0) then
+                
+c                   ---- critere d interface desactives ----------------
+
+                    icrt=(iphase-1)*3+2
+                    idebut=(iphase-1)*9+3
+                    ACTIF_T(icrt)=.false.
+                    LNCRT(icrt)=idebut+1 
+                    DFDST(icrt)=0.d0
+                    do idir=1,3
+                        dirt(icrt,idir)=0.d0
+                    end do
+                    
+c                   ---- critere orthoradial ---------------------------
+
+                    icrt=(iphase-1)*3+3
+                    idebut=(iphase-1)*9+6
+                    ACTIF_T(icrt)=.false.
+                    LNCRT(icrt)=idebut+1  
+                    DFDST(icrt)=0.d0                    
+c                   initialisation des directions et des activites
+                    REST(icrt)=fmax                   
+                    do idir=1,3
+c                       on conserve tous les ecoulemnts actifs                
+                        dirt(icrt,idir)=AUX_DIRT(idebut+idir)                   
+                        if(ACTIFT(idebut+idir)) then
+                          ACTIF_T(icrt)=.true.
+                          if(FTR(idebut+idir).le.REST(icrt)) then
+                            REST(icrt)=FTR(idebut+idir)
+                            LNCRT(icrt)=idebut+idir                            
+                            dfdst(icrt)=AUX_DFDST(idebut+idir)
+                          end if
+                        end if
+                    end do
+                    
+                end if
+            end do
+       else
+            print*,'Il n y a rien a preparer dans prpl3d'
+            err1=1
+            return
+       end if 
+
+       if(affiche_local) then
+            print*,'Dans prpl3d'
+            do idir=1,ndimg
+                write(*,'(A9,I2,A11,E10.3,A12,E10.3)')
+     #          'direction',idir,' aux_dfdst=',aux_dfdst(idir),
+     #          ' aux_dirt=',aux_dirt(idir)
+            end do
+            do icrt=1,4
+                print*,'Groupe',icrt,actif_t(icrt),
+     #          'dfdst(',icrt,')=',dfdst(icrt)
+                do idir=1,3
+                    write(*,'(A9,I2,A6,I2,I2,A2,E10.3)')
+     #              'direction',idir,' dirt(',icrt,idir,')=',
+     #              dirt(icrt,idir)          
+                end do
+            end do
+       end if
+        
+       return
+       end
+        
+ 

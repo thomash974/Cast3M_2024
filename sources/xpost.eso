@@ -1,0 +1,87 @@
+C XPOST     SOURCE    CB215821  20/11/25    13:43:25     10792          
+C
+      SUBROUTINE XPOST
+C
+C     Post traitement des calculs avec elements de type X-FEM necessitant
+C     une attention particuliere
+C
+      IMPLICIT REAL*8 (A-H,O-Z)
+C
+C
+C  SEGMENTS INCLUDE
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC SMCHPOI
+-INC SMCHAML
+C
+C
+      PARAMETER (NMOT0=2)
+      CHARACTER*4 MOTCLE(NMOT0)
+      DATA MOTCLE/'RECO','FISS'/
+*      DATA MOTCLE/'DEP2DEP','GRAD    ','CHANCHAM','SSDECOUP',
+*     $            'CHAMPAUX','GRADCHAM'/
+
+      CALL LIRMOT(MOTCLE,NMOT0,IMOT0,1)
+
+c     XFEM 'RECO'
+      IF(IMOT0.EQ.1) THEN
+        CALL LIROBJ('CHPOINT ',IPCHP1,1,IRETOU)
+        CALL ACTOBJ('CHPOINT ',IPCHP1,1)
+        if (iretou.ne.1)
+     &  write(6,*) 'il faut fournir un chPO de déplacements'
+        CALL LIROBJ('MMODEL',IPMOD1,1,IRETOU)
+        CALL ACTOBJ('MMODEL',IPMOD1,1)
+        if (iretou.ne.1)
+     &  write(6,*) 'il faut fournir le modèle'
+        IF (IERR.NE.0) RETURN
+        
+c       lecture eventuelle d'un maillage sur lequel faire la recombinaison
+        CALL LIROBJ('MAILLAGE',IPT2in,0,IRETOU)
+        IF(IERR.NE.0) RETURN
+        IF(IRETOU.NE.1) THEN
+c         on travaille sur les noeuds du chpoint (approximation simple)
+          CALL XPOST1(IPCHP1,IPMOD1,IPCHP2)
+        ELSE
+c         on recombine sur les noeuds du maillage fourni (interpolation)
+          CALL ACTOBJ('MAILLAGE',IPT2in,1)
+          IF (IERR.NE.0) RETURN
+          CALL XPOST3(IPCHP1,IPMOD1,IPT2in,IPCHP2)
+          RETURN
+        ENDIF
+        IF (IERR.NE.0) RETURN
+
+C       ECRITURE
+        CALL ACTOBJ('CHPOINT ',IPCHP2,1)
+        CALL ECROBJ('CHPOINT ',IPCHP2)
+
+c     XFEM 'FISS'
+      ELSEIF(IMOT0.EQ.2) THEN
+        CALL XPOST2
+        
+c       ELSEIF(IMOT0.EQ.3) THEN
+c         CALL XPOST3
+c
+c      ELSEIF(IMOT0.EQ.4) THEN
+c        CALL XPOST4
+c
+c      ELSEIF(IMOT0.EQ.5) THEN
+c        call LIRENT(IVAL,1,IRETOU)
+c        if(IVAL.eq.1)         call XPOS51
+c        if(IVAL.eq.2)         call XPOS52
+C
+c      ELSEIF(IMOT0.EQ.6) THEN
+c        CALL XPOST6
+
+      ELSE
+        WRITE(*,*) '!!! OPTION NON IMPLANTÉE !!!'
+        RETURN
+
+      ENDIF
+
+      END
+
+ 
+ 
+ 

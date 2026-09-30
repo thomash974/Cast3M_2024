@@ -1,0 +1,54 @@
+C CHATIT    SOURCE    CB215821  19/08/20    21:15:43     10287          
+       SUBROUTINE CHATIT(IPOI1,CHAR,IPOI2)
+*
+*  APPELE PAR PRCHAN,CHANGE LE TITRE D'UN MCHAML
+*******************************************************************
+* ENTREES :
+* IPOI1 = POINTEUR DU MCHAML POUR LEQUEL ON VEUT CHANAGER LE TITRE
+* CHAR  = CHAINE DE CARACTERES REPRESENTANT LE TITRE
+*
+* SORITIES :
+*
+* IPOI2 = POINTEUR DU MCHAML AVEC LE NOUVELLE TITRE
+*
+************************************************************************
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC SMCHAML
+
+-INC PPARAM
+-INC CCOPTIO
+
+      CHARACTER*(*) CHAR
+
+      MCHEL1=IPOI1
+
+      N1=MCHEL1.ICHAML(/1)
+      N3=MCHEL1.INFCHE(/2)      
+      L1=LEN(CHAR)
+      SEGINI,MCHELM
+      IPOI2=MCHELM
+      
+      MCHELM.TITCHE=CHAR(1:L1)
+      MCHELM.IFOCHE=MCHEL1.IFOCHE
+
+C     Unroll pour aller plus vite
+      DO ii=1,N1
+        MCHELM.CONCHE(ii)=MCHEL1.CONCHE(ii)
+      ENDDO
+      DO ii=1,N1
+        MCHELM.IMACHE(ii)=MCHEL1.IMACHE(ii)
+      ENDDO
+      DO ii=1,N1
+        MCHELM.ICHAML(ii)=MCHEL1.ICHAML(ii)
+      ENDDO
+      DO kk=1,N3
+        DO ii=1,N1
+          MCHELM.INFCHE(ii,kk)=MCHEL1.INFCHE(ii,kk)
+        ENDDO
+      ENDDO
+
+      END
+
+ 

@@ -1,0 +1,28 @@
+C XVAR3D    SOURCE    FD218221  24/02/07    21:15:31     11834          
+       subroutine xvar3d(valx,numx,var,nvari,vnvari,nstype,ndtens,
+     # styp,snum)
+
+c      recuperation d une vari et de son numero pour mc3d
+
+c      declarations externes
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+
+       real*8 valx
+       integer numx,nvari,nstype,ndtens
+       real*8 var(nvari)
+       integer vnvari(nstype,2)
+       integer styp,snum
+
+       integer ityp
+
+       numx=0
+       if(styp.gt.1) then
+            do ityp=1,styp-1
+                numx=numx+ vnvari(ityp,1)+vnvari(ityp,2)*ndtens
+            end do
+       end if
+       numx=numx+snum
+       valx=var(numx)
+       return
+       end  

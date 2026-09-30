@@ -1,0 +1,112 @@
+C MTXADJ    SOURCE    GOUNAND   21/04/06    21:15:15     10940          
+      SUBROUTINE MTXADJ(MLENTX,JGDONN,lchang,mmot)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : MTXADJ
+C DESCRIPTION : Ajustement (SEGADJ) du nombre d'éléments d'un
+C     segment MLENTX
+C
+C     On calcule un JGMAX automatiquement, éventuellement
+C     supérieur à la valeur JGDONN donnée et on modifie JGCOU qui
+C     devient égal à JGDONN
+C
+C     Inspiré de mlxadl
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 20/12/2017, version initiale
+C HISTORIQUE : v1, 20/12/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+*(pour impr)       
+-INC TMATOP2
+-INC TMATOP1
+*-INC SMLENTX
+      logical lchang
+      character*(*) mmot
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans mtxadj.eso'
+*
+      lchang=.false.
+      JGMAXO=MLENTX.LECTX(/1)
+      JGCOUO=MLENTX.JGCOU
+      JGCOUN=JGDONN
+      IF (JGCOUN.LE.JGMAXO) THEN
+*     write(ioimp,*) 'pas besoin d''appeler mtxadj ???'
+*     goto 9999
+*         MELEMX.NLCOU=NLCOUN
+*         return
+      ELSE
+*            NVMAXN=NVDONN+0
+*     Stratégie d'augmentation
+         JGMAX1=JGDONN
+*     XCOF=1.414D0
+         XCOF=2.D0
+         JGMAX2=MLENTX.JGINI+INT(((JGMAXO-MLENTX.JGINI)*XCOF)+0.5D0)
+         JGMAXN=MAX(JGMAX1,JGMAX2)
+*      endif
+      
+         IF (JGCOUN.LT.JGCOUO.or.JGMAXN.LT.JGCOUO) THEN
+            write(ioimp,*) 'On ne peut pas redimensionner à une ',
+     $           'valeur plus petite que jgcou' 
+            goto 9999
+         endif
+         
+         lchang=.true.
+         JGMAX=JGMAXN
+         if (isgadj.gt.0)
+     $        write(ioimp,386) mmot,JGMAXO,JGMAXN,JGCOUN
+*     
+         SEGADJ MLENTX
+      ENDIF
+      MLENTX.JGCOU=JGCOUN
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+* 386  FORMAT ('Segment MELEMX=',I8,' nbel max ajusté de ',I6,' à ',I6,
+*     $     ' (nbel. courant=',I6,')') 
+ 386  FORMAT (A25,' nbel max ajusté de ',I6,' à ',I6,
+     $     ' (nbel. courant=',I6,')') 
+* 187  FORMAT (5X,10I8)
+* 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+* 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+*     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='MTXADJ  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine MTXADJ
+*
+      END
+
+ 

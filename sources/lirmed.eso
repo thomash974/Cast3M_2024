@@ -1,0 +1,1938 @@
+C LIRMED    SOURCE    OF166741  24/03/28    21:15:03     11811          
+
+C***********************************************************************
+C NOM         : lirmed.eso
+C DESCRIPTION : Sortie d'un maillage au format .med
+C***********************************************************************
+C HISTORIQUE :  21/12/2010 : CHAT     : creation de la subroutine
+C HISTORIQUE :  04/11/2013 : CB215821 : PASSAGE AU FORMAT 3.0 DE MED
+C HISTORIQUE :  05/01/2017 : CB215821 : GESTION DES ERREURS DE LECTURE
+C HISTORIQUE :  23/10/2017 : RPAREDES : LECTURE CHPOINT,MCHAML,PASAPAS
+C HISTORIQUE :  09/10/2018 : BERTHINC : SOUCIS SI TASSPO dans PARAVIS
+C HISTORIQUE :  28/20/2019 : BERTHINC : PASSAGE AU FORMAT 4.0 DE MED
+C HISTORIQUE :  25/11/2022 : OF       : AMELIORATIONS LECTURE DES POINTS
+C HISTORIQUE :  25/11/2022 : OF       : LECTURE D'UN SEUL MAILLAGE MED
+C HISTORIQUE :  25/11/2022 : OF       : MEILLEURE GESTION DES SEGMENTS
+C HISTORIQUE :  25/11/2022 : OF       : AJOUT LECTURE POLYGONES
+C HISTORIQUE :  10/01/2024 : OF       : QUELQUES AMELIORATIONS
+C HISTORIQUE :  22/01/2024 : OF       : QUELQUES AMELIORATIONS (2)
+C HISTORIQUE :  31/01/2024 : OF       : QUELQUES MODIFICATIONS
+C HISTORIQUE :  12/02/2024 : OF       : PASSAGE A LA VERSION MED 64B
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : operateur LIRE (lirefi.eso)
+C***********************************************************************
+C ENTREES : aucune
+C SORTIES : aucune
+C***********************************************************************
+C SYNTAXE (GIBIANE) :
+C
+C    TAB1 = LIRE 'MED' 'fichier.med' ;
+C
+C***********************************************************************
+
+      SUBROUTINE LIRMED
+
+      IMPLICIT INTEGER(i-n)
+      IMPLICIT REAL*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCMED
+
+-INC SMCOORD
+-INC SMELEME
+-INC SMTABLE
+-INC SMMED
+
+C Definition des reels *8
+      REAL*8    dt
+
+C-----Chaines de Caractere de longueur MED_SNAME_SIZE=16
+      CHARACTER*(MED_SNAME_SIZE) dtunit
+
+C-----Chaines de Caractere de longueur MED_NAME_SIZE=64
+      CHARACTER*(MED_NAME_SIZE) name
+      CHARACTER*(MED_NAME_SIZE) fam
+      CHARACTER*(MED_NAME_SIZE) fname
+      CHARACTER*(MED_NAME_SIZE) mname
+      CHARACTER*(MED_NAME_SIZE) dname
+
+C-----Chaines de Caractere de longueur MED_LNAME_SIZE=80
+      CHARACTER*(MED_LNAME_SIZE) char80
+
+C-----Chaines de Caractere de longueur MED_COMMENT_SIZE=200
+      CHARACTER*(MED_COMMENT_SIZE) desc
+C ***** FIN
+
+C ***** Declaration des variables
+      CHARACTER*8   cha8b, charin,charre, typobj,typmot
+      CHARACTER*64  cha64a, cha64b
+      LOGICAL       ltelq, login, logre
+      CHARACTER*(LOCHAI) medres,medmai
+      EXTERNAL LONG
+
+C ***** Declaration des segments
+      SEGMENT SAWORK
+        CHARACTER*(MED_SNAME_SIZE) ANAME(jdim)
+        CHARACTER*(MED_SNAME_SIZE) AUNIT(jdim)
+      ENDSEGMENT
+
+C-----Contiendra les MAILLAGES SIMPLES au sens de Cast3M
+C       ntypel ==> Type d'element au sens de Cast3M
+C       IPOMAI ==> pointeur MAILLAGE SIMPLE
+C       INUMLI ==> pointeur vers le tableau des numeros de famille de chaque element
+      SEGMENT MAITOT
+        INTEGER IPOMAI(ntypel)
+        INTEGER INUMLI(ntypel)
+      ENDSEGMENT
+
+C-----Contiendra les numeros des familles des noeuds
+      SEGMENT NUMLI8
+        INTEGER NUMLIS(nbelem)
+      ENDSEGMENT
+      POINTEUR LFPOLY.NUMLI8
+
+C-----SEGMENT contenant les informations sur les familles
+C       infam  ==> Indice de la famille
+C       IFAMNU ==> Numero de la famille
+C       PFAMGR ==> Pointeur vers le SEGMENT SFAMGR : nom des groupes dans la famille
+C       CFANOM ==> Nom de la famille
+C       PFAMAI ==> Pointeur vers MELEME de la famille en question
+      SEGMENT SFAMI
+        INTEGER                   IFAMNU(infam)
+        INTEGER                   PFAMGR(infam)
+        CHARACTER*(MED_NAME_SIZE) CFANOM(infam)
+        INTEGER                   PFAMAI(infam)
+      ENDSEGMENT
+
+C-----SEGMENT contenant les noms des groupes
+      SEGMENT SFAMGR
+        CHARACTER*(MED_LNAME_SIZE) CFGRN(ngroup)
+      ENDSEGMENT
+
+C-----SEGMENT contenant les groupes de noms differents (Casse comprise)
+C       CGRNOM  ==> Nom des groupes differents
+      SEGMENT SGRTOT
+        CHARACTER*(MED_NAME_SIZE) CGRNOM(ngrdif)
+      ENDSEGMENT
+C-- SEGMENT qui contiendra le nom de tous les maillages du fichier
+      POINTEUR LINOMA.SGRTOT
+
+      SEGMENT ICOOR
+        REAL*8 XCOO(isdim,nbpta)
+      ENDSEGMENT
+
+      SEGMENT SINT4
+        INTEGER INT4(itaill)
+      ENDSEGMENT
+      POINTEUR LMAIL2.SINT4,LPOLY.SINT4,LINDP.SINT4,LCONP.SINT4
+
+C----- SEG SLSCHA
+C         LSNMAI : nom du maillage
+C         ncham  : nombre de champs (CHPOINT ou MCHAML)
+C         LSNCHA : liste des noms de champs
+C         LSCHIN : liste de SEG CHAINF (information)
+C         LSPARA : liste de SEG CHAPAR (parametres)
+      SEGMENT SLSCHA
+        CHARACTER*(MED_NAME_SIZE) LSNMAI
+        CHARACTER*(MED_NAME_SIZE) LSNCHA(ncham)
+        INTEGER                   LSCHIN(ncham), LSPARA(ncham)
+      ENDSEGMENT
+
+C----- SEG SLSSOR
+C         nbsor  : nombre de champs a sortir
+C         CHATYP : type de champ (CHPOINT, MCHAML ou TABLE)
+C         CHANOM : nom du champ
+C         CHALIS : liste de champs dans un segment SLSFUS(CHPOINT ou MCHAML)
+C                  ou SLSSOR(TABLE)
+      SEGMENT SLSSOR
+        CHARACTER*8               CHATYP(nbsor)
+        CHARACTER*(MED_NAME_SIZE) CHANOM(nbsor)
+        INTEGER                   CHALIS(nbsor)
+      ENDSEGMENT
+      POINTEUR SLSSO1.SLSSOR
+
+      SEGMENT SLSFUS
+        INTEGER      CHAFUS(nbfus)
+      ENDSEGMENT
+
+      SEGMENT CHAINF
+C         nseq   :   nombre de sequences de calcul dans le champ
+C         ncomp  :   nombre de composantes
+C         INUMDT :   liste de numeros de pas de tps
+C         INUMIT :   liste de numeros d'iteration
+C         ISCHPR :   liste de SEG CHAPRO (profil)
+C         XDT    :   liste de pas de tps
+C         CNAME  :   liste de noms des composants
+C         CUNIT  :   liste d'unites des composants
+        INTEGER      INUMDT(nseq), INUMIT(nseq), ISCHPR(nseq)
+        REAL*8       XDT(nseq)
+        CHARACTER*(MED_SNAME_SIZE) CNAME(ncomp), CUNIT(ncomp)
+      ENDSEGMENT
+
+C----- SEG CHAPAR
+C         ncpars : nombre de parametres par champ
+C         CHAPAR : nom du parametre
+C         CPARVL : valeur du parametre
+      SEGMENT CHAPAR
+        CHARACTER*(MED_SNAME_SIZE) CPARNM(ncpars)
+        INTEGER                    CPARVL(ncpars)
+      ENDSEGMENT
+
+C----- SEG CHAPRO
+C         nprof  : nombre de profils
+C         CTYPE  : type de champ
+C         CPRONA : nom du profil
+C         CETYPE : entity type
+C         CGTYPE : geometry type
+      SEGMENT CHAPRO
+        CHARACTER*8               CTYPE(nprof)
+        CHARACTER*(MED_NAME_SIZE) CPRONA(nprof)
+        INTEGER                   CETYPE(nprof), CGTYPE(nprof)
+      ENDSEGMENT
+
+C----- SEG LISPRO
+C         ntprof : nombre total de profils
+C         DPNAME : nom du profil
+C         LNAME  : localisation du profil
+      SEGMENT LISPRO
+        CHARACTER*(MED_NAME_SIZE) DPNAME(ntprof), LNAME(ntprof)
+      ENDSEGMENT
+
+      if (iimpi.EQ.1972) then
+        write(ioimp,*)
+        write(ioimp,*) 'Entree dans LIRE "MED"'
+        write(ioimp,*) '----------------------'
+      endif
+C***********************************************************************
+C* 0 - Initialisations (pour retour a etat de depart en cas d'erreur)
+C***********************************************************************
+      SEGACT,MCOORD*MOD
+      IDIM_REF  = IDIM
+      NBPTS_REF = NBPTS
+
+      MEDTAB = 0
+      MTABLE = 0
+
+      typmot = 'MOT     '
+
+C***********************************************************************
+C* 1 - Lecture des arguments et options de 'LIRE' 'MED'
+C***********************************************************************
+C* 1.1 - Nom du fichier MED
+      medres = ' '
+      ilores = 0
+
+      icond = 1
+      CALL LIRCHA(medres, icond, iretou)
+      IF (IERR.NE.0) GOTO 9999
+      ilores = LONG(medres)
+
+C* 1.2 - Nom du maillage a lire, numero du maillage a lire (par defaut tous)
+C*       Cas particulier : obtention du nom de tous les maillages si 0 est lu
+      IMEDMA = -3
+      medmai = ' '
+      ilomai = 0
+
+      icond = 0
+      CALL LIRCHA(medmai, icond, iretou)
+      IF (IERR.NE.0) GOTO 9999
+      IF (iretou.GT.0) THEN
+        ilomai = LONG(medmai)
+        IF (ilomai.GT.MED_NAME_SIZE) THEN
+          moterr = 'Nom du maillage trop long pour MED'
+          CALL ERREUR(-385)
+          CALL ERREUR(21)
+        ELSE IF (ilomai.LT.1) THEN
+          moterr = 'Nom du maillage de taille nulle'
+          CALL ERREUR(-385)
+          CALL ERREUR(21)
+        ENDIF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'MEDMAI=',medmai(1:ilomai),'='
+      endif
+        IF (IERR.NE.0) GOTO 9999
+        IMEDMA = -1
+      ELSE
+        CALL LIRENT(ia, icond, iretou)
+        IF (IERR.NE.0) GOTO 9999
+        IF (iretou.GT.0) THEN
+          IF (ia.LT.0) THEN
+            interr(1) = ia
+            CALL ERREUR(36)
+            GOTO 9999
+          END IF
+          IMEDMA = ia
+        ENDIF
+      ENDIF
+
+C***********************************************************************
+C* 2 - Ouverture du fichier - Debut de la lecture
+C***********************************************************************
+C *** Initialisation du code de retour (=0 si OK, probleme sinon)
+      mcret = 0
+
+C *** Ouverture d'un fichier MED
+      macces = MED_ACC_RDONLY
+      CALL MFIOPE(mfid, medres(1:ilores), macces, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mfiope'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9999
+      ENDIF
+
+C *** Verification de la compatibilite d'un fichier avec HDF et MED
+      CALL MFICOM(medres(1:ilores), hdfok, medok, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mficom'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+C *** Lecture du numero de version de la bibliotheque MED utilisee pour creer le fichier
+      CALL MFINVR(mfid, major, minor, mrele, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mfinvr'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+      if (iimpi.EQ.1972) then
+        write(moterr,'(A,I2,A,I2,A,I2)')
+     &          'Read MED file version ',major,'.',minor,'.',mrele
+        call erreur(-385)
+      endif
+C *** On ne sait pas lire du MED anterieur a 3
+      IF (major .LT. 3) THEN
+        write(moterr,'(A,I2,A,I2,A,I2)')
+     &           'Bad MED file version ',major,'.',minor,'.',mrele
+        CALL ERREUR(-385)
+        interr(1) = 9999
+        CALL ERREUR(21)
+        GOTO 9998
+      ENDIF
+
+C *** Lecture du nombre de maillages dans le fichier MED
+      CALL MMHNMH(mfid, nbmail, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr     = 'lirmed / mmhnmh'
+        interr(1)  = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Nombre de maillages du fichier',nbmail
+      endif
+
+C ***** Nombre de champs a lire
+      CALL mfdnfd(mfid, nbcham, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mfdnfd'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Nombre de champs du fichier',nbcham
+      endif
+
+C ***** Recherche des parametres numeriques
+      CALL mprnpr(mfid, nparam, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mprnpr'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Nombre de parametres numeriques',nparam
+      endif
+
+C ***** Nombre de profils
+      CALL mpfnpf(mfid, n4, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mpfnpf'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+      ntprof = n4
+      ntprof = MAX(ntprof,1)
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Nombre de profils',ntprof,n4
+      endif
+
+C***********************************************************************
+C* 3 - Quelques premieres initialisations et verifications
+C***********************************************************************
+C- Pour la table
+      inin  = 0
+      inre  = 0
+      login = .FALSE.
+      logre = .FALSE.
+      floin = 0.D0
+      flore = 0.D0
+      charin = '    '
+      charre = '    '
+
+      SAWORK = 0
+      jdim   = 3
+      SEGINI,SAWORK
+      DO ii = 1, jdim
+        SAWORK.ANAME(ii) = '    '
+        SAWORK.AUNIT(ii) = '    '
+      END DO
+
+C- Recherche et stockage du nom de tous les maillages du fichier
+C- On verifie qu'il n'y a pas redondance des noms.
+      LINOMA = 0
+      ngrdif = nbmail
+      SEGINI,LINOMA
+      isdim = 0
+      DO imel = 1, nbmail
+        LINOMA.CGRNOM(imel) = ' '
+        name = ' '
+        it   = imel
+        CALL MMHMII(mfid, it, name, msdim, mmdim, mmtype, desc, dtunit,
+     &                  mstype, nstep, matype, ANAME, AUNIT, mcret)
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) '1) sdim,mtype,mdim,stype,nstep,atype lus :',
+     &                  msdim,mmtype,mmdim,mstype,nstep,matype
+        write(ioimp,*) (ANAME(i),AUNIT(i),i=1,jdim)
+      endif
+        IF (mcret .NE. 0) THEN
+          moterr    = 'lirmed / mmhmii'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9997
+        ENDIF
+        if (msdim.le.0) then
+          moterr    = 'lirmed / mmhmii / msdim'
+          interr(1) = msdim
+          call erreur(873)
+          goto 9997
+        endif
+        LINOMA.CGRNOM(imel) = name
+        ilm = LONG(name)
+        moterr = '    : Mesh name "'//name(1:ilm)//'"'
+        write(moterr(2:4),'(I3)') imel
+        ilm = LONG(moterr)
+      if (iimpi.EQ.1972) then
+        CALL ERREUR(-385)
+      endif
+        DO ii = 1, imel-1
+          IF (name .EQ. LINOMA.CGRNOM(ii)) THEN
+            moterr = moterr(1:ilm)//' already defined !'
+            CALL ERREUR(-385)
+            CALL ERREUR(21)
+            GOTO 9997
+          END IF
+        END DO
+        ii = msdim
+        isdim = MAX(isdim, ii)
+      ENDDO
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'SDIM',isdim
+        moterr = ' '
+        call erreur(-385)
+      endif
+
+C***********************************************************************
+C* 4 - Cas particuliers : - On ne souhaite que la liste des maillages
+C*                        - On veut tous les maillages et leur nombre =0
+C***********************************************************************
+      IF (IMEDMA.EQ.0) THEN
+      if (iimpi.eq.1972) then
+        moterr = 'Nombre de maillages dans le fichier'
+        write(moterr(36:39),fmt='(I4)') nbmail
+        call erreur(-385)
+      endif
+        m = nbmail
+        SEGINI,MTABLE
+        typobj = 'ENTIER  '
+        DO imel = 1, nbmail
+          name = LINOMA.CGRNOM(imel)
+          ilm  = LONG(name)
+          CALL ECCTAB(MTABLE,typobj,imel,floin,charin(1:1),
+     &                              login,inin,
+     &                       typmot,inre,flore,name(1:ilm),
+     &                              logre,inre)
+        ENDDO
+      if (iimpi.EQ.1972) then
+        write(ioimp,*)
+c#DBG        moterr = ' '
+c#DBG        CALL ERREUR(-385)
+      endif
+        MEDTAB = MTABLE
+        GOTO 9997
+      ENDIF
+
+      IF (IMEDMA.EQ.-3 .AND. nbmail.EQ.0) THEN
+        m = 0
+        SEGINI,MTABLE
+        MEDTAB = MTABLE
+        GOTO 9997
+      ENDIF
+
+C***********************************************************************
+C* 5 -  Recherche du maillage si demande (son nom sera dans medmai).
+C*      Par defaut, on lira tous les maillages.
+C***********************************************************************
+C 5.1 - Le nom du maillage est donne, on verifie s'il existe dans le 
+C       fichier dont la liste des maillages est maintenant connu, on 
+C       a alors l'indice du maillage imel_i = imel_f = indice_de_medmai
+      IF (IMEDMA.EQ.-1) THEN
+        imel_i = 0
+        DO imel = 1, nbmail
+          name = LINOMA.CGRNOM(imel)
+          ilm = LONG(name)
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Traitement du maillage ',imel,' / ',nbmail
+        write(ioimp,*) 'name=',name(1:ilm),'='
+      endif
+          IF (name(1:ilm).EQ.medmai(1:ilomai)) THEN
+            IF (imel_i.NE.0) THEN
+              write(ioimp,*) 'Maillage deja trouve',imel_i,'<-',imel
+              CALL ERREUR(21)
+              GOTO 9997
+            ENDIF
+            imel_i = imel
+          ENDIF
+        ENDDO
+        IF (imel_i.EQ.0) THEN
+          moterr = 'Maillage/Mesh "'//medmai(1:ilomai)//
+     &             '" non trouve/not found'
+          CALL ERREUR(-385)
+          CALL ERREUR(21)
+          GOTO 9997
+        ENDIF
+        imel_f = imel_i
+        IMEDMA = imel_i
+C 5.2 - On veut relire tous les maillages du fichier, boucle sur les 
+C       indices des maillages seront de imel_i = 1 a imel_f = nbmail 
+      ELSE IF (IMEDMA .EQ. -3) THEN
+        imel_i = 1
+        imel_f = nbmail
+C 5.3 - L'indice du maillage est donne, on verifie s'il est coherent 
+C       avec le nombre de maillages du fichier et on recupere alors
+C       son nom (dans medmai) et imel_i = imel_f = IMEDMA
+      ELSE
+        IF (IMEDMA.LT.1 .OR. IMEDMA.GT. nbmail) THEN
+          moterr = 'Mesh number "   " not found'
+          write(moterr(14:16),'(I3)') IMEDMA
+          CALL ERREUR(-385)
+          CALL ERREUR(21)
+          GOTO 9997
+        ENDIF
+        imel_i = IMEDMA
+        imel_f = imel_i
+C-------Recuperation du nom du maillage
+        name = LINOMA.CGRNOM(imel_i)
+        ilomai = LONG(name)
+        medmai(1:ilomai) = name(1:ilomai)
+      ENDIF
+
+C***********************************************************************
+C* 6 - Dimension du ou des maillages a lire
+C***********************************************************************
+      imdim = 0
+      DO imel = imel_i, imel_f
+        it = imel
+C---Lecture du nombre d'axes du repere des coordonnees du maillage
+        CALL MMHNAX(mfid, it, n4, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'lirmed / mmhnax'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9997
+        ENDIF
+        ii = n4
+        imdim = MAX(imdim, ii)
+      ENDDO
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) '6) IMDIM =',imdim
+      endif
+
+C---Changement de la dimension de l'espace en cas de necessite
+C---J'utilise le GIBIANE pour le faire : "OPTI DIME imdim ;"
+      IF (IDIM .LT. imdim) THEN
+        CALL ECRENT(imdim)
+        CALL ECRCHA('DIME')
+        CALL OPTION(1)
+
+        IF (IERR .NE. 0) THEN
+          moterr = 'LIRE MED - ERREUR de changement de DIMEnsion'
+          CALL ERREUR(-385)
+          CALL ERREUR(219)
+          GOTO 9997
+        ENDIF
+
+        moterr = ' '
+        CALL ERREUR(-385)
+        moterr = 'Passage en DIMEnsion   '
+        write(moterr(22:22),'(I1)') imdim
+        CALL ERREUR(-385)
+        moterr = ' '
+        CALL ERREUR(-385)
+
+        SEGACT,MCOORD*MOD
+      ENDIF
+      IDIMP1 = IDIM + 1
+
+C***********************************************************************
+C* 7 - Initialisations
+C***********************************************************************
+C* 7.1 - On initialise la table (au minimum N maillages et N maillages de POI1) 
+      m = 2 * (imel_f - imel_i + 1)
+      SEGINI,MTABLE
+
+      ltelq = .TRUE.
+
+C* 7.2 - Quelques segments locaux :
+C- (legerement surdimensionnes pour ne les definir q'une seule fois)
+C- ntypol = MED_MAXCPO pour les polygones ayant de 1 a MED_MAXCPO cotes
+C- Ce segment sert a chaque maillage (a remettre a zero avant lecture du maillage)
+      MAITOT = 0
+      ntypol = MED_MAXCPO
+      ntypel = 1 + MED_GTABLE + ntypol
+      SEGINI,MAITOT
+
+      LPOLY = 0
+      itaill = ntypol
+      SEGINI,LPOLY
+
+      LISPRO = 0
+      SEGINI,LISPRO
+
+C***********************************************************************
+C* 8 - Boucle sur le ou les maillages et champs a relire
+C***********************************************************************
+      DO imel = imel_i, imel_f
+
+        IF (IMEDMA.EQ.-3) THEN
+          name   = LINOMA.CGRNOM(imel)
+          ilomai = LONG(name)
+          medmai(1:ilomai) = name(1:ilomai)
+        ENDIF
+
+        NUMLI8 = 0
+        SFANOE = 0
+        SFAMI  = 0
+        SFAMGR = 0
+        ICOOR  = 0
+        SINT4  = 0
+        SLSCHA = 0
+        SLSSOR = 0
+        SLSFUS = 0
+        CHAINF = 0
+        CHAPAR = 0
+        CHAPRO = 0
+        LMAIL2 = 0
+        LINDP  = 0
+        LCODP  = 0
+        LFPOLY = 0
+
+        DO ii = 1, ntypel
+          maitot.IPOMAI(ii) = 0
+          maitot.INUMLI(ii) = 0
+        ENDDO
+        DO ii = 1, ntypol
+          lpoly.INT4(ii) = 0
+        ENDDO
+        DO ii = 1, ntprof
+          lispro.DPNAME(ii) = ' '
+          lispro.LNAME(ii)  = ' '
+        ENDDO
+
+C--- Lecture et traitement du maillage imel
+        name = ' '
+        it = imel
+        CALL MMHMII(mfid, it, name, msdim, mmdim, mmtype, desc, dtunit,
+     &              mstype, nstep, matype, ANAME, AUNIT, mcret)
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) '2) sdim,mtype,mdim,stype,nstep,atype lus :',
+     &                 msdim,mmtype,mmdim,mstype,nstep,matype
+        write(ioimp,*) (ANAME(i),AUNIT(i),i=1,jdim)
+      endif
+        IF (mcret .NE. 0) THEN
+          moterr    = 'lirmed / mmhmii'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 199
+        ENDIF
+        if (msdim.le.0) then
+          moterr    = 'lirmed / mmhmii / msdim'
+          interr(1) = msdim
+          call erreur(873)
+          goto 199
+        endif
+        ilm = LONG(name)
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'name=',name(1:ilm),'='
+      endif
+        IF (name(1:ilm) .NE. medmai(1:ilomai)) THEN
+          moterr = 'LIRE MED - FATAL ERROR - incorrect MeshName ?'
+          CALL ERREUR(5)
+          GOTO 199
+        ENDIF
+        isdim  = msdim
+        itypem = mmtype
+
+C ***** Lecture du nombre d'entites (Noeuds ici) dans un maillage MED
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Lecture du nombre d entites (Noeuds ici) '
+      endif
+        numdt  = MED_NO_DT
+        numit  = MED_NO_IT
+        metype = MED_NODE
+        mgtype = 0
+        mdtype = MED_COORDINATE
+        mcmode = MED_NODAL
+        mchgt  = MED_FALSE
+        mtsf   = MED_FALSE
+        CALL MMHNME(mfid, name, numdt, numit, metype, mgtype, mdtype,
+     &                  mcmode, mchgt, mtsf, n4, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr = 'lirmed / mmhnme'
+          interr(1)  = mcret
+          CALL ERREUR(873)
+          GOTO 199
+        ENDIF
+        nbpta = n4
+
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Lecture des coordonnees des noeuds'
+        write(ioimp,*) 'Nombre de noeuds =',nbpta
+      endif
+C ***** Lecture des coordonnees des noeuds MED
+        SEGINI,ICOOR
+        numdt = MED_NO_DT
+        numit = MED_NO_IT
+        mswm  = MED_FULL_INTERLACE
+
+        CALL MMHCOR(mfid, name, numdt, numit, mswm, ICOOR.XCOO, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'lirmed / mmhcor'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 199
+        ENDIF
+C-----Mise a jour du SEGMENT MCOORD
+C-----Les coordonnees des noeuds lus sont placees dans le tableau XCOOR
+        NBNOIN = NBPTS
+        ndec   = mcoord.XCOOR(/1)
+        NBPTS  = NBNOIN + nbpta
+        SEGADJ,MCOORD
+        DO ia = 1, nbpta
+          DO ii = 1, isdim
+            mcoord.XCOOR(ndec+ii) = ICOOR.XCOO(ii,ia)
+          ENDDO
+          ndec = ndec + IDIMP1
+        ENDDO
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) '- Coordonnees des noeuds :',nbpta,NBNOIN
+        do ia = 1, min(nbpta,200)
+          write(ioimp,*) '[',ia,']',(xcoo(i,ia),i=1,isdim)
+        enddo
+        if (nbpta.gt.200) write(ioimp,*) '[ ... ]'
+      endif
+
+C-----Creation du MAILLAGE SIMPLE de POI1
+C-----La connectivite lue est decalee si des noeuds existaient avant (NBNOIN)
+        nbnn   = 1
+        nbelem = nbpta
+        nbsous = 0
+        nbref  = 0
+        SEGINI,IPT1
+        IPT1.ITYPEL = 1
+        DO ib = 1, nbelem
+          IPT1.NUM(1,ib)  = NBNOIN + ib
+          IPT1.ICOLOR(ib) = idcoul
+        ENDDO
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'Creation du MAILLAGE SIMPLE de POI1',IPT1
+      endif
+C On preconditionne le maillage POI1 des noeuds avant toute utilisation
+        CALL CRECH1(IPT1,1)
+
+C ***** Lecture des numeros de famille des noeuds pour generer les POI1
+        if (iimpi.EQ.1972) then
+          write(ioimp,*) 'Lecture des numeros de famille des noeuds'
+        endif
+        nbelem = nbpta
+        SEGINI,NUMLI8
+
+        numdt  = MED_NO_DT
+        numit  = MED_NO_IT
+        metype = MED_NODE
+        mgtype = 0
+        CALL MMHFNR(mfid, name, numdt, numit, metype, mgtype,
+     &              NUMLI8.NUMLIS, mcret)
+        IF (mcret.GT.0) THEN
+          moterr    = 'lirmed / mmhfnr'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 199
+        ENDIF
+      if (iimpi.EQ.1972) then
+        write(ioimp,*) 'NUMLI8',numli8,nbelem,nbpta
+c#DBG       write(ioimp,'(2000000(1X,I2,1X))') (numli8.numlis(i),i=1,nbelem)
+      endif
+
+        nbtype = 1
+C-----Sauvegarde du pointeur vers le MELEME simple
+        maitot.IPOMAI(nbtype) = IPT1
+C-----Sauvegarde du pointeur vers le tableau des numeros de famille de chaque noeud de ce MAILLAGE SIMPLE de POI1
+        maitot.INUMLI(nbtype) = NUMLI8
+C Verifier que l'on se sert de ce maillage de POI1 comme reference pour les CHPOINTS
+
+C-----Boucle sur tous les types d'elements autres que POI1 (deja traite)
+C ***** Lecture du nombre d'entites (Elements ici) en balayant tous les
+C ***** MAILLAGES SIMPLES d'un maillage MED >= 3.*
+C ***** TRAITEMENT PARTICULIER des elements MED_POLYGON soit ity=32 'POLY'
+        DO itypem = 1, MED_GTABLE
+
+          numdt  = MED_NO_DT
+          numit  = MED_NO_IT
+          metype = MED_CELL
+          mgtype = MEDGTB(itypem)
+
+          ITY     = MDICLA(mgtype)
+          IF (ITY .EQ. 32) GOTO 211
+
+C ***** Cas general *****
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Lecture maillage elementaire - cas general'
+        write(ioimp,*) 'Type',itypem,mgtype,ITY,NOMS(ITY)
+      endif
+C--- Lecture du nombre d'elements :
+          mdtype = MED_CONNECTIVITY
+          mcmode = MED_NODAL
+          mchgt  = MED_FALSE
+          mtsf   = MED_FALSE
+          CALL MMHNME(mfid  ,   name, numdt, numit, metype, mgtype,
+     &                mdtype, mcmode, mchgt, mtsf , n4    , mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhnme'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          nbelem = n4
+          IF (nbelem .EQ. 0) GOTO 21
+C--- Lecture de la connectivite des elements
+          nbnn   = NBNNE(ITY)
+          nbsous = 0
+          nbref  = 0
+          SEGINI,IPT1
+          IPT1.ITYPEL = ITY
+          DO ib = 1, nbelem
+            IPT1.ICOLOR(ib) = idcoul
+          ENDDO
+          if (iimpi.eq.1972) then
+            write(ioimp,*) 'Maillage ',nbelem,nbnn,IPT1
+          endif
+          mcmode = MED_NODAL
+          mswm   = MED_FULL_INTERLACE
+          CALL MMHCYR(mfid, name, numdt, numit, metype, mgtype,
+     &                mcmode, mswm, IPT1.NUM, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhcyr'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          if (iimpi.eq.1972) then
+            write(ioimp,*) 'Lect. des familles des elements'
+          endif
+          SEGINI,NUMLI8
+          CALL MMHFNR(mfid, name, numdt, numit, metype, mgtype,
+     &                NUMLI8.NUMLIS, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhfnr'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+
+          nmai2 = 1
+          itaill = 2 * nmai2
+          SEGINI,LMAIL2
+          LMAIL2.INT4(1) = IPT1
+          LMAIL2.INT4(2) = NUMLI8
+          GOTO 210
+
+C **** Cas particulier des MED_POLYGON & ity=32 ****
+ 211      CONTINUE
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Lecture maillage elementaire - cas POLYGON'
+        write(ioimp,*) 'Type',itypem,mgtype,ITY,NOMS(ITY)
+      endif
+
+          mdtype = MED_INDEX_NODE
+          mcmode = MED_NODAL
+          mchgt  = MED_FALSE
+          mtsf   = MED_FALSE
+          CALL MMHNME(  mfid,   name, numdt , numit,
+     &                metype, mgtype, mdtype,
+     &                mcmode,  mchgt,  mtsf , n4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhnme'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          nbpoly = n4 - 1
+          IF (nbpoly .LE. 0) GOTO 21
+C--- Lecture de la connectivite des elements
+          mdtype = MED_CONNECTIVITY
+          mcmode = MED_NODAL
+          mchgt  = MED_FALSE
+          mtsf   = MED_FALSE
+          CALL MMHNME(  mfid,   name,  numdt,  numit,
+     &                metype, mgtype, mdtype,
+     &                mcmode,  mchgt,  mtsf ,  n4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhnme'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          nbconn = n4
+
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Maillage ',nbpoly,nbconn
+      endif
+
+          itaill = nbpoly + 1
+          SEGINI,LINDP
+          itaill = nbconn
+          SEGINI,LCONP
+          CALL MMHPGR(mfid  , name, numdt, numit, metype, mcmode,
+     &                LINDP.INT4,LCONP.INT4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhpgr'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          if (iimpi.eq.1972) then
+            write(ioimp,*) 'Lect. des familles des elements'
+          endif
+          nbelem = nbpoly
+          SEGINI,LFPOLY
+          CALL MMHFNR(mfid, name, numdt, numit, metype, mgtype,
+     &                LFPOLY.NUMLIS, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mmhfnr'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+
+          DO ib = 1, nbpoly
+            ind1 = LINDP.INT4(ib)
+            ind2 = LINDP.INT4(ib+1)-1
+            nbnn = ind2 - ind1 + 1
+            lpoly.INT4(nbnn) = lpoly.INT4(nbnn) + 1
+          END DO
+          i_z = 0
+          nmai2 = 0
+          DO ib = 1, ntypol
+            nbelem = lpoly.INT4(ib)
+            i_z = i_z + nbelem
+            IF (nbelem.NE.0) nmai2 = nmai2 + 1
+          ENDDO
+          IF (i_z.NE.nbpoly) then
+            moterr    = 'lirmed / verif nbpoly'
+            interr(1) = 1
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          itaill = 2 * nmai2
+          SEGINI,LMAIL2
+          nbsous = 0
+          nbref  = 0
+          nmai2  = 0
+          DO ib = 1, ntypol
+            nbnn   = ib
+            nbelem = lpoly.INT4(ib)
+            IF (nbelem.NE.0) THEN
+              SEGINI,IPT1
+              IPT1.ITYPEL = ITY
+              DO ia = 1, nbelem
+                IPT1.ICOLOR(ia) = idcoul
+              ENDDO
+              IPT1.ICOLOR(1) = 0
+              SEGINI,NUMLI8
+              nmai2 = nmai2 + 1
+              LMAIL2.INT4(2*nmai2-1) = IPT1
+              LMAIL2.INT4(2*nmai2)   = NUMLI8
+              lpoly.INT4(ib) = nmai2
+            ENDIF
+          ENDDO
+          DO ib = 1, nbpoly
+            ind1 = LINDP.INT4(ib)
+            ind2 = LINDP.INT4(ib+1)-1
+            nbnn = ind2 - ind1 + 1
+            ii = lpoly.INT4(nbnn)
+            IPT1   = LMAIL2.INT4(2*ii-1)
+            NUMLI8 = LMAIL2.INT4(2*ii)
+            ielt = IPT1.ICOLOR(1) + 1
+            DO ia = 1, nbnn
+              IPT1.NUM(ia,ielt) = LCONP.INT4(ind1-1+ia)
+            ENDDO
+            IPT1.ICOLOR(1) = ielt
+            NUMLI8.NUMLIS(ielt) = LFPOLY.NUMLIS(ib)
+          ENDDO
+          SEGSUP,LINDP,LCONP
+          itaill = nbconn
+          GOTO 210
+
+ 210    CONTINUE
+          itaill = 50
+          SEGINI,SINT4
+
+          DO ii = 1, nmai2
+            IPT1   = LMAIL2.INT4(2*ii-1)
+            NUMLI8 = LMAIL2.INT4(2*ii)
+
+            nbnn   = IPT1.NUM(/1)
+            nbelem = IPT1.NUM(/2)
+            IPT1.ICOLOR(1) = idcoul
+
+C---------La connectivite lue est decalee si des noeuds existaient avant
+            IF (NBNOIN .NE. 0) THEN
+              DO ib = 1, nbelem
+                DO ia = 1, nbnn
+                  IPT1.NUM(ia,ib) = IPT1.NUM(ia,ib) + NBNOIN
+                ENDDO
+              ENDDO
+            ENDIF
+
+C---------Passage de la connectivite MED a Cast3M si besoin
+            IPER = MEDPER(ITY)
+            IF (IPER .GE. 0) THEN
+              if (nbnn.gt.itaill) call erreur(5)
+              nn = nbnn - 1
+              DO ib = 1, nbelem
+                DO ia = 1, nn
+                  SINT4.INT4(ia) = ipt1.num(ia+1,ib)
+                ENDDO
+                DO ia = 1, nn
+                  ipt1.num(IPERM(IPER+ia),ib) = SINT4.INT4(ia)
+                ENDDO
+              ENDDO
+            ENDIF
+
+            nbtype = nbtype + 1
+C---------Sauvegarde du pointeur vers le MELEME simple
+            maitot.IPOMAI(nbtype) = IPT1
+C---------Sauvegarde du pointeur vers le tableau des numeros de famille de chaque element de ce MAILLAGE SIMPLE
+            maitot.INUMLI(nbtype) = NUMLI8
+
+          ENDDO
+          SEGSUP,SINT4
+
+          SEGSUP,LMAIL2
+
+ 21     CONTINUE
+        ENDDO
+
+C-- Le SEGMENT MAITOT est de dimension ntypel, mais seuls les nbtype 
+C-- premiers indices sont utilises
+
+C ***** Creation du MAILLAGE complet des FAMILLES => Partition
+C ***** Creation d'un MAILLAGE COMPLEXE contenant tous les MELEME SIMPLES
+        nbsous = nbtype - 1
+        IF      (nbsous.EQ.0) THEN
+          moterr = 'LIRE MED - Only points read !'
+          call erreur(-385)
+          nbref  = 0
+          nbelem = 0
+          nbnn   = 0
+          SEGINI,IPT1
+          IPT1.ITYPEL = 0
+          SEGDES,IPT1
+        ELSE IF (nbsous.EQ.1) THEN
+          IPT1 = maitot.IPOMAI(nbsous+1)
+        ELSE 
+          nbref  = 0
+          nbelem = 0
+          nbnn   = 0
+          SEGINI,IPT1
+          DO ia = 1,nbsous
+            IPT1.lisous(ia) = maitot.IPOMAI(ia+1)
+          ENDDO
+          SEGDES,IPT1
+        ENDIF
+C-----Ecriture dans la table du MAILLAGE complet des FAMILLES
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Ecriture dans la table du maillage ',IPT1
+      endif
+        typobj = 'MAILLAGE'
+        CALL ECCTAB(MTABLE,typmot,inin,floin,MEDMAI(1:ilomai),
+     &                              login,inin,
+     &                     typobj,inre,flore,charre          ,
+     &                              logre,IPT1)
+        IPT1 = maitot.IPOMAI(1)
+        CALL ECCTAB(MTABLE,typmot,inin,floin,MEDMAI(1:ilomai)//'_POI1',
+     &                              login,inin,
+     &                     typobj,inre,flore,charre                   ,
+     &                              logre,IPT1)
+        IF (IERR.NE.0) GOTO 199
+
+C ***** Lecture du nombre de familles du maillage
+        CALL MFANFA(mfid, name, n4, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'lirmed / mfanfa'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 199
+        ENDIF
+        infam = n4
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Nombre de familles du maillage',infam
+      endif
+
+        ncompg = 0
+        ngrdif = 10
+        SEGINI,SGRTOT
+
+        SEGINI,SFAMI
+        DO ifam = 1, infam
+          if (iimpi.eq.1972) then
+            write(ioimp,*) 'Famille ' ,ifam, ' / ' , infam
+          endif
+C ***** Lecture du nombre de groupes dans une famille
+          it1 = ifam
+          CALL MFANFG(mfid, name, it1, n4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mfanfg'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          ngroup = n4
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Lecture nombre groupes famille ',name,ngroup
+      endif
+          SEGINI,SFAMGR
+
+C ***** Lecture des informations sur une famille
+          it1 = ifam
+          CALL MFAFAI(mfid, name, it1, fam, mfnum, SFAMGR.CFGRN, mcret)
+          if (iimpi.eq.1972) then
+            write(ioimp,*)
+            write(ioimp,*) 'Lecture des informations sur une famille ',ifam
+            write(ioimp,*) 'fam =',fam
+            write(ioimp,*) 'fnum=',mfnum
+            write(ioimp,*) 'sfamgr-',(SFAMGR.CFGRN(ii),'-',ii=1, ngroup)
+          endif
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mfafai'
+            interr(1) = mcret
+C          CALL ERREUR(873)
+C          GOTO 199
+          ENDIF
+
+          SFAMI.IFAMNU(ifam) = mfnum
+          SFAMI.PFAMGR(ifam) = SFAMGR
+          SFAMI.CFANOM(ifam) = fam
+
+C-------Construction a la volee de la liste des groupes differents
+          IF (ngroup .GT. 0) THEN
+C---------Cas ou le nombre de groupe(s) n'est pas nul
+            IF (ncompg .EQ. 0) THEN
+C-----------Cas ou la liste est vierge ==> Ajout de tous les noms
+              ncompg = ncompg + ngroup
+C-----------Ajustement intermediaire (eventuel) du SEGMENT SGRTOT
+              IF (ncompg.GT.ngrdif) THEN
+                ngrdif = ncompg * 2 + 10
+                SEGADJ,SGRTOT
+              ENDIF
+              DO ii = 1, ngroup
+                SGRTOT.CGRNOM(ii) = SFAMGR.CFGRN(ii)
+              ENDDO
+            ELSE
+C-----------Cas ou des noms de groupes existent deja ==> Comparaison aux noms existants
+              DO igroup = 1, ngroup
+                iverif = 0
+                DO ii = 1, ncompg
+                  IF (SFAMGR.CFGRN(igroup).EQ.SGRTOT.CGRNOM(ii)) THEN
+                    iverif = 1
+                  ENDIF
+                ENDDO
+
+                IF (iverif .EQ. 0) THEN
+C---------------Ajout du groupe s'il n'existe pas deja
+                  ncompg = ncompg + 1
+
+C---------------Ajustement intermediaire (eventuel) du SEGMENT SGRTOT
+                  IF (ncompg .GT. ngrdif) THEN
+                    ngrdif = ngrdif * 2
+                    SEGADJ SGRTOT
+                  ENDIF
+                  SGRTOT.CGRNOM(ncompg) = SFAMGR.CFGRN(igroup)
+                ENDIF
+              ENDDO
+            ENDIF
+          ENDIF
+
+        ENDDO
+
+C-----Ajustement final (eventuel) du SEGMENT SGRTOT
+        IF (ncompg .NE. ngrdif) THEN
+          ngrdif = ncompg
+          SEGADJ,SGRTOT
+        ENDIF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 
+        write(ioimp,*)  'SGRTOT',ngrdif
+        do i = 1, ngrdif
+          write(ioimp,*) i, SGRTOT.CGRNOM(i)
+        enddo
+      endif
+
+C ***** Reconstitution des dependances des maillages dans Cast3M
+C-----creation des maillages des familles (POI1 compris)
+        nbref  = 0
+        nbsous = 0
+        IPT3   = 0
+
+C-----Boucle sur les familles lues
+        DO ifam = 1, infam
+          inufam = SFAMI.IFAMNU(ifam)
+          IPT3   = 0
+          if (iimpi.eq.1972) then
+            write(ioimp,*)
+            write(ioimp,*) 'ifam=',ifam,inufam
+          endif
+C-------Boucle sur les types d'elements
+          DO itype = 1, nbtype
+C---------Chargement du numero de famille de la ifam ieme famille
+            NUMLI8 = maitot.INUMLI(itype)
+            nbelem = 0
+            ielfam = 0
+            DO ielem = 1, NUMLI8.NUMLIS(/1)
+C-----------Calcule le nombre d'elements du type itype appartenant a la famille ifam
+              IF (NUMLI8.NUMLIS(ielem) .EQ. inufam) THEN
+                nbelem = nbelem+1
+                ielfam = ielem
+              ENDIF
+            ENDDO
+
+            IF (nbelem .GT. 0) THEN
+C-----------Cas ou un maillage d'elements de type itype est a creer pour la famille ifam
+C-----------Chargement du maillage complet du type d'element itype
+              IPT1 = maitot.IPOMAI(itype)
+              nbnn = IPT1.num(/1)
+
+C* cas particulier des POINTS NOMMES : Solution temporaire
+              IF (nbnn .EQ.1 .AND. nbelem.EQ.1) THEN
+                IPT3 = -IPT1.num(1,ielfam)
+                GOTO 762
+              ENDIF
+
+C-----------Creation du nouveau maillage compose de la partition des elements de IPT1 appartenant a la famille ifam
+              SEGINI IPT2
+              iel = 0
+              IPT2.itypel = IPT1.itypel
+              DO ielem = 1, NUMLI8.NUMLIS(/1)
+                IF (NUMLI8.NUMLIS(ielem) .EQ. inufam) THEN
+                  iel = iel+1
+                  DO ia = 1, nbnn
+                    IPT2.num(ia,iel) = IPT1.num(ia,ielem)
+                  ENDDO
+                  IPT2.icolor(iel) = idcoul
+                ENDIF
+              ENDDO
+
+C-----------Creation du MELEME COMPLEXE s'il y a lieu
+              IF (IPT3 .EQ. 0) THEN
+                IPT3=IPT2
+              ELSE
+C-------------Fusion des maillages IPT3 et IPT2 dans IPT4
+                CALL FUSE(IPT3, IPT2, IPT4, ltelq)
+                IPT3 = IPT4
+              ENDIF
+ 762        CONTINUE
+            ENDIF
+          ENDDO
+          SFAMI.PFAMAI(ifam) = IPT3
+        ENDDO
+
+C-----creation des maillages des groupes : OBJETS NOMMES DANS CAST3M
+        DO igroup=1,ngrdif
+          char80 = SGRTOT.CGRNOM(igroup)
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ' igr',igroup,char80(1:long(char80))
+      endif
+          IPT3   =  0
+          DO ifam = 1, infam
+            SFAMGR = SFAMI.PFAMGR(ifam)
+            DO inomgr = 1, SFAMGR.CFGRN(/2)
+              IF (char80 .EQ. SFAMGR.CFGRN(inomgr)) THEN
+                IPT2 = SFAMI.PFAMAI(ifam)
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ' igr',igroup,inomgr,IPT2
+      endif
+                IF (IPT3 .EQ. 0)THEN
+                  IPT3 = IPT2
+                ELSE
+C---------------Fusion des maillages IPT3 et IPT2 dans IPT4
+                  IF (IPT3.LT.0) THEN
+                    IPT3 = -IPT3
+                    CALL CRELEM(IPT3)
+                  ENDIF
+                  IF (IPT2.LT.0) THEN
+                    IPT2 = -IPT2
+                    CALL CRELEM(IPT2)
+                  ENDIF
+                  CALL FUSE(IPT3, IPT2, IPT4, ltelq)
+                  IPT3 = IPT4
+                ENDIF
+                GOTO 115
+              ENDIF
+            ENDDO
+ 115        CONTINUE
+          ENDDO
+
+C       En cas de MAILLAGE VIDE dans MED :(Ne s'appuyant sur aucune FAMILLE) : C'est possible !
+          IF (IPT3 .EQ. 0) THEN
+            ITEL   = ILCOUR
+            NBELEM = 0
+            NBSOUS = 0
+            NBREF  = 0
+            IF (NOMS(ITEL).EQ.'POLY') THEN
+              NBNN = 0
+            ELSEIF (NOMS(ITEL).EQ.'MULT') THEN
+              NBNN = 0
+            ELSE
+              NBNN = NBNNE(ITEL)
+            ENDIF
+            SEGINI,IPT3
+            IPT3.ITYPEL=ITEL
+          ENDIF
+
+C-----Ecriture dans la table du MAILLAGE du Groupe
+          IF (char80 .NE. ' ') THEN
+            IF (IPT3.GT.0) THEN
+              typobj = 'MAILLAGE'
+              CALL ECCTAB(MTABLE,typmot,inin,floin,char80,login,inin,
+     &                           typobj,inre,flore,charre,logre,IPT3)
+            ELSE
+              typobj = 'POINT   '
+              CALL ECCTAB(MTABLE,typmot,inin,floin,char80,login,inin,
+     &                           typobj,inre,flore,charre,logre,-IPT3)
+            ENDIF
+          ENDIF
+        ENDDO
+
+C***********************************************************************
+C      Lecture des champs
+C***********************************************************************
+        IF (nbcham .EQ. 0) GOTO 100
+        ncham = nbcham
+        SEGINI,SLSCHA
+        SLSCHA.LSNMAI = name
+
+        icham = 0
+        DO ia = 1, nbcham
+
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Champ ',ia,' / ',nbcham
+      endif
+          it = ia
+C-------Nombre de composantes d'un champ
+          CALL mfdnfc(mfid, it, n4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mfdnfc'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+          ncomp = n4
+          nseq = 1
+          SEGINI,CHAINF
+C-------Information sur le champ
+          fname = ' ' 
+          mname = ' '
+          CALL mfdfdi(mfid, it, fname, mname, lmesh, mmtype,
+     &                CHAINF.CNAME,CHAINF.CUNIT, dtunit, n4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mfdfdi'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ' mname,fname=',mname(1:long(mname)),'=',
+     &                 fname(1:long(fname)),'='
+      endif
+          IF (mname.NE.name) THEN
+      if (iimpi.eq.1972) then
+        moterr = 'LIRE MED - mname & name are different ?'
+        CALL ERREUR(-385)
+        moterr = mname(1:long(mname))//' & '//name(1:ilomai)
+        CALL ERREUR(-385)
+      endif
+            goto 25
+          END IF
+          nseq = n4
+          IF (nseq .EQ. 0) THEN
+            moterr = ' LIRE MED - ERREUR nseq=0'
+            CALL ERREUR(-385)
+            CALL ERREUR(21)
+            GOTO 199
+          ENDIF
+          IF (nseq .GT. 1) THEN
+            SEGADJ,CHAINF
+          ENDIF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Composantes du champ ',ncomp
+        write(ioimp,*) '-',(CNAME(ii)//'-',ii=1,ncomp)
+      endif
+C       Certains fichiers MED ont des CHAMPS sans composantes nommees !
+          DO ii = 1, ncomp
+            IF (CHAINF.CNAME(ii) .EQ. '                ') THEN
+              CHAINF.CNAME(ii) = 'SCAL'
+            ENDIF
+          ENDDO
+
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Nombre de sequences du champ',nseq
+      endif
+          DO ii = 1, nseq
+C---------Lecture des informations caracterisant une sequence de calcul
+            it1 = ii
+            CALL mfdcsi(mfid, fname, it1, numdt, numit, dt, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    = 'lirmed / mfdcsi'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              GOTO 199
+            ENDIF
+            CHAINF.INUMDT(ii) = numdt
+            CHAINF.INUMIT(ii) = numit
+            CHAINF.XDT(ii)    = dt
+          ENDDO
+
+          icham = icham + 1
+          SLSCHA.LSNCHA(icham) = fname
+          SLSCHA.LSCHIN(icham) = CHAINF
+          SLSCHA.LSPARA(icham) = 0
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Ecriture de ',mname,fname,'-> LSNMAI',icham
+      endif
+ 25       CONTINUE
+        ENDDO
+        IF (icham.NE.ncham) THEN
+          ncham = icham
+          SEGADJ,SLSCHA
+        END IF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Nombre de champs lus pour ce maillage',ncham
+      endif
+
+C ***** Recherche des parametres numeriques
+        DO iparam = 1, nparam
+
+          it1 = iparam
+          CALL mprpri(mfid, it1, dname, mmtype, desc, dtunit,
+     &                nstep, mcret)
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'param',iparam,'-',dname,'-'
+      endif
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lirmed / mprpri'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 199
+          ENDIF
+
+C-------On regarde si cela correspond a un champ existant
+          CALL MEDNML(-1, 1, dname, cha64a, isca)
+          CALL MEDNML(-2, 1, dname, cha64b, iscb)
+          IF (isca .GT. 0 .AND. iscb .GT. 0) THEN
+            CALL PLACE(SLSCHA.LSNCHA, ncham, iamo, cha64b)
+
+            IF (iamo .GT. 0) THEN
+              numdt = MED_NO_DT
+              numit = MED_NO_IT
+              CALL mprivr(mfid, dname, numdt, numit, mdval, mcret)
+              IF (mcret .NE. 0) THEN
+                moterr    = 'lirmed / mprivr'
+                interr(1) = mcret
+                CALL ERREUR(873)
+                GOTO 199
+              ENDIF
+              CHAPAR = SLSCHA.LSPARA(iamo)
+              IF (CHAPAR .EQ. 0) THEN
+                ncpars = 1
+                SEGINI CHAPAR
+              ELSE
+                ncpars = CHAPAR.CPARVL(/1) + 1
+                SEGADJ CHAPAR
+              ENDIF
+              CHAPAR.CPARNM(ncpars) = cha64a(1:isca)
+              CHAPAR.CPARVL(ncpars) = mdval
+              SLSCHA.LSPARA(iamo)   = CHAPAR
+            ENDIF
+          ENDIF
+        ENDDO
+
+C ***** Recherche des profils et mise en place des champs a sortir
+C-----Initialisation
+        nbsor = 0
+        nbso  = 0
+        SEGINI,SLSSOR
+
+C-----Boucle sur tous les pas de tps de chaque champ. On suppose qu'un
+C-----champ peut etre defini soit sur un profil soit sur le maillage total
+        DO ia = 1, ncham
+          fname  = SLSCHA.LSNCHA(ia)
+          CHAINF = SLSCHA.LSCHIN(ia)
+          ndt    = CHAINF.INUMDT(/1)
+          typobj = '        '
+
+          DO idt = 1, ndt
+            numdt = CHAINF.INUMDT(idt)
+            numit = CHAINF.INUMIT(idt)
+            ip    = 0
+            nprof = ntprof*MED_GTABLE*MED_ETABLE
+            SEGINI CHAPRO
+
+C---------Avec profil
+C---------CHPOINT
+            metype = MED_NODE
+            mgtype = MED_NONE
+
+            CALL mfdnpf(mfid, fname, numdt, numit, metype, mgtype,
+     &                  lispro.DPNAME, lispro.LNAME, n4, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    = 'lirmed / mfdnpf'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              GOTO 199
+            ENDIF
+            nprof = n4
+            IF (nprof .GT. 0) THEN
+              IF (typobj .EQ. '        ') typobj = 'CHPOINT '
+              IF (typobj .NE. 'CHPOINT ') THEN
+                moterr = ' ERREUR On voulait CHPOINT mais on a '//typobj
+                CALL ERREUR(-385)
+                CALL ERREUR(21)
+                GOTO 199
+              ENDIF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ' On a CHPOINT profil',nprof,idt,ip
+      endif
+              DO ib = 1, nprof
+                ip = ip + 1
+                CHAPRO.CTYPE(ip)  = typobj
+                CHAPRO.CPRONA(ip) = lispro.DPNAME(ib)
+                CHAPRO.CETYPE(ip) = metype
+                CHAPRO.CGTYPE(ip) = mgtype
+              ENDDO
+              nprof = ip
+              SEGADJ,CHAPRO
+              CHAINF.ISCHPR(idt) = CHAPRO
+              GOTO 300
+            ENDIF
+
+C---------MCHAML
+            isea = 0
+            DO ib = 1, MED_GTABLE
+              mgtype  = MEDGTB(ib)
+              DO ic = 1, MED_ETABLE
+                metype  = MEDETB(ic)
+                CALL mfdnpf(mfid, fname, numdt, numit, metype, mgtype,
+     &                      lispro.DPNAME, lispro.LNAME, n4, mcret)
+                IF (mcret .NE. 0) THEN
+                  moterr    = 'lirmed / mfdnpf'
+                  interr(1) = mcret
+                  CALL ERREUR(873)
+                  GOTO 199
+                ENDIF
+                nprof = n4
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ' MCHAML profil',nprof,idt,ip
+      endif
+                IF (nprof.GT.0) THEN
+                  DO ie = 1, nprof
+                    ip = ip + 1
+                    CHAPRO.CTYPE(ip)  = 'MCHAML  '
+                    CHAPRO.CPRONA(ip) = lispro.DPNAME(ie)
+                    CHAPRO.CETYPE(ip) = metype
+                    CHAPRO.CGTYPE(ip) = mgtype
+                  ENDDO
+                  isea = 1
+                ENDIF
+              ENDDO
+            ENDDO
+            IF (isea .EQ. 1) THEN
+              IF (typobj .EQ. '        ') typobj = 'MCHAML  '
+              IF (typobj .NE. 'MCHAML  ') THEN
+                moterr = ' ERREUR On voulait MCHAML mais on a '//typobj
+                CALL ERREUR(-385)
+                CALL ERREUR(21)
+                GOTO 199
+              ENDIF
+              nprof = ip
+              SEGADJ,CHAPRO
+              CHAINF.ISCHPR(idt) = CHAPRO
+              GOTO 300
+            ENDIF
+
+C---------Sans profil
+C---------CHPOINT
+            metype = MED_NODE
+            mgtype = MED_NONE
+            CALL mfdnva(mfid, fname, numdt,numit, metype,mgtype,
+     &                  n4, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    ='lirmed / mfdnva'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              GOTO 199
+            ENDIF
+            nprof = n4
+            IF (nprof.GT.0) THEN
+              IF (typobj .EQ. '        ') typobj = 'CHPOINT '
+              IF (typobj .NE. 'CHPOINT ') THEN
+                moterr = 'ERREUR On voulait CHPOINT mais on a '//typobj
+                CALL ERREUR(-385)
+                CALL ERREUR(21)
+                GOTO 199
+              ENDIF
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ' CHPOINT sans profil',nprof,idt,ip
+      endif
+              CHAPRO.CTYPE(1)  = typobj
+              CHAPRO.CPRONA(1) = ' '
+              CHAPRO.CETYPE(1) = metype
+              CHAPRO.CGTYPE(1) = mgtype
+              nprof = 1
+              SEGADJ,CHAPRO
+              CHAINF.ISCHPR(idt) = CHAPRO
+              GOTO 300
+            ENDIF
+
+C---------MCHAML
+            isea = 0
+            DO ib = 1, MED_GTABLE
+              mgtype  = MEDGTB(ib)
+              DO ic = 1, MED_ETABLE
+                metype  = MEDETB(ic)
+                CALL mfdnva(mfid,fname,numdt,numit,metype,mgtype,
+     &                      n4,mcret)
+                IF (mcret .NE. 0) THEN
+                  moterr    = 'lirmed / mfdnpf'
+                  interr(1) = mcret
+                  CALL ERREUR(873)
+                  GOTO 199
+                ENDIF
+                n = n4
+                IF (n .GT. 0) THEN
+                  ip = ip + 1
+                  CHAPRO.CTYPE(ip)  = 'MCHAML'
+                  CHAPRO.CPRONA(ip) = ' '
+                  CHAPRO.CETYPE(ip) = metype
+                  CHAPRO.CGTYPE(ip) = mgtype
+                  isea = 1
+                ENDIF
+              ENDDO
+            ENDDO
+            IF (isea .EQ. 1) THEN
+              IF (typobj .EQ. ' ') typobj = 'MCHAML'
+              IF (typobj .NE. 'MCHAML') THEN
+                moterr = 'LIRE MED - ERREUR : MCHAML demande mais '//
+     &                   typobj//' lu'
+                CALL ERREUR(-385)
+                CALL ERREUR(21)
+                GOTO 199
+              ENDIF
+              nprof = ip
+              SEGADJ,CHAPRO
+              CHAINF.ISCHPR(idt) = CHAPRO
+              GOTO 300
+            ENDIF
+
+C---------Champ non conforme
+            IF (ip .EQ. 0) THEN
+              moterr = 'LIRE MED - ERREUR : Champ non conforme'
+              CALL ERREUR(-385)
+              CALL ERREUR(21)
+              GOTO 199
+            ENDIF
+ 300        CONTINUE
+          ENDDO
+
+C-------Sortie d'un champ
+          IF (ndt .EQ. 1) THEN
+            isea = 0
+C---------On cherche une syntaxe de sortie
+            CALL MEDNML(2, 2, fname, cha64a, isca)
+            IF (isca .EQ. 0) THEN
+              cha64a = fname
+            ENDIF
+C---------On cherche une syntaxe de fusion
+            IF (nbso .EQ. 0) THEN
+              nbso = nbso + 1
+              IF (nbso .GT. nbsor) THEN
+                nbsor = nbsor + 20
+                SEGADJ,SLSSOR
+              ENDIF
+            ELSE
+              CALL PLACE(SLSSOR.CHANOM, nbso, iamo, cha64a)
+      if (iimpi.eq.1972) then
+        write(ioimp,*) 'Fusion ?',iamo,nbso,cha64a
+      endif
+              IF (iamo .EQ. 0) THEN
+                nbso = nbso + 1
+                IF (nbso .GT. nbsor) THEN
+                  nbsor = nbsor + 20
+                  SEGADJ,SLSSOR
+                ENDIF
+              ELSE
+                cha8b = SLSSOR.CHATYP(iamo)
+                IF (cha8b .NE. typobj) THEN
+                  moterr = '   ERREUR cha8b ('//cha8b//') different '//
+     &                     'de typobj ('//typobj//')'
+                  CALL ERREUR(-385)
+                  CALL ERREUR(21)
+                  GOTO 199
+                ENDIF
+                nbso = iamo
+                isea = 1
+              ENDIF
+            ENDIF
+C---------On remplit l'information
+            IF (isea .EQ. 0) THEN
+              nbfus = 1
+              SEGINI SLSFUS
+              SLSFUS.CHAFUS(nbfus) = ia
+              SLSSOR.CHATYP(nbso)  = typobj
+              SLSSOR.CHANOM(nbso)  = cha64a
+              SLSSOR.CHALIS(nbso)  = SLSFUS
+            ELSE
+              SLSFUS = SLSSOR.CHALIS(nbso)
+              nbfus  = SLSFUS.CHAFUS(/1) + 1
+              SEGADJ SLSFUS
+              SLSFUS.CHAFUS(nbfus) = ia
+            ENDIF
+C-------Sortie d'une TABLE
+          ELSE
+            isea1 = 0
+            isea2 = 0
+C---------On cherche une syntaxe de sortie
+            CALL MEDNML(2, 2, fname, cha64a, isca)
+            IF (isca .EQ. 0) THEN
+              cha64a = fname
+            ENDIF
+            CALL MEDNML(3, 3, fname, cha64b, iscb)
+            IF (iscb .EQ. 0) THEN
+              cha64b = fname
+            ENDIF
+C---------On cherche une syntaxe de fusion
+            IF (nbso .EQ. 0) THEN
+              nbso = nbso + 1
+              IF (nbso .GT. nbsor) THEN
+                nbsor = nbsor + 20
+                SEGADJ SLSSOR
+              ENDIF
+            ELSE
+              CALL PLACE(SLSSOR.CHANOM, nbso, iamo, cha64a)
+              IF (iamo .EQ. 0) THEN
+                nbso = nbso + 1
+                IF (nbso .GT. nbsor) THEN
+                  nbsor = nbsor + 20
+                  SEGADJ SLSSOR
+                ENDIF
+              ELSE
+                cha8b = SLSSOR.CHATYP(iamo)
+                IF (cha8b .NE. 'TABLE') THEN
+                  moterr = 'LIRE MED - ERREUR objet TABLE mais on a'
+     &                     //cha8b
+                  CALL ERREUR(-385)
+                  CALL ERREUR(21)
+                  GOTO 199
+                ENDIF
+                nbso  = iamo
+                isea1 = 1
+              ENDIF
+            ENDIF
+C---------On remplit l'information
+            nbso1  = nbso
+            nbsor1 = nbsor
+
+            IF (isea1 .EQ. 0) THEN
+              nbsor = 1
+              SEGINI SLSSO1
+              nbfus = 1
+              SEGINI SLSFUS
+              SLSFUS.CHAFUS(nbfus) = ia
+              SLSSO1.CHATYP(nbsor) = typobj
+              SLSSO1.CHANOM(nbsor) = cha64b
+              SLSSO1.CHALIS(nbsor) = SLSFUS
+              SLSSOR.CHATYP(nbso1) = 'TABLE'
+              SLSSOR.CHANOM(nbso1) = cha64a
+              SLSSOR.CHALIS(nbso1) = SLSSO1
+            ELSE
+              SLSSO1 = SLSSOR.CHALIS(nbso1)
+              nbsor  = SLSSO1.CHALIS(/1)
+              CALL PLACE(SLSSO1.CHANOM, nbsor, iamo, cha64b)
+              IF (iamo .EQ. 0) THEN
+                nbsor = nbsor + 1
+                SEGADJ SLSSO1
+              ELSE
+                cha8b = SLSSO1.CHATYP(iamo)
+                IF (cha8b .NE. typobj) THEN
+                  moterr = '   ERREUR cha8b ('//cha8b//') different '//
+     &                     'de typobj ('//typobj//')'
+                  CALL ERREUR(-385)
+                  CALL ERREUR(21)
+                  GOTO 199
+                ENDIF
+                nbsor = iamo
+                isea2 = 1
+              ENDIF
+
+              IF (isea2 .EQ. 0) THEN
+                nbfus = 1
+                SEGINI SLSFUS
+                SLSFUS.CHAFUS(nbfus) = ia
+                SLSSO1.CHATYP(nbsor) = typobj
+                SLSSO1.CHANOM(nbsor) = cha64b
+                SLSSO1.CHALIS(nbsor) = SLSFUS
+              ELSE
+                SLSFUS = SLSSO1.CHALIS(nbsor)
+                nbfus  = SLSFUS.CHAFUS(/1) + 1
+                SEGADJ SLSFUS
+                SLSFUS.CHAFUS(nbfus) = ia
+              ENDIF
+            ENDIF
+
+            nbso  = nbso1
+            nbsor = nbsor1
+          ENDIF
+
+        ENDDO
+
+C***********************************************************************
+C      Lecture des champs & Stockage dans la table
+C***********************************************************************
+        DO ia = 1, nbso
+          typobj = SLSSOR.CHATYP(ia)
+          cha64a = SLSSOR.CHANOM(ia)
+          isor = 0
+          inin = 1
+          IF      (typobj .EQ. 'CHPOINT ') THEN
+            SLSFUS = SLSSOR.CHALIS(ia)
+            CALL LMDCHP(mfid, MTABLE, NBNOIN,SLSCHA,SLSFUS, inin, isor)
+          ELSE IF (typobj .EQ. 'MCHAML  ') THEN
+            SLSFUS = SLSSOR.CHALIS(ia)
+            CALL LMDCHM(mfid, MTABLE, SLSCHA,SLSFUS, inin, isor)
+          ELSE IF (typobj .EQ. 'TABLE   ') THEN
+            SLSSO1 = SLSSOR.CHALIS(ia)
+            CALL LMDTAB(mfid, MTABLE, NBNOIN,SLSCHA,SLSSO1, isor)
+          ENDIF
+          IF (IERR.NE.0) GOTO 199
+      if (iimpi.eq.1972) then
+        write(ioimp,*) ia,' nom ',cha64a,' type ',typobj,isor
+      endif
+          CALL ECCTAB(MTABLE,typmot,inin,floin,cha64a,login,inin,
+     &                       typobj,inre,flore,charre,logre,isor)
+        ENDDO
+
+ 100    CONTINUE
+C***********************************************************************
+C     Nettoyage
+C***********************************************************************
+ 199    CONTINUE
+        IF (MAITOT .GT. 0) THEN
+          DO ii = 1, nbtype
+            NUMLI8 = maitot.INUMLI(ii)
+            IF (NUMLI8.GT.0) SEGSUP,NUMLI8
+          ENDDO
+        ENDIF
+        IF (SFAMI .GT. 0) THEN
+          infam = SFAMI.PFAMGR(/1)
+          DO ii = 1, infam
+            SFAMGR = SFAMI.PFAMGR(ii)
+            IF (SFAMGR.GT.0) SEGSUP,SFAMGR
+            SFAMI.PFAMGR(ii) = 0
+            IPT1 = SFAMI.PFAMAI(ii)
+            IF (IPT1.GT.0) SEGDES,IPT1
+            SFAMI.PFAMAI(ii) = 0
+          ENDDO
+          SEGSUP,SFAMI
+        ENDIF
+        IF (SLSCHA .GT. 0) SEGSUP,SLSCHA
+        IF (SLSSOR .GT. 0) SEGSUP,SLSSOR
+        IF (ICOOR  .GT. 0) SEGSUP,ICOOR
+
+        IF (IERR.NE.0) GOTO 9996
+
+      ENDDO
+C***********************************************************************
+C* 8 - Fin de la Boucle
+C***********************************************************************
+      MEDTAB = MTABLE
+
+ 9996 CONTINUE
+      IF (MAITOT .GT. 0) SEGSUP,MAITOT
+      IF (LPOLY  .GT. 0) SEGSUP,LPOLY
+      IF (LISPRO .GT. 0) SEGSUP,LISPRO
+ 9997 CONTINUE
+      IF (LINOMA .GT. 0) SEGSUP,LINOMA
+      IF (SAWORK .GT. 0) SEGSUP,SAWORK
+
+C***********************************************************************
+C  Fermeture du fichier .med
+C***********************************************************************
+ 9998 CONTINUE
+      CALL MFICLO(mfid, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'lirmed / mficlo'
+        interr(1) = mcret
+        CALL ERREUR(873)
+c*        MEDTAB = 0
+      ENDIF
+
+C***********************************************************************
+C  Ecriture de la TABLE Resultat ou Remise a etat initial (si erreur)
+C***********************************************************************
+      IF (MEDTAB .GT. 0) THEN
+c*        MTABLE = MEDTAB (on a deja cela)
+        SEGDES,MTABLE
+        CALL ECROBJ('TABLE   ',MTABLE)
+      ELSE
+        IF (MTABLE .GT. 0) SEGSUP,MTABLE
+        IF (IDIM_REF.NE.0 .AND. IDIM_REF.NE.IDIM) THEN
+c*        CHANGER de DIMENSION ? IDIM = IDIM_REF
+        ENDIF 
+        NBPTS = NBPTS_REF
+        SEGADJ,MCOORD
+      ENDIF
+
+ 9999 CONTINUE
+      SEGACT,MCOORD*NOMOD
+      if (iimpi.EQ.1972) then
+        write(ioimp,*)
+        write(ioimp,*) 'Sortie de LIRE "MED"'
+        write(ioimp,*) '--------------------'
+        write(ioimp,*)
+      endif
+
+c      RETURN
+      END
+
+ 

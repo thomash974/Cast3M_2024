@@ -1,0 +1,81 @@
+C SUTRAV    SOURCE    GOUNAND   21/06/02    21:17:53     11022          
+      SUBROUTINE SUTRAV(TATRAV,IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : SUTRAV
+C DESCRIPTION : Supprimme l'objet TATRAV de l'include SMTNLIN
+C
+C
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          :
+C APPELES (E/S)    :
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 15/12/2005, version initiale
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+* Segments à moi
+-INC TNLIN      
+*-INC SMTNLIN
+*-INC SMCHAEL
+      POINTEUR MYMCHA.MCHAEL
+*
+      INTEGER IMPR,IRET
+*
+* Executable statements
+*
+      IF (IMPR.GT.2) WRITE(IOIMP,*) 'Entrée dans sutrav.eso'
+* Destruction de TATRAV
+      IF (TATRAV.NE.0) THEN
+         SEGACT TATRAV*MOD
+         JGVD=TATRAV.IVD(/1)
+         DO IJVD=1,JGVD
+            MYMCHA=TATRAV.IVD(IJVD)
+            CALL SUCAEL(MYMCHA,IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+         ENDDO
+         SEGSUP TATRAV
+      ENDIF
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine sutrav'
+      RETURN
+*
+* End of subroutine SUTRAV
+*
+      END
+
+
+ 

@@ -1,0 +1,1567 @@
+C GO2NLI    SOURCE    JK148537  23/11/20    21:15:05     11790          
+      SUBROUTINE GO2NLI(IPMODL,IPCHA1,IPRIGI,iope)
+* transition RIGI vers NLIN
+* iope = 1 : RIGI / 2 : MASS / 3 : RIGI DIVE / 4 : ADVE / 
+* iope = 5 : EXTR / 6 : PROI / 7 : MASS /
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*                                                                    *
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+-INC SMLREEL
+-INC SMLENTI
+-INC SMLMOTS
+      POINTEUR opnlin.mlmots
+-INC SMMODEL
+-INC SMCHAML
+      parameter (mnli=7)
+      common / c2nli / it2nlp(mnli),it2nld(mnli),it2mod(mnli)
+      CHARACTER*4 CHA1
+      CHARACTER*8 TYPRET,cha8
+      CHARACTER*16 CHARRE
+      logical lvar0, lvar1
+      
+      
+      mmodel = IPMODL
+      nsous = kmodel(/1)
+            
+      if(iope.eq.6) then
+        ichpad = ipcha1
+      else
+        mchelm = ipcha1 
+        n1 = imache(/1)            
+      endif
+      
+      if (iope.eq.4) then
+        mchaml = ichaml(1)
+        melval = ielval(1)
+        ichpad = ielche(1,1)
+      endif
+
+      if (iope.ge.3) goto 600
+
+      jg = nsous 
+      segini mlreel
+      if (iope.eq.1) cha1 = 'REYN'
+      if (iope.eq.2) cha1 = 'FREQ'
+      
+      do 500 isous = 1,nsous
+        imodel = kmodel(isous)
+        
+        do 400 is1 = 1,n1
+          ipmail = imache(is1)
+          if (ipmail.eq.imamod) then
+            mchaml = ichaml(is1)
+            n2 = ielval(/1)
+            do ic2 = 1,n2
+              if (nomche(ic2)(1:4).eq.cha1) then
+                melval = ielval(ic2)
+                xrey = velche(1,1)
+                if (xrey.gt.0.) xrey = xrey ** (-1)
+                prog(isous) = xrey
+                goto 400
+              endif
+              
+            enddo            
+            
+          endif
+ 400    continue
+      
+ 500  continue
+ 
+* a faire traitement Reynolds variable ?
+      do is = 1,nsous
+        if (prog(is).eq.0. ) then
+          call erreur(21)
+          return
+        endif
+        ipoint = mlreel
+        CALL MAXIN3 (IPOINT,  IPLACE,PGRAND,1,0)
+        CALL MAXIN3 (IPOINT,  IPLACE,PPETIT,-1,0)
+        if (pgrand.ne.ppetit) then
+          call erreur(21)
+          return
+        endif
+      enddo
+
+      if (iope.eq.1) xrey = prog(1)
+      if (xrey.gt.0) usxrey = xrey**(-1)
+      if (iope.eq.2) unsdt = prog(1)
+      
+      segsup mlreel
+      
+ 600  continue
+
+      imodel = kmodel(1)
+* creation arguments NLIN
+      if (imodel.eq.it2mod(iope)) then
+       if (it2nlp(iope).gt.0.and.iope.ne.4.and.iope.ne.6) then
+        itprim = it2nlp(iope)
+        itdual = it2nld(iope)
+        goto 1000
+       endif
+      endif
+***********************************************************************
+      if (iope.eq.1) then
+* pour RIGI
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 4
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+      I1 = 2
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+        call crtabl(it2)
+          CALL ECCTAB(itprim,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it2)
+        call crtabl(it3)
+          CALL ECCTAB(itprim,'ENTIER',3,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it3)
+        call crtabl(it4)
+          CALL ECCTAB(itprim,'ENTIER',4,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it4)
+
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+         call crtabl(itdat1)
+          CALL ECCTAB(itdat,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat1)     
+         call crtabl(itdat2)
+          CALL ECCTAB(itdat,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat2)
+         call crtabl(itcof1)
+          CALL ECCTAB(itcof,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof1)     
+         call crtabl(itcof2)
+          CALL ECCTAB(itcof,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof2)
+      
+* itprim.VAR
+          nomid = lnomid(1)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+* itprim.DAT
+          typret = 'FLOTTANT'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,2.d0,CHARRE,LVAR1,ittm)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT     '
+          CALL ECCTAB(itdat2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,'CSTE',LVAR1,ittm)
+          typret = 'FLOTTANT'
+          CALL ECCTAB(itdat2,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,usxrey,CHARRE,LVAR1,ittm)
+
+* itprim.COF
+          typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itcof1,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+      I1 = 2
+          CALL ECCTAB(itcof2,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+        call crtabl(it21)
+          CALL ECCTAB(it2,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it21)     
+        call crtabl(it22)
+          CALL ECCTAB(it2,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it22)     
+        call crtabl(it31)
+          CALL ECCTAB(it3,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it31)     
+        call crtabl(it32)
+          CALL ECCTAB(it3,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it32)     
+        call crtabl(it41)
+          CALL ECCTAB(it4,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it41)     
+        call crtabl(it42)
+          CALL ECCTAB(it4,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it42)     
+
+* itprim . k . l
+        jg = 2
+        segini mlenti
+        ilen11 = mlenti
+        lect(1) = 1
+        lect(2) = 2
+        typret = 'LISTENTI'
+          CALL ECCTAB(it11,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+          CALL ECCTAB(it42,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+        jg = 1
+        segini mlenti
+        ilen21 = mlenti
+        lect(1) = 2
+          CALL ECCTAB(it21,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen21)     
+          CALL ECCTAB(it22,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen21)     
+          CALL ECCTAB(it31,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen21)     
+          CALL ECCTAB(it32,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen21)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 4
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+      I1 = 2
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+        call crtabl(it2)
+          CALL ECCTAB(itdual,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it2)
+        call crtabl(it3)
+          CALL ECCTAB(itdual,'ENTIER',3,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it3)
+        call crtabl(it4)
+          CALL ECCTAB(itdual,'ENTIER',4,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it4)
+
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+      
+* itdual.VAR
+          nomid = lnomid(2)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+        call crtabl(it21)
+          CALL ECCTAB(it2,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it21)     
+        call crtabl(it22)
+          CALL ECCTAB(it2,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it22)     
+        call crtabl(it31)
+          CALL ECCTAB(it3,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it31)     
+        call crtabl(it32)
+          CALL ECCTAB(it3,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it32)     
+        call crtabl(it41)
+          CALL ECCTAB(it4,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it41)     
+        call crtabl(it42)
+          CALL ECCTAB(it4,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it42)     
+
+* itdual . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+          CALL ECCTAB(it21,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+          CALL ECCTAB(it32,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+          CALL ECCTAB(it42,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm) 
+* pour RIGI      
+      endif    
+***********************************************************************
+      if (iope.eq.2) then
+* pour MASS
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 2
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 1
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+        call crtabl(it2)
+          CALL ECCTAB(itprim,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it2)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+         call crtabl(itdat1)
+          CALL ECCTAB(itdat,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat1)     
+         call crtabl(itcof1)
+          CALL ECCTAB(itcof,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof1)     
+      
+* itprim.VAR
+          nomid = lnomid(1)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+* itprim.DAT
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT     '
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,'CSTE',LVAR1,ittm)
+          typret = 'FLOTTANT'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,unsdt,CHARRE,LVAR1,ittm)
+
+* itprim.COF
+          typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itcof1,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+        call crtabl(it21)
+          CALL ECCTAB(it2,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it21)     
+        call crtabl(it22)
+          CALL ECCTAB(it2,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it22)     
+
+* itprim . k . l
+        typret = 'ENTIER'
+        I1 = 1
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+          CALL ECCTAB(it22,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 2
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+        call crtabl(it2)
+          CALL ECCTAB(itdual,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it2)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+      
+* itdual.VAR
+          nomid = lnomid(2)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+        call crtabl(it21)
+          CALL ECCTAB(it2,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it21)     
+        call crtabl(it22)
+          CALL ECCTAB(it2,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it22)     
+
+* itdual . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+          CALL ECCTAB(it22,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+* pour MASS      
+      endif    
+***********************************************************************
+      if (iope.eq.3) then
+* pour DIVE
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+      I1 = 2
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 1
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+         call crtabl(itdat1)
+          CALL ECCTAB(itdat,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat1)     
+         call crtabl(itcof1)
+          CALL ECCTAB(itcof,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof1)     
+      
+* itprim.VAR
+          nomid = lnomid(1)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+* itprim.DAT
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT     '
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,'CSTE',LVAR1,ittm)
+          typret = 'FLOTTANT'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,1.d0,CHARRE,LVAR1,ittm)
+
+* itprim.COF
+          typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itcof1,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+
+* itprim . k . l
+        typret = 'LISTENTI'
+        jg = 1
+        segini mlenti
+        ilen11 = mlenti
+        lect(1) = 1
+          CALL ECCTAB(it11,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+          CALL ECCTAB(it12,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 2
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+        call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+      
+* itdual.VAR
+          nomid = lnomid(15)
+          jgn = 8
+          jgm = 3
+          segini mlmots
+          ilmotx = mlmots
+          do jj = 1, jgm
+           mots(jj)= lesobl(jj)
+          enddo
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = 'LINM'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm) 
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itdual . k . l
+        typret = 'ENTIER  '
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+* pour DIVE     
+      endif    
+***********************************************************************
+      if (iope.eq.4) then
+* pour ADVE
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 2
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 3
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+        call crtabl(it2)
+          CALL ECCTAB(itprim,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it2)
+
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+         call crtabl(itdat1)
+          CALL ECCTAB(itdat,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat1)     
+         call crtabl(itdat2)
+          CALL ECCTAB(itdat,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat2)
+         call crtabl(itdat3)
+          CALL ECCTAB(itdat,'ENTIER',3,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat3)
+         call crtabl(itcof1)
+          CALL ECCTAB(itcof,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof1)     
+         call crtabl(itcof2)
+          CALL ECCTAB(itcof,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof2)
+         call crtabl(itcof3)
+          CALL ECCTAB(itcof,'ENTIER',3,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof3)
+      
+* itprim.VAR
+          nomid = lnomid(1)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+* itprim.DAT
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          typret = 'CHPOINT '
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ichpad)
+
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itdat2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          typret = 'CHPOINT '
+          CALL ECCTAB(itdat2,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ichpad)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat3,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT     '
+          CALL ECCTAB(itdat3,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,'CSTE',LVAR1,ittm)
+          typret = 'FLOTTANT'
+          CALL ECCTAB(itdat3,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,1.d0,CHARRE,LVAR1,ittm)
+
+* itprim.COF
+          typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itcof1,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+      I1 = 2
+          CALL ECCTAB(itcof2,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+      I1 = 3
+          CALL ECCTAB(itcof3,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+        call crtabl(it21)
+          CALL ECCTAB(it2,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it21)     
+        call crtabl(it22)
+          CALL ECCTAB(it2,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it22)     
+
+* itprim . k . l
+        typret = 'LISTENTI'
+        jg = 2
+        segini mlenti
+        ilen11 = mlenti
+        lect(1) = 1
+        lect(2) = 3
+          CALL ECCTAB(it11,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen11)     
+        segini mlenti
+        ilen12 = mlenti
+        lect(1) = 2
+        lect(2) = 3
+          CALL ECCTAB(it11,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen12)     
+        segini mlenti
+        ilen21 = mlenti
+        lect(1) = 1
+        lect(2) = 3
+          CALL ECCTAB(it22,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen21)     
+        segini mlenti
+        ilen22 = mlenti
+        lect(1) = 2
+        lect(2) = 3
+          CALL ECCTAB(it22,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilen22)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 2
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+        call crtabl(it2)
+          CALL ECCTAB(itdual,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it2)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itvar2)
+          CALL ECCTAB(itvar,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar2)
+      
+* itdual.VAR
+          nomid = lnomid(2)
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ilmotx = mlmots
+          mots(1)= lesobl(1)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT     '
+          cha1 = nomtp(nefmod)
+* correction QUAF
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          segini mlmots
+          ilmoty = mlmots
+          mots(1)= lesobl(2)
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmoty)
+          typret = 'MOT     '
+          CALL ECCTAB(itvar2,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+        call crtabl(it12)
+          CALL ECCTAB(it1,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it12)     
+        call crtabl(it21)
+          CALL ECCTAB(it2,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it21)     
+        call crtabl(it22)
+          CALL ECCTAB(it2,'ENTIER',2,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it22)     
+
+* itdual . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+          CALL ECCTAB(it22,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+* pour ADVE      
+      endif    
+***********************************************************************      
+      if (iope.eq.5) then
+* pour EXTR CENT
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = idim
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+      
+* itprim.VAR
+          typret = 'FLOTTANT'
+          X1 = 0.d0
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,X1,charre,LVAR1,ittm) 
+
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itprim . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = idim
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+      
+* itdual.VAR
+          typret = 'MOT'
+          cha1 = 'DUMM'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          cha1 = 'CSTE'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+ 
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itdual . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+* pour EXTR CENT      
+      endif    
+***********************************************************************
+      if (iope.eq.6) then
+* pour 2nd membre resolution pression 
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = idim
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itdat1)
+          CALL ECCTAB(itdat,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat1)     
+         call crtabl(itcof1)
+          CALL ECCTAB(itcof,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof1)     
+
+* itprim.VAR
+          nomid = lnomid(16)
+          jgn = 8
+          jgm = 3
+          segini mlmots
+          ilmotx = mlmots
+          do jj = 1, jgm
+           mots(jj)= lesobl(jj)
+          enddo
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ilmotx)
+          typret = 'MOT'
+          cha1 = 'LINM'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          typret = 'CHPOINT'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,X1,charre,LVAR1,ichpad) 
+
+* itprim.DAT
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT'
+          cha1 = 'CSTE'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          typret = 'FLOTTANT'
+          X1 = 1.D0
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,X1,charre,LVAR1,ittm) 
+     
+* itprim.COF
+         typret = 'ENTIER'
+         I1 = 1
+          CALL ECCTAB(itcof1,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,charre,LVAR1,ittm) 
+         
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itprim . k . l
+        typret = 'ENTIER'
+        I1 = 1
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = idim
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+      
+
+* itdual.VAR       
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT'
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itdual . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+* pour 2nd membre resolution pression    
+      endif    
+***********************************************************************
+      if (iope.eq.7) then
+* pour matrice resolution pression
+* table primale
+      call crtabl(itprim)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = idim
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itprim,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itprim,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+         call crtabl(itdat1)
+          CALL ECCTAB(itdat,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat1)     
+         call crtabl(itcof1)
+          CALL ECCTAB(itcof,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof1)     
+
+* itprim.VAR
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT'
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+
+* itprim.DAT
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT'
+          cha1 = 'CSTE'
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          typret = 'FLOTTANT'
+          X1 = 1.D0
+          CALL ECCTAB(itdat1,'MOT',0,0.D0,'VALEUR',lvar0,ittl,
+     &                     TYPRET,I1,X1,charre,LVAR1,ittm) 
+     
+* itprim.COF
+         typret = 'ENTIER'
+         I1 = 1
+          CALL ECCTAB(itcof1,'MOT',0,0.D0,'LDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,charre,LVAR1,ittm) 
+         
+          
+* itprim . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itprim . k . l
+        typret = 'ENTIER'
+        I1 = 1
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+
+***********************************************************************
+* table duale
+      call crtabl(itdual)
+      typret = 'ENTIER  '
+      I1 = 1
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMOP',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMVAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = 0
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMCOF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+      I1 = idim
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'NUMDER',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ITTM)
+
+
+        typret = 'TABLE   '
+        call crtabl(itvar)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'VAR',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar)
+        call crtabl(itdat)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'DAT',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itdat)
+        call crtabl(itcof)
+          CALL ECCTAB(itdual,'MOT',0,0.D0,'COF',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itcof)
+
+        call crtabl(it1)
+          CALL ECCTAB(itdual,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it1)
+
+         call crtabl(itvar1)
+          CALL ECCTAB(itvar,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,itvar1)     
+      
+
+* itdual.VAR       
+          jgn = 8
+          jgm = 1
+          segini mlmots
+          ijmot1 = mlmots
+          mots(1)= 'SCAL    '
+          typret = 'LISTMOTS'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'NOMDDL',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ijmot1)
+          typret = 'MOT'
+          cha1 = 'QUAF'
+          CALL ECCTAB(itvar1,'MOT',0,0.D0,'DISC',lvar0,ittl,
+     &                     TYPRET,I1,X1,cha1,LVAR1,ittm)
+          
+* itdual . k
+        typret = 'TABLE   '
+        call crtabl(it11)
+          CALL ECCTAB(it1,'ENTIER',1,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,it11)     
+
+* itdual . k . l
+        typret = 'ENTIER'
+        I1 = 0
+          CALL ECCTAB(it11,'ENTIER',0,0.D0,' ',lvar0,ittl,
+     &                     TYPRET,I1,X1,CHARRE,LVAR1,ittm)     
+* pour matrice resolution pression
+      endif    
+***********************************************************************
+      if (iope.ne.4.and.iope.ne.6) then
+        it2mod(iope) = imodel
+        it2nlp(iope) = itprim
+        it2nld(iope) = itdual
+      endif
+ 1000 continue     
+
+        mmodel = ipmodl
+        imodel = kmodel(1)
+        ipma1 = imamod
+        opnlin = ivamod(1)
+      if (iope.eq.5) then
+        CHA1 = 'GAU1'
+        call ecrcha(CHA1)
+        CHA1 = 'ERF1'
+        call ecrcha(CHA1)
+      else
+        do k = opnlin.mots(/2), 2, -1
+          CHA1 = opnlin.mots(k)
+          call ecrcha(CHA1)
+        enddo
+      endif
+      CALL ECROBJ('TABLE   ',itdual)
+      CALL ECROBJ('TABLE   ',itprim)
+      call ecrobj('MAILLAGE',ipma1)
+        CHA1 = opnlin.mots(1)
+      call ecrcha(CHA1)
+      call prlin
+      if (ierr.ne.0) return
+      if (iope.eq.5) then
+        call lirobj('CHPOINT ',ipri1,1,ir1)
+        CHA1 = 'MAIL'
+        call ecrcha(CHA1)
+        call ecrobj('CHPOINT ',ipri1)
+        call extrai
+        if (ierr.ne.0) return
+        call lirobj('MAILLAGE',iprigi,1,ir1)
+      elseif (iope.eq.6) then
+        call lirobj('CHPOINT ',iprigi,1,ir1)      
+      else
+        call lirobj('RIGIDITE',iprigi,1,ir1)
+      endif
+      
+      if (iope.eq.3) then
+        ipri1 = iprigi
+        call ecrobj('RIGIDITE',ipri1)
+        cha8 = 'TRANSPOS'
+        call ecrcha(cha8)
+        call kops
+        if (ierr.ne.0) return
+        call ecrobj('RIGIDITE',ipri1)
+        call prfuse      
+        if (ierr.ne.0) return
+        call lirobj('RIGIDITE',iprigi,1,ir2)
+      endif
+ 
+
+
+      RETURN
+      END
+ 
+ 

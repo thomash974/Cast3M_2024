@@ -1,0 +1,218 @@
+C VOMSI2    SOURCE    GOUNAND   21/04/06    21:15:44     10940          
+      SUBROUTINE VOMSI2(MELEME,IELDEB,IELFIN,IMET,IPVIRT,
+     $        XVOL,XVOLV)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : VOMSI2
+C DESCRIPTION : VOlume d'un Maillage de SIMplexes
+C               MELEME est supposé actif.
+C
+C     Comme VOMSIM mais on précise les numéros d'éléments de début
+C     et de fin à prendre en compte.
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 03/11/2017, version initiale
+C HISTORIQUE : v1, 03/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC CCGEOME
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+-INC SMLREEL
+      logical lvirt
+* Statement functions
+*      DISTA(A,B,C,D)=SQRT((A-C)*(A-C)+(B-D)*(B-D))
+*      DISTB(A,B,C,D,E,F)=SQRT((A-D)*(A-D)+(B-E)*(B-E)+(C-F)*(C-F))
+*      DISTA(A,B)=SQRT(A*A+B*B)
+*      DISTB(A,B,C)=SQRT(A*A+B*B+C*C)
+*      DETTRI(A11,A12,A21,A22)=A11*A22-A21*A12
+      DETTET(A11,A12,A13,A21,A22,A23,A31,A32,A33)=
+     &  A11*(A22*A33-A23*A32)
+     &       +A12*(A23*A31-A21*A33)
+     &       +A13*(A21*A32-A22*A31)
+
+*     
+* Executable statements
+*
+      XVOL=0.D0
+      XVOLV=0.D0
+*Maillage vide
+*      SEGACT MELEME
+      IF (LISOUS(/1).EQ.0.AND.NUM(/2).EQ.0) THEN
+         WRITE(IOIMP,*) 'ITLOC coucou vomsi2'
+         write(ioimp,*) 'LISOU1=',LISOUS(/1)
+         write(ioimp,*) 'NUM1=',NUM(/1)
+         write(ioimp,*) 'NUM2=',NUM(/2)
+         write(ioimp,*) 'MELEME=',MELEME
+         CALL ECMAI1(MELEME,0)
+         CALL ERREUR(5)
+         RETURN
+      ENDIF
+      IDIMP1=IDIM+1
+      NBNN=NUM(/1)
+      IF (NBNN.NE.IDIMP1.OR.LISOUS(/1).NE.0) THEN
+         WRITE(IOIMP,*) 'NBNN=',NBNN
+         WRITE(IOIMP,*) 'IDIMP1=',IDIMP1
+         WRITE(IOIMP,*) 'NBSOUS=',LISOUS(/1)
+         WRITE(IOIMP,*) 'ITLOC'
+         CALL ECMAI1(MELEME,0)
+         CALL ERREUR(5)
+         RETURN
+      ENDIF
+      IF (.NOT.(IELDEB.GE.1.AND.IELFIN.GE.IELDEB.AND.NUM(
+     $     /2).GE.IELFIN))  THEN
+         WRITE(IOIMP,*) 'ITLOC coucou vomsi2'
+         write(ioimp,*) 'IELDEB=',IELDEB
+         write(ioimp,*) 'IELFIN=',IELFIN
+         write(ioimp,*) 'NUM2=',NUM(/2)
+         write(ioimp,*) 'MELEME=',MELEME
+         CALL ECMAI1(MELEME,0)
+         CALL ERREUR(5)
+         RETURN
+      ENDIF
+*
+      IF (IMET.EQ.0) THEN
+         DO 10 IBELEM=IELDEB,IELFIN
+*         WRITE(IOIMP,*) 'IBELEM=',IBELEM
+* Volume d'un triangle
+            lvirt=.false.
+            IF (IDIM.EQ.2) THEN 
+               I0=NUM(1,IBELEM)
+               I1=NUM(2,IBELEM)
+               I2=NUM(3,IBELEM)
+               IF (IPVIRT.NE.0) THEN
+                  IF (IPVIRT.EQ.I0.OR.IPVIRT.EQ.I1.OR.IPVIRT.EQ.I2) 
+     $                 lvirt=.true.
+*     $                 goto 10
+               ENDIF
+               IP0=(I0-1)*IDIMP1
+               IP1=(I1-1)*IDIMP1
+               IP2=(I2-1)*IDIMP1
+               X10=XCOOR(IP1+1)-XCOOR(IP0+1)
+               Y10=XCOOR(IP1+2)-XCOOR(IP0+2)
+               X20=XCOOR(IP2+1)-XCOOR(IP0+1)
+               Y20=XCOOR(IP2+2)-XCOOR(IP0+2)
+*     XVOL=ABS(DETTRI(X10,Y10,X20,Y20))/2.D0
+               XVOLIO=(X10*Y20-X20*Y10)/2.D0
+*tst               sigvol=sign(1.d0,xvolio)
+*tst               if (sigvol.lt.0.d0) xvoli=xvoli*2
+* Volume d'un tétraèdre
+            ELSEIF (IDIM.EQ.3) THEN
+               I0=NUM(1,IBELEM)
+               I1=NUM(2,IBELEM)
+               I2=NUM(3,IBELEM)
+               I3=NUM(4,IBELEM)
+               IF (IPVIRT.NE.0) THEN
+                  IF (IPVIRT.EQ.I0.OR.IPVIRT.EQ.I1.OR.IPVIRT.EQ.I2
+     $                 .OR.IPVIRT.EQ.I3)
+     $                 lvirt=.true.
+*     $                 goto 10
+               ENDIF
+               IP0=(I0-1)*IDIMP1
+               IP1=(I1-1)*IDIMP1
+               IP2=(I2-1)*IDIMP1
+               IP3=(I3-1)*IDIMP1
+               X10=XCOOR(IP1+1)-XCOOR(IP0+1)
+               Y10=XCOOR(IP1+2)-XCOOR(IP0+2)
+               Z10=XCOOR(IP1+3)-XCOOR(IP0+3)
+               X20=XCOOR(IP2+1)-XCOOR(IP0+1)
+               Y20=XCOOR(IP2+2)-XCOOR(IP0+2)
+               Z20=XCOOR(IP2+3)-XCOOR(IP0+3)
+               X30=XCOOR(IP3+1)-XCOOR(IP0+1)
+               Y30=XCOOR(IP3+2)-XCOOR(IP0+2)
+               Z30=XCOOR(IP3+3)-XCOOR(IP0+3)
+               XVOLIO=(DETTET(X10,X20,X30,Y10,Y20,Y30,Z10,Z20
+     $              ,Z30))/6.D0
+*               XVOL=XVOL+ABS(DETTET(X10,X20,X30,Y10,Y20,Y30,Z10,Z20
+*     $              ,Z30))
+            ENDIF
+            xvoli=abs(xvolio)
+            if (.not.lvirt) then
+               XVOL=XVOL+xvoli
+            else
+               XVOLV=XVOLV+xvoli
+            endif
+ 10      CONTINUE
+      ELSEIF (IMET.EQ.1) THEN
+         XMETD=1.D0/DENSIT
+         XDETMD=XMETD**IDIM
+         DO 20 IBELEM=IELDEB,IELFIN
+*         WRITE(IOIMP,*) 'IBELEM=',IBELEM
+*     Volume d'un triangle
+            lvirt=.false.
+            IF (IDIM.EQ.2) THEN 
+               I0=NUM(1,IBELEM)
+               I1=NUM(2,IBELEM)
+               I2=NUM(3,IBELEM)
+               IF (IPVIRT.NE.0) THEN
+                  IF (IPVIRT.EQ.I0.OR.IPVIRT.EQ.I1.OR.IPVIRT.EQ.I2) 
+     $                 lvirt=.true.
+*     $                 goto 20
+               ENDIF
+               IP0=(I0-1)*IDIMP1
+               IP1=(I1-1)*IDIMP1
+               IP2=(I2-1)*IDIMP1
+               X10=XCOOR(IP1+1)-XCOOR(IP0+1)
+               Y10=XCOOR(IP1+2)-XCOOR(IP0+2)
+               X20=XCOOR(IP2+1)-XCOOR(IP0+1)
+               Y20=XCOOR(IP2+2)-XCOOR(IP0+2)
+*            XVOL=ABS(DETTRI(X10,Y10,X20,Y20))/2.D0
+*     XVOLI=ABS(X10*Y20-X20*Y10)*XDETMD
+               XVOLIO=((X10*Y20-X20*Y10)/2.D0)*XDETMD
+* Volume d'un tétraèdre
+            ELSEIF (IDIM.EQ.3) THEN
+               I0=NUM(1,IBELEM)
+               I1=NUM(2,IBELEM)
+               I2=NUM(3,IBELEM)
+               I3=NUM(4,IBELEM)
+               IF (IPVIRT.NE.0) THEN
+                  IF (IPVIRT.EQ.I0.OR.IPVIRT.EQ.I1.OR.IPVIRT.EQ.I2
+     $                 .OR.IPVIRT.EQ.I3)
+     $                 lvirt=.true.
+*     $                 goto 20
+               ENDIF
+               IP0=(I0-1)*IDIMP1
+               IP1=(I1-1)*IDIMP1
+               IP2=(I2-1)*IDIMP1
+               IP3=(I3-1)*IDIMP1
+               X10=XCOOR(IP1+1)-XCOOR(IP0+1)
+               Y10=XCOOR(IP1+2)-XCOOR(IP0+2)
+               Z10=XCOOR(IP1+3)-XCOOR(IP0+3)
+               X20=XCOOR(IP2+1)-XCOOR(IP0+1)
+               Y20=XCOOR(IP2+2)-XCOOR(IP0+2)
+               Z20=XCOOR(IP2+3)-XCOOR(IP0+3)
+               X30=XCOOR(IP3+1)-XCOOR(IP0+1)
+               Y30=XCOOR(IP3+2)-XCOOR(IP0+2)
+               Z30=XCOOR(IP3+3)-XCOOR(IP0+3)
+*               XVOLI=ABS(DETTET(X10,X20,X30,Y10,Y20,Y30,Z10,Z20,Z30))
+*     $              *XDETMD
+               XVOLIO=((DETTET(X10,X20,X30,Y10,Y20,Y30,Z10,Z20,Z30))
+     $              /6.D0)*XDETMD
+            ENDIF
+            xvoli=abs(xvolio)
+            if (.not.lvirt) then
+               XVOL=XVOL+xvoli
+            else
+               XVOLV=XVOLV+xvoli
+            endif
+*            XVOL=XVOL+xvoli
+ 20      CONTINUE
+      ELSE
+         WRITE(IOIMP,*) 'vomsi2 imet=',IMET
+         CALL ERREUR(5)
+         RETURN
+      ENDIF
+      RETURN
+*
+* End of subroutine VOMSI2
+*
+      END
+
+ 

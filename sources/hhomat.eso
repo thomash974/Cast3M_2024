@@ -1,0 +1,365 @@
+C HHOMAT    SOURCE    OF166741  24/05/06    21:15:12     11082          
+C HHOMAT    SOURCE                                                      
+
+      SUBROUTINE HHOMAT (IPMODL, IPCARA, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMELEME
+-INC SMMODEL
+-INC SMCHAML
+-INC SMLENTI
+-INC SMLREEL
+
+      EXTERNAL LONG
+
+      CHARACTER*(LOCHAI) chaHHO, charerr
+      CHARACTER*(NCONCH) conHHO
+      CHARACTER*(LOCOMP) mocomp
+
+      iret = 0
+
+      mmodel = IPMODL
+c*      segact,mmodel*nomod (segment actif en entree)
+      NSOUM = mmodel.kmodel(/1)
+
+      mchelm = IPCARA
+      N1 = mchelm.IMACHE(/1)
+c*      segact,mchelm
+
+      DO im = 1, NSOUM
+        imodel = mmodel.kmodel(im)
+
+        IF (imodel.nefmod .NE. HHO_NUM_ELEMENT) GOTO 100
+        CALL HHONOB(imodel, nobHHO, iret)
+        IF (nobHHO.LE.0) THEN
+          write(ioimp,*) 'HHOMAT: nobHHO undefined'
+          CALL ERREUR(5)
+          RETURN
+        END IF
+
+        iva = imodel.IVAMOD(nobHHO)
+        CALL QUEVAL(iva,'MOT     ',iret,lchho,r_z,chaHHO,b_z,i_z)
+        if (iret .NE. 0) CALL ERREUR(5)
+
+        imaHHO = imodel.IMAMOD
+        CALL PLACE2(mchelm.IMACHE(1),N1,i_z,imaHHO)
+        IF (i_z .EQ. 0) GOTO 100
+        conHHO = imodel.CONMOD
+        IF (conHHO.NE.mchelm.CONCHE(i_z)) GOTO 100
+
+        ISUPM = mchelm.INFCHE(i_z,6)
+        IF (ISUPM.NE.3) THEN
+          write(ioimp,*) 'HHOMAT: ISUPM /= 3 (',ISUPM,')'
+        END IF
+        IF (mchelm.INFCHE(i_z,4).NE.imodel.infmod(2+ISUPM)) THEN
+          write(ioimp,*) 'HHOMAT: Pointeur infche/infmod ???'
+        END IF
+
+        mchaml = mchelm.ICHAML(i_z)
+c*        segact,mchaml
+        noCOMP = mchaml.IELVAL(/1)
+        moCOMP = 'STAB    '
+        CALL PLACE(mchaml.NOMCHE(1),noCOMP,i_z,moCOMP)
+c* pas de composante STAB, je plante tout !
+        IF (i_z .EQ. 0) THEN
+          write(ioimp,*) 'STAB component is needed for HHO formulation'
+          CALL ERREUR(21)
+          GOTO 100
+        END IF
+
+        meleme = imaHHO
+c*        segact,meleme
+        NBNOE = meleme.num(/1)
+        NBELT = meleme.num(/2)
+
+        mlenti = imodel.ivamod(nobhho+1)
+c*        segact,mlenti
+
+        NBFAC = mlenti.lect(7)
+c- Le nombre de points d'integration correspond a ISUPM !
+        NBPIN = imodel.infele(6)
+
+        mlent3 = imodel.ivamod(nobhho+3)
+c*        segact,mlent3
+        nb3 = mlent3.lect(/1) / 2
+        nbfac3 = 2 * NBFAC
+
+c-dbg        write(ioimp,*) 'HHOMAT',im,NSOUM,nbnoe,nbelt,nbpin
+        IF (IDIM .NE. mlenti.lect(1)) then
+          write(ioimp,*) 'HHOMAT: Bizarre idim'
+        END IF
+        IF (NBNOE .NE. mlenti.lect(6)) then
+          write(ioimp,*) 'HHOMAT: Bizarre nbnoe'
+        END IF
+        IF (IDIM.EQ.2 .AND. NBFAC .NE. NBNOE) THEN
+          write(ioimp,*) 'HHOMAT: Bizarre nbfac2d'
+        END IF
+        IF (NBPIN .NE. mlenti.lect(8)) then
+          write(ioimp,*) 'HHOMAT: Bizarre nb.pint'
+        END IF
+        IF (nb3.ne.(NBELT*NBFAC)) THEN
+          write(ioimp,*) 'HHOMAT: Bizarre mlent3'
+        END IF
+
+        N2 = noCOMP
+        moCOMP = 'PIHO    '
+        CALL PLACE(mchaml.NOMCHE(1),noCOMP,icpi,moCOMP)
+        IF (icpi .EQ. 0) THEN
+          N2 = N2 + 1
+          icpi = N2
+        END IF
+        moCOMP = 'BHHO    '
+        CALL PLACE(mchaml.NOMCHE(1),noCOMP,icmb,moCOMP)
+        IF (icmb .EQ. 0) THEN
+          N2 = N2 + 1
+          icmb = N2
+        END IF
+        moCOMP = 'SHHO    '
+        CALL PLACE(mchaml.NOMCHE(1),noCOMP,icms,moCOMP)
+        IF (icms .EQ. 0) THEN
+          N2 = N2 + 1
+          icms = N2
+        END IF
+        IF (N2.GT.noCOMP) THEN
+          segadj,mchaml
+        ELSE
+          segact,mchaml*MOD
+        END IF
+
+        mchaml.NOMCHE(icpi) = 'PIHO    '
+        mchaml.TYPCHE(icpi) = 'REAL*8          '
+        N1PTEL = NBPIN
+        N1EL   = NBELT
+        N2PTEL = 0
+        N2EL   = 0
+        IF (icpi.GT.nocomp) THEN
+          SEGINI,melval
+          mchaml.IELVAL(icpi) = melval
+        ELSE
+          melval = mchaml.IELVAL(icpi)
+          SEGADJ,melval
+        END IF
+        IVPIHO = melval
+
+        mchaml.NOMCHE(icmb) = 'BHHO    '
+        mchaml.TYPCHE(icmb) = 'POINTEURLISTREEL'
+        N1PTEL = 0
+        N1EL   = 0
+        N2PTEL = NBPIN
+        N2EL   = NBELT
+        IF (icmb.GT.nocomp) THEN
+          SEGINI,melval
+          mchaml.IELVAL(icmb) = melval
+        ELSE
+          melval = mchaml.IELVAL(icmb)
+          SEGADJ,melval
+        END IF
+        IVMBHO = melval
+
+        mchaml.NOMCHE(icms) = 'SHHO    '
+        mchaml.TYPCHE(icms) = 'POINTEURLISTREEL'
+        melval = mchaml.IELVAL(icms)
+        N1PTEL = 0
+        N1EL   = 0
+        N2PTEL = 1
+        N2EL   = NBELT
+        IF (icms.GT.nocomp) THEN
+          SEGINI,melval
+          mchaml.IELVAL(icms) = melval
+        ELSE
+          melval = mchaml.IELVAL(icms)
+          SEGADJ,melval
+        END IF
+        IVMSTA = melval
+
+C- Preparation des tableaux pour l'appel a HHOC3M et les fonctions de
+C- calcul associees a l'element HHO ici present
+        ne_0  = 9
+* connectivity des faces : en 2D 2 noeuds par aretes --> en 3D a faire !
+        ne_co = nbfac3
+        ie_0  = 0
+        ie_co = ie_0  + ne_0
+        ie_1  = ie_co + ne_co
+
+        nr_0  = 0
+        nr_co = IDIM * nbnoe
+        nr_pi = NBPIN
+        nr_bh = mlenti.lect(14)
+        nr_sh = mlenti.lect(16)
+        ir_0  = 0
+        ir_co = ir_0  + nr_0
+        ir_1  = ir_co + nr_co
+
+        JG = ie_1
+        SEGINI,mlent2
+        ile = JG
+
+        mlent2.lect(ie_0 + 1) = ie_co + 1
+        mlent2.lect(ie_0 + 2) = ie_1
+        mlent2.lect(ie_0 + 3) = ir_co + 1
+        mlent2.lect(ie_0 + 4) = ir_1
+
+        JG = nr_0 + nr_co + MAX(nr_pi,nr_bh,nr_sh)
+        SEGINI,mlree2
+        ilr = JG
+
+c*        SEGACT,MCOORD*NOMOD
+
+        DO IEL = 1, NBELT
+
+C- Recuperation des coordonnees des noeuds de l element IEL
+          CALL HHOCOO(meleme.num,NBNOE,mcoord.xcoor(1), IEL,
+     &                mlree2.prog(ir_co+1),iret)
+          IF (iret.NE.0) RETURN
+c-dbg      write(ioimp,*) 'HHOMAT-HHOCOO',IEL,NBNOE,ir_co,ir_1
+c-dbg      write(ioimp,*) '   ',(meleme.num(i,IEL),i=1,NBNOE)
+c-dbg      write(ioimp,*) '  X',(mlree2.prog(ir_co+i),i=1,NBNOE)
+c-dbg      write(ioimp,*) '  Y',(mlree2.prog(ir_co+NBNOE+i),i=1,NBNOE)
+C- Connectivite des faces de l element IELT en tenant compte du signe :
+C- il faudra faire une fonction pour le 3D. pour le 2D que des SEG2
+C- Dans la bibliotheque, la numerotation locale des sommets d'une cellule
+C- debute a 0 ! Attention en 2D sur le dernier element !
+          in1 = (IEL-1) * NBFAC3
+          DO i = 1, NBFAC
+            j = 2 * i
+            in2 = in1 + j
+            if (mlent3.lect(in2-1).ne.2)
+     &        write(ioimp,*) 'HHOMAT : Bizarre mlent3 2',iel,i,in1,in2
+            ie2 = mlent3.lect(in2)
+            if (ie2.eq.0)
+     &        write(ioimp,*) 'HHOMAT : Bizarre mlent3 ie2',iel,i,in1,in2
+            IF (ie2.GT.0) THEN
+              mlent2.lect(ie_co+j-1) = i-1
+              mlent2.lect(ie_co+j  ) = MOD(i,NBFAC)
+            ELSE
+              mlent2.lect(ie_co+j-1) = MOD(i,NBFAC)
+              mlent2.lect(ie_co+j  ) = i-1
+            END IF
+c-dbg      write(ioimp,*) 'hhomat - iel',iel,i,in2,ie2
+          END DO
+
+C- Recuperation des poids de Gauss :
+          mlent2.lect(ie_0 + 5) = nr_pi
+          mlent2.lect(ie_0 + 6) = ir_1
+          mlent2.lect(ie_0 + 7) = 0
+
+          DO i = ir_1+1, ilr
+            mlree2.prog(i) = 0.D0
+          END DO
+
+          iretc = 0
+          CALL HHOC3M('INTG',chaHHO(1:lchho),
+     &                   mlent2.lect,ile, mlree2.prog,ilr,
+     &                   iretc,charerr)
+          IF (iretc.NE.0) THEN
+            write(ioimp,*) 'HHOMAT -> HHOC3M -> INTG : ERROR ='
+            write(ioimp,*) charerr(1:LONG(charerr))
+            iret = 21
+            return
+          END IF
+
+          melval = IVPIHO
+          DO IGA = 1, NBPIN
+            melval.velche(IGA,IEL) = mlree2.prog(ir_1+iga)
+          END DO
+
+C- Recuperation des matrices B en chaque point de Gauss :
+          mlent2.lect(ie_0 + 5) = ir_1 + 1
+          mlent2.lect(ie_0 + 6) = ir_1 + nr_bh
+
+          melval = IVMBHO
+          DO IGA = 1, NBPIN
+
+            mlent2.lect(ie_0 + 7) = iga
+            DO i = ir_1+1, ilr
+              mlree2.prog(i) = 0.D0
+            END DO
+
+            iretc = 0
+            CALL HHOC3M('BHHO',chaHHO(1:lchho),
+     &                         mlent2.lect,ile, mlree2.prog,ilr,
+     &                         iretc,charerr)
+            IF (iretc.NE.0) THEN
+              write(ioimp,*) 'HHOMAT -> HHOC3M -> BHHO : ERROR ='
+              write(ioimp,*) charerr(1:LONG(charerr))
+              iret = 21
+              return
+            END IF
+
+c- La matrice BHHO(9,NBDDL) :
+            NLIG = 9
+            NCOL = mlenti.lect(11)
+            JG = nr_bh
+            SEGINI,mlreel
+      if (JG.ne.(NLIG*NCOL)) write(ioimp,*)'HHOMAT - Bizarre nr_bh',iga
+c* Matrice BHHO stockee ligne par ligne dans la bibliotheque.
+c* Matrice BHHO stockee colonne par colonne dans Cast3M.
+            DO j = 1, NCOL
+              jc = NLIG * (j-1)
+              DO i = 1, NLIG
+                ic = NCOL * (i-1)
+                mlreel.prog(jc+i) = mlree2.prog(ir_1+ic+j)
+              END DO
+            END DO
+c*            SEGDES,mlreel
+
+            melval.ielche(IGA,IEL) = mlreel
+
+          END DO
+
+C- Recuperation de la matrice de stabilisation :
+          mlent2.lect(ie_0 + 5) = ir_1 + 1
+          mlent2.lect(ie_0 + 6) = ir_1 + nr_sh
+
+          DO i = ir_1+1, ilr
+            mlree2.prog(i) = 0.D0
+          END DO
+
+          iretc = 0
+          CALL HHOC3M('SHHO',chaHHO(1:lchho),
+     &                   mlent2.lect,ile, mlree2.prog,ilr,
+     &                   iretc,charerr)
+          IF (iretc.NE.0) THEN
+            write(ioimp,*) 'HHOMAT -> HHOC3M -> SHHO : ERROR ='
+            write(ioimp,*) charerr(1:LONG(charerr))
+            iret = 21
+            return
+          END IF
+
+          NLIG = mlenti.lect(11)
+          NCOL = mlenti.lect(11)
+          JG = nr_sh
+          SEGINI,mlreel
+      if (JG.ne.(NLIG*NCOL)) write(ioimp,*)'HHOMAT - Bizarre nr_sh'
+c* !! matrice SHHO stockee ligne par ligne dans la bibliotheque.
+c* !! matrice SHHO stockee colonne par colonne dans Cast3M.
+          DO j = 1, NCOL
+            jc = NLIG * (j-1)
+            DO i = 1, NLIG
+              ic = NCOL * (i-1)
+              mlreel.prog(jc+i) = mlree2.prog(ir_1+ic+j)
+            END DO
+          END DO
+c*          SEGDES,mlreel
+
+          melval = IVMSTA
+          melval.ielche(1,IEL) = mlreel
+
+        END DO
+
+ 100    CONTINUE
+      END DO
+
+c      RETURN
+      END
+
+ 

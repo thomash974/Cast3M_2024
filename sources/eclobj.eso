@@ -1,0 +1,70 @@
+C ECLOBJ    SOURCE    PASCAL    22/06/10    21:15:03     11377          
+      SUBROUTINE ECLOBJ(IPLOBJ,IRESU)
+************************************************************************
+*
+*                             E C L O B J
+*                             -----------
+*
+*     FONCTION: IMPRESSION D'UN OBJET "LISTOBJE"
+*     ---------
+*
+************************************************************************
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      PARAMETER (NMOT = 6)
+      CHARACTER*24 MFORM
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLOBJE
+
+      NMOT1 = NMOT 
+
+      MLOBJE = IPLOBJ
+      SEGACT,MLOBJE
+      NBOBJ1 = LISOBJ(/1)
+
+      INTERR(1) = IPLOBJ
+      INTERR(2) = NBOBJ1
+      MOTERR(1:8) = TYPOBJ
+
+C     LISTE VIDE
+      IF (NBOBJ1.EQ.0) THEN
+        CALL ERREUR(-383)
+        GOTO 999 
+      ENDIF
+
+C     DEFINITION DES FORMATS SELON LE CAS
+      IF (TYPOBJ.EQ.'POINT   ') THEN
+        CALL ERREUR(-382)
+        NMOT1 = 10
+        WRITE (MFORM,FMT='("(",I1,"(1x,I7))")') NMOT1
+      ELSE
+        CALL ERREUR(-381)
+        WRITE (MFORM,FMT='("(",I1,"(I12))")') NMOT1
+      ENDIF
+C     WRITE (6,*) MFORM
+
+C     OPTION "RESU" ?
+      IF (IRESU.EQ.1) NBOBJ1 = MIN(NBOBJ1,10)
+
+C     BOUCLE SUR LES OBJETS PAR PAQUET DE NMOT1
+      I1 = 1 
+      N1 = MIN(NBOBJ1,NMOT1)
+1     CONTINUE
+        WRITE(IOIMP,MFORM) (LISOBJ(IP),IP=I1,N1)
+        IF (N1.GE.NBOBJ1) GOTO 999
+        I1 = I1 + NMOT1
+        N1 = MIN(NBOBJ1,N1+NMOT1)
+        GOTO 1
+
+C     SORTIE
+999   CONTINUE
+
+      RETURN
+      END
+
+
+ 

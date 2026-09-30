@@ -1,0 +1,39 @@
+C IMPOSE    SOURCE    PASCAL    21/06/08    21:15:00     10793          
+C
+C Operateur IMPO :
+C
+C  impo mail fabrique un maillage support des conditions eventuelles
+C  impo bloc fabrique les raideurs et les depi a partir de ce maillage
+C  impo acti cree les contours des surfaces de contact
+C  impo impa cree directement la raideur de couplage en cas de contact
+C
+C  impo sans rien fabrique directement les raideurs et les depi
+C
+      subroutine impose
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCOORD
+
+      character*4 mcle(4)
+      data mcle /'MAIL','BLOC','ACTI','IMPA'/
+*
+      segact mcoord*mod
+      call lirmot(mcle,4,iret,0)
+      if (ierr.ne.0) return
+
+      if (iret.eq.4.and.idim.eq.2) then
+        call impos7
+      else
+        CALL ERREUR(21)
+      endif
+
+      RETURN
+      END
+
+
+ 

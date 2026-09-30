@@ -1,0 +1,76 @@
+C CHAM11    SOURCE    CB215821  20/11/25    13:19:12     10792          
+      SUBROUTINE CHAM11(NBTHL,ITHR,MCHPOI,ICPR,MTRA2)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMELEME
+
+      CHARACTER*(LOCOMP) MOCOMP
+
+      SEGMENT ICPR(NNNN)
+
+      SEGMENT MTRA2
+C      Copie du CHPOINT dans MTRA2 pour aller plus vite ensuite
+       CHARACTER*(LOCOMP) INCO(N2)
+       REAL*8      BB(NX,N2)
+C        INCO  : Nom des INCONNUES du CHPOINT
+C        BB    : Valeurs au noeuds du MMODEL (associees au ICPR)
+C                NX : Nombre de noeuds differents dans le MODELE
+C                N2 : Nombre de composantes dans le CHPOINT
+      ENDSEGMENT
+
+C     Copie du CHPOINT dans MTRA2 pour accelerer le travail ensuite !
+      NSOUPO=IPCHP(/1)
+      NCO   =MTRA2.INCO(/2)
+      DO 20 ISOUPO=1,NSOUPO
+        MSOUPO=IPCHP(ISOUPO)
+        NC    =MSOUPO.NOHARM(/1)
+        MELEME=IGEOC
+        MPOVAL=IPOVAL
+        NBELEM=NUM(/2)
+
+C       On assure le travail contigu en memoire (Si // sur les threads)
+        IF(NBTHL .EQ. 1)THEN
+          IDEB  = 1
+          IFIN  = NBELEM
+
+        ELSE
+          NBTHR= MIN(NBELEM,NBTHL)
+          IF(ithr .GT. NBTHR) GOTO 20
+          IRES = MOD(NBELEM,NBTHR)
+          IF(IRES  .EQ. 0)THEN
+            ILON  = NBELEM / NBTHR
+            IDEB  = (ithr-1)* ILON + 1
+          ELSE
+            IF (ithr .LE. IRES) THEN
+              ILON  = (NBELEM / NBTHR) + 1
+              IDEB  = (ithr-1)* ILON + 1
+            ELSE
+              ILON  = NBELEM / NBTHR
+              IDEB  = (IRES * (ILON+1)) + (ithr-IRES-1)* ILON + 1
+            ENDIF
+          ENDIF
+          IFIN  = IDEB + ILON - 1
+        ENDIF
+
+        DO ICO=1,NC
+          MOCOMP=MSOUPO.NOCOMP(ICO)
+          DO K=1,NCO
+            IF(MOCOMP .EQ. MTRA2.INCO(K))GOTO 101
+          ENDDO
+          CALL ERREUR(5)
+
+ 101      CONTINUE
+          DO IPOI=IDEB,IFIN
+            INOEU=MELEME.NUM(1,IPOI)
+            IPCPR=ICPR(INOEU)
+            IF(IPCPR.NE.0)THEN
+              MTRA2.BB(IPCPR,K)=MPOVAL.VPOCHA(IPOI,ICO)
+            ENDIF
+          ENDDO
+        ENDDO
+ 20   CONTINUE
+      END
+ 

@@ -1,0 +1,526 @@
+C CP2CV7    SOURCE    GOUNAND   21/07/06    21:15:01     11061          
+      SUBROUTINE CP2CV7(CGEOME,MYLMOT,MYDISC,TYPCHA,ICHAM,MYREAL,
+     $     MYFALS,
+     $     MYMCHA,
+     $     IMPR,IRET)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : CP2CV7
+C DESCRIPTION : Transforme un chpoint en MCHAEL
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DRN/DMT/SEMT/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          :
+C APPELE PAR       : PRLS63
+C***********************************************************************
+C ENTREES            : * CGEOME (type MELEME) : maillage de QUAFs
+C                        partitionné.
+C                      * MYDISC (type CH*(4)) : nom d'espace de
+C                        discrétisation (cf. NOMFA dans l'include
+C                        SFALRF)
+C                      * MYFALS (type FALRFS) : segment de description
+C                        des familles d'éléments de références.
+C SORTIES            : * MYMCHA (type MCHAEL) : champ par éléments de
+C                        la grandeur tensorielle (degrés de liberté de
+C                        la grandeur).
+C ENTREES/SORTIES    : -
+C TRAVAIL            :
+C                        (1, nb. ddl, NCOMPD, NCOMPP, 1, nb. élément)
+C
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 24/09/03, version initiale
+C HISTORIQUE : v1, 24/09/03, création
+C HISTORIQUE :     18/05/21, ajout lecture MCHAML
+C HISTORIQUE :
+C***********************************************************************
+C Prière de PRENDRE LE TEMPS de compléter les commentaires
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMCOORD
+-INC SMCHPOI
+      POINTEUR MYCHPO.MCHPOI
+-INC SMCHAML
+      POINTEUR MYCHAM.MCHAML
+-INC TMTRAV
+      POINTEUR MYMTRA.MTRAV
+      INTEGER NNIN,NNNOE
+-INC SMELEME
+      POINTEUR CGEOME.MELEME
+      POINTEUR SOUMAI.MELEME
+      POINTEUR SOUMEL.MELEME
+-INC SMLMOTS
+      POINTEUR MYLMOT.MLMOTS
+      INTEGER JGN
+-INC SMLENTI
+      POINTEUR KRIGEO.MLENTI
+      POINTEUR KRINCO.MLENTI
+      POINTEUR MPQUAF.MLENTI
+      POINTEUR IORDO.MLENTI
+      INTEGER JG
+-INC SMMODEL      
+*
+* Includes persos
+*
+-INC TNLIN      
+*-INC SMCHAEL
+      INTEGER N1
+      POINTEUR MYMCHA.MCHAEL
+      INTEGER NBLIG,NBCOL,N2LIG,N2COL,NBPOI,NBELM
+      POINTEUR MZMCHA.MCHEVA
+*-INC SFALRF
+      POINTEUR MYFALS.FALRFS
+*-INC SELREF
+      POINTEUR MYLRF.ELREF
+*
+      CHARACTER*(4) MYDISC
+      CHARACTER*8 TYPCHA
+*
+      INTEGER IBEL,IDDL,ISOUS,ITQUAF
+      INTEGER NBEL,NDDL,NSOUS
+      INTEGER NMLOC,NMQUA,NNGLO,NNLOC,NNMDDL,NNQUA
+      INTEGER NTOGPO
+      LOGICAL LDDLEX
+      REAL*8 MYREAL
+      REAL*8 CONTRI
+      LOGICAL LWARN,LVIDE,LINIZ,LCROI
+*
+      CHARACTER*(4) NMELEM,NMELEQ
+      PARAMETER (NDISC=3)
+      CHARACTER*(4) DISCS(NDISC)
+      PARAMETER (NQUAF=7)
+      CHARACTER*4 NMQUAF(NQUAF)
+      CHARACTER*4 NMQUAI(NQUAF)
+      CHARACTER*4 NMLINE(NQUAF)
+      INTEGER IMPR,IRET
+*
+      DATA DISCS/'LINE','QUAI','QUAF'/
+* A supprimer ?      
+      DATA NMQUAF/'SEG3','TRI7','QUA9','CU27','PR21','TE15','PY19'/
+      DATA NMQUAI/'SEG3','TRI6','QUA8','CU20','PR15','TE10','PY13'/
+      DATA NMLINE/'SEG2','TRI3','QUA4','CUB8','PRI6','TET4','PYR5'/
+*
+* Executable statements
+*
+      IF (IMPR.GT.1) WRITE(IOIMP,*) 'Entrée dans cp2cv7'
+*
+* Transformation du chpoint en un objet MTRAV plus commode
+*
+      IF (ICHAM.EQ.0) THEN
+         MYMCHA=0
+      ELSEIF (ICHAM.LT.0) THEN
+         SEGACT CGEOME
+         NSOUS=CGEOME.LISOUS(/1)
+         N1=NSOUS
+         SEGINI MYMCHA
+         DO 2 ISOUS=1,NSOUS
+            SOUMAI=CGEOME.LISOUS(ISOUS)
+            SEGACT SOUMAI
+* On cherche l'élément fini correspondant au QUAF
+            ITQUAF=SOUMAI.ITYPEL
+            CALL KEEF(ITQUAF,MYDISC,
+     $           MYFALS,
+     $           MYLRF,
+     $           IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+            SEGACT MYLRF
+            NDDL=MYLRF.NPQUAF(/1)
+*            NBEL=SOUMAI.NUM(/2)
+* On initialise le MCHEVA a remplir
+            NBLIG=1
+            NBCOL=NDDL
+            N2LIG=1
+            N2COL=1
+            NBPOI=1
+* Astuce !
+            NBELM=1
+            SEGINI MZMCHA
+            DO IDDL=1,NDDL
+               MZMCHA.WELCHE(1,IDDL,1,1,1,1)=
+     $              MYREAL
+            ENDDO
+            SEGDES MZMCHA
+            MYMCHA.ICHEVA(ISOUS)=MZMCHA
+            SEGDES MYLRF
+            SEGDES SOUMAI
+            MYMCHA.JMACHE(ISOUS)=SOUMAI
+ 2       CONTINUE
+         SEGDES MYMCHA
+         SEGDES CGEOME
+* ICHAM.GT.0
+      ELSE
+         IF (TYPCHA.EQ.'MCHAML  ') THEN
+            MYCHAM=ICHAM
+* Vérifions que MYDISC permet l'utilisation des MCHAML
+            CALL PLACE5(DISCS,NDISC,IDISC,MYDISC)
+            IF (IDISC.EQ.0) THEN
+               WRITE(IOIMP,*)
+     $              'MCHAML datum incompatible with discretization '
+     $              ,MYDISC
+               GOTO 9999
+            ENDIF
+* Réduisons le champ par élément sur les composantes de MYLMOT
+*     Normalement, il n'y a qu'un mot dans MYLMOT compte tenu des
+*     espaces de discrétisation envisagés (LINE, QUAI, QUAF)
+            SEGACT MYLMOT
+            NNMDDL=MYLMOT.MOTS(/2)
+            IF (NNMDDL.NE.1) THEN
+               WRITE(IOIMP,*) 'Programming error 3'
+               write(ioimp,*) 'NMELEM,NMELEQ,MYDISC=',NMELEM
+     $              ,NMELEQ,MYDISC 
+               write(ioimp,*) 'NBNN,NDDL=',NBNN,NDDL
+               GOTO 9999
+            ENDIF
+*
+            CALL ACTOBJ('MCHAML  ',MYCHAM,1)
+            CALL EXCOC2(MYCHAM,MYLMOT,MCHELM,MYLMOT,0)
+            IF (IERR.NE.0) GOTO 9999
+* Construisons le maillage issu de CGEOME (QUAF) qui ne va porter
+* que sur les noeuds du QUAD ou du LINE si necessaire (voir aussi cv2cml.eso)            
+            IF (IDISC.EQ.1) THEN
+               CALL ECROBJ('MAILLAGE',CGEOME)
+               CALL CHANLI
+               CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+               IF(IERR.NE.0) RETURN
+            ELSEIF (IDISC.EQ.2) THEN
+               CALL ECROBJ('MAILLAGE',CGEOME)
+               CALL CHANQU
+               CALL LIROBJ('MAILLAGE',MELEME,1,IRETOU)
+               IF(IERR.NE.0) RETURN
+            ELSEIF (IDISC.EQ.3) THEN
+               MELEME=CGEOME
+            ENDIF
+* Réduisons sur le maillage cree
+*            WRITE(IOIMP,*) 'MELEME'
+*            CALL ECROBJ('MAILLAGE',MELEME)
+*            CALL PRLIST
+*            CALL ECROBJ('MCHAML  ',MCHELM)
+*            CALL PRLIST
+* On passe par un modele car le REDUIC ne fait pas ce que l'on veut            
+*            CALL REDUIC(MCHELM,MELEME,MCHEL2)
+*            IF (IERR.NE.0) GOTO 9999
+            call ecrcha('MECANIQUE')
+            call ecrobj('MAILLAGE',MELEME)
+            call modeli
+            IF (IERR.NE.0) GOTO 9999
+            call lirobj('MMODEL  ',MMODEL,1,IRET)
+            IF (IERR.NE.0) GOTO 9999
+            CALL REDUAF(MCHELM,MMODEL,MCHEL2,0,IR,KER)
+            IF(IR   .NE. 1) CALL ERREUR(KER)
+            IF(IERR .NE. 0) GOTO 9999
+            IF (MCHEL2.EQ.0) THEN
+               WRITE(IOIMP,*) 'Erreur REDU'
+               GOTO 9999
+            ENDIF
+* Osons...            
+            CALL DTCHAM(MCHELM)
+            SEGSUP MMODEL
+            MCHELM=MCHEL2
+*     
+* Création et remplissage du champ par éléments
+* En même temps, on supprime les MELEME crees.
+            SEGACT CGEOME
+*            SEGACT MELEME
+            NSOUS=CGEOME.LISOUS(/1)
+            CALL ACTOBJ('MCHAML  ',MCHELM,1)
+*         write(ioimp,*) 'MCHELM=',MCHELM
+            N1=NSOUS
+            SEGINI MYMCHA
+            DO 3 ISOUS=1,NSOUS
+*               write(ioimp,*) 'isous=',isous
+*               write(ioimp,*) 'ichaml(/1)=',ichaml(/1)
+*               write(ioimp,*) 'lisous(/1)=',lisous(/1)
+               SOUMAI=CGEOME.LISOUS(ISOUS)
+               SEGACT SOUMAI
+               SOUMEL=IMACHE(ISOUS)
+               SEGACT SOUMEL
+               MCHAML=ICHAML(ISOUS)
+               N2=IELVAL(/1)
+* Normalement, 1 seule composante vu qu'on a reduit le champ dessus
+               IF (N2.NE.1) THEN
+                  WRITE(IOIMP,*) 'Programming error 4'
+                  GOTO 9999
+               ENDIF
+               IF (TYPCHE(1).NE.'REAL*8') THEN
+                  WRITE(IOIMP,*) 'Error : component ',NOMCHE(1)
+     $                 ,' not REAL*8 in the MCHAML object'
+                  GOTO 9999
+               ENDIF
+*               write(ioimp,*) 'N1,N2=',N1,N2
+*            do i=1,n2
+*               write(ioimp,*) 'i,nomche',i,nomche(i)
+*            enddo
+*            SEGPRT,MYLMOT
+*            SEGPRT,MCHAML
+               ITQUAF=SOUMAI.ITYPEL
+               CALL KEEF(ITQUAF,MYDISC,
+     $              MYFALS,
+     $              MYLRF,
+     $              IMPR,IRET)
+               IF (IRET.NE.0) GOTO 9999
+               SEGACT MYLRF
+               NDDL=MYLRF.NPQUAF(/1)
+               NDDL2=SOUMEL.NUM(/1)
+               if (NDDL.NE.NDDL2) then 
+                  write(ioimp,*) 'Erreur grave dimensions soumel'
+                  goto 9999
+               endif
+               NBEL=SOUMEL.NUM(/2)
+               MELVAL=IELVAL(1)
+               N1PTEL=VELCHE(/1)
+               N1EL=VELCHE(/2)
+               IF ((N1PTEL.NE.NDDL.AND.N1PTEL.NE.1).OR.
+     $             (N1EL.NE.1.AND.N1EL.NE.NBEL)) THEN
+                  write(ioimp,*) 'Erreur grave dimensions MELVAL'
+                  write(ioimp,*) 'N1PTEL,NDDL=',N1PTEL,NDDL
+                  write(ioimp,*) 'N1EL,NBEL=',N1EL,NBEL
+                  GOTO 9999
+               ENDIF
+* On initialise le MCHEVA a remplir
+               NBLIG=1
+               NBCOL=NDDL
+               N2LIG=1
+               N2COL=1
+               NBPOI=1
+               NBELM=N1EL
+               SEGINI MZMCHA
+*     Construisons le segment qui permet de parcourir les ddl dans
+*     l'ordre croissant des points du quaf
+*     Implicitement, on utilise le fait que les maillages LINE et QUAD
+*     parcourent les points du QUAF en croissant aussi.             
+*     On utilise le tri par insertion car les listes sont petites
+               JG=NDDL
+               SEGINI MPQUAF
+               SEGINI IORDO
+               DO IG=1,JG
+                  MPQUAF.LECT(IG)=MYLRF.NPQUAF(IG)
+                  IORDO.LECT(IG)=IG
+               ENDDO
+               LCROI=.TRUE.
+               CALL ORDO04(MPQUAF.LECT(1),NDDL,LCROI,IORDO.LECT(1))
+               SEGDES MYLRF
+*
+*               DO IDDL=1,NDDL
+*                  write(ioimp,*) 'I,NPQUAF,IORDO=',IDDL
+*     $                 ,MYLRF.NPQUAF(IDDL),IORDO.LECT(IDDL) 
+*               ENDDO
+*               SEGPRT,MYLRF
+*               SEGPRT,SOUMAI
+*               SEGPRT,SOUMEL
+*               SEGPRT,IORDO
+               DO I1EL=1,N1EL
+                  DO IDDL=1,NDDL
+                     JDDL=IORDO.LECT(IDDL)
+*********** Cette partie est un test que l'on pourrait supprimmer**********           
+*                     NNQUA=MYLRF.NPQUAF(JDDL)
+*                     NNGLO=SOUMAI.NUM(NNQUA,I1EL)
+**                     do 99 jddl=1,nddl
+*                     NNGLO2=SOUMEL.NUM(IDDL,I1EL)
+**                        if (nnglo2.eq.nnglo) goto 999
+**     99                  continue
+*                     if (nnglo2.ne.nnglo) then
+*                        write(ioimp,*) 'Erreur grave'
+*                        write(ioimp,*) 'IDDL,NNQUA,JDDL=',IDDL,NNQUA
+*     $                       ,JDDL
+*                        write(ioimp,*) 'NNGLO,NNGLO2=',NNGLO,NNGLO2
+*                        goto 9999
+*                     endif
+** 999                 continue
+****************************************************************************
+                     IF (N1PTEL.EQ.1) THEN
+                        I1PTEL=1
+                     ELSE
+                        I1PTEL=IDDL
+                     ENDIF
+                     MZMCHA.WELCHE(1,JDDL,1,1,1,I1EL)=VELCHE(I1PTEL
+     $                    ,I1EL)
+                  ENDDO
+               ENDDO
+               SEGSUP IORDO
+               SEGSUP MPQUAF
+               SEGDES MZMCHA
+               MYMCHA.ICHEVA(ISOUS)=MZMCHA
+               SEGDES SOUMEL
+               SEGDES SOUMAI
+               MYMCHA.JMACHE(ISOUS)=SOUMAI
+*               IF (SOUMEL.NE.SOUMAI) SEGSUP SOUMEL
+ 3          CONTINUE
+*        IMPR=6
+            IF (IMPR.GT.3) THEN
+               CALL PRCAEL(MYMCHA,IMPR,IRET)
+               IF (IRET.NE.0) GOTO 9999
+            ENDIF
+*         IMPR=0 
+            SEGDES MYMCHA
+            SEGDES CGEOME
+*            SEGSUP MELEME
+            CALL DTCHAM(MCHELM)
+         ELSEIF (TYPCHA.EQ.'CHPOINT ') THEN
+            MYCHPO=ICHAM
+*
+* Transformation du chpoint en un objet MTRAV plus commode
+*
+            CALL CP2TRA(MYCHPO,
+     $           MYMTRA,LVIDE,
+     $           IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+*
+* Warning, si aucune valeur du chpoint n'a servi
+*
+*Pour débugger
+            LWARN=.TRUE.
+*     LWARN=.FALSE.
+            LINIZ=.FALSE.
+*
+* Segments de repérage dans MTRAV
+*
+            SEGACT MYMTRA
+            JGN=MYMTRA.INCO(/1)
+            NNIN=MYMTRA.INCO(/2)
+            NNNOE=MYMTRA.IGEO(/1)
+*  Création du segment de répérage dans IGEO
+            NTOGPO=nbpts
+            JG=NTOGPO
+            SEGINI,KRIGEO
+            CALL RSETEE(MYMTRA.IGEO,NNNOE,
+     $           KRIGEO.LECT,NTOGPO,
+     $           IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+*  Création du segment de repérage dans INCO
+            SEGACT MYLMOT
+            NNMDDL=MYLMOT.MOTS(/2)
+            JG=NNMDDL
+            SEGINI KRINCO
+            CALL CREPE2(JGN,NNMDDL,NNIN,
+     $           MYLMOT.MOTS,MYMTRA.INCO,
+     $           KRINCO.LECT,
+     $           IMPR,IRET)
+            IF (IRET.NE.0) GOTO 9999
+*
+* Création et remplissage du champ par éléments
+*
+            SEGACT CGEOME
+            NSOUS=CGEOME.LISOUS(/1)
+            N1=NSOUS
+            SEGINI MYMCHA
+            DO 1 ISOUS=1,NSOUS
+               SOUMAI=CGEOME.LISOUS(ISOUS)
+               SEGACT SOUMAI
+*            SEGPRT,SOUMAI
+* On cherche l'élément fini correspondant au QUAF
+               ITQUAF=SOUMAI.ITYPEL
+               CALL KEEF(ITQUAF,MYDISC,
+     $              MYFALS,
+     $              MYLRF,
+     $              IMPR,IRET)
+               IF (IRET.NE.0) GOTO 9999
+*               SEGPRT,MYLRF
+               SEGACT MYLRF
+               NDDL=MYLRF.NPQUAF(/1)
+               NBEL=SOUMAI.NUM(/2)
+* On initialise le MCHEVA a remplir
+               NBLIG=1
+               NBCOL=NDDL
+               N2LIG=1
+               N2COL=1
+               NBPOI=1
+               NBELM=NBEL
+               SEGINI MZMCHA
+               DO IBEL=1,NBEL
+                  DO IDDL=1,NDDL
+                     NNQUA=MYLRF.NPQUAF(IDDL)
+                     NNGLO=SOUMAI.NUM(NNQUA,IBEL)
+                     NNLOC=KRIGEO.LECT(NNGLO)
+                     NMQUA=MYLRF.NUMCMP(IDDL)
+                     NMLOC=KRINCO.LECT(NMQUA)
+                     IF (NNLOC.EQ.0.OR.NMLOC.EQ.0) THEN
+                        LINIZ=.TRUE.
+                        CONTRI=0.D0
+                     ELSE
+                        LDDLEX=MYMTRA.IBIN(NMLOC,NNLOC).EQ.1
+                        IF (.NOT.LDDLEX) THEN
+                           LINIZ=.TRUE.
+                           CONTRI=0.D0
+                        ELSE
+                           LWARN=.FALSE.
+                           CONTRI=MYMTRA.BB(NMLOC,NNLOC)
+                        ENDIF
+                     ENDIF
+                     MZMCHA.WELCHE(1,IDDL,1,1,1,IBEL)=CONTRI
+                  ENDDO
+               ENDDO
+               SEGDES MZMCHA
+*            SEGPRT,MZMCHA
+               MYMCHA.ICHEVA(ISOUS)=MZMCHA
+               SEGDES MYLRF
+               SEGDES SOUMAI
+               MYMCHA.JMACHE(ISOUS)=SOUMAI
+ 1          CONTINUE
+            SEGDES MYMCHA
+            SEGDES CGEOME
+            SEGSUP KRINCO
+            SEGDES MYLMOT
+            SEGSUP KRIGEO
+            SEGSUP MYMTRA
+*      IMPR=6
+            IF (IMPR.GT.3) THEN
+               WRITE(IOIMP,*) 'On a créé',
+     $              ' MYMCHA(élément ,1, 1 , 1 ,1, ddl)'
+               CALL PRCAEL(MYMCHA,IMPR,IRET)
+               IF (IRET.NE.0) GOTO 9999
+            ENDIF
+*      IMPR=0
+*
+* Warning
+*
+            IF (LWARN.AND.(.NOT.LVIDE)) THEN
+               WRITE(IOIMP,*) 'Error : no values of the given CHPOINT',
+     $              ' were used'
+               GOTO 9999
+            ENDIF
+            IF (LINIZ) THEN
+               WRITE(IOIMP,*) 'Error : the given CHPOINT',
+     $              ' does not give all the required values'
+               GOTO 9999
+            ENDIF
+         ELSE
+            write(ioimp,*) 'TYPCHA=',TYPCHA,' unexpected'
+            goto 9999
+         ENDIF
+      ENDIF
+*
+* Normal termination
+*
+      IRET=0
+      RETURN
+*
+* Format handling
+*
+*
+* Error handling
+*
+ 9999 CONTINUE
+      IRET=1
+      WRITE(IOIMP,*) 'An error was detected in subroutine cp2cv7'
+      RETURN
+*
+* End of subroutine CP2CV7
+*
+      END
+
+
+
+
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,122 @@
+C EXTR51    SOURCE    PASCAL    22/11/22    21:15:02     11507          
+        SUBROUTINE EXTR51(IPO1,IPOSI)
+**********************************************************************
+*
+*     Extraction de l'objet contenu dans un NUAGE "colonne"
+*          Correspondant a une composante donnee
+*
+*   INTEGER    (E)   IPO1   pointeur sur l'objet NUAGE
+*   INTEGER    (E)   IPOSI  position informatique de la composante
+*                           souhaitee
+*
+**********************************************************************
+      IMPLICIT INTEGER(I-N)
+-INC SMNUAGE
+-INC SMLREEL
+-INC SMLENTI
+-INC SMLMOTS
+-INC SMLOBJE
+
+       INTEGER     IPO1,IPO2,IPO3,IPOSI,IDIM,IVAL
+       CHARACTER*8 TYP1,MVAL
+       LOGICAL     LVAL
+       REAL*8      XVAL
+
+       MNUAGE = IPO1
+       SEGACT MNUAGE
+       TYP1 = NUATYP(IPOSI)
+       IF (TYP1.EQ.'FLOTTANT') THEN
+          NUAVFL = NUAPOI(IPOSI)
+          SEGACT NUAVFL
+          IDIM = NUAFLO(/1)
+          IF (IDIM.NE.1) THEN
+            JG = IDIM
+            SEGINI,MLREEL
+            DO 100 I=1,IDIM
+               PROG(I) = NUAFLO(I)
+ 100        CONTINUE
+            CALL ECROBJ('LISTREEL',MLREEL)
+          ELSE 
+            XVAL = NUAFLO(1)
+C           SEGDES NUAVFL
+C           SEGDES MNUAGE
+            CALL ECRREE(XVAL)
+          ENDIF
+          RETURN
+       ELSE IF (TYP1.EQ.'ENTIER') THEN
+          NUAVIN = NUAPOI(IPOSI)
+          SEGACT NUAVIN
+          IDIM = NUAINT(/1)
+          IF (IDIM.NE.1) THEN
+            JG = IDIM
+            SEGINI,MLENTI
+            DO 200 I=1,IDIM
+               LECT(I) = NUAINT(I)
+ 200        CONTINUE
+            CALL ECROBJ('LISTENTI',MLENTI)
+          ELSE
+            IVAL = NUAINT(1)
+C           SEGDES NUAVIN
+C           SEGDES MNUAGE
+            CALL ECRENT(IVAL)
+          ENDIF
+          RETURN
+       ELSE IF (TYP1.EQ.'LOGIQUE ') THEN
+          NUAVLO = NUAPOI(IPOSI)
+          SEGACT NUAVLO
+          IDIM = NUALOG(/1)
+          IF (IDIM.NE.1) THEN
+             SEGDES NUAVLO
+             SEGDES MNUAGE
+*------------- Le nuage n'est pas un nuage "colonne" -------------
+             CALL ERREUR(670)
+             RETURN
+          ENDIF
+          LVAL = NUALOG(1)
+          SEGDES NUAVLO
+          SEGDES MNUAGE
+          CALL ECRLOG(LVAL)
+          RETURN
+       ELSE IF (TYP1.EQ.'MOT     ') THEN
+          NUAVMO = NUAPOI(IPOSI)
+          SEGACT NUAVMO
+          IDIM = NUAMOT(/2)
+          IF (IDIM.NE.1) THEN
+            JG = IDIM
+            SEGINI,MLMOTS
+            DO 300 I=1,IDIM
+               MOTS(I) = NUAMOT(I)
+ 300        CONTINUE
+            CALL ECROBJ('LISTMOTS',MLMOTS)
+          ELSE
+            MVAL = NUAMOT(1)
+C           SEGDES NUAVMO
+C           SEGDES MNUAGE
+            CALL ECRCHA(MVAL)
+          ENDIF
+          RETURN
+       ELSE
+          IPO2 = NUAPOI(IPOSI)
+          NUAVIN = IPO2
+          SEGACT NUAVIN
+          IDIM = NUAINT(/1)
+          IF (IDIM.NE.1) THEN
+            NOBJ = IDIM
+            SEGINI,MLOBJE
+            TYPOBJ = TYP1
+            DO 400 I=1,IDIM
+               LISOBJ(I) = NUAINT(I)
+ 400        CONTINUE
+            CALL ECROBJ('LISTOBJE',MLOBJE)
+          ELSE
+            IPO3 = NUAINT(1)
+C           SEGDES NUAVIN
+C           SEGDES MNUAGE
+            CALL ECROBJ(TYP1,IPO3)
+          ENDIF
+          RETURN
+       ENDIF
+
+       END
+
+ 

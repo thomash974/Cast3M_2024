@@ -1,0 +1,22 @@
+C ORIE3D    SOURCE    FD218221  24/02/07    21:15:22     11834          
+        subroutine orie3d(V33,O333)
+
+c       declarations externes
+        implicit integer(i-n)
+        implicit real*8(a-h,o-z)
+        real*8 V33(3,3),O333(3,3,3)
+
+c       tenseurs d orientations des increments
+c       boucle direction principales
+        do i=1,3
+c           1er boucle composante vecteur propre
+            do j=1,3
+c               2eme boucle composante vecteur propre
+                do k=1,3
+                    O333(i,j,k)=V33(j,i)*V33(k,i)
+                end do
+            end do
+        end do
+
+        return
+        end 

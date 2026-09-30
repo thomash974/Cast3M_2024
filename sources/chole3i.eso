@@ -1,0 +1,123 @@
+C CHOLE3I   SOURCE    PV090527  24/01/15    21:15:02     10699          
+      subroutine chole3i(ithr)
+C
+C  interface avec chole3 qui peut être appelee en parallele
+C  pour un ensemble de ligne ligne en stockage complet, effectue les operations
+C  avec les lignes superieures lig1 qui sont en stockage compact
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+-INC SMMATRI
+-INC CCHOLE
+-INC CCREEL
+-INC CCASSIS
+**    SEGMENT IMASQ(LMASQ)
+**    SEGMENT ITMASQ(NBLIG)
+      segment immt(nblig)
+      POINTEUR LILIGN.MILIGN
+      nbo=nbop(ithr)
+*  maitre=1 pour nes noeuds maitres de chomod
+      lig1=lig2
+C     write (6,*) ' ith dans chole3i ',ith
+C     write (6,*) ' dans chole3i il1 il2 iper ider',il1,il2,iper,ider
+      nbtr=(il2-il1)/nbthr+1
+      nbpck=nbtr/32+ 1
+*     if(nbpck.gt.4) write(6,*) 'chole3i nbpck ',nbpck
+      do 101 jbib=il2,il1,-nbthr*nbpck
+      do 100 jbis=0,nbpck-1
+        jbi=jbib-jbis-((ithr-1)*nbpck+1)+1
+        if (jbi.gt.il2) goto 100
+        if (jbi.lt.il1) goto 101
+**    write(6,*) 'chole3i ithr jbi',ithr,jbi,il1,il2
+      LIGN=ILIGN(JBI)
+
+*  blocage tertiaire en rondelles
+      im=immt(jbi)
+      if (im.gt.ider) then
+       goto 100
+      endif
+**    imasq=itmasq(jbi)
+      na=lcara(3,jbi)-lcara(2,jbi)+1
+      kidepb=lcara(1,jbi)-1
+**    write(6,*) 'chole3i na kidepb ',na,kidepb
+      lpl=lcara(2,jbi)-kidepb
+* *6 pour travailler avec un bloc 5.5 fois plus petit
+* ici faire le decoupage de la ligne en rondelles
+      iperi=iper
+      iprelj=lcara(2,jbi)
+      iderlj=lcara(3,jbi)
+      na=iderlj-iprelj+1
+**    na1=lcara(3,ider)-lcara(3,ider)+1
+      ngm=450000/na
+      ngm = ngm*nbthrs/nbthr
+      ivpm=ivpo(1)
+      kidep=kidepb+ivpm
+      do 300 irondh=1,lpl,ngm
+        irondf=min(lpl,irondh+ngm-1)
+*  pour etre bien positionne sur imasq
+        if(irondh.ne.1) then
+         irondi=irondh
+        else
+         irondi=-kidepb-1
+        endif
+      do 10 ip=max(im,iperi),ider
+C  kidep nous donne le dernier terme non nul avant le terme courant de la ligne lign
+C  lig1.iml (lcara(1 ) est le premier terme de lig1
+      if (lcara(1,ip).gt.irondf+kidepb) goto 10
+      ippr=lcara(2,ip)
+      iddr=lcara(3,ip)
+*  test si la ligne touche la rondelle
+      if (iddr.lt.irondi+kidepb) then
+        iperi=ip+1
+        goto 10
+      endif
+      lig1=LILIGN.ilign(ip)
+      irondj=irondi
+      ivd=1
+      if (kidep.lt.lcara(1,ip)) then
+       mdeb=ippr-kidepb
+ 13    continue
+*  test si la rondelle est non nulle
+       do ima=max(irondi,mdeb)/masdim+1         ,
+     >      min(iddr-kidepb,irondf+na)/masdim+1
+       if (imasq(ima).gt.0) then
+**   ivd est le premier terme non nul de la rondelle
+         imam=(ima-1)*masdim-1
+         irondj=max(irondi,imam)
+         if(irondj.gt.irondf)  goto 10
+         ivd=irondj
+         goto 12
+       elseif ((-imasq(ima))/masdim+1.gt.ima+jacc) then
+         mdeb=-imasq(ima)
+         goto 13
+       endif
+       enddo
+       goto 10
+  12   continue
+      endif
+**    write (6,*) 'chole3 jbi ip',jbi,ip
+      nbg1=lig1.ippvv(2)-1
+      CALL CHOLE3(iprelj,iderlj,lpl,IPPR,IDDR,IVPO(1),
+     > nbg1,VAL(1),LIG1.VAL(1),LIG1.IVPO(1),
+     > imasq(1),nbo,irondj,irondf,ivd)
+        ivpm=ivpo(1)
+        kidep=kidepb+ivpm
+  10  continue
+ 300  continue
+ 100  continue
+ 101  continue
+      nbop(ithr)=nbo
+      end
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

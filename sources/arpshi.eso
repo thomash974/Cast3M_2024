@@ -1,0 +1,155 @@
+C ARPSHI    SOURCE    BP208322  19/04/29    21:15:06     10213          
+      SUBROUTINE ARPSHI (FREQ,VPROPR,QUAD,SENS)
+
+
+
+
+***********************************************************************
+*
+*                          A R P S H I
+*
+* FONCTION:
+* ---------
+*
+*     PASSAGE D'UNE FREQUENCE (Hz) A UNE VALEUR PROPRE SOLUTION DE
+*     [A - VPROPR*B] X = 0  
+*     ET VICE VERSA
+*
+*
+* PARAMETRES:  (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*
+*     FREQ  COMPLEXE DP    (E/S)  FREQUENCE 
+*
+*     VPROPR  COMPLEXE DP    (E/S)  VALEUR PROPRE 
+*
+*     QUAD    LOGIQUE        (E)    PROBLEME QUADRATIQUE OU NON
+*
+*     SENS    ENTIER         (E)    SENS DE CONVERSION
+*             = 1 : FREQ -> VPROPR
+*             = 2 : VPROPR -> FREQ
+*             = 3 : VPROPR -> FREQ avec convention pour garder une
+*                                  frequence propre reelle :
+*                                  v<0 => f<0 
+*
+* SOUS-PROGRAMMES APPELES:
+* ------------------------
+*
+*     NEANT
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL BOUDA     17 JUIN 2015
+*
+************************************************************************
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+      COMPLEX*16 FREQ
+      COMPLEX*16 VPROPR
+      LOGICAL QUAD
+      INTEGER SENS
+
+      REAL*8 MODV,MODF,THETAV,THETAF
+      REAL*8 X,Y,VRE
+      COMPLEX*16 ZERO,J
+
+      ZERO=CMPLX(0.D0,0.D0)
+      J=CMPLX(0.D0,1.D0)
+
+
+*on utilise la notation exponentielle pour faciliter les calculs
+*l'objectif est de calculer
+*
+*       - lambda=(2*pi*f)^2 si le problemeest lineaire*
+*       - lambda=jw=j*(2*pi*f) si le probleme est quadratique
+*
+*le module et l'argument de l'inconnue sont calcules separement.
+*la solution est unique grace a la fonction atan2 qui renvoie
+*l'argument dans le bon cadran
+
+****************************
+*** PROBLEME QUADRATIQUE ***
+****************************
+
+      IF (QUAD) THEN
+      
+*       frequence connue: on calcule la valeur propre 
+        IF (SENS .EQ. 1) THEN
+           VPROPR=2.D0*XPI*J*FREQ
+           
+*       valeur propre connue: on calcule la frequence
+        ELSEIF (SENS .EQ. 2) THEN
+           FREQ=VPROPR/(2.D0*XPI*J)
+           
+        ELSE        
+          CALL ERREUR(5)
+          
+        ENDIF
+
+*************************
+*** PROBLEME LINEAIRE ***
+*************************
+      ELSE
+      
+*       frequence connue: on calcule la valeur propre 
+        IF (SENS .EQ. 1) THEN
+
+          MODF=ABS(FREQ)
+          THETAF=ATAN2(AIMAG(FREQ),REAL(FREQ))
+
+          MODV=(2.D0*XPI*MODF)**2
+          THETAV=2.D0*THETAF
+
+          X=MODV*COS(THETAV)
+          Y=MODV*SIN(THETAV)
+
+          VPROPR=CMPLX(X,Y)
+
+
+*       valeur propre connue: on calcule la frequence
+        ELSEIF (SENS .EQ. 2) THEN
+
+          MODV=ABS(VPROPR)
+          THETAV=ATAN2(AIMAG(VPROPR),REAL(VPROPR))
+
+          MODF=SQRT(MODV)/(2.D0*XPI)
+          THETAF=THETAV/2.D0
+
+          X=MODF*COS(THETAF)
+          Y=MODF*SIN(THETAF)
+
+          FREQ=CMPLX(X,Y)
+          
+*       valeur propre connue: on calcule la frequence avec convention
+*       pour rester reel
+        ELSEIF (SENS .EQ. 3) THEN
+        
+          VRE=REAL(VPROPR)
+*         on ne doit demander le sens 3 que pour des pb aux vp
+*         hermitiens a valeurs propres reelles : on teste Im(lambda)=0
+          THETA=ABS(AIMAG(VPROPR)/VRE)
+          TOL=SQRT(XZPREC)
+          IF(THETA.gt.TOL) CALL ERREUR(5)
+          X=SQRT(ABS(VRE))/(2.D0*XPI)
+          X=SIGN(X,VRE)
+          FREQ=CMPLX(X,0.d0)
+          
+        
+        ELSE        
+          CALL ERREUR(5)
+          
+        ENDIF
+
+
+      ENDIF
+
+      END
+
+
+ 

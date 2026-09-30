@@ -1,0 +1,912 @@
+C EXCFRO    SOURCE    PV        22/11/02    21:15:02     11491          
+
+      SUBROUTINE EXCFRO
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+*  on lit un modele de contact qui contient des frottement
+*  un materiau de frottement, un chpoint
+*  de deplacement, la raideur de frottement et on ecrit un chpoint de
+*  forces de frottement
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC SMCHAML
+-INC SMCHPOI
+-INC SMCOORD
+-INC SMELEME
+-INC SMMODEL
+      POINTEUR mmode3.mmodel,mmode4.mmodel,mmode5.mmodel,mmode6.mmodel
+      POINTEUR mmode7.mmodel,mmode8.mmodel,imode6.imodel,imode7.imodel
+
+
+-INC SMRIGID
+
+*  icpr xcpr lx du deplacement
+*  jcpr ycpr flx du frottement
+*  tableau d'indirection generale
+      SEGMENT ncpr(nbpts)
+      SEGMENT icpr(nbptl)
+      SEGMENT xcpr(nbptl)
+      SEGMENT jcpr(nbptl)
+      SEGMENT ycpr(nbptl)
+*  segments 3D
+      SEGMENT kcpr(nbptl)
+      SEGMENT zcprd(nbptl)
+      SEGMENT zcprf(nbptl)
+*  tableau donnant la sous matrice associee a un multiplicateur
+      segment irilx(nbptl)
+*  tableau donnant le descripteur associe a un multiplicateur
+      segment irides(nbptl)
+*  tableau donnant l'element dans la sous raideur
+      segment iellx(nbptl)
+*  tableau donnant le maillage du modele associe a un multiplicateur
+      segment imolx(nbptl)
+*  tableau donnant l'element dans le maillage
+      segment imllx(nbptl)
+*  tableau donnant le coefficient  a partir du LX
+      segment xdcp(nbptl)
+
+*
+C
+*
+*  pour tester le 3D non symetrique, mettre NS3D a vrai
+*
+
+
+
+C
+*
+      logical ns3d,ns2d
+*
+      ns3d=.false.
+      ns2d=.true.
+*
+C=======================================================================
+C= LECTURE DES DONNEES DE L'OPERATEUR
+C=======================================================================
+**    write(6,*) ' entree dans excfro '
+      call lirobj('MMODEL  ',modini,1,iretou)
+      call actobj('MMODEL  ',modini,1)
+      if (ierr.ne.0) return
+      call lirobj('MCHAML  ',icham1,1,iretou)
+      call actobj('MCHAML  ',icham1,1)
+      if (ierr.ne.0) return
+      call lirobj('CHPOINT ',mchpin,1,iretou)
+      call actobj('CHPOINT ',mchpin,1)
+      if (ierr.ne.0) return
+      call lirobj('RIGIDITE',mrigid,1,iretou)
+      if (ierr.ne.0) return
+      icham2 = 0
+      mchpi2 = 0
+      call lirent(noncon,1,iretou)
+      if (ierr.ne.0) return
+C- Tri des MCHAML donnes en entree
+      CALL rngcha(icham1,icham2,'CARACTERISTIQUES','CONTRAINTES',
+     &            ipcar,ipcon)
+      if (ierr.ne.0) return
+C- Le champ de caracteristiques est toujours obligatoire !
+      if (ipcar.eq.0) then
+        moterr(1:16)='CARACTERISTIQUES'
+        call erreur(565)
+        return
+      endif
+
+C=======================================================================
+C= QUELQUES INITIALISATIONS
+C=======================================================================
+      idimp1 = IDIM + 1
+*      write(ioimp,*) ' Entree dans excfro jcpr(ncpr(/1) ',nbpts
+
+
+C=======================================================================
+C= ANALYSE DU MODELE DU FROTTEMENT et DECOUPAGE EN MODELES DE MEME TYPE
+C=======================================================================
+      mmodel=modini
+      SEGACT,mmodel
+      nsoum = kmodel(/1)
+
+      n1 = nsoum
+      icoulo = 0
+      SEGINI,mmode2
+      mocoul = mmode2
+
+      DO isoum = 1, nsoum
+        imodel = kmodel(isoum)
+        SEGACT,imodel
+*        write(ioimp,*) isoum,' formod(1) matmod(1)',formod(1),matmod(1)
+        IF (formod(1).ne.'CONTACT') then
+           moterr(1:16)='CONTACT'
+           call erreur(719)
+           goto 9999
+        ENDIF
+        icoul=0
+        do inma=1,matmod(/2)
+          if ( matmod(inma).eq.'COULOMB') icoul=1
+        enddo
+        IF (icoul.eq.1) THEN
+*          IF (idim.eq.2.and.NEFMOD.NE.107) call erreur(16)
+*          IF (idim.eq.3.and.NEFMOD.NE.165) call erreur(16)
+          icoulo = icoulo + 1
+          mmode2.kmodel(icoulo) = imodel
+        ELSE
+**        write(ioimp,*) 'Modele de FROTTEMENT non implemente'
+**        call erreur(21)
+        ENDIF
+        IF (ierr.ne.0) goto 9999
+      ENDDO
+      if(n1.ne.icoulo) then
+         n1=icoulo
+         segadj mmode2
+      endif
+
+
+C=======================================================================
+*  noter les contacts actifs dans le champ de deplacement
+C=======================================================================
+*  ncpr tableau des multiplicateurs de lagrange
+*  recuperes dans le model
+      segini ncpr
+      nbptl=0
+      mmodel=mocoul
+      segact mmodel
+      do m1=1,kmodel(/1)
+        imodel=kmodel(m1)
+        segact imodel
+        ipt7=imamod
+        ipt1=ipt7
+        segact ipt7
+        do is=1,max(1,ipt7.lisous(/1))
+         if(ipt7.lisous(/1).ne.0) ipt1=ipt7.lisous(is)
+         segact ipt1
+         nbele1=ipt1.num(/2)
+         nbnoe1=ipt1.num(/1)
+         do iel=1,nbele1
+          impt=ipt1.num(1,iel)
+          if(ncpr(impt).eq.0) then
+           nbptl=nbptl+1
+           ncpr(impt)=nbptl
+          endif
+*  cas des cables mult en 2
+**        impt=ipt1.num(2,iel)
+**        if(ncpr(impt).eq.0) then
+**         nbptl=nbptl+1
+**         ncpr(impt)=nbptl
+**        endif
+          impt=ipt1.num(nbnoe1,iel)
+          if(ncpr(impt).eq.0) then
+           nbptl=nbptl+1
+           ncpr(impt)=nbptl
+          endif
+          if(idim.eq.3) then
+          impt=ipt1.num(nbnoe1-1,iel)
+          if(ncpr(impt).eq.0) then
+           nbptl=nbptl+1
+           ncpr(impt)=nbptl
+          endif
+          endif
+         enddo
+        enddo
+      enddo
+
+** maintenant on cree les tableaux permettant de retrouver la raideur et le modele a partir du lx
+      segini irilx,iellx,irides
+      segact mrigid
+      do 11 ir=1,irigel(/2)
+        if (irigel(6,ir).eq.0) goto 11
+        descr=irigel(3,ir)
+        segact descr
+        if (lisinc(1).ne.'LX  ') goto 11
+        meleme=irigel(1,ir)
+        segact meleme
+        do iel=1,num(/2)
+         impt=ncpr(num(1,iel))
+         if(impt.ne.0) then
+           if (irilx(impt).ne.0) call erreur(5)
+           irilx(impt)=irigel(4,ir)
+           irides(impt)=irigel(3,ir)
+           iellx(impt)=iel
+         endif
+        enddo
+  11  continue
+      segini imolx,imllx
+      do m1=1,kmodel(/1)
+        imodel=kmodel(m1)
+        ipt7=imamod
+        meleme=ipt7
+        segact meleme
+        do is=1,max(1,ipt7.lisous(/1))
+         if(ipt7.lisous(/1).ne.0) meleme=ipt7.lisous(is)
+         segact meleme
+         do iel=1,num(/2)
+           impt=ncpr(num(1,iel))
+           if (imolx(impt).ne.0) call erreur(5)
+           imolx(impt)=meleme
+           imllx(impt)=iel
+         enddo
+        enddo
+      enddo
+*
+
+
+
+**    write(6,*) ' nbptl nbpts dans excfro ',nbptl,nbpts
+      segini icpr,xcpr,jcpr,ycpr,xdcp
+                     segini zcprd,zcprf,kcpr
+
+*      call ecchpo(mchpin,0)
+      mchpo1=mchpin
+      segact mchpo1
+      xcprmf=xpetit/xzprec
+      xcprmd=xpetit/xzprec
+      do 100 isoupo=1,mchpo1.ipchp(/1)
+        msoupo=mchpo1.ipchp(isoupo)
+        segact msoupo
+        do 110 ic=1,nocomp(/2)
+          if (nocomp(ic).ne.'LX  ') go to 110
+          ipt2=igeoc
+          mpoval=ipoval
+          segact ipt2,mpoval
+          nbel2 = ipt2.num(/2)
+          do 130 iel=1,nbel2
+            imptr = ncpr(ipt2.num(1,iel))
+            if (imptr.ne.0) then
+             icpr(imptr)=1
+             xcpr(imptr)=xcpr(imptr)+vpocha(iel,ic)
+             xcprmf=max(xcprmf,abs(xcpr(imptr)))
+*            write(6,*) 'impt imptr icpr xcpr ',impt,imptr,xcpr(imptr)
+            endif
+ 130      continue
+ 110    continue
+ 100  continue
+
+
+C=======================================================================
+C= TRAITEMENT DES MODELES DE TYPE 'COULOMB'
+C=======================================================================
+ 1000 CONTINUE
+      IF (icoulo.EQ.0) GOTO 2000
+      mmodel = mocoul
+      mchelm=ipcar
+      segact,mchelm
+      segact,mmodel
+      DO 200 m1 = 1, icoulo
+        imodel = kmodel(m1)
+        SEGACT,imodel
+        ipt1 = imamod
+        segact ipt1
+*  recherche rapide d'un maillage correspondant dans le mchaml
+        DO 210 n2 = 1,imache(/1)
+*          write(ioimp,*) ' n2 imache(n2) ipt1 ',n2,imache(n2),ipt1
+          if (imache(n2).eq.ipt1) goto 220
+ 210    continue
+        call erreur(472)
+        goto 9200
+ 220    continue
+        mchaml=ichaml(n2)
+        ipt7=imache(n2)
+        segact,mchaml,ipt7
+*  recherche des bonnes composantes dans le chamelem
+*  nouveau elem frot PV
+        imu=0
+        icohe=0
+        melva1=mmodel
+        melva2=mmodel
+        melva3=mmodel
+        do 225 iche=1,nomche(/2)
+          if (nomche(iche).eq.'MU  ') then
+            imu=iche
+            melva1=ielval(imu)
+            segact melva1
+            icva1 = melva1.velche(/2)
+            do i=1,ipt7.num(/2)
+*            write(6,*) ' creation xdcp ',ipt7.num(1,i),
+*    >       ncpr(ipt7.num(1,i)),
+*    >          melva1.velche(1,min(i,icva1))
+             xdcp(ncpr(ipt7.num(1,i)))=melva1.velche(1,min(i,icva1))
+            enddo
+          else if (nomche(iche).eq.'COHE') then
+            icohe=iche
+            melva2=ielval(icohe)
+            segact melva2
+            icva2 = melva2.velche(/2)
+          endif
+ 225    continue
+        ipt7=imamod
+        SEGACT,ipt7
+*  attention ipt7 peut etre compose
+        ipt1=ipt7
+        do 231 is=1,max(1,ipt7.lisous(/1))
+        if (ipt7.lisous(/1).ne.0) ipt1=ipt7.lisous(is)
+        segact ipt1
+        nbele1 = ipt1.num(/2)
+        nbnoe1 = ipt1.num(/1)
+        if (nbnoe1.eq.0) goto 231
+*  on met la raideur additionnelle de frottement meme si contact inactif
+        do 230 iel=1, nbele1
+          impt = ipt1.num(1,iel)
+          imptr=ncpr(impt)
+**        if (icpr(imptr).eq.0) goto 230
+          ipasp = 0
+          xpres= xcprmf*xzprec
+          ypres = 0.
+*  bon on a un frottement actif ou non. On a le multiplicateur de lagrange
+*  associe. Il faut le transformer en pression
+          if (icpr(imptr).ne.0) then
+              xpres = xcpr(imptr)
+          endif
+          if (idim.eq.2) then
+            if (imu.ne.0) then
+              ypres = ypres + xpres * melva1.velche(1,min(iel,icva1))
+            endif
+            if (icohe.ne.0.and.icpr(imptr).ne.0) then
+*  cohesion uniquement si contact
+              ypres = ypres + melva2.velche(1,min(iel,icva2))
+            endif
+            ip1 = ipt1.num(nbnoe1,iel)
+            jcpr(ncpr(ip1)) = ip1
+            ycpr(ncpr(ip1)) = ypres
+*  cas 3D
+          else
+*  on ne traite que mu pour le moment quelle que soit la formulation
+            if (imu.ne.0) then
+              ypres = xpres * melva1.velche(1,min(iel,icva1))
+            endif
+            if (icohe.ne.0.and.icpr(imptr).ne.0) then
+              ypres = ypres + melva2.velche(1,min(iel,icva2))
+            endif
+* ypres est le multiplicateur donnant la force de frottement totale
+* on la repartira ulterieurement entre les deux conditions
+* elements de contact a nbnoe1 noeuds en 3D (les 2 derniers etant les
+* points supports du frottement)
+* on met la moitié ici car
+            ip1 = ipt1.num(nbnoe1-1,iel)
+            ip2 = ipt1.num(nbnoe1,iel)
+            jcpr(ncpr(ip1)) = ip2
+            ycpr(ncpr(ip1)) = ypres
+            jcpr(ncpr(ip2)) = ip1
+            ycpr(ncpr(ip2)) = ypres
+          endif
+ 230    continue
+ 231    continue
+ 200  CONTINUE
+ 9200 CONTINUE
+      IF (ierr.ne.0) goto 9999
+
+C=======================================================================
+C= TRAITEMENT DES MODELES DE TYPE '........'
+C=======================================================================
+ 2000 CONTINUE
+
+C=======================================================================
+*  RECHERCHE DU SENS DU FROTTEMENT (TOUS MODELES)
+C=======================================================================
+* 1 - On applique la raideur de frottement sur le chpt de deplacement.
+*     On regarde le signe des multiplicateurs.
+* 2 - Si le blocage est actif, il faut maintenir la condition.
+*     On utilise le signe de la reaction.
+*
+      ymcritd = xpetit/xzprec
+      ymcritf = xpetit/xzprec
+      ymcritf=max(xpetit,xcprmf)
+*  on remplit dans tous les cas les reactions
+      segact mcoord
+*  si le blocage est actif on s'en servira
+**    call ecchpo(mchpo1,0)
+      segact mchpo1
+      do 450 isoupo=1,mchpo1.ipchp(/1)
+        msoupo=mchpo1.ipchp(isoupo)
+        segact msoupo
+        mpoval=ipoval
+        segact mpoval
+        ipt2=igeoc
+        segact ipt2
+          do  il=1,ipt2.num(/2)
+          xg=-xgrand
+          do  ip=2,ipt2.num(/1)
+            it1=ipt2.num(ip-1,il)
+            it2=ipt2.num(ip,il)
+            xg=max(xg,abs(xcoor((it1-1)*(idim+1)+1)-
+     >            xcoor((it2-1)*(idim+1)+1)))
+            xg=max(xg,abs(xcoor((it1-1)*(idim+1)+2)-
+     >            xcoor((it2-1)*(idim+1)+2)))
+            if(idim.eq.3)
+     >      xg=max(xg,abs(xcoor((it1-1)*(idim+1)+3)-
+     >            xcoor((it2-1)*(idim+1)+3)))
+          enddo
+            ymcritd=max(ymcritd,xg)
+          enddo
+        do 465 ic=1,nocomp(/2)
+        if (nocomp(ic).eq.'LX  ') then
+          do  iel=1,vpocha(/1)
+            ymcritf=max(ymcritf,abs(vpocha(iel,ic)))
+          enddo
+        else
+          do  iel=1,vpocha(/1)
+            ymcritd=max(ymcritd,abs(vpocha(iel,ic)))
+          enddo
+        endif
+ 465    continue
+ 450  continue
+      ymcritf=1d-10 * ymcritf
+**    write (ioimp,*) ' 3 ymcritf ',ymcritf
+
+      do 400 isoupo=1,mchpo1.ipchp(/1)
+        msoupo=mchpo1.ipchp(isoupo)
+        mpoval=ipoval
+        do 405 ic=1,nocomp(/2)
+        if (nocomp(ic).ne.'LX  ') goto 405
+        ipt2=igeoc
+        do 430 iel=1,ipt2.num(/2)
+          impt = ipt2.num(1,iel)
+          imptr=ncpr(impt)
+          if (imptr.eq.0) goto 430
+*  pas de contact => pas de reaction on passe
+          if (jcpr(imptr).eq.0) goto 430
+          if (abs(vpocha(iel,ic)).lt.ymcritf)  then
+          else
+               kcpr(imptr)=0
+               zcprf(imptr)= vpocha(iel,ic)
+          endif
+ 430    continue
+ 405    continue
+ 400  continue
+
+*
+*
+*  etude des deplacements
+*  si le deplacement est non nul, c'est que le frottement glisse
+*  et on met alors la direction du glissement
+      mchpo1=mchpin
+      call mucpri(mchpo1,mrigid,mchpoi)
+      segact mchpoi
+      do 290 isoupo=1,ipchp(/1)
+        msoupo=ipchp(isoupo)
+        segact msoupo
+        mpoval=ipoval
+        segact mpoval
+        do ic=1,nocomp(/2)
+        if (nocomp(ic).ne.'FLX ') goto 290
+        ipt2=igeoc
+        segact ipt2
+        do 293 iel=1,vpocha(/1)
+          ymcritd=max(ymcritd,abs(vpocha(iel,ic)))
+ 293    continue
+        enddo
+ 290  continue
+      ymcritd=ymcritd*1d-10
+
+      do 300 isoupo=1,ipchp(/1)
+        msoupo=ipchp(isoupo)
+        mpoval=ipoval
+        do 305 ic=1,nocomp(/2)
+        if (nocomp(ic).ne.'FLX ') goto 300
+        ipt2=igeoc
+        do 330 iel=1,ipt2.num(/2)
+          impt = ipt2.num(1,iel)
+          imptr=ncpr(impt)
+          if (imptr.eq.0) goto 331
+** si jcpr nul, pas de contact donc pas de force de frottement
+          if (jcpr(imptr).eq.0) goto 331
+          if (abs(vpocha(iel,ic)).gt.ymcritd) then
+            kcpr(imptr)=1
+            zcprd(imptr) = vpocha(iel,ic)
+          else
+          endif
+          goto 330
+ 331    continue
+**           write(6,*) 'point saute ',impt,imptr
+ 330    continue
+ 305    continue
+        segsup,mpoval
+        segsup,msoupo
+ 300  continue
+      segsup mchpoi
+
+*
+* On cree un CHPOINT de MULT de FROTTEMENT qui nous donnera les forces
+* de frottement en le multipliant par la raideur
+* CHPOINT s'appuyant sur un seul maillage (nsoupo = 1) avec une seule
+* composante (nc = 1) de nom 'LX'
+      jg=jcpr(/1)
+      nat=1
+      nsoupo=1
+      segini mchpoi
+      jattri(1)=2
+      mtypoi='LX'
+      mochde='cree par excfro'
+      ifopoi=ifour
+      nc=1
+      segini msoupo
+      ipchp(1)=msoupo
+      nocomp(1)='LX  '
+      nbnn=1
+      nbelem=2*jg
+      nbref=0
+      nbsous=0
+      segini ipt7
+      ipt7.itypel=1
+      igeoc=ipt7
+      n=nbelem
+      segini mpoval
+      ipoval=mpoval
+      ip=0
+** boucle sur le modele pour recuperer les conditions
+      mmodel=mocoul
+      DO 610 m1 = 1, icoulo
+        imodel = kmodel(m1)
+        ipt5=imamod
+        SEGACT,ipt5
+*  attention ipt5 peut etre compose
+        ipt1=ipt5
+        do 631 is=1,max(1,ipt5.lisous(/1))
+        if (ipt5.lisous(/1).ne.0) ipt1=ipt5.lisous(is)
+        segact ipt1
+        if(ipt1.itypel.ne.22) call erreur(5)
+        nbnn1=ipt1.num(/1)
+      do 635 iel=1,ipt1.num(/2)
+        ipr=ipt1.num(nbnn1,iel)
+        lxf1=ncpr(ipr)
+*  test si on a bien contact
+        if (idim.eq.2) then
+          if(lxf1.eq.0) goto 635
+          xxd=zcprd(lxf1)
+          xxf=zcprf(lxf1)
+*  deplacements non nuls, on les prend
+          ssd=abs(xxd)
+          ssf=abs(xxf)
+          if (ssd.lt.xpetit) ssd=1.
+          if (ssf.lt.xpetit) ssf=1.
+          if (abs(xxd).gt.ymcritd) then
+             xx= xxd/ssd
+**           write(6,*) ' point glisse ',ipr,xx
+*  sinon les forces
+          elseif(abs(xxf).gt.ymcritf) then
+                xx= xxf/ssf
+**           write(6,*) ' point bloque ',ipr,xx
+          else
+*  pas de deplacements, pas de forces
+              jcpr(lxf1)=0
+              xdcp(lxf1)=0.d0
+              xx=0.d0
+              goto 635
+          endif
+ 601      continue
+          ip=ip+1
+          ipt7.num(1,ip)=ipr
+*  en 2d utilisation de la formulation non symetrique
+*  on laisse juste une force residuelle pour passer le signe a excite
+          vpocha(ip,1)=-ycpr(lxf1)*xx
+          if(ns2d) vpocha(ip,1)=vpocha(ip,1)*xzprec
+          xdcp(lxf1)= xx
+        else
+* en 3d il faut corriger en fonction de la direction du depl et des reac
+          idu=ipt1.num(nbnn1-1,iel)
+          lxf2=ncpr(idu)
+          if(lxf1.eq.0.and.lxf2.eq.0) goto 635
+          xxd=0.d0
+          xxf=0.d0
+          yyd=0.d0
+          yyf=0.d0
+          if (lxf1.ne.0) then 
+           xxd=zcprd(lxf1)
+           xxf=zcprf(lxf1)
+          endif
+          if (lxf2.ne.0) then
+           yyd=zcprd(lxf2)
+           yyf=zcprf(lxf2)
+          endif
+*  deplacements non nuls, on les prend
+             ssd=sqrt(xxd**2+yyd**2)
+             ssf=sqrt(xxf**2+yyf**2)
+             if (ssd.lt.ymcritd) then
+**pv          write(6,*) 'point bloque ',ipr,idu
+              ssd=xgrand
+             endif
+             if (ssf.lt.ymcritf) then
+**pv           write(6,*) 'point bloque ',ipr,idu
+               ssf=xgrand
+             endif
+*  on moyenne la direction entre force et deplacement
+*  sauf en non convergence ou on garde la direction forces
+*  noncon est le compteur d'iteration
+*  les 5 premieres, on ne relaxe pas beaucoup pour obtenir la bonne direction de glissement
+*  ensuite on relaxe de plus en plus pour converger sur la direction (meme fausse)
+             if(ssd.lt.xsgran) then
+              if(noncon.gt.6) ssd=ssd*2*(noncon-6)
+              if(noncon.gt.25) ssd=ssd*(2.**(noncon-25))
+             endif
+             xx= xxd/ssd*3  + xxf/ssf*2
+             yy= yyd/ssd*3  + yyf/ssf*2
+*  normalisation
+          ss=sqrt(xx**2+yy**2)
+          if (ss.lt.xpetit/xzprec.or.(ssd.ge.xgrand.and.
+     >          ssf.ge.xgrand)) then
+*  pas de deplacements, pas de forces
+              jcpr(lxf1)=0
+              jcpr(lxf2)=0
+              xdcp(lxf1)=0.d0
+              xdcp(lxf2)=0.d0
+              goto 635
+          endif
+** on met une grande excitation a la premiere iteration pour bloquer les frottements
+** autant qu'on peut
+          if(noncon.le.1) ss=ss/16
+          xx=xx/(ss+xpetit)
+          yy=yy/(ss+xpetit)
+**        write(6,*) 'depl forc ',xxd,yyd,xxf,yyf,xx,yy
+          ip=ip+1
+          ipt7.num(1,ip)=ipr
+          vpocha(ip,1)= -ycpr(lxf1)*xx
+** rajouter xzprec pour passer en NS
+          if (ns3d) vpocha(ip,1)=vpocha(ip,1)*xzprec
+          xdcp(lxf1)= xx
+          ip=ip+1
+          ipt7.num(1,ip)=idu
+** rajouter xzprec pour passer en NS
+          vpocha(ip,1)= -ycpr(lxf2)*yy
+          if (ns3d) vpocha(ip,1)=vpocha(ip,1)*xzprec
+          xdcp(lxf2)= yy
+          if(ycpr(lxf1).ne.ycpr(lxf2)) write(6,*) 'ycpr differents',
+     >      ycpr(lxf1),ycpr(lxf2)
+*          write(ioimp,*) ' force ',vpocha(ip,1),ipr,idu
+        endif
+ 600  continue
+ 635  continue
+ 631  continue
+ 610  continue
+      nbelem=ip
+      n=ip
+      segadj ipt7,mpoval
+
+**    goto 1954
+*
+*      maintenant, en cas de frottement, on construit la partie non symetrique de la raideur.
+*
+      segact mrigid
+      nrigel=irigel(/2)
+      iforis=iforig
+      segini,ri1
+      ri1.iforig=iforis
+      ri1.mtymat='FROTTEME'   
+      ir2=0
+      do 1200 ir=1,irigel(/2)
+       meleme=irigel(1,ir)
+       segact meleme
+       descr=irigel(3,ir)
+       nbsous=0
+       nbref=0
+       nbnn=num(/1)
+       nbelem=num(/2)
+       segini,ipt1
+       ipt1.itypel=itypel
+       iel2=0
+       xmatri=irigel(4,ir)
+       segact xmatri
+       nligrd=re(/1)
+       nligrp=re(/2)
+       nelrig=re(/3)
+       segini,xmatr1
+       nbnn=num(/1)
+       do 1100 iel=1,num(/2)
+        lxc=ncpr(num(1,iel))
+        if (lxc.eq.0) goto 1100
+        ipt7=imolx(lxc)
+        if (ipt7.eq.0) goto 1100
+        segact ipt7
+        nbnn7=ipt7.num(/1)
+        ilm=imllx(lxc)
+        if(ilm.eq.0) goto 1100
+*  verif que c'est bien un multiplicateur de contact
+        if (ncpr(ipt7.num(1,ilm)).ne.lxc) goto 1100
+*  et qu'on a determine le sens de frottement
+        lxf1=ncpr(ipt7.num(nbnn7,ilm))
+        if (idim.eq.2) then
+          if (.not. ns2d) goto 1100
+*pv        if(jcpr(lxf1).eq.0) then
+*pv         goto 1100
+*pv        endif
+        else
+*  test si NS
+*  pas de matrice non symetrique en 3D pour le moment
+          if (.not. ns3d) goto 1100
+          lxf2=ncpr(ipt7.num(nbnn7-1,ilm))
+**        if(jcpr(lxf1).eq.0.and.jcpr(lxf2).eq.0) goto 1100
+        endif
+        iel2=iel2+1
+        do ip=1,num(/1)
+         ipt1.num(ip,iel2)=num(ip,iel)
+        enddo
+        xmatr6=irilx(lxf1)
+        des6  =irides(lxf1)
+        segact xmatr6
+        if(xmatr6.re(/1).ne.re(/1)) call erreur(5)
+        if(des6.ne.descr) call erreur(5)
+        nelri1=iellx(lxf1)
+** xdcp contient le coef de frottement pour les multiplicateurs de contact
+** et l'angle (cos sin) pour les multiplicateurs de frottement
+        do id=1,re(/1)
+         xmatr1.re(id,1,iel2)=
+     >        +xdcp(lxc)*xdcp(lxf1)*xmatr6.re(id,1,nelri1)
+        enddo
+        if(idim.eq.3) then
+          xmatr6=irilx(lxf2)
+          segact xmatr6
+          nelri2=iellx(lxf2)
+          do id=1,re(/1)
+           xmatr1.re(id,1,iel2)=xmatr1.re(id,1,iel2)
+     >         +xdcp(lxc)*xdcp(lxf2)*xmatr6.re(id,1,nelri2)
+          enddo
+        endif
+**      write(6,*) 'mu ',lxc,xdcp(lxc),'angle',lxf,xdcp(lxf)
+ 1100  continue
+       nbnn=ipt1.num(/1)
+       nbelem=iel2
+       nsous=0
+       nbref=0
+       segadj ipt1
+       nelrig=iel2
+       nligrd=xmatr1.re(/1)
+       nligrp=xmatr1.re(/2)
+       if(nelrig.ne.0) then
+       segadj xmatr1
+        ir2=ir2+1
+        ri1.coerig(ir2)=coerig(ir)
+        ri1.irigel(1,ir2)=ipt1
+        ri1.irigel(2,ir2)=irigel(2,ir)
+        ri1.irigel(3,ir2)=irigel(3,ir)
+        ri1.irigel(4,ir2)=xmatr1
+        ri1.irigel(5,ir2)=irigel(5,ir)
+        ri1.irigel(6,ir2)=irigel(6,ir)
+        ri1.irigel(7,ir2)=2
+        ri1.irigel(8,ir2)=irigel(8,ir)
+        xmatr1.symre=2
+       endif
+ 1200 continue
+      nrigel=ir2
+      segadj ri1
+1954  continue
+** ecriture de la raideur de contact non associee
+**    call prrigi(ri1,0)
+      call ecrobj('RIGIDITE',ri1)
+*
+*  on construit maintenant la raideur de passage des multiplicateurs de contact aux multiplicateurs de frottement
+*  elle permettre en fin de unilater de recalculer les multiplicateurs de frottement du probleme sans la raideur additionnelle
+       nligrp=idim
+       nligrd=idim
+       nelrig=nbptl
+       segini xmatri
+       nbsous=0
+       nbref=0
+       nbnn=idim
+       nbelem=nbptl
+       iel2=0
+       segini meleme
+       itypel=idim
+*  Test si 3D NS
+       if ((.not.ns3d).and.idim.eq.3) goto 2101
+       if ((.not.ns2d).and.idim.eq.2) goto 2101
+       do 2100 lxc=1,nbptl
+        ipt7=imolx(lxc)
+        if (ipt7.eq.0) goto 2100
+        segact ipt7
+        ilm=imllx(lxc)
+        if(ilm.eq.0) goto 2100
+*  verif que c'est bien un multiplicateur de contact
+        if (ncpr(ipt7.num(1,ilm)).ne.lxc) goto 2100
+        nbnn7=ipt7.num(/1)
+        iel2=iel2+1
+         num(1,iel2)=ipt7.num(1,ilm)
+         num(2,iel2)=ipt7.num(nbnn7,ilm)
+         re(1,1,iel2)=0.d0
+         lxf1=ncpr(num(2,iel2))
+* verifier qu'on a bien mis la matrice additionnelle
+        if(idim.eq.2) then
+*pv       if(jcpr(lxf1).eq.0) then
+**         write(6,*) ' pas de matrice additionnelle '
+*pv        iel2=iel2-1
+*pv        goto 2100
+*pv       endif
+**        write (6,*) ' matrice de transfert pour ',
+**   >    num(2,iel2),jcpr(lxf1)
+        else
+          num(3,iel2)=ipt7.num(nbnn7-1,ilm)
+          lxf2=ncpr(num(3,iel2))
+*pv       if(jcpr(lxf1).eq.0.and.jcpr(lxf2).eq.0) then
+*pv        iel2=iel2-1
+*pv        goto 2100
+*pv       endif
+        endif
+** xdcp contient le coef de frottement pour les multiplicateurs de contact
+** et l'angle (cos sin) pour les multiplicateurs de frottement
+**       write(6,*) 'excfro transfert',
+**   >         num(2,iel2),xdcp(lxf1),num(1,iel2),xdcp(lxc)
+         re(2,1,iel2)= xdcp(lxf1) *  xdcp(lxc)
+         if(idim.eq.3) then
+          re(3,1,iel2)= xdcp(lxf2)*xdcp(lxc)
+**       write(6,*) ' angle du frottement ',ipt7.num(1,ilm),
+**   >     atan2(xdcp(lxf1),xdcp(lxf2))
+         endif
+ 2100  continue
+ 2101  continue
+       segini descr
+        lisinc(1)='LX'
+        lisinc(2)='LX'
+        lisdua(1)='LX'
+        lisdua(2)='LX'
+        noelep(1)=1
+        noelep(2)=2
+        noeled(1)=1
+        noeled(2)=2
+        if(idim.eq.3) then 
+         lisinc(3)='LX'
+         lisdua(3)='LX'
+         noelep(3)=3
+         noeled(3)=3
+        endif
+       nelrig=iel2
+       segadj xmatri
+       nbelem=iel2
+       segadj meleme
+       nrigel=0
+       if(nelrig.ne.0) nrigel=1
+       segini mrigid
+       iforig=iforis
+       if(nrigel.eq.1) then
+       coerig(1)=1.d0
+       irigel(1,1)=meleme
+       irigel(3,1)=descr
+       irigel(4,1)=xmatri
+       irigel(7,1)=2
+       symre=2
+       endif
+
+** ecriture de la raideur de transfert du contact en frottement
+**    call prrigi(mrigid,0)
+      call ecrobj('RIGIDITE',mrigid)
+
+
+
+ 9000 CONTINUE
+      call actobj('CHPOINT ',mchpoi,1)
+**    write(6,*) 'sortie de excfro '
+**    call ecchpo(mchpoi,0)
+      call ecrobj('CHPOINT ',mchpoi)
+
+
+ 9900 CONTINUE
+      segsup icpr,jcpr,xcpr,ycpr
+                     segsup zcprd,zcprf,kcpr
+      segsup ncpr,irilx,imolx,iellx,imllx,irides
+
+
+ 9999 CONTINUE
+      mmode2 = mocoul
+      SEGSUP mmode2
+
+      END
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,407 @@
+C LMDCHM    SOURCE    OF166741  24/03/28    21:15:04     11811          
+
+C***********************************************************************
+C NOM         : lmdchm.eso
+C DESCRIPTION : Sortie d'un MCHAML au format .med
+C***********************************************************************
+C HISTORIQUE :  23/10/2017 : RPAREDES : Creation
+C HISTORIQUE :  22/01/2024 : OF       : Menues corrections
+C HISTORIQUE :  31/01/2024 : OF       : Menues corrections (2)
+C HISTORIQUE :  12/02/2024 : OF       : Passage en MED 64b 
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : operateur (LIRE 'MED') lirmed.eso
+C***********************************************************************
+C ENTREES :
+C             mfid    : Id du fichier
+C             MTABLE  : Table avec la geometrie
+C             SLSCHA  : Segment avec l'information des champs
+C             SLSFUS  : Segment avec la liste de champs a creer
+C             IPDT    : Pas de Tps
+C SORTIES : ISOR : Pointeur vers le MCHAML
+C***********************************************************************
+      SUBROUTINE LMDCHM(mfid, MTABLE, SLSCHA, SLSFUS, IPDT, ISOR)
+
+      IMPLICIT INTEGER(i-n)
+      IMPLICIT REAL*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCMED
+
+-INC SMELEME
+-INC SMCOORD
+-INC SMLMOTS
+-INC SMTABLE
+-INC SMCHAML
+
+C-----Chaines de Caractere de longueur MED_SNAME_SIZE=16
+      CHARACTER*(MED_SNAME_SIZE) dtunit
+
+C-----Chaines de Caractere de longueur MED_NAME_SIZE=64
+      CHARACTER*(MED_NAME_SIZE) lname, fname, pname, mname
+
+      CHARACTER*(MED_NAME_SIZE) nommai, cha64a
+
+      CHARACTER*8   charre, typobj
+      LOGICAL       login, logre
+
+      EXTERNAL LONG
+
+C ***** Declaration des segments
+C----- SEG SLSCHA
+C         LISMAI : nom du maillage
+C         ncham  : nombre de champs (CHPOINT ou MCHAML)
+C         LISCHA : liste des noms de champs
+C         LSCHIN : liste de SEG CHAINF (information)
+C         LSPARA : liste de SEG CHAPAR (parametres)
+      SEGMENT SLSCHA
+        CHARACTER*(MED_NAME_SIZE) LISMAI
+        CHARACTER*(MED_NAME_SIZE) LISCHA(ncham)
+        INTEGER                   LSCHIN(ncham), LSPARA(ncham)
+      ENDSEGMENT
+
+      SEGMENT SLSFUS
+        INTEGER      CHAFUS(nbfus)
+      ENDSEGMENT
+
+      SEGMENT CHAINF
+C         nc     :   nombre de sequences de calcul dans le champ
+C         ncomp  :   nombre de composantes
+C         INUMDT :   liste de numeros de pas de tps
+C         INUMIT :   liste de numeros d'iteration
+C         ISCHPR :   liste de SEG CHAPRO (profil)
+C         XDT    :   liste de pas de tps
+C         CNAME  :   liste de noms des composants
+C         CUNIT  :   liste d'unites des composants
+        INTEGER      INUMDT(nc), INUMIT(nc), ISCHPR(nc)
+        REAL*8       XDT(nc)
+        CHARACTER*(MED_SNAME_SIZE) CNAME(ncomp), CUNIT(ncomp)
+      ENDSEGMENT
+
+C----- SEG CHAPAR
+C         ncpars : nombre de parametres par champ
+C         CHAPAR : nom du parametre
+C         CPARVL : valeur du parametre
+      SEGMENT CHAPAR
+        CHARACTER*(MED_SNAME_SIZE) CPARNM(ncpars)
+        INTEGER                    CPARVL(ncpars)
+      ENDSEGMENT
+
+C----- SEG CHAPRO
+C         nprof  : nombre de profils
+C         CTYPE  : type de champ
+C         CPRONA : nom du profil
+C         CETYPE : entity type
+C         CGTYPE : geometry type
+      SEGMENT CHAPRO
+        CHARACTER*8               CTYPE(nprof)
+        CHARACTER*(MED_NAME_SIZE) CPRONA(nprof)
+        INTEGER    CETYPE(nprof), CGTYPE(nprof)
+      ENDSEGMENT
+
+      SEGMENT MCNAM4
+        CHARACTER*4 CNAME4(ncomp)
+      ENDSEGMENT
+
+      SEGMENT SCHAVL
+        REAL*8 CHAVAL(n, n2)
+      ENDSEGMENT
+      POINTEUR SCHAV1.SCHAVL
+
+C***********************************************************************
+C      Ecriture du MCHAML
+C***********************************************************************
+      charre = ' '
+
+      mcret = 0
+
+C-----Initialisation
+      lname  = ' '
+      MCHELM = 0
+      ISOR   = 0
+      ifoch1 = IFOUR
+      infch1 = 2
+      infch3 = 0
+      infch5 = 0
+      IPER   = 0
+
+      mswm = MED_NO_INTERLACE
+      mcs  = MED_ALL_CONSTITUENT
+
+C---- Boucle sur les champs a lire
+      nbfus  = SLSFUS.CHAFUS(/1)
+      DO ia = 1,nbfus
+        icha   = SLSFUS.CHAFUS(ia)
+        nommai = SLSCHA.LISMAI
+        fname  = SLSCHA.LISCHA(icha)
+        CHAINF = SLSCHA.LSCHIN(icha)
+        CHAPAR = SLSCHA.LSPARA(icha)
+        CHAPRO = CHAINF.ISCHPR(IPDT)
+        numdt  = CHAINF.INUMDT(IPDT)
+        numit  = CHAINF.INUMIT(IPDT)
+        IF (CHAPAR .LE. 0) THEN
+          ncpars = 0
+        ELSE
+          ncpars = CHAPAR.CPARVL(/1)
+        ENDIF
+        n2     = CHAINF.CNAME(/2)
+
+C-------Recherche de parametres
+        IF (ncpars .GT. 0) THEN
+          CALL PLACE(CHAPAR.CPARNM, ncpars, ipar, 'IFOCHE')
+          IF (ipar.GT.0) THEN
+            ifoch1 = CHAPAR.CPARVL(ipar)
+          ENDIF
+          CALL PLACE(CHAPAR.CPARNM, ncpars, ipar, 'INFCHE1')
+          IF (ipar.GT.0) THEN
+            infch1 = CHAPAR.CPARVL(ipar)
+          ENDIF
+          CALL PLACE(CHAPAR.CPARNM, ncpars, ipar, 'INFCHE3')
+          IF (ipar.GT.0) THEN
+            infch3 = CHAPAR.CPARVL(ipar)
+          ENDIF
+          CALL PLACE(CHAPAR.CPARNM, ncpars, ipar, 'INFCHE5')
+          IF (ipar.GT.0) THEN
+            infch5 = CHAPAR.CPARVL(ipar)
+          ENDIF
+        ENDIF
+
+C-------Definition initiale du MCHAML
+        n1 = CHAPRO.CETYPE(/1)
+        n3 = 6
+        l1 = 64
+        SEGINI MCHEL1
+        MCHEL1.TITCHE = 'SCALAIRE'
+        MCHEL1.IFOCHE = ifoch1
+
+        DO ib=1,n1
+C---------Definition de IMACHE
+          pname  = CHAPRO.CPRONA(ib)
+          metype = CHAPRO.CETYPE(ib)
+          mgtype = CHAPRO.CGTYPE(ib)
+
+          IF (pname .NE. ' ') THEN
+            cha64a = pname
+          ELSE
+            cha64a = nommai
+          ENDIF
+
+          typobj = 'MAILLAGE'
+          CALL ACCTAB(MTABLE,'MOT' ,ival  ,xval  ,cha64a,login,iobin,
+     &                       typobj,ivalre,xvalre,charre,logre,iobre)
+          IF (IERR.NE.0) RETURN
+
+C         Constituant 'MED' en attendant de pouvoir le relire
+          MCHEL1.CONCHE(ib) = 'MED'
+          IF (pname .NE. ' ') THEN
+            MCHEL1.IMACHE(ib) = iobre
+          ELSE
+            IPT1 = iobre
+            SEGACT IPT1
+            itype  = MEDEL(IPT1.ITYPEL)
+            nbsous = IPT1.LISOUS(/1)
+            IF (itype .EQ. mgtype) THEN
+              MCHEL1.IMACHE(ib) = IPT1
+              nbnode = IPT1.NUM(/1)
+              nbelem = IPT1.NUM(/2)
+            ELSE
+              isea1 = 0
+              IF (nbsous .GT. 0) THEN
+                DO ic=1,nbsous
+                  IPT2 = IPT1.LISOUS(ic)
+                  SEGACT IPT2
+                  itype2 = MEDEL(IPT2.ITYPEL)
+                  IF (itype2 .EQ. mgtype) THEN
+                    isea1 = 1
+                    nbnode = IPT2.NUM(/1)
+                    nbelem = IPT2.NUM(/2)
+                    MCHEL1.IMACHE(ib) = IPT2
+                    GOTO 10
+                  ENDIF
+                ENDDO
+ 10             CONTINUE
+              ENDIF
+              IF (isea1 .EQ. 0) THEN
+                CALL ERREUR(21)
+                RETURN
+              ENDIF
+            ENDIF
+          ENDIF
+
+C         Information sur le champ de nom "fname"
+          CALL mfdfin(mfid, fname, mname, lmesh, mftype,
+     &                CHAINF.CNAME, CHAINF.CUNIT, dtunit, n4, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'lmdchm / mfdfin'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            RETURN
+          ENDIF
+
+C---------Restitution des valeurs
+          IF (pname .NE. ' ') THEN
+C-----------Taille du profil
+            CALL mpfpsn(mfid, pname, n4, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr   = 'lmdchm / mpfpsn'
+              interr(1)= mcret
+              CALL ERREUR(873)
+              RETURN
+            ENDIF
+
+C-----------Nombre de valeurs
+            IF     (metype .EQ. MED_NODE_ELEMENT) THEN
+              infch6 = 1
+            ELSEIF (metype .EQ. MED_CELL        ) THEN
+              infch6 = 2
+            ENDIF
+            mtsf   = MED_COMPACT_STMODE
+            CALL mfdnpn(mfid, fname, numdt, numit, metype, mgtype,
+     &                  pname, mtsf, n4, lname, it1, nval, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    = 'lmdchm / mfdnpn'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              RETURN
+            ENDIF
+
+            n1el   = nval
+            n1ptel = it1
+            n2el   = 0
+            n2ptel = 0
+
+            n = n1ptel * n1el
+            SEGINI SCHAVL,SCHAV1
+            CALL mfdrpr(mfid, fname, numdt, numit, metype, mgtype,
+     &                  mtsf, pname, mswm, mcs, SCHAV1.CHAVAL, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    = 'lmdchm / mfdrpr'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              RETURN
+            ENDIF
+
+          ELSE
+C-----------Nombre de valeurs
+            IF      (metype .EQ. MED_NODE_ELEMENT) THEN
+              infch6 = 1
+              n1ptel = nbnode
+            ELSE IF (metype .EQ. MED_CELL        ) THEN
+              infch6 = 2
+              n1ptel = 1
+            ENDIF
+
+            CALL mfdnva(mfid,fname,numdt,numit,metype,mgtype,nval,mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    = 'lmdchm / mfdnva'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              RETURN
+            ENDIF
+
+            n1el   = nbelem
+            n2el   = 0
+            n2ptel = 0
+
+            n = n1ptel * n1el
+            SEGINI SCHAVL,SCHAV1
+            CALL mfdrvr(mfid, fname, numdt, numit, metype, mgtype,
+     &                  mswm, mcs, SCHAV1.CHAVAL, mcret)
+            IF (mcret .NE. 0) THEN
+              moterr    = 'lmdchm / mfdrvr'
+              interr(1) = mcret
+              CALL ERREUR(873)
+              RETURN
+            ENDIF
+          ENDIF
+
+C         Conversion des types MED en REAL*8 suivant les cas
+          ITAIL=n*n2
+C         On envoie le meme tableau plusieurs fois pour le recuperer
+C         dans MTCONV selon plusieurs types (INTEGER*4, etc.)
+          itypd = mftype
+          ITAIL = n*n2
+          iret  = 0
+          CALL MTCONV(itypd,SCHAV1.CHAVAL,SCHAV1.CHAVAL,
+     &                      SCHAV1.CHAVAL,SCHAV1.CHAVAL, ITAIL,
+     &                      SCHAVL.CHAVAL,iret)
+          mcret = iret
+          IF (mcret .NE. 0) RETURN
+
+C---------Definition de INFCHE
+          MCHEL1.INFCHE(ib, 1) = infch1
+          MCHEL1.INFCHE(ib, 3) = infch3
+          MCHEL1.INFCHE(ib, 5) = infch5
+          MCHEL1.INFCHE(ib, 6) = infch6
+
+C---------Definition de MCHAML
+          SEGINI,MCHAML
+          DO ic = 1, n2
+            MCHAML.NOMCHE(ic) = CHAINF.CNAME(ic)(1:8)
+            IF (MCHAML.NOMCHE(ic) .EQ. '        ') THEN
+              MCHAML.NOMCHE(ic) = 'SCAL    '
+            ENDIF
+            MCHAML.TYPCHE(ic) = 'REAL*8'
+
+            IF (infch6 .EQ. 1) THEN
+C             Cas MCHAML aux NOEUDS
+              IPT1 = MCHEL1.IMACHE(ib)
+              SEGACT,IPT1
+              IPER = MEDPER(IPT1.ITYPEL)
+            ELSE
+C             Cas MCHAML au GRAVITE
+              IPER = -1
+            ENDIF
+
+            SEGINI,MELVAL
+            icc = 1
+            IF (IPER .LT. 0) THEN
+              DO il=1,n1el
+                DO im=1,n1ptel
+                  MELVAL.VELCHE(im,il) = SCHAVL.CHAVAL(icc, ic)
+                  icc = icc + 1
+                ENDDO
+              ENDDO
+            ELSE
+              DO il=1,n1el
+                MELVAL.VELCHE(1,il) = SCHAVL.CHAVAL(icc, ic)
+                icc = icc + 1
+                DO im = 1,n1ptel-1
+                  jm = IPERM(IPER+im)
+                  MELVAL.VELCHE(jm,il) = SCHAVL.CHAVAL(icc, ic)
+                  icc = icc + 1
+                ENDDO
+              ENDDO
+            ENDIF
+
+            SEGACT MELVAL*NOMOD
+            MCHAML.IELVAL(ic) = MELVAL
+          ENDDO
+
+          SEGSUP SCHAVL
+          SEGACT MCHAML*NOMOD
+          MCHEL1.ICHAML(ib) = MCHAML
+        ENDDO
+        SEGACT MCHEL1*NOMOD
+
+C-------Fusion des champs
+        IF (MCHELM .EQ. 0) THEN
+          MCHELM = MCHEL1
+        ELSE
+          CALL FUSCHL(MCHELM, MCHEL1, IRECHE)
+          IF (IERR .NE. 0) RETURN
+          MCHELM = IRECHE
+        ENDIF
+      ENDDO
+
+      ISOR = MCHELM
+
+c      return
+      END
+
+ 

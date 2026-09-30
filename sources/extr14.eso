@@ -1,0 +1,155 @@
+C EXTR14    SOURCE    CB215821  20/11/04    21:17:05     10766          
+      SUBROUTINE EXTR14(IPCHE1,IENT1,IENT2,IENT3,MOT)
+C_____________________________________________________________________
+C
+C     Extrait une composante d'un MCHAML
+C
+C  Entrees :
+C  ---------
+C
+C     IPCHE1  Pointeur sur un MCHAML
+C     IENT1   Numero de la sous zone
+C     IENT2   Numero de l'element
+C     IENT3   Numero du point de gauss
+C     MOT     Nom de la composante a extraire ou mot cle indiquant
+C             l'action a effectuer  (TITR = TYPE ou MAIL)
+C
+C  JM CAMPENON le 07/91
+C  C La Borderie le 21/07/92 :possibilite d'extraire une composante entiere
+C  PP 21/12/92 :extension a l'extraction d'un objet de type quelconque
+C_____________________________________________________________________
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMCHAML
+-INC SMINTE
+-INC SMLMOTS
+-INC SMELEME
+C
+      logical ltelq
+      REAL*8 FLOX
+      CHARACTER*(LOCOMP) MOT
+      CHARACTER*(4) MOT4
+      CHARACTER*8 TYPOBJ
+      CHARACTER*(LOCHAI) CTEXT
+C
+      MCHELM=IPCHE1
+      SEGACT MCHELM
+      NSOUS=ICHAML(/1)
+C
+      MOT4=MOT
+      IF ((MOT4.EQ.'TITR').OR.(MOT4.EQ.'TYPE')) THEN
+         JGM=1
+         JGN=TITCHE(/1)
+         CTEXT=TITCHE
+         SEGINI MLMOTS
+         IPMOTS=MLMOTS
+         MOTS(1)=CTEXT
+         SEGDES MLMOTS
+         CALL ECROBJ('LISTMOTS',IPMOTS)
+         RETURN
+      ELSEIF (MOT4.EQ.'MAIL') THEN
+         N1 = IMACHE(/1)
+         IF ( N1 .EQ. 0) THEN
+C          Cas du MCHAML VIDE ==> MAILLAGE VIDE
+           NBELEM=0
+           NBNN  =NBNNE(ILCOUR)
+           NBREF =0
+           NBSOUS=0
+           SEGINI MELEME
+           ITYPEL = ILCOUR
+           IPP1 = MELEME
+         ELSE
+           IPP1=IMACHE(1)
+           IF(NSOUS.GT.1) THEN
+              DO 30 I=2,NSOUS
+                 IPP2=IMACHE(I)
+                 ltelq=.false.
+                 CALL FUSE (IPP1,IPP2,IRET,ltelq)
+                 IPP1=IRET
+ 30          CONTINUE
+           ENDIF
+         ENDIF
+         CALL ACTOBJ('MAILLAGE',IPP1,1)
+         CALL ECROBJ('MAILLAGE',IPP1)
+         GOTO 555
+      ENDIF
+C
+      IF (IENT1.GT.NSOUS) THEN
+C
+C        Sous zone inexistante
+C
+         CALL ERREUR(279)
+         GOTO 555
+      ENDIF
+C
+      MELEME=IMACHE(IENT1)
+      SEGACT MELEME
+      NBELEM=NUM(/2)
+      NBPGAU=NUM(/1)
+C
+      N3=INFCHE(/2)
+      IF (N3.GE.4) THEN
+         MINTE=INFCHE(IENT1,4)
+         IF(MINTE.NE.0)THEN
+          SEGACT MINTE
+          NBPGAU=POIGAU(/1)
+        ENDIF
+      ENDIF
+C
+      IF (IENT3.GT.NBPGAU.OR.IENT2.GT.NBELEM) THEN
+C
+C        Numero du point de gauss ou de l'element trop grand
+C
+         CALL ERREUR(281)
+         GOTO 555
+      ENDIF
+C
+      MCHAML=ICHAML(IENT1)
+      SEGACT MCHAML
+      NCOMP=IELVAL(/1)
+      DO 100 ICOMP=1,NCOMP
+         IF (MOT.EQ.NOMCHE(ICOMP)) GOTO 200
+ 100  CONTINUE
+C
+C     Composante inexistante
+C
+      CALL ERREUR (280)
+      GOTO 444
+C
+ 200  CONTINUE
+      MELVAL=IELVAL(ICOMP)
+      SEGACT MELVAL
+C+PP
+      IF(TYPCHE(ICOMP)(1:6).EQ.'REAL*8')THEN
+         IGMN=MIN(IENT3,VELCHE(/1))
+         IBMN=MIN(IENT2,VELCHE(/2))
+         FLOX=VELCHE(IGMN,IBMN)
+         CALL ECRREE(FLOX)
+      ELSE
+        TYPOBJ=TYPCHE(ICOMP)(9:16)
+        IGMN=MIN(IENT3,IELCHE(/1))
+        IBMN=MIN(IENT2,IELCHE(/2))
+        IPOOBJ=IELCHE(IGMN,IBMN)
+C       Gestion des pointeurs nuls (et oui, ca arrive)
+        IF (IPOOBJ.EQ.0) THEN
+          MOTERR(1:8)=TYPOBJ
+          CALL ERREUR(356)
+        ENDIF
+        CALL ACTOBJ(TYPOBJ,IPOOBJ,1)
+        CALL ECROBJ(TYPOBJ,IPOOBJ)
+      ENDIF
+C+PP
+C
+ 444  CONTINUE
+C
+ 555  CONTINUE
+      END
+
+ 
+ 

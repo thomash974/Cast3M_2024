@@ -1,0 +1,638 @@
+$$$$ WAAM
+* WAAM      PROCEDUR  SP204843  23/07/07    21:15:08     11702          
+DEBP WAAM TAB1*'TABLE' ;
+
+*-------------------------- Initialisations ---------------------------*
+
+* Lecture des options :
+argu MOT1*'MOT' ;
+
+* icas1 = 1 / 2 pour MAIL / VISU
+* Si 0 in fine : erreur.
+icas1    = 0 ;
+
+*----------------------------------------------------------------------*
+*                             Option MAIL   
+*----------------------------------------------------------------------*
+
+si (ega mot1 'MAIL') ;
+  icas1    = 1 ;
+ 
+*----------------- Lecture des arguments de l'option ------------------*
+ 
+  imot1    = faux ; imot2    = faux ; imot3    = faux ; imot4    = faux ;
+  repe b1 4 ;
+    argu moti1/'MOT' ;
+    si (non (exis moti1)) ; quit b1 ; fins ;
+
+*   Arguments option MAIL :
+    si (ega moti1 'PAS') ;
+      imot1    = vrai ;
+      argu  lpas1/'LISTREEL' ;
+      si (exis lpas1) ;
+        npas1    = dime lpas1 ;
+        si (npas1 ega 0) ;
+          erre '*****  ERREUR : le LISTREEL fourni est de dimension nulle.' ;
+          quit waam ;
+        fins ;
+        pas1   = extr lpas1 1 ;
+      sino ;
+        argu  pas1*'FLOTTANT' ;
+        lpas1    = prog pas1 ;
+        npas1    = 1 ;
+      fins ;
+    fins ;
+    si (ega moti1 'LARG') ;
+      imot2    = vrai ;
+      argu larg1*'FLOTTANT' ;
+    fins ;
+    si (ega moti1 'DENS') ;
+      imot3    = vrai ;
+      argu dens1*'FLOTTANT' ;
+    fins ;
+
+*   Arguments option TEMP :
+    si (ega moti1 'TEMP') ;
+      imot4    = vrai ;
+      argu dtca1/'FLOTTANT' ;
+      si (non (exis dtca1)) ;
+        dtca1  = -1. ;
+      fins ;
+*     argu dtca2/'FLOTTANT' ;
+*     si (non (exis dtca2)) ;
+*       dtca2  = -1. ;
+*     fins ;
+    fins ;
+  fin b1 ;
+  si (non imot1) ;
+    erre '*****  ERREUR : il manque la donnee du PAS de discretisation du depot' ;
+    quit waam ;
+  fins ;
+  si (non imot2) ;
+    si (exis tab1 'LARGEUR_DE_PASSE') ;
+      larg1    = tab1.largeur_de_passe ;
+    sino ;
+      erre '*****  ERREUR : il manque la donnee de la LARGeur du depot' ;
+      quit waam ;
+    fins ;
+  fins ;
+  si (non imot3) ;
+    argu N1/'ENTIER' ;
+    si (exis N1) ;
+      N1       = maxi (lect N1 1) ;
+    sino ;
+      N1       = 1 ;
+    fins ;
+    dens1    = pas1 / (flot N1) ;
+  fins ;
+
+*------------------- MAILLAGE des passes de soudage -------------------*
+
+  si (non (exis tab1 passes)) ;
+    erre '*****  ERREUR : la table de SOUDAGE en entree n"a pas d"indice PASSES' ;
+    quit waam ;
+  fins ;
+
+* Definition d'une tolerance geometrique :
+  tol1     = 1.e-4 * dens1 ;
+
+* Maillage d'une section de cordon :
+  lsi1     = (0 0 0) droi (0 larg1 0) dini dens1 dfin dens1 ;
+
+* Initialisattion sorties (MAIL) :
+  tab2     = table ;
+  ttps1    = table ;
+  tmai1    = table ;
+  indi1    = 0 ;
+
+* On parcourt la trajectoire :
+  mtraj1   = tab1.trajectoire ;
+  mail2    = vide maillage ;
+  idebui1  = vrai ;
+  ibouci1  = faux ;
+
+* Boucle sur elements de la trajectoire :
+  nb1      = nbel mtraj1 ;
+  repe b1 nb1 ;
+
+*   Lecture ieme element de la trajectoire :
+    eli1     = mtraj1 elem &b1 ;
+    Pi1      = eli1 poin 1 ;
+    Pi2      = eli1 poin 2 ;
+    vai1     = Pi2 moin Pi1 ;
+    vni1     = vai1 / (norm vai1) ;
+    mcouli1  = (eli1 elem coul) extr 1 ;
+    imaili1  = ega mcouli1 'ROUG' ;
+    idepli1  = ega mcouli1 'VERT' ;
+*
+*   Segment VERT : deplacement
+    si idepli1 ;
+      idebui1  = vrai ;
+      ibouci1  = faux ;
+      iter b1 ;
+    fins ;
+*
+*   Segment ROUGE : maillage
+    si imaili1 ;
+
+*     Si debut nouvelle passe :
+      si idebui1 ;
+
+*       Identification de la passe :
+        npassi1  = 0 ;
+        repe bp1 (dime tab1.passes) ;
+          mailpss1 = (tab1.passes.&bp1).maillage ;
+          pps1 pps2 = (mailpss1 poin 1) (mailpss1 poin 2) ;
+          si ((Pi1 ega pps1) et (Pi2 ega pps2)) ;
+            tpassi1  = tab1.passes.&bp1 ;
+            npassi1  = &bp1 ;
+            mess '*****  WAAM : maillage de la passe :' npassi1 ;
+            quit bp1 ;
+          fins ;
+        fin bp1 ;
+        si (npassi1 ega 0) ;
+          erre '*****  WAAM : passe non identifiee' ;
+          quit waam ;
+        fins ;
+
+*       Hauteur de cordon :
+        debi1    = tpassi1 . debit ;
+        vite1    = tpassi1 . vitesse ;
+        haut1    = debi1 / vite1 / larg1 ;
+        mess (chai '*****  WAAM : hauteur de la passe :' npassi1 ' =' haut1) ;
+
+*       Maillage :
+*       si1       : maillage section courante :
+*       vnsi1     : normale a la section 
+        si1      = lsi1 tran (0 0 haut1) dini dens1 dfin dens1 ;
+        vnsi1    = 1 0 0 ;
+
+*       Positionnement extremite initiale (Pi1 au centre de l'arete superieure) :
+        Pmsup1   = 0 (0.5*larg1) haut1 ;
+        si1      = si1 plus (Pi1 moin Pmsup1) ;
+      
+*       Initialisation section extremite finale :
+        si2      = si1 plus vai1 ;
+        vnsi2    = vnsi1 ;
+        angl2    = 0. ;
+*
+*       Orientation sections de maillage :
+*       Par defaut, selon vni1 :
+        vnsmai1  = vni1 ;
+        vnsmai2  = vnsmai1 ;
+
+*       Detection suite segments rouges et boucle :
+        si (&b1 neg nb1) ;
+          elip1    = mtraj1 elem (&b1 + 1) ;
+          mcoulip1 = (elip1 elem coul) extr 1 ;
+          isuiti1  = ega mcoulip1 'ROUG' ;
+          si isuiti1 ;
+            idebui1  = faux ;
+            vai2     = (elip1 poin 2) moin (elip1 poin 1) ;
+            vni2     = vai2 / (norm vai2) ;
+            vasmai2  = vni1 plus vni2 ;
+            vnsmai2  = vasmai2 / (norm vasmai2) ;
+            elfini1  = elip1 ;
+            pfini1   = elip1 poin 2 ;
+            nb2      = nb1 - (&b1 + 1) ;
+            i2       = &b1 + 2 ;
+*           Rq : si nb2 = 0, le bloc n'est pas execute
+            repe b2 nb2 ;
+              eli2     = mtraj1 elem i2 ;
+              mcoul2   = (eli2 elem coul) extr 1 ;
+              si (neg mcoul2 'ROUG') ; quit b2 ; fins ;
+              pfini1   = eli2 poin 2 ;
+              elfini1  = eli2 ;
+              vafini1  = pfini1 moin (eli2 poin 1) ;
+              vnfini1  = vafini1 / (norm vafini1) ;
+              i2       = i2 + 1 ;
+            fin b2 ;
+            ibouci1  = (norm (pfini1 moin pi1)) < tol1 ;
+            si ibouci1 ;
+              mess '*****  WAAM : boucle fermee detectee' ;
+*             On definit la normale a la section de maillage (SMA) :
+              vasmai1  = vni1 plus vnfini1 ;
+              vnsmai1  = vasmai1 / (norm vasmai1) ;
+            fins ;
+          fins ;
+        fins ;
+
+*       Orientation de si1 selon vnsmai1 :
+*list vnsmai1 ; list vnsi1 ;
+*trac (0 -0 3) (mtraj1 et mail2 et (si1 coul rose) et (si2 coul turq) et pi1 et pi2) ;
+        vnnz1    = pvec vnsi1 vnsmai1 ;
+        lvnnz1   = norm vnnz1 ;
+*       Si sinus non nul a tol1 pres, on oriente la section :
+        si (lvnnz1 neg 0. (tol1 / dens1)) ;
+          si (lvnnz1 ega 1. (vale prec)) ; lvnnz1 = 1. ; fins ;
+          angl1    = asin lvnnz1 ;
+*list vnsi1 ; list vnsmai1 ; list angl1 ;
+          si ((psca vnsmai1 vnsi1) < 0.) ;
+            angl1    = 180. - angl1 ;
+*mess ' on prend (180.-angl1)' ;
+          fins ;
+          si1      =  si1 tour angl1 pi1 (pi1 plus vnnz1) ;
+          vnsi1     = vnsmai1 ;
+          si2      = si1 plus vai1 ;
+          vnsi2    = vnsi1 ;
+          angl2    = 0. ;
+        sino ;
+          si ((psca vnsmai1 vnsi1) < 0.) ;
+            vnsi1     = vnsmai1 ;
+            si2      = si1 plus vai1 ;
+            vnsi2    = vnsi1 ;
+            angl2    = 0. ;
+          fins ;
+        fins ;
+*list vnsi1 ; list angl1 ;
+titr 'Debut de passe, apres orientation de si1' ;
+*trac (0 0 100) (mtraj1 et mail2 et (si1 coul rose) et (si2 coul turq) et pi1 et pi2) ;
+
+*       Si boucle, on garde la section de maillage du debut :
+        si ibouci1 ;
+          sfini1   = si1 ;
+          vnfini1  = vnsmai1 ;
+        fins ;
+
+      sino ;
+
+*       On a deja si1 correctement orientee.
+*       On doit orienter si2.
+*       Par defaut, orientation de si1 :
+        si2      = si1 plus vai1 ;
+        vnsi2    = vnsi1 ;
+        angl2    = 0. ;
+        vnsmai2  = vnsi2 ;
+
+*       Si fin d'une boucle, orientation si2 connue :
+        si (ibouci1 et (pi2 ega pfini1)) ;
+          vnsmai2  = vnfini1 ;
+        sino ;
+          si (&b1 neg nb1) ;
+            elip1    = mtraj1 elem (&b1 + 1) ;
+            mcoulip1 = (elip1 elem coul) extr 1 ;
+            isuiti1  = ega mcoulip1 'ROUG' ;
+            si isuiti1 ;
+              vai2     = (elip1 poin 2) moin (elip1 poin 1) ;
+              vni2     = vai2 / (norm vai2) ;
+              vasmai2  = vni1 plus vni2 ;
+              vnsmai2  = vasmai2 / (norm vasmai2) ;
+            fins ;
+          fins ;
+        fins ;
+
+*     Fin "Si idebui1 / sinon" :
+      fins ;
+*
+*     Orientation de si2 selon vnsmai2 :
+*list vnsmai2 ; list vnsi2 ;
+*trac (0 0 100) (mtraj1 et mail2 et (si1 coul rose) et (si2 coul turq) et pi1 et pi2 et (pi1 droi 1 (pi1 plus (0.01*vnsi1))) et (pi2 droi 1 (pi2 plus (0.01*vnsi2)))) titr 'Avant orientation si2' ;
+      vnnz1    = pvec vnsi2 vnsmai2 ;
+      lvnnz1   = norm vnnz1 ;
+*     Si sinus non nul a tol1 pres, on oriente la section :
+      si (lvnnz1 neg 0. (tol1 / dens1)) ;
+        si (lvnnz1 ega 1. (vale prec)) ; lvnnz1 = 1. ; fins ;
+        angl2    = asin lvnnz1 ;
+        si ((psca vnsi2 vnsmai2) < 0.) ;
+*mess ' on prend (180.-angl2)'  ; saut 1 lign ;
+          angl2    = 180. - angl2 ;
+        fins ;
+        si2      =    si2 tour angl2     pi2 (pi2 plus vnnz1) ;
+        vnsi2    =  vnsi2 tour angl2 (0 0 0)            vnnz1 ;
+      sino ;
+*       Pas sur que ça serve a quelque chose...
+        si ((psca vnsi2 vnsmai2) < 0.) ;
+          vnsi2     = vnsmai2 ;
+          angl2    = 180. ;
+        fins ;
+      fins ;
+titr 'En cours de passe, apres orientation de si2' ;
+*trac (0 0 100) (mtraj1 et mail2 et (si1 coul rose) et (si2 coul turq) et pi1 et pi2 et (pi1 droi 1 (pi1 plus (0.01*vnsi1))) et (pi2 droi 1 (pi2 plus (0.01*vnsi2)))) ;
+*si (ibouci1 et (pi2 ega pfini1)) ;
+*trac (5 -2 3) (mtraj1 et mail2 et (si1 coul rose) et (si2 coul turq) et (si22 coul oran) et pi1 et pi2) ;
+*fins ;
+
+*---- Maillage du segment :
+
+      llpas1   = somm (lpas1 enle npas1) ;
+      leli1    = mesu eli1 ;
+      si (leli1 <EG llpas1) ;
+        erre '*****  ERREUR : somme pas de discretisation > long. ' &b1 'e passe' ;
+        quit waam ;
+      fins ;
+
+*     Boucle sur les pas de discretisation :
+
+*     pasi1 : pas de discretisation courant
+*     nei1  : nb maillages pour ce pas de discretisation du segment
+*     pami1 : pas de maillage courant
+*     nei2  : nbel crees par pas de maillage
+
+      tpsi2    = tpassi1.instants extr 1 ;
+      repe bp1 npas1 ;
+        pasi1    = extr lpas1 &bp1 ;
+        si (&bp1 neg npas1) ;
+          nei1     = 1 ;
+          pami1    = pasi1 ;
+        sino ;
+          llmi1    = leli1 - llpas1 ;
+          nei1     = llmi1 / pasi1 + 0.5 ;
+          nei1     = maxi (lect (enti nei1) 1) ;
+*mess 'nei1=' nei1 ;
+          pami1    = llmi1 / (flot nei1) ;
+        fins ;
+
+        vtrani1  = pami1 * vni1 ;
+        ltrani1  = norm vtrani1 ;
+        nei2     = enti (ltrani1 / dens1 + 0.5) ;
+        nei2     = maxi (lect (enti nei2) 1) ;
+*mess 'nei2=' nei2 ;
+        itouri1  = (abs angl2) > 0. ;
+*list itouri1 ;
+*list angl2 ;
+        angli2   = angl2 / (flot nei1) ;
+        vnsi22   = vnsi1 ;
+        si22     = si1 ;
+        dti2     = ltrani1 / vite1 ;
+        repe b2 nei1 ;
+          pi22     = pi1 plus vtrani1 ;
+          si itouri1 ;
+            vnsi22   = vnsi22 tour angli2 (0 0 0) vnnz1 ;
+            pi33     = pi22 plus vnnz1 ;
+            pi44     = pi22 plus (pvec vnsi22 vnnz1) ;
+            si22     = si22 proj cyli vtrani1 plan pi22 pi33 pi44 ;
+          sino ;
+            si22     = si1 plus vtrani1 ;
+          fins ;
+          maili2   = si1 volu si22 nei2 ;
+          si1      = si22 ;
+          pi1      = pi22 ;
+          maili2   = maili2 coul (indi1+1) ;
+          mail2    = mail2 et maili2 ;
+          tmai1 . indi1 = mail2 ;
+          ttps1 . indi1 = tpsi2 ;
+          tpsi2    = tpsi2 + dti2 ;
+          indi1    = indi1 + 1 ;
+        fin b2 ;
+
+      fin bp1 ;
+
+*trac (5 -2 3) (mtraj1 et mail2 et (si1 coul rose) et (si2 coul turq) et (si22 coul oran) et pi1 et pi2) ;
+
+      vnsi1    = vnsi2 ;
+      vnsmai1  = vnsmai2 ;
+
+*   Fin si imail1 (segment rouge) ;
+    sino ;
+      erre '*****  ERREUR : pb definition trajectoire, couleur segment inconnue' ;
+      quit waam ;
+    fins ;
+
+* Fin boucle segments trajectoire
+  fin b1 ;
+*  elim mail2 tol1 ;
+
+* Enregistrement des sorties :
+  tab2.maillage                    = mail2 ;
+  tab2.evolution_maillage          = table ;
+  tab2.evolution_maillage.temps    = ttps1 ;
+  tab2.evolution_maillage.maillage = tmai1 ;
+
+*-------------------------- Sous-option TEMP --------------------------*
+
+  si imot4 ;
+
+*   Valeurs par defaut dtca1 :
+    si (dtca1 < 0.) ;
+      dtca1    = pas1 / (tab1.vitesse_de_soudage) / pi / 3. ;
+    fins ;
+*   si (dtca2 < 0.) ;
+*     dtca2    = dtca1 ;
+*   fins ;
+
+*   Redecoupage de la liste des temps de l'evolution de la puissance thermique :
+    evqt1    = tab1.evolution_puissance ;
+    ltqt1    = extr evqt1 absc ;
+    lqqt1    = extr evqt1 ordo ;
+    tol2     = 1.e-6 * (maxi lqqt1) ;
+    tol3     = 0.001 * tab1.temps_de_coupure ;
+
+*   Gestion des evenements :
+    ieve1    = exis tab1 evenements ;
+    Si ieve1 ;
+      lteve1   = prog ;
+      lieve1   = lect ;
+      repe beve1 (dime tab1.evenements) ;
+        ie1      = &beve1 ;
+        lteve1   = lteve1 et tab1.evenements.ie1.temps ;
+        lieve1   = lieve1 et (lect (dime (tab1.evenements.ie1.temps)) * ie1) ;
+      fin beve1 ;
+      lpeve1   = posi ltqt1 dans lteve1 tol3 ;
+*list lteve1 ;
+*list lieve1 ;
+*list lpeve1 ;
+    sino ;
+      lpeve1   = lect (dime ltqt1) * 0 ;
+    fins ;
+
+*   Sous-decoupage de l'historique de puissance :
+    nb1      = dime ltqt1 ;
+    t0       = extr ltqt1 1 ;
+    q0       = extr lqqt1 1 ;
+
+*   Gestion evenements :
+    peve0    = extr lpeve1 1 ;
+    si (peve0 neg 0) ;
+      neve0    = extr lieve1 peve0 ;
+      si ((peve0 + 1) <EG (dime lieve1)) ; 
+        neve1    = extr lieve1 (peve0 + 1) ;
+      sino ;
+        neve1    = -1 ;
+      fins ;
+      idtev1   = neve0 ega neve1 ;
+      si idtev1 ;
+        tev1     = lteve1 extr (peve0 + 1) ;
+        dtev1    = tev1 - t0 ;
+*mess (chai 'Even. = ' neve0 ', dtev1 =' dtev1) ;
+      fins ;
+    sino ;
+      idtev1   = faux ;
+    fins ;
+
+*   Boucle sur les piquets de temps :
+    ltca1    = prog t0 ;
+    repe b1 (nb1 - 1) ;
+      ip1      = &b1 + 1 ;
+      t1       = extr ltqt1 ip1 ;
+      q1       = extr lqqt1 ip1 ;
+      peve1    = extr lpeve1 ip1 ;
+      dt1      = t1 - t0 ;
+      si (&b1 ega 1) ; dt0 = dt1 ; fins ;
+* Avec evements :
+      si idtev1 ;
+        si (dt1 <EG dtca1) ;
+          si (dtev1 <EG dtca1) ;
+            si (dt1 ega dtev1 tol3) ;
+              ltca1    = ltca1 et (prog t1) ;
+            sino ;
+              si (dt1 < dtev1) ;
+                ltca1    = ltca1 et (prog t1) et (prog tev1) ;
+                t1       = tev1 ;
+              sino ;
+                ltca1    = ltca1 et (prog tev1) et (prog t1) ;
+              fins ;
+            fins ;
+          sino ;
+            ltca1    = ltca1 et (prog t1) ;
+            si ((q0 > tol2) ou (q1 > tol2)) ;
+              ltca1    = ltca1 et ((prog t1 pas dtca1 tev1) enle 1) ;
+            sino ;
+              ltca1    = ltca1 et ((prog t1 pas dt1 geom 2. tev1) enle 1) ;
+            fins ;
+            t1       = tev1 ;
+          fins ;
+        sino ;
+          si (dt1 ega dtev1 tol3) ;
+            si ((q0 > tol2) ou (q1 > tol2)) ;
+              ltca1    = ltca1 et ((prog t0 pas dtca1 t1) enle 1) ;
+            sino ;
+              ltca1    = ltca1 et ((prog t0 pas dtev1 geom 2. t1) enle 1) ;
+            fins ;
+          sino ;
+            si (dtev1 < dt1) ;
+              si (dtev1 < dtca1) ;
+                ltca1    = ltca1 et (prog tev1) ;
+              sino ;
+                si ((q0 > tol2) ou (q1 > tol2)) ;
+*mess '############ Ici 1' ;
+                  ltca1    = ltca1 et ((prog t0 pas dtca1 tev1) enle 1) ;
+                  ltca1    = ltca1 et ((prog tev1 pas dtca1 t1) enle 1) ;
+                sino ;
+                  ltca1    = ltca1 et (prog tev1 pas dtev1 geom 2. t1) ;
+                fins ;
+              fins ;
+            sino ;
+              si ((q0 > tol2) ou (q1 > tol2)) ;
+*mess '############ Ici 2' ;
+                ltca1    = ltca1 et ((prog t0 pas dtca1 tev1) enle 1) ;
+              sino ;
+                ltca1    = ltca1 et ((prog t0 pas dt0 geom 2. tev1) enle 1) ;
+              fins ;
+              t1       = tev1 ;
+            fins ;
+          fins ;
+        fins ;
+* Pas d'evenement :
+      sino ;
+        si (dt1 <EG dtca1) ;
+          ltca1    = ltca1 et (prog t1) ;
+        sino ;
+          si ((q0 > tol2) ou (q1 > tol2)) ;
+            ltca1    = ltca1 et ((prog t0 pas dtca1 t1) enle 1) ;
+          sino ;
+            ltca1    = ltca1 et ((prog t0 pas dt0 geom 2. t1) enle 1) ;
+          fins ;
+        fins ;
+      fins ;
+      t0       = t1 ;
+      q0       = q1 ;
+      ntca1    = dime ltca1 ;
+      dt0      = (ltca1 extr ntca1) - (ltca1 extr (ntca1-1)) ;
+*     Gestion evenement suivant :
+      peve0    = peve1 ;
+      si (peve0 neg 0) ;
+        neve0    = extr lieve1 peve0 ;
+        si ((peve0 + 1) <EG (dime lieve1)) ; 
+          neve1    = extr lieve1 (peve0 + 1) ;
+        sino ;
+          neve1    = -1 ;
+        fins ;
+        idtev1   = neve0 ega neve1 ;
+        si idtev1 ;
+          tev1     = lteve1 extr (peve0 + 1) ;
+          dtev1    = tev1 - t0 ;
+*mess (chai 'Even. = ' neve0 ', dtev1 =' dtev1) ;
+        fins ;
+      sino ;
+        idtev1   = faux ;
+      fins ;
+    fin b1 ;
+
+*   Verification si liste temps calcules bien ordonnee :
+    ltca2    = ordo ltca1 ;
+    si (((ltca2 - ltca1) maxi abs) > (1.e-3*dtca1)) ;
+      erre '*****  ERREUR WAAM dans construction liste TEMPS_CALCULES' ;
+      quit waam ;
+    fins ;
+
+    tab2.temps_calcules = ltca1 ;
+
+*   Sorties si evenements :
+    si ieve1 ;
+      tab2.temps_evenements = lteve1 ;
+      tab2.index_evenements = lieve1 ;
+    fins ;
+
+* Fin sous-option TEMP :
+  fins ;
+
+  resp tab2 ;
+  quit waam ;
+* Fin option MAILLAGE :
+fins ; 
+
+*----------------------------------------------------------------------*
+*                             Option VISU                              *
+*----------------------------------------------------------------------*
+
+si (ega mot1 'VISU') ;
+  icas1    = 2 ;
+*
+* Lecture MOT CACH / FACE :
+  argu mot1/'MOT' ;
+  si (exis mot1) ;
+    cle1    = text mot1 ;
+  sino ;
+    cle1    = text ' ' ;
+  fins ;
+
+* Lecture maillage complementaire a afficher :
+  argu mail2/maillage ;
+  si (non (exis mail2)) ;
+    mail2    = vide maillage ;
+  fins ;
+
+  mail1    = tab1.maillage ;
+  tmai1    = tab1.evolution_maillage.maillage ;
+  dep0     = manu chpo (mail1 et mail2) 3 ux 0 uy 0 uz 0 ;
+  def0     = vide deforme ;
+  i1       = 0 ;
+  repe b2 (dime tmai1) ;
+    maili1    = tmai1.i1 ;
+    maili1    = maili1 et mail2 ;
+    defi1     = defo maili1 dep0 0. ;
+    def0      = def0 et defi1 ;
+    i1       = i1 + 1 ;
+  fin b2 ;
+  trac cle1 anim def0 ;
+
+  quit waam ;
+* Fin option VISU :
+fins ; 
+
+*----------------------------------------------------------------------*
+*                                  FIN                                 * 
+*----------------------------------------------------------------------*
+*
+* MOT1 n'est pas un des mots-cles des options de la procedure :
+si (icas1 ega 0) ;
+  erre '*****  ERREUR WAAM : MOT-cle option WAAM non reconnu.' ;
+  quit waam ;
+fins ;
+
+FINP ;
+ 
+ 
+ 
+ 
+ 

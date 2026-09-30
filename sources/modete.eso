@@ -1,0 +1,110 @@
+C MODETE    SOURCE    CB215821  20/07/29    21:15:54     10668          
+
+      SUBROUTINE MODETE(IPMODL,MMODE1,IMELAN)
+
+      IMPLICIT REAL*8(A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+
+***********************************************************************
+* Cette SUBROUTINE permet d'etendre un MMODEL lorsqu'une formulation
+* de MELANGE est presente
+*
+* Entrees : 
+*   IPMODL : Pointeur sur un objet MMODEL
+*   
+* Sorties : 
+*   MMODE1 : Modele etendu           (si presence MELANGE 'PARALLELE')
+*            Identique a celui donne (si absence  MELANGE 'PARALLELE')
+*   IMELAN : Flag valant 1 si un MMODEL de MELANGE a ete trouve
+*                        0 sinon
+***********************************************************************
+
+-INC SMMODEL
+-INC CCPRECO
+
+      CHARACTER*(16) MOT16
+      SEGMENT,LIMODE(0)
+
+      MOT16='MELANGE         '
+
+      MMODEL=IPMODL
+      NSOUS =KMODEL(/1)
+
+C     Recherche d'un eventuel modele de MELANGE 'PARALLELE'
+      DO im = 1,NSOUS
+         imodel = kmodel(im)
+         IF (formod(1) .eq. MOT16) THEN
+           if (matmod(1)(1:10).eq.'PARALLELE ') GOTO 1
+         ENDIF
+      ENDDO
+
+      IMELAN=0
+      MMODE1=IPMODL
+      RETURN
+      
+ 1    CONTINUE      
+      IMELAN=1
+      
+C     Verification si presence dans le preconditionnement CCPRECO
+      ith   = oothrd
+      ith1  = ith + 1
+      
+      ITAILL = NBMOMO(ith1)
+      DO 10 IPREC1 = 1, ITAILL
+        IF (PMOMO1(IPREC1,ith1) .NE. mmodel)       GOTO 10
+        MMODE1 = PMOMO2(IPREC1,ith1)
+        CALL ACTOBJ('MMODEL  ',MMODE1,1)
+C        IF (IPREC1 .EQ. NPREDU) THEN
+C          PRINT *,' CCPRECO trop petit :',IPREC1
+C          CALL ERREUR(5)
+C        ENDIF
+C        PRINT *,'Preconditionnement MODETE trouve',mmodel,MMODE1,IPREC1
+
+C       Mise a jour du preconditionnement dans CCPRECO : Deplacement en position 1 du MMODEL etendu
+        IF (IPREC1 .EQ. 1) RETURN
+        DO IPREC2 = IPREC1,2,-1
+          PMOMO1(IPREC2,ith1) = PMOMO1(IPREC2 - 1,ith1)
+          PMOMO2(IPREC2,ith1) = PMOMO2(IPREC2 - 1,ith1)
+        ENDDO
+        PMOMO1(1,ith1) = mmodel
+        PMOMO2(1,ith1) = MMODE1
+        RETURN
+ 10   CONTINUE
+
+C     En cas de modele melange derouler : creer un nouveau MMODEL
+      SEGINI,LIMODE
+      do im = 1,NSOUS
+         imodel = kmodel(im)
+         CALL ajou(LIMODE,imodel)
+         if (formod(1) .eq. MOT16) then
+            if (ivamod(/1).ge.1) then
+               do ivm1 = 1,ivamod(/1)
+                  if (tymode(ivm1).eq.'IMODEL') then
+                    iel=ivamod(ivm1)
+                    CALL ajou(LIMODE,iel)
+                  endif
+               enddo
+            endif
+         endif
+      enddo
+
+      N1=LIMODE(/1)
+      SEGINI,MMODE1
+      DO iii=1,N1
+        MMODE1.KMODEL(iii)=LIMODE(iii)
+      ENDDO
+      SEGSUP,LIMODE
+
+C     Mise a jour du preconditionnement dans CCPRECO
+      ITAILL       = MIN(ITAILL + 1, NPREDU)
+      NBMOMO(ith1) = ITAILL
+      DO IPRECO = ITAILL,2,-1
+        PMOMO1(IPRECO,ith1) = PMOMO1(IPRECO - 1,ith1)
+        PMOMO2(IPRECO,ith1) = PMOMO2(IPRECO - 1,ith1)
+      ENDDO
+      PMOMO1(1,ith1) = mmodel
+      PMOMO2(1,ith1) = MMODE1
+      PRINT *,'Preconditionnement MODETE fabrique',mmodel,MMODE1
+
+      END
+ 

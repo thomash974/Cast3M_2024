@@ -1,0 +1,143 @@
+C FIN       SOURCE    CB215821  23/05/05    21:15:02     11665          
+      SUBROUTINE FIN
+      IMPLICIT INTEGER(I-N)
+      
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC SMBLOC
+-INC CCPERF
+-INC CQALITE
+
+      INTEGER ITTIME(4)
+      CHARACTER*42 MESS
+      CHARACTER*(LONOM) ICHC
+      DATA IFINCP/0/
+      IFINCP=IFINCP+1
+      IRETOU=0
+      IF (IERR.EQ.0.AND.IFINCP.EQ.1) THEN
+      CALL LIROBJ('BLOC    ',IRET,0,IRETOU)
+      IF(IERR.NE.0) RETURN
+      IF (IRETOU.EQ.1) GOTO 10
+      ENDIF
+*  pour afficher les messages suivants
+       IECHO=1
+       WRITE (IOIMP,1)
+   1   FORMAT (//)
+       INTERR(1)=IERMAX
+       CALL ERREUR(-375)
+       if (iqexe.ne.0) CALL ERREUR(-376)
+       if (iqpro.ne.0) CALL ERREUR(-377)
+       WRITE (IOIMP,1)
+      IF (IIMPI.NE.0) CALL OOODMP(0)
+      CALL OOOSTP
+      call flush(IOIMP)
+      call epilog
+***   if (iermax.eq.3) call abort
+      IF (IERMAX.EQ.1) STOP 4
+      IF (IERMAX.EQ.2) STOP 8
+      IF (IERMAX.EQ.3) STOP 12
+      STOP
+  10  CONTINUE
+      IFINCP=0
+      IF (MBLOC.NE.IRET)   THEN
+         MBLO1=IRET
+         SEGACT,MBLO1
+         MOTERR=MBLO1.NCONBO(2:LONOM)
+         SEGDES,MBLO1
+         CALL ERREUR(154)
+         RETURN
+      ENDIF
+* MISE A BLANC DU NOM DE LA BOUCLE AFIN DE NE PAS LA REUTILISER
+      IPLAC = JPOOB2(IMOTLU)
+      INOOB1(IPLAC)=1
+C
+C  si c'est la premiere fois on ajuste le segment
+C
+      IF(MBFONC.NE.0) THEN
+         MTXBLC=MTXBL
+         NINST=NINSTV+1
+         IPVINN=MTXBA(NINST)
+         NBNOMM=LMTXBM(NINST)
+         IF(IIMPI.EQ.1756) WRITE(IOIMP,1788)NINST,IPVINN,NBNOMM
+ 1788    FORMAT(' apres ajustement NINST IPVINN NBNOMM',3I8)
+         SEGADJ MTXBLC
+      ENDIF
+
+C     Gestion du SOUCI dans le BLOC (COMMENTE ACTUELLEMENT)
+C     MBSOU = mbsouc
+C     mbsouc= 0
+
+      MBCOUR= 0
+      MBFONC= 0
+      MBCONT= MBCONT-1
+      ICONBO= ICONBO+1
+      ICHC  = NCONBO
+      IIPROU= ICONBO
+      CALL NOMENT(ICHC,IIPROU)
+      IF (MBCONT.NE.0 .AND. MBERR.EQ.0) RETURN
+
+C     DEBUT Duree passee dans les boucles (Voir PROCED pour le depart)
+      IF(ITPSBO .GT. 0) THEN
+        call timespv(ittime,oothrd)
+        IELAPS=ITTIME(1) + ITTIME(2)
+        ICPU  =ITTIME(3) + ITTIME(4)
+        
+        ITPSBL=ITPSBO
+        SEGACT,ITPSBL*MOD
+        
+C       Niveau, position dans le tableau et nom de la boucle courante
+        NICOU  = ITPSBL.NIVCOU
+        II     = ITPSBL.IPRONI(NICOU)
+        
+C       Incremente la duree de la boucle quittee
+        ITPSBL.DURPRO(1,II)=ITPSBL.DURPRO(1,II) + 
+     &                     (IELAPS - ITPSBL.TPSPRO(1,II))
+        ITPSBL.DURPRO(2,II)=ITPSBL.DURPRO(2,II) +
+     &                     (ICPU   - ITPSBL.TPSPRO(2,II))
+        
+C       Remise a zero du CHRONOMETRE de la boucle parent
+        NICOU = NICOU - 1
+        ITPSBL.NIVCOU = NICOU
+        IF(NICOU .GT. 0)THEN
+          II=ITPSBL.IPRONI(NICOU)
+          ITPSBL.TPSPRO(1,II) = IELAPS
+          ITPSBL.TPSPRO(2,II) = ICPU
+        ENDIF
+      ENDIF
+C     FIN Duree passee dans les boucles
+
+      MBCONT=1
+      MBER1 =MBERR
+      MBLO1 =MBLOC
+      IF (MBLSUP.EQ.0) CALL ERREUR(5)
+      IF (IERR  .NE.0) RETURN
+      MTXBLC=MTXBL
+      SEGDES MTXBLC
+      MBLOC =MBLSUP
+      ISSPOT=MBLO1.ISPOTE
+      SEGDES ISSPOT
+      SEGDES MBLO1
+      SEGACT MBLOC*MOD
+      ISSPOT=ISPOTE
+      SEGACT ISSPOT*MOD
+      MTXBLC=MTXBL
+      CALL NOUTRU
+      IF (MBLSUP.NE.0) SEGACT MTXBLC
+      MBERR=MBER1
+
+C     Gestion du SOUCI dans le BLOC (COMMENTE ACTUELLEMENT)
+C     mbsouc = max(mbsou,mbsouc)
+
+      END
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,182 @@
+C PROLON    SOURCE    PASCAL    21/03/09    21:15:07     10917          
+      SUBROUTINE PROLON
+C
+C=======================================================================
+C
+C     Opérateur PROL
+C
+C     SYNTAXE : voir notice
+C
+C=======================================================================
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      PARAMETER (NCLE=2)
+      CHARACTER*4 LMCLE(NCLE)
+      CHARACTER*4 LNOID(1)
+      DATA LMCLE/'BORN','LINE'/
+      DATA LNOID/'NOID'/
+
+-INC CCREEL
+-INC PPARAM
+-INC CCOPTIO
+-INC SMEVOLL
+-INC SMLREEL
+
+C---- Lecture des arguments
+
+*     Lecture mot Option
+      CALL LIRMOT(LMCLE,NCLE,ICLE,0)
+      IF (ICLE.EQ.0) ICLE = 1
+
+*     Lecture de la fonction à extrapoler
+      CALL LIROBJ('EVOLUTIO',IEV1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+*     Analyse EVOLUTION 
+      CALL ACTOBJ('EVOLUTIO',IEV1,1)
+      IF (IERR.NE.0) RETURN
+      MEVOLL = IEV1
+      NEV1   = IEVOLL(/1)
+      IF (NEV1.EQ.0) GOTO 900
+      DO 10 I1=1,NEV1
+        KEVOLL = IEVOLL(I1)
+        IF ((TYPX.NE.'LISTREEL').OR.(TYPY.NE.'LISTREEL')) THEN
+          CALL ERREUR(1116)
+          RETURN
+        ENDIF
+ 10   CONTINUE 
+
+*     Lecture valeur a laquelle extrapoler la fonction
+      CALL LIRREE(FLOT1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL LIRREE(FLOT2,0,IFLOT2)
+
+C Je debranche l'option NOID car conflit avec donnee FLOT1, FLOT2...
+C 20   CONTINUE 
+*     Lecture mot-cle "NOID"
+C      CALL LIRMOT(LNOID,1,INOID,0)
+C      IF (NEV1.EQ.0) THEN
+C        IF (INOID.EQ.0) THEN
+C          GOTO 900
+C        ELSE
+C          GOTO 910
+C        ENDIF
+C      ENDIF
+
+C---- Calcul prolongement
+
+C     Boucle si IFLOT2
+ 99   CONTINUE 
+
+*     Initialisation courbe solution
+      N = NEV1
+      SEGINI,MEVOL1
+
+C     NMOD1 : on compte les courbes modifiees
+      NMOD1 = 0
+      DO 100 I1=1,NEV1
+        KEVOLL = IEVOLL(I1)
+C       write(6,*) 'KEVOLL =',KEVOLL
+        MLREEL = IPROGX
+        MLREE1 = IPROGY
+C
+C       Test longueur abscisse (objets vides !)
+        JG     = PROG(/1)
+        IF (JG.EQ.0) THEN
+          MOTERR(1:8) = 'LISTREEL'
+          INTERR = MLREEL
+          CALL ERREUR(356)
+          RETURN
+        ENDIF
+C
+C       Extrapolation valeur fonction selon option :
+        CALL INTER5(FLOT1,MLREEL,MLREE1,FT0,0,0,ICLE,IRET)
+        IF (IERR.NE.0) RETURN
+C
+C       Cas a gauche de la borne :
+        IF (FLOT1.LT.PROG(1)) THEN
+          JG = JG + 1
+          SEGINI,MLREE2,MLREE3
+          MLREE2.PROG(1) = FLOT1
+          MLREE3.PROG(1) = FT0
+          DO 120 IX=2,JG
+            MLREE2.PROG(IX) = MLREEL.PROG(IX-1)
+            MLREE3.PROG(IX) = MLREE1.PROG(IX-1)
+ 120      CONTINUE
+
+C         Creation de la I1e courbe :
+          SEGINI,KEVOL1  
+          KEVOL1.IPROGX = MLREE2
+          KEVOL1.IPROGY = MLREE3
+          KEVOL1.NUMEVX = NUMEVX
+          KEVOL1.NUMEVY = NUMEVY
+          KEVOL1.TYPX   = TYPX
+          KEVOL1.TYPY   = TYPY
+          KEVOL1.NOMEVX = NOMEVX
+          KEVOL1.NOMEVY = NOMEVY
+          KEVOL1.KEVTEX = KEVTEX
+
+          NMOD1 = NMOD1 + 1
+
+C       Cas a droite de la borne :
+        ELSEIF (FLOT1.GT.PROG(JG)) THEN
+          SEGINI,MLREE2=MLREEL
+          SEGINI,MLREE3=MLREE1
+          JG = JG + 1
+          SEGADJ,MLREE2,MLREE3
+          MLREE2.PROG(JG) = FLOT1
+          MLREE3.PROG(JG) = FT0
+
+C         Creation de la I1e courbe :
+          SEGINI,KEVOL1  
+          KEVOL1.IPROGX = MLREE2
+          KEVOL1.IPROGY = MLREE3
+          KEVOL1.NUMEVX = NUMEVX
+          KEVOL1.NUMEVY = NUMEVY
+          KEVOL1.TYPX   = TYPX
+          KEVOL1.TYPY   = TYPY
+          KEVOL1.NOMEVX = NOMEVX
+          KEVOL1.NOMEVY = NOMEVY
+          KEVOL1.KEVTEX = KEVTEX
+
+          NMOD1 = NMOD1 + 1
+
+C       Cas dans le domaine de definition
+        ELSE
+          KEVOL1 = KEVOLL
+        ENDIF
+C
+C       Ajout I1e courbe a EVOL resultat
+        MEVOL1.IEVOLL(I1) = KEVOL1
+        MEVOL1.ITYEVO = ITYEVO
+        MEVOL1.IEVTEX = IEVTEX
+
+ 100  CONTINUE
+
+C     SI FLOT2, on recommence :
+      IF (IFLOT2.NE.0) THEN
+        IFLOT2 = 0
+        FLOT1  = FLOT2
+        MEVOLL = MEVOL1
+        GOTO 99
+      ENDIF
+      
+C---- Sorties
+      IF (NMOD1.EQ.0) GOTO 910
+      CALL ECROBJ('EVOLUTIO',MEVOL1)
+      RETURN
+
+C     L'evolution est vide et pas NOID
+ 900  CONTINUE
+      MOTERR(1:8)='EVOLUTIO'
+      CALL ERREUR(1027)
+      RETURN
+
+C     On renvoie l'evolution en entree :
+ 910  CONTINUE
+      CALL ECROBJ('EVOLUTIO',MEVOLL)
+      RETURN
+
+      END
+ 

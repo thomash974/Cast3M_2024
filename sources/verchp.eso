@@ -1,0 +1,30 @@
+C VERCHP    SOURCE    CB215821  20/11/25    13:42:21     10792          
+*  verification chpoint
+*
+      subroutine verchp(mchpoi,resul)
+      implicit real*8 (a-h,o-z)
+      logical resul
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCHPOI
+*
+      resul = .true.
+
+      do ip = 1,ipchp(/1)
+       msoupo=ipchp(ip)
+       mpoval=ipoval
+       do j=1,vpocha(/2)
+        do i=1,vpocha(/1)
+          xval=vpocha(i,j)
+
+         if (.not.(xval.le.xgrand.and.xval.ge.-xgrand))
+     >      resul = .false.
+        enddo
+       enddo
+      enddo
+      end
+
+ 
+ 

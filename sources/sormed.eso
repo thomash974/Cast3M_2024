@@ -1,0 +1,1633 @@
+C SORMED    SOURCE    OF166741  24/03/28    21:15:11     11811          
+
+C***********************************************************************
+C NOM         : sormed.eso
+C DESCRIPTION : Sortie d'un maillage au FORMAT .med
+C***********************************************************************
+C HISTORIQUE :  21/12/2010 : CHAT : creation de la subroutine
+C HISTORIQUE :  07/06/2012 : JCARDO : l'argument MOT1 devient optionnel
+C                                    + ajout de l'extension .med
+C HISTORIQUE :  04/11/2013 : BERTHINC : PASSAGE AU FORMAT 3.0 DE MED
+C HISTORIQUE :  16/10/2017 : RPAREDES : SORTIE CHPOINT,MCHAML,PASAPAS
+C HISTORIQUE :  09/10/2018 : BERTHINC : CALL ERREUR au lieu de WRITE
+C                                       TAILLES parametriques et pas fixes
+C HISTORIQUE :  28/11/2018 : JCARDO : remplacement TMLCHA8 par TMLNOMS
+C                                     + noms groupes en MED_NAME_SIZE
+C HISTORIQUE :  28/20/2019 : BERTHINC : PASSAGE AU FORMAT 4.0 DE MED
+C HISTORIQUE :  18/12/2019 : BERTHINC : Ne pas sortir les 'LX' & 'FLX' des 'CHPOINT'
+C                                       Sortie plus facile des 'CHPOINTS' et 'MCHAML'
+C                                       A l'aide de la SUBROUTINE smchp1
+C                                       Sortie des TABLES quelconques pour les indices
+C                                       de type 'MOT' pointant sur un MAILLAGE, MCHAML ou CHPOINT
+C HISTORIQUE :  20/10/2022 : OF : Ameliorations et corrections diverses
+C                                 Ecriture des POLYGONEs (2D)
+C HISTORIQUE :  12/01/2024 : OF : Ameliorations diverses
+C HISTORIQUE :  24/01/2024 : OF : Menues ameliorations
+C HISTORIQUE :  31/01/2024 : OF : Menues modifications
+C HISTORIQUE :  08/02/2024 : OF : Correction numerotation locale profil
+C HISTORIQUE :  12/02/2024 : OF : Passage en MED 64bits
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : operateur SORTir (prsort.eso)
+C***********************************************************************
+C ENTREES : aucune
+C SORTIES : aucune (sur fichier uniquement)
+C***********************************************************************
+C SYNTAXE (GIBIANE) :
+C
+C    OPTI 'SORT' 'fichier.med' ;
+C    SORT 'MED' OBJ1 OBJ2 ... OBJi ;
+C
+C    avec OBJi = [ MAILi | CHPOi | TABi ]
+C
+C***********************************************************************
+      SUBROUTINE SORMED
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC CCASSIS
+-INC CCGEOME
+-INC CCMED
+
+-INC SMELEME
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMCHAML
+-INC SMTABLE
+-INC SMMODEL
+-INC SMLENTI
+      POINTEUR LPOLY.MLENTI
+-INC SMLMOTS
+-INC SMMED
+
+      EXTERNAL LONG
+
+C Nom du fichier de sauvegarde au format 'MED' (fourni via OPTI SORT)
+      CHARACTER*(LOCHAI) nomfid
+
+C-----Definition des reels
+      REAL*8    dt
+      REAL*8    vcchmp
+
+C-----Chaines de Caractere de longueur MED_SNAME_SIZE=16
+      CHARACTER*(MED_SNAME_SIZE) dtunit
+
+C-----Chaines de Caractere de longueur MED_NAME_SIZE=64
+      CHARACTER*(MED_NAME_SIZE) name,fname,nomg,chaNSa
+
+C-----Chaines de Caractere de longueur MED_LNAME_SIZE=80
+      CHARACTER*(MED_LNAME_SIZE) gname
+
+C-----Chaines de Caractere de longueur MED_COMMENT_SIZE=200
+      CHARACTER*(MED_COMMENT_SIZE) desc
+
+C ***** Declaration des segments
+      SEGMENT SANAME
+        CHARACTER*(MED_SNAME_SIZE) ANAME(IDIM)
+        CHARACTER*(MED_SNAME_SIZE) AUNIT(IDIM)
+      ENDSEGMENT
+
+C-----Information sur les FAMILLES
+      SEGMENT IJFAM
+        INTEGER NFAM
+        INTEGER                   IFAM(jf)
+        INTEGER                   INUMF(jf)
+        INTEGER                   INOGRO(jf)
+        CHARACTER*(MED_NAME_SIZE) CNOMFA(jf)
+        INTEGER                   IPROF(jf)
+C       jf     : Entier de dimensionnement
+C       NFAM   : Nombre de familles
+C       IFAM   : Objet MELEME (simple normalement)
+C       INOGRO : pointeur sur un SEGMENT NOMGRO(Noms des groupes composes de cette famille)
+C       CNOMFA : Nom de la famille
+C       IPROF  : pointeur sur un SEGMENT IPROFI pour definir le PROFIL
+      ENDSEGMENT
+
+C-----Contiendra les numeros des familles des elements pour chaque type (ITYPEL)
+      SEGMENT INUMFA(nbelt)
+
+C-----SEGMENT pour stocker les profils des familles (numero d'element local)
+      SEGMENT IPROFI(nbelp)
+
+C-----SEGMENT pour la numerotation locale (voir bdata.eso & CCGEOME pour NOMBR)
+      SEGMENT INBTYP(3,NOMBR)
+C           (1,.)  : Nombre d'elements de ce type (MLENTI si POLYGONe)
+C           (2,.)  : Pointeur MELEME (MLENTI si POLYGONe)
+C           (3,.)  : Pointeur INUMFA
+
+C-----NOGROU contient les noms des groupes qui incluent la famille
+      SEGMENT NOMGRO
+        INTEGER NOCO
+        CHARACTER*(MED_LNAME_SIZE) NOGROU(kg)
+      ENDSEGMENT
+
+C-----Information sur les GROUPES
+      SEGMENT IJGROU
+        INTEGER                    ILENTI(nbgrou)
+        INTEGER                    IPMAIL(nbgrou)
+        CHARACTER*(MED_LNAME_SIZE) CNOMGR(nbgrou)
+C       nbgrou : Nombre de groupes
+C       ILENTI : pointeur LISTENTI des numeros de famille composant les groupes
+C       IPMAIL : pointeur MELEME du groupe en question
+C       CNOMGR : Noms des groupes
+      ENDSEGMENT
+
+      SEGMENT ICPR8(nnic)
+
+      SEGMENT ICOO
+        REAL*8 COO(IDIM,nnoe)
+      ENDSEGMENT
+
+C-----SEGMENT SREPER d'objets nommes et leur nom (INCLUDE SMMED)
+C     SREPER ==> Repertorie les MAILLAGES nommes dans Cast3M
+C     SREPE1 ==> Repertorie les POINTS    nommes dans Cast3M
+C     SREPE2 ==> Repertorie les MAILLAGES nommes dans des indices de TABLE
+C     SREPE3 ==> Repertorie les POINTS    nommes dans des indices de TABLE
+
+C     SID : SEGMENT CONTENANT LES INFORMATIONS POUR LA FUSION DES OBJETS
+      SEGMENT SID
+C       NBFUS  : NOMBRE D'OBJETS A FUSIONNER
+C       IPOINT : POINTEURS A FUSIONNER ou ENTIERS A FUSIONNER (cas particuler MAXI / MINI)
+C       BVAL   : LOGIQUES SUR LESQUELS ON FAIT UN ET/OU LOGIQUE
+C       XVAL   : REELS A FUSIONNER (cas particuler MAXI / MINI)
+C       CVAL   : MOTS  A FUSIONNER (cas particuler MAXI / MINI)
+C       CHATYP : MOT DONNANT LE TYPE   D'OBJETS A FUSIONNER
+        INTEGER     IPOINT(NBFUS)
+        LOGICAL     BVAL  (NBFUS)
+        REAL*8      XVAL  (NBFUS)
+        CHARACTER*(IC1) CVAL(NBFUS)
+        CHARACTER*8 CHATYP,CREATE
+      ENDSEGMENT
+
+      SEGMENT ITLAC1(0)
+      SEGMENT ITLACS(0)
+
+      CHARACTER*8       ctyp
+      CHARACTER*4       cha4F
+      CHARACTER*8       cha8b, cha8c, cha8d
+      CHARACTER*(LONOM) cha24a
+      CHARACTER*64      fobj
+
+      LOGICAL           login, logre, log1, log2
+
+      CHARACTER*8  TYPOBJ, TYPMAI,TYPCHM,TYPMOD,TYPCHP,TYPMOT,
+     &                     TYPTAB,TYPPOI
+      DATA  TYPMAI    ,TYPCHM    ,TYPMOD    ,TYPCHP    ,TYPMOT
+     &    / 'MAILLAGE','MCHAML  ','MMODEL  ','CHPOINT ','MOT     ' /
+      DATA  TYPTAB    ,TYPPOI
+     &    / 'TABLE   ','POINT   ' /
+
+      PARAMETER (NMOTC = 2)
+      CHARACTER*(4) LMOTC(NMOTC)
+C- Sortie de tous les maillages (en particulier en cas de table)
+ccc      DATA LMOTC / 'TOUS','TABM' /
+      DATA LMOTC / 'NOID','TABM' /
+      LOGICAL logall,logple
+
+C **********************************************************************
+C  DEBUT DES INSTRUCTIONS
+C **********************************************************************
+C-----Je bloque la sortie MED sur les ASSISTANTS (sans doute inutilement)
+      IF (oothrd .NE. 0) THEN
+        CALL ERREUR(915)
+        RETURN
+      ENDIF
+
+      SEGACT,MCOORD
+
+C-----Initialisation
+      TYPOBJ = '        '
+
+      IJFAM  = 0
+      IJGROU = 0
+      INUMFA = 0
+      IPROFI = 0
+      INBTYP = 0
+
+      SREPER = 0
+      SREPE1 = 0
+      SREPE2 = 0
+      SREPE3 = 0
+      NBREP1 = 0
+      NBREP2 = 0
+      NBREP3 = 0
+      ITLAC1 = 0
+
+      IPT8   = 0
+      ICPR8  = 0
+      nnic   = 0
+      ICOO   = 0
+
+      LISMAI = 0
+      LISTBP = 0
+      LISTBM = 0
+C-----Definition de la liste de CHPOINT & MCHAML
+      LISCHP = 0
+      LISCHA = 0
+
+C-----Cas particulier des POLYGONEs (2D) : MED_POLYGON & ity=32
+C     On ne considere que les polygones ayant de 1 a MED_MAXCPO cotes
+      JG = 3 * (MED_MAXCPO + 1)
+      SEGINI,LPOLY
+      NEPOLY = 0
+      NCPOLY = 0
+
+C----- Nom par defaut :
+      name   ='$MESH_FROM_CAST3M$'
+
+C----- Option(s) par defaut :
+      logall = .TRUE.
+c#DEV logall = .FALSE. si option par defaut (pour avoir TRUE mot-cle TOUS 
+c#DEV a definir dans MOTC au lieu de NOID) --->  Probleme actuellement 
+c#DEV car on peut se retrouver sans maillage si on ne sort qu'un CHPO !
+      logple = .FALSE.
+
+C **********************************************************************
+C  Analyse des objets envoyes a l'operateur
+C **********************************************************************
+      SEGINI,ITLAC1
+
+ 1    CONTINUE
+        INTEXT = 1
+        ctyp   = '        '
+        cha24a = ' '
+
+C---- Eventuels mot-cles :
+        CALL LIRMOT(LMOTC,NMOTC,IMOTC,0)
+        IF (IERR.NE.0) GOTO 9999
+c#DBG      if (imotc.ne.0) write(ioimp,*) 'IMOTC =',IMOTC
+cccc        IF (IMOTC.EQ.1) logall = .TRUE.
+        IF (IMOTC.EQ.1) logall = .FALSE.
+        IF (IMOTC.EQ.2) logple = .TRUE.
+        IF (IMOTC.NE.0) GOTO 1
+
+        CALL QUETYP(ctyp, 0, iretou)
+        IF (iretou .NE. 1) GOTO 100
+c#DBG      write(ioimp,*) 'ctyp =',ctyp
+
+        CALL LIROBJ(ctyp, iret, 0, iretou)
+
+C ***** On controle que le type est connu de Cast3M
+        CALL TYPFIL(ctyp, k)
+
+        IF (k .LT. 0) THEN
+C----------On NE sait pas sortir un objet de ce type
+           moterr = ctyp
+           CALL ERREUR(242)
+           GOTO 9999
+        ENDIF
+
+C-------Le type est ok
+        CALL QUENOM(cha24a)
+        ilon2 = LONG(cha24a)
+        fname = ' '
+
+        IF     (ctyp .EQ. TYPMAI) THEN
+C         **************************************************************
+C         *  Sortie directe des MAILLAGE                               *
+C         **************************************************************
+c#DBG      write(ioimp,*) 'meleme lu =',iret
+          CALL ACTOBJ(TYPMAI,iret,1)
+          MELEME = iret
+          jsous = MELEME.LISOUS(/1)
+          IF (jsous.EQ.0) THEN
+            IF (MEDEL(MELEME.ITYPEL) .EQ. MED_NONE) GOTO 10
+          ELSE
+            DO ii = 1, jsous
+              IPT1 = MELEME.LISOUS(ii)
+              IF (MEDEL(IPT1.ITYPEL) .EQ. MED_NONE) GOTO 10
+            ENDDO
+          ENDIF
+          LISMAI = LISMAI + 1
+          CALL AJOU(ITLAC1,iret)
+c#DBG      write(ioimp,*) 'meleme conserve =',LISMAI,jsous+1
+ 10       CONTINUE
+
+        ELSEIF (ctyp .EQ. TYPCHP) THEN
+C         **************************************************************
+C         *  Sortie directe des CHPOINT                                *
+C         **************************************************************
+c#DBG      write(ioimp,*) 'chpoint lu =',iret
+          CALL ACTOBJ(TYPCHP,iret,1)
+          fname = cha24a
+          i_z   = MED_NO_DT
+          xbid1 = MED_UNDEF_DT
+          CALL smchp1(ITLAC1,iret,TYPCHP,LISCHP,fname,i_z,xbid1)
+          IF (IERR .NE. 0) GOTO 9999
+
+        ELSEIF (ctyp .EQ. TYPCHM) THEN
+C         **************************************************************
+C         *  Sortie directe des 'MCHAML'                               *
+C         **************************************************************
+c#DBG      write(ioimp,*) 'mchaml lu =',iret
+          CALL ACTOBJ(TYPCHM,iret,1)
+          fname = cha24a
+          i_z   = MED_NO_DT
+          xbid1 = MED_UNDEF_DT
+          CALL smchp1(ITLAC1,iret,TYPCHM,LISCHA,fname,i_z,xbid1)
+          IF (IERR .NE. 0) GOTO 9999
+
+        ELSEIF (ctyp .EQ. TYPTAB) THEN
+C         **************************************************************
+C         *  Sortie des 'TABLES'                                       *
+C         **************************************************************
+C-1-----  On sort une TABLE
+          MTABLE = iret
+          TYPOBJ = '        '
+          cha8d  = '        '
+          CALL ACCTAB(MTABLE,TYPMOT,ival1,xval1,'SOUSTYPE',login,iobin,
+     &                       TYPOBJ,ival2,xval2,cha8d     ,logre,iobre)
+          IF (IERR .NE. 0) GOTO 9999
+
+C-2-----  On sort une TABLE de SOUSTYPE 'PASAPAS'
+          IF (TYPOBJ.EQ.TYPMOT .AND. cha8d.EQ.'PASAPAS ') THEN
+            LISTBP = LISTBP + 1
+            cha8c = '        '
+            CALL ACCTAB(MTABLE,TYPMOT,ival1,xval1,'MODELE',login,iobin,
+     &                         TYPMOD,ival2,xval2,cha8c   ,logre,iobre)
+            IF (IERR .NE. 0) GOTO 9999
+            MMODEL = iobre
+            CALL ACTOBJ(TYPMOD,MMODEL,1)
+            nsous = MMODEL.KMODEL(/1)
+            n1    = nsous
+            SEGINI,MMODE1
+            n1 = 0
+            DO isous = 1, nsous
+              IMODEL = MMODEL.KMODEL(isous)
+              IPT1   = IMODEL.IMAMOD
+              IF (MEDEL(IPT1.ITYPEL) .NE. MED_NONE) THEN
+                n1 = n1 + 1
+                MMODE1.KMODEL(n1) = IMODEL
+                CALL AJOU(ITLAC1,IPT1)
+              ELSE
+                write(ioimp,*) 'SORMED MMODEL ELEMENT NON PREVU'
+              ENDIF
+            ENDDO
+            IF (n1.EQ.0) THEN
+              write(ioimp,*) 'SORMED MMODEL VIDE'
+            ENDIF
+            IF (n1.NE.nsous) SEGADJ,MMODE1
+
+            cha8c = '        '
+            CALL ACCTAB(MTABLE,TYPMOT,ival1,xval1,'TEMPS',login,iobin,
+     &                         TYPTAB,ival2,xval2,cha8c  ,logre,iobre)
+            IF (IERR .NE. 0) GOTO 9999
+C           Reactivation de la TABLE desactivee dans ACCTAB
+            SEGACT,MTABLE
+
+            MTAB1 = iobre
+            SEGACT,MTAB1
+            nbtps = MTAB1.MLOTAB
+
+C---------  Boucle sur tous les indices afin de chercher des champs a sortir
+            nbind = MTABLE.MLOTAB
+            DO ib=1,nbind
+C             IPILOC peut avoir ete SEGDES
+              if (nbesc.ne.0) SEGACT,IPILOC
+C-----------  Recherche d'une table de CHPOINT ou MCHAML
+              TYPOBJ = MTABLE.MTABTV(ib)
+              IF (TYPOBJ .NE. TYPTAB) GOTO 90
+              ip     = MTABLE.MTABII(ib)
+              nd     = IPCHAR(ip)
+              nf     = IPCHAR(ip+1)
+              IF ((nf-nd) .GT. MED_NAME_SIZE) THEN
+                interr(1)= MED_NAME_SIZE
+                moterr   = ICHARA(nd:nd+MED_NAME_SIZE-1)
+                CALL ERREUR(1096)
+                GOTO 9999
+              ENDIF
+              chaNSa = ICHARA(nd:nf-1)
+              ilon2  = LONG(chaNSa)
+              fname = ' '
+              fname(1:ilon2) = chaNSa(1:ilon2)
+c#DBG      write(ioimp,*)'TABLE',ib,'INDICE //',chaNSa(1:ilon2),'\\'
+
+              IF ( (chaNSa(1:6) .EQ.'TEMPS ')     .OR.
+     &             (chaNSa(1:10).EQ.'REACTIONS ') ) GOTO 90
+
+C              IF (chaNSa(1:11).EQ.'CHARGEMENT ') THEN
+CC               Cas de l'indice CHARGEMENT
+C                MCHARG = MTABLE.MTABIV(ib)
+C                DO ic=1,nbtps
+C                  XTPS = MTAB1.RMTABV(ic)
+CC                 On invoque 'TIRE' au temps considere
+C                  CALL ECRCHA('TABL')
+C                  CALL ECRREE(XTPS)
+C                  CALL ECROBJ('CHARGEME',MCHARG)
+C                  CALL TIRE
+C                  CALL LIROBJ('TABLE',MTAB2,1,IRETOU)
+C                  SEGACT,MTAB2
+C                ENDDO
+C                GOTO 90
+C              ENDIF
+
+              MTAB2  = MTABLE.MTABIV(ib)
+              SEGACT,MTAB2
+              nbtps2 = MTAB2.MLOTAB
+              IF (nbtps .NE. nbtps2) GOTO 90
+
+C-------------Verification de l'uniformite de tous les indices
+              TYPOBJ = MTAB2.MTABTV(1)
+              IF (TYPOBJ.NE.TYPCHP .AND. TYPOBJ.NE.TYPCHM) GOTO 90
+
+              DO ic=1,nbtps
+                ip1   = MTAB1.MTABII(ic)
+                ip2   = MTAB2.MTABII(ic)
+                cha8c = MTAB2.MTABTV(ic)
+                IF ((ip1.NE.ip2).OR.(TYPOBJ.NE.cha8c)) GOTO 90
+              ENDDO
+
+C------------ Boucle sur les indices SAUVES de la TABLE
+C             ********************************************************
+C             * INDICE DE TYPE 'CHPOINT'                             *
+C             ********************************************************
+              IF (TYPOBJ .EQ. TYPCHP) THEN
+                DO ic=1,nbtps
+                  ndt  = MTAB1.MTABII(ic)
+                  xtps = MTAB1.RMTABV(ic)
+
+                  iret = MTAB2.MTABIV(ic)
+                  CALL ACTOBJ(TYPCHP,iret,1)
+                  IF (IERR .NE. 0) GOTO 9999
+
+c#DBG      write(ioimp,*) 'Appel a smchp1 CHPO fname=',fname,'='
+                  CALL smchp1(ITLAC1,iret,TYPCHP,LISCHP,fname,ndt,xtps)
+                  IF (IERR .NE. 0) GOTO 9999
+                ENDDO
+
+C             ********************************************************
+C             * INDICE DE TYPE 'MCHAML'                              *
+C             ********************************************************
+              ELSE IF (TYPOBJ .EQ. TYPCHM) THEN
+                DO ic=1,nbtps
+                  ndt  = MTAB1.MTABII(ic)
+                  xtps = MTAB1.RMTABV(ic)
+
+                  iret = MTAB2.MTABIV(ic)
+                  CALL ACTOBJ(TYPCHM,iret,1)
+                  IF (IERR .NE. 0) GOTO 9999
+                  MCHELM = iret
+C                 Verification s'il faut passer aux noeuds
+                  ICHSUP = 0
+                  DO ii = 1,MCHELM.ICHAML(/1)
+                    ISUPP = MCHELM.INFCHE(ii,6)
+                    IF (ISUPP .GT. 2) THEN
+                      ICHSUP = 1
+                      GOTO 92
+                    ENDIF
+                  ENDDO
+ 92               CONTINUE
+                  IF (ICHSUP .EQ. 1) THEN
+C                   Chgt de support aux Noeuds
+                    ISUPP = 1
+                    CALL REDUAF(MCHELM,MMODE1,MCHEL2,0,iret,kerre)
+                    IF (IRET .NE. 1) CALL ERREUR(kerre)
+                    IF (IERR .NE. 0) GOTO 9999
+                    CALL CHASUP(MMODE1,MCHEL2,MCHELM,iret,ISUPP)
+                    IF (IRET .NE. 0) THEN
+                      CALL ERREUR(iret)
+                      GOTO 9999
+                    ENDIF
+                  ENDIF
+                  iret = MCHELM
+
+c#DBG      write(ioimp,*) 'Appel a smchp1 CHAM fname=',fname,'='
+                  CALL smchp1(ITLAC1,iret,TYPCHM,LISCHA,fname,ndt,xtps)
+                  IF (IERR .NE. 0) GOTO 9999
+                ENDDO
+
+              ENDIF
+
+              SEGDES,MTAB2
+ 90           CONTINUE
+            ENDDO
+C           MTAB1 : TABLE des 'TEMPS'
+            SEGDES,MTAB1
+            SEGSUP,MMODE1
+
+C-3-----  On sort une TABLE quelconque
+C         On ne veut que des indices de type MOT
+C         Cas TABM = les indices doivent contenir que des MAILLAGE et POINT
+          ELSE
+
+            log1 = .TRUE.
+            name = ' '
+            name = cha24a
+
+            SEGACT,MTABLE
+            nbind = MTABLE.MLOTAB
+c#DBG      write(ioimp,*) 'TABLE quelconque (60)',MTABLE,nbind
+
+            DO ib = 1, nbind
+              IF (MTABTI(ib).NE.TYPMOT) THEN
+                moterr = MTABTI(ib)
+                CALL ERREUR(791)
+                GOTO 9999
+              ENDIF
+            ENDDO
+
+            DO 60 ib = 1, nbind
+
+C------------ Recherche d'une table de MAILLAGE et de POINT (pour l'option TABM)
+              fname  = ' '
+              ip     = MTABLE.MTABII(ib)
+              cha8b  = MTABLE.MTABTV(ib)
+              iret   = MTABLE.MTABIV(ib)
+
+C             IPILOC peut avoir ete SEGDES
+              IF (NBESC.NE.0) SEGACT,IPILOC
+              nd = IPCHAR(ip)
+              nf = IPCHAR(ip+1)
+              ilon2 = nf - nd
+              IF (ilon2 .GT. MED_NAME_SIZE) THEN
+                interr(1) = MED_NAME_SIZE
+                moterr    = ICHARA(nd:nd+MED_NAME_SIZE-1)
+                CALL ERREUR(1096)
+                GOTO 9999
+              ENDIF
+              chaNSa = ICHARA(nd:nf-1)
+              ilon2  = LONG(chaNSa)
+              fname = chaNSa
+
+c#DBG      write(ioimp,*) 'Indice ',ib,fname(1:ilon2),ilon2
+c#DBG      write(ioimp,*) '       ',cha8b,iret
+
+C* Cas particulier de l'indice SOUSTYPE :
+              IF (fname(1:ilon2).EQ.'SOUSTYPE') THEN
+                IF  (cha8b .EQ. TYPMOT) THEN
+C                 IPILOC peut avoir ete SEGDES
+                  IF (NBESC.NE.0) SEGACT,IPILOC
+                  nd = IPCHAR(iret)
+                  nf = IPCHAR(iret+1)
+                  ilon2 = nf-nd
+                  IF (ilon2 .GT. MED_NAME_SIZE) THEN
+                    interr(1) = MED_NAME_SIZE
+                    moterr    = ICHARA(nd:nd+MED_NAME_SIZE-1)
+                    CALL ERREUR(1096)
+                    GOTO 9999
+                  ENDIF
+                  chaNSa = ICHARA(nd:nf-1)
+                  ilon2  = LONG(chaNSa)
+                  name = ' '
+                  name(1:ilon2) = ChaNSa(1:ilon2)
+c#DBG      write(ioimp,*) ' Nom du maillage par defaut : name = ',
+c#DBG     &                name(1:ilon2)
+                ENDIF
+                GOTO 60
+              ENDIF
+
+              IF     (cha8b .EQ. TYPPOI) THEN
+C               ********************************************************
+C               *  Sortie des POINTS                                   *
+C               ********************************************************
+                NBREP3 = NBREP3 + 1
+                IF (SREPE3 .EQ. 0) THEN
+                  NBENT = nbind
+                  SEGINI,SREPE3
+                ELSE
+                  IF (NBREP3 .GT. SREPE3.IREPER(/1)) THEN
+                    NBENT = SREPE3.IREPER(/1) + nbind
+                    SEGADJ,SREPE3
+                  ENDIF
+                ENDIF
+                INO3 = iret
+                SREPE3.IREPER(NBREP3) = INO3
+                SREPE3.CREPER(NBREP3) = ' '
+                SREPE3.CREPER(NBREP3) = chaNSa(1:ilon2)
+c#DBG      write(ioimp,*) ' POINT',NBREP3,ChaNSa,'NOEUD',INO3
+
+              ELSEIF (cha8b .EQ. TYPMAI) THEN
+C               ********************************************************
+C               *  Sortie des MAILLAGE                                 *
+C               ********************************************************
+                CALL ACTOBJ(TYPMAI,iret,1)
+                MELEME = iret
+                jsous = MELEME.LISOUS(/1)
+                IF (jsous.EQ.0) THEN
+                  IF (MEDEL(MELEME.ITYPEL) .EQ. MED_NONE) GOTO 60
+                ELSE
+                  DO ii = 1, jsous
+                    IPT1 = MELEME.LISOUS(ii)
+                    IF (MEDEL(IPT1.ITYPEL) .EQ. MED_NONE) GOTO 60
+                  ENDDO
+                ENDIF
+                CALL AJOU(ITLAC1,iret)
+
+                NBREP2=NBREP2 + 1
+                IF(SREPE2 .EQ. 0)THEN
+                  NBENT = nbind
+                  SEGINI,SREPE2
+                ELSE
+                  IF(NBREP2 .GT. SREPE2.IREPER(/1))THEN
+                    NBENT =SREPE2.IREPER(/1) + nbind
+                    SEGADJ,SREPE2
+                  ENDIF
+                ENDIF
+                SREPE2.IREPER(NBREP2)=MELEME
+                SREPE2.CREPER(NBREP2)=' '
+                SREPE2.CREPER(NBREP2)=chaNSa(1:ilon2)
+c#DBG      write(ioimp,*) ' MAILLAGE',NBREP2,MELEME,ChaNSA
+
+              ELSEIF (TYPOBJ .EQ. TYPCHP) THEN
+C               ********************************************************
+C               * Sortie des CHPOINT                                   *
+C               ********************************************************
+                CALL ACTOBJ(TYPCHP,iret,1)
+                IF (IERR .NE. 0) GOTO 9999
+
+                CALL smchp1(ITLAC1,iret,TYPCHP,LISCHP,fname,ndt,xtps)
+                IF (IERR .NE. 0) GOTO 9999
+                log1 = .FALSE.
+
+              ELSEIF (TYPOBJ .EQ. TYPCHM) THEN
+C               ********************************************************
+C               * Sortie des MCHAML                                    *
+C               ********************************************************
+                CALL ACTOBJ(TYPCHM,iret,1)
+                IF (IERR .NE. 0) GOTO 9999
+
+                MCHELM = iret
+C  Champ aux noeuds, aux gravite, constant ?
+                DO ii = 1,MCHELM.ICHAML(/1)
+                  ISUPP  = MCHELM.INFCHE(ii,6)
+                  IF (ISUPP .GT. 2) THEN
+                    write(ioimp,*) 'Support incorrect !'
+                    CALL ERREUR(21)
+                    GOTO 9999
+                  ENDIF
+                ENDDO
+
+                CALL smchp1(ITLAC1,iret,TYPCHM,LISCHA,fname,ndt,xtps)
+                IF (IERR .NE. 0) GOTO 9999
+                log1 = .FALSE.
+
+              ELSE
+C               Indice non sorti actuellement
+                moterr = '        MAILLAGE'
+                CALL ERREUR(800)
+                GOTO 9999
+              ENDIF
+
+              IF (NBESC.NE.0) SEGDES,IPILOC
+ 60         CONTINUE
+            SEGDES,MTABLE
+            IF (log1) THEN
+              LISTBM = LISTBM + 1
+            ELSE
+              LISTBP = LISTBP + 1
+            END IF
+          ENDIF
+
+C---------On NE sait pas sortir ce type d'objet
+        ELSE
+          moterr = ctyp
+          CALL ERREUR(242)
+          GOTO 9999
+        ENDIF
+
+      GOTO 1
+
+C-----On a explore toutes les demandes
+ 100  CONTINUE
+      if (nbesc.ne.0) SEGDES,IPILOC
+
+C-----Cas particuliers :
+      log1 =     (LISMAI.NE.0) .OR. (LISCHP.NE.0) .OR. (LISCHA.NE.0)
+     &      .OR. (LISTBP.NE.0)
+      log2 = (LISTBM.EQ.0)
+      IF (log1 .AND. log2) logple = .FALSE.
+      IF ((.NOT.log1) .AND. (.NOT.log2)) logple = .TRUE.
+      IF (logple) THEN
+        IF (log1) THEN
+          write(ioimp,*) 'Seules des tables contenant des MAILLAGE & ',
+     &                   'POINT sont possibles avec l option TABM'
+          CALL ERREUR(19)
+          GOTO 9999
+        END IF
+        IF (log2) THEN
+          write(ioimp,*) 'Pas de table a sortir !'
+          CALL ERREUR(21)
+          GOTO 9999
+        END IF
+c#DBG        IF (logall) THEN
+c#DBG          write(ioimp,*) 'Option "TOUS" desactivee'
+c#DBG        END IF
+        logall = .FALSE.
+c#DBG        IF (SREPE2.LE.0 .AND. SREPE3.LE.0) THEN
+c#DBG          write(ioimp,*) 'DBG - SREPE2 et SREPE3 non definis !'
+c#DBG          CALL ERREUR(5)
+c#DBG        END IF
+      END IF
+
+C **********************************************************************
+C  Union des MELEME ELEMENTAIRES
+C **********************************************************************
+c#DBG      write(ioimp,*)
+      NBFUS = ITLAC1(/1)
+c#DBG      write(ioimp,*) 'NBFUS = ',NBFUS
+      IF     (NBFUS .EQ. 0) THEN
+C-------Rien a sortir...
+        CALL ERREUR(-365)
+        GOTO 9999
+      ELSEIF (NBFUS .EQ. 1) THEN
+        IPT8 = ITLAC1(1)
+      ELSEIF (NBFUS .GT. 1) THEN
+        ITLACS = 0
+        SEGINI,ITLACS
+        DO ii = 1, NBFUS
+          MELEME = ITLAC1(ii)
+          jsous = MELEME.LISOUS(/1)
+          IF (jsous.EQ.0) THEN
+c#DBG      write(ioimp,*) 'ITLACS ajout S',ii,MELEME
+            CALL AJOU(ITLACS,MELEME)
+          ELSE
+c#DBG      write(ioimp,*) 'ITLACS ajout C',ii,MELEME
+            DO j = 1, jsous
+              iret = MELEME.LISOUS(j)
+c#DBG      write(ioimp,*) 'ITLACS ajout C',ii,j,iret
+              CALL AJOU(ITLACS,iret)
+            ENDDO
+          ENDIF
+        ENDDO
+        NBFUS = ITLACS(/1)
+        IC1=0
+        SEGINI,SID
+        SID.CREATE='SORT MED'
+        SID.CHATYP=TYPMAI
+        DO ii = 1, NBFUS
+          SID.IPOINT(ii)=ITLACS(ii)
+        ENDDO
+c#DBG      write(ioimp,*) 'ITLACS FUSION',NBFUS
+        log1  = .FALSE.
+        xbid1 = 0.D0
+        CALL FUNOBJ(SID,IPT8,xbid1,log1)
+        SEGSUP,SID
+        SEGSUP,ITLACS
+c**        CALL AJOU(ITLAC1,IPT8)
+        CALL ACTOBJ(TYPMAI,IPT8,1)
+      ELSE
+        CALL ERREUR(5)
+        GOTO 9999
+      ENDIF
+c#DBG      write(ioimp,*) 'UNION',NBFUS,IPT8
+
+C **********************************************************************
+C  REPERAGE DES NOEUDS A SAUVER
+C **********************************************************************
+      nnoe = 0
+
+      nnic = NBPTS
+      SEGINI,ICPR8
+      imax = 0
+      imin = NBPTS + 1
+
+      IPT1 = IPT8
+      jsous = IPT8.LISOUS(/1)
+      DO ii = 1, MAX(jsous,1)
+        IF (jsous.GE.1) IPT1 = IPT8.LISOUS(ii)
+        DO j = 1, IPT1.NUM(/2)
+          DO i = 1, IPT1.NUM(/1)
+            inoe = IPT1.NUM(i,j)
+            IF (ICPR8(inoe).LE.0) THEN
+              nnoe = nnoe + 1
+              ICPR8(inoe) = nnoe
+              imin = MIN(imin,inoe)
+              imax = MAX(imax,inoe)
+            END IF
+          END DO
+        END DO
+      END DO
+c#DBG      write(ioimp,*) 'NNOE IPT8',nnoe,imin,imax,NBPTS
+      IF (NBREP3.GT.0) THEN
+        DO i = 1, NBREP3
+          inoe = SREPE3.IREPER(i)
+          IF (ICPR8(inoe).LE.0) THEN
+            nnoe = nnoe + 1
+            ICPR8(inoe) = nnoe
+            imin = MIN(imin,inoe)
+            imax = MAX(imax,inoe)
+          END IF
+        END DO
+c#DBG      write(ioimp,*)
+c#DBG      write(ioimp,*) 'NNOE IPT8+MPOI3',nnoe,imin,imax,NBPTS
+      END IF
+
+C **********************************************************************
+C * En 2D on repere s'il y a des POLYGONEs (itypel=32) dans IPT8
+C * Attention : NEPOLY et NCPOLY sont surdimensionnes !
+C **********************************************************************
+      jsous = IPT8.LISOUS(/1)
+      IPT1  = IPT8
+      DO ii = 1, MAX(1,jsous)
+        IF (jsous.GE.1) IPT1 = IPT8.LISOUS(ii)
+        IF (IPT1.ITYPEL.EQ.32) THEN
+          if (nbnn.gt.MED_MAXCPO) then
+            write(ioimp,*) 'MAILLAGE ',IPT1,' : POLYGON edges ',nbnn,
+     &                     ' > ',MED_MAXCPO
+            call erreur(5)
+            goto 9999
+          end if
+          nbnn   = IPT1.NUM(/1)
+          nbelem = IPT1.NUM(/2)
+          NEPOLY = NEPOLY + nbelem
+          NCPOLY = NCPOLY + (nbelem*nbnn)
+          j = 3*nbnn-2
+          LPOLY.LECT(j) = LPOLY.LECT(j) + nbelem
+        END IF
+      END DO
+      IF (NEPOLY.GT.0) THEN
+        iel = 0
+        ino = 0
+        j = 3
+        DO ii = 1, MED_MAXCPO
+          LPOLY.LECT(j-1) = iel
+          LPOLY.LECT(j  ) = ino
+          nbelem = LPOLY.LECT(j-2)
+          iel = iel + nbelem
+          ino = ino + (nbelem * ii)
+          j = j + 3
+        END DO
+        LPOLY.LECT(j-1) = iel
+        LPOLY.LECT(j  ) = ino
+c#DBG        jjjcpo = MIN(11,MED_MAXCPO)
+c#DBG        write(ioimp,*) 'POLYGONES'
+c#DBG        write(ioimp,*) (ii,LPOLY.LECT(3*ii-2),ii=1,jjjcpo)
+c#DBG        write(ioimp,*) 'NEPOLY =',NEPOLY,LPOLY.LECT(3*MED_MAXCPO+2)
+c#DBG        write(ioimp,*) (ii,LPOLY.LECT(3*ii-1),ii=1,jjjcpo+1)
+c#DBG        write(ioimp,*) 'NCPOLY =',NCPOLY,LPOLY.LECT(3*MED_MAXCPO+3)
+c#DBG        write(ioimp,*) (ii,LPOLY.LECT(3*ii  ),ii=1,jjjcpo+1)
+      END IF
+
+C **********************************************************************
+C  Creation des GROUPES
+C **********************************************************************
+c#DBG      write(ioimp,*)
+      IF (logall) THEN
+C   Liste des MELEME nommes inclus strictement dans IPT8
+        CALL NOEINC(ICPR8,TYPMAI,SREPER)
+        NBNOM = SREPER.IREPER(/1)
+c#DBG        write(ioimp,*) 'MELEME nommes inclus dans IPT8'
+c#DBG        write(ioimp,*) 'SREPER',SREPER,NBNOM
+c#DBG        DO ii = 1, NBNOM
+c#DBG          write(ioimp,*) '  SREP',ii,NBNOM,IREPER(ii),CREPER(ii)
+c#DBG        ENDDO
+      ELSE
+        NBENT = 0
+        SEGINI,SREPER
+        NBNOM = NBENT
+c#DBG        write(ioimp,*) 'On ne prend pas les MELEME nommes'
+      END IF
+
+C   Ajout des MELEME nommes par des indices de TABLES QUELCONQUES
+      IF (SREPE2 .GT. 0) THEN
+        NBENT = NBNOM + NBREP2
+        SEGADJ,SREPER
+        DO ii = 1, NBREP2
+          IPT1 = SREPE2.IREPER(ii)
+C 2 objets differents pour le meme nom (objet nomme / indice table) ==> interdit
+          CALL PLACE(SREPER.CREPER(1),NBNOM,IMOT,SREPE2.CREPER(ii))
+          IF (IMOT .NE. 0) THEN
+            IF (IPT1 .NE. SREPER.IREPER(IMOT)) THEN
+              write(ioimp,*) 'objets differents pour le meme nom ',
+     &                       '(objet nomme / indice table) ==> interdit'
+              CALL ERREUR(21)
+              GOTO 9999
+            ENDIF
+          ENDIF
+c*          CALL PLACE2(SREPER.IREPER(1),NBNOM,IDANS,IPT1)
+c*          IF (IDANS.EQ.0) THEN
+c* Un meme maillage peut etre pointe plusieurs fois (avec noms et indices differents)
+          NBNOM = NBNOM + 1
+          SREPER.IREPER(NBNOM) = IPT1
+          SREPER.CREPER(NBNOM) = SREPE2.CREPER(ii)
+c*          END IF
+        ENDDO
+c#DBG        write(ioimp,*) 'SREPER+2',NBNOM,NBREP2
+c#DBG        DO ii = 1, NBNOM
+c#DBG          write(ioimp,*) '  SREP',ii,NBNOM,IREPER(ii),CREPER(ii)
+c#DBG        ENDDO
+      ENDIF
+
+C   Ajout de tous les MELEME pointes dans ITLAC1 si demande !
+      IF (logall) THEN
+        NBMAIL = ITLAC1(/1)
+C   Ceux pas nommes --> nom base sur num de pointeur
+        NBENT = NBNOM + NBMAIL
+        SEGADJ,SREPER
+C     Determination du FORMAT automatique
+        IFORMA = INT(LOG10(REAL(NBENT))) + 1
+        IF (IFORMA.LT.0 .OR. IFORMA.GE.9) THEN
+          CALL ERREUR(1094)
+          GOTO 9999
+        ENDIF
+        cha8d = '(I8.8)  '
+        IF (IFORMA.LE.6) cha8d = '(I6.6)  '
+        IF (IFORMA.LE.3) cha8d = '(I3.3)  '
+
+        DO ii = 1, NBMAIL
+          IPT1 = ITLAC1(ii)
+          CALL PLACE2(SREPER.IREPER(1),NBNOM,IDANS,IPT1)
+c#DBG      if (idans .gt. 0)
+c#DBG     &  write(ioimp,*) '  ',ii,NBMAIL,IPT1,' IDANS=',IDANS,NBNOM,NBENT
+c#DBG     &                   ,SREPER.CREPER(IDANS)
+          IF (IDANS .GT. 0) GOTO 20
+C       MAILLAGE A Ajouter
+          NBNOM = NBNOM+1
+C       Les pointeurs negatifs serviront a ne pas creer de FAMILLE supplementaire
+          SREPER.IREPER(NBNOM) = -IPT1
+          cha8c = '        '
+          WRITE(cha8c,cha8d(1:6)) NBNOM
+          SREPER.CREPER(NBNOM) = '$MAIL$_'//cha8c
+c#DBG      write(ioimp,*) '  ',ii,NBMAIL,IPT1,' <0 ',NBNOM,
+c#DBG     &                   SREPER.CREPER(NBNOM)
+          ilon2 = NBNOM - 1
+          CALL PLACE(SREPER.CREPER(1),ilon2,IMOT,SREPER.CREPER(NBNOM))
+          IF (IMOT .GT. 0) THEN
+            CALL ERREUR(21)
+            GOTO 9999
+          END IF
+ 20       CONTINUE
+        END DO
+        IF (NBENT .NE. NBNOM) THEN
+          NBENT = NBNOM
+          SEGADJ,SREPER
+        ENDIF
+c#DBG      write(ioimp,*)
+c#DBG      write(ioimp,*) 'SREPER',NBNOM,NBREP2,NBMAIL
+c#DBG      DO ii = 1, NBNOM
+c#DBG        write(ioimp,*) '  SREP',ii,NBNOM,IREPER(ii),
+c#DBG     &                 CREPER(ii)(1:LONG(CREPER(ii)))
+c#DBG      ENDDO
+      END IF
+
+C **********************************************************************
+c#DBG      write(ioimp,*)
+      IF (logall) THEN
+C Reperage des POINT nommes strictement inclus dans ICPR8
+        CALL NOEINC(ICPR8,TYPPOI,SREPE1)
+        NBREP1 = SREPE1.IREPER(/1)
+        DO ii = 1, NBREP1
+          SREPE1.IREPER(ii) = ICPR8(SREPE1.IREPER(ii))
+        END DO
+c#DBG        write(ioimp,*) 'POINTS nommes inclus dans ICPR8'
+c#DBG        write(ioimp,*) 'SREPE1',SREPE1,NBREP1
+c#DBG        DO ii = 1, NBREP1
+c#DBG          write(ioimp,*) '  SREP1',ii,NBREP1,SREPE1.IREPER(ii),
+c#DBG     &                   SREPE1.CREPER(ii)(1:LONG(SREPE1.CREPER(ii)))
+c#DBG        END DO
+      ELSE
+        NBENT = 0
+        SEGINI,SREPE1
+        NBREP1 = NBENT
+c#DBG        write(ioimp,*) 'On ne prend pas les POINTS nommes'
+      END IF
+
+C     Ajout des POINTS nommes par des indices de TABLES QUELCONQUES
+C Test equivalent :      IF (SREPE3 .GT. 0) THEN
+      IF (NBREP3.GT.0) THEN
+        NBENT = NBREP1 + NBREP3
+        SEGADJ,SREPE1
+        NBNOM1 = NBREP1
+        DO ii = 1, NBREP3
+          IPT3 = SREPE3.IREPER(ii)
+          INO3 = ICPR8(IPT3)
+c#DBG          write(ioimp,*) 'SREPE3',ii,NBREP3,IPT3,INO3
+          CALL PLACE(SREPE1.CREPER(1),NBNOM1,IMOT,SREPE3.CREPER(ii))
+C 2 points differents pour le meme nom ==> interdit
+          IF (IMOT .NE. 0) THEN
+            IF (INO3 .NE. SREPE1.IREPER(IMOT)) THEN
+              write(ioimp,*) 'points differents pour le meme nom ',
+     &                       '(objet nomme / indice table) ==> interdit'
+              CALL ERREUR(21)
+              GOTO 9999
+            ENDIF
+          ENDIF
+c*          CALL PLACE2(SREPE1.IREPER(1),NBNOM1,IDANS,INO3)
+c*          IF (IDANS.LE.0) THEN
+c* Un meme point peut etre reference plusieurs fois (avec noms et indices differents)
+          NBNOM1 = NBNOM1 + 1
+          SREPE1.IREPER(NBNOM1) = INO3
+          SREPE1.CREPER(NBNOM1) = SREPE3.CREPER(ii)
+c#DBG      write(ioimp,*) 'Ajout SREPE1',ii,NBREP3,NBNOM1,IPT3,INO3,
+c#DBG     &               SREPE3.CREPER(ii)
+c*          END IF
+        END DO
+        IF (NBENT.NE.NBNOM1) THEN
+          NBENT = NBNOM1
+          SEGADJ,SREPE1
+        ENDIF
+c#DBG      write(ioimp,*)
+c#DBG      write(ioimp,*) 'SREPE1+3',NBNOM1
+c#DBG      do ii = 1, NBNOM1
+c#DBG        write(ioimp,*) '  SREP1',ii,NBNOM1,SREPE1.IREPER(ii),
+c#DBG     &                 SREPE1.CREPER(ii)
+c#DBG      enddo
+      ENDIF
+      NBREP1 = SREPE1.IREPER(/1)
+
+C Initialisation du code de retour :
+      mcret = 0
+
+C **********************************************************************
+C  Creation/ouverture d'un fichier MED 4.*
+C **********************************************************************
+      nomfid = ' '
+C Recuperation du nom stocke par 'OPTI' 'SORT'
+      INQUIRE(UNIT = ioper, NAME   = nomfid )
+      CLOSE  (UNIT = ioper, STATUS ='DELETE')
+
+      ilon2  = LONG(nomfid)
+      macces = MED_ACC_CREAT
+      CALL mfiope(mfid, nomfid(1:ilon2), macces, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr   = 'sormed / mfiope '//nomfid(1:ilon2)
+        interr(1)= mcret
+        CALL ERREUR(873)
+        GOTO 9999
+      ENDIF
+
+C **********************************************************************
+C  Creation d'un MAILLAGE dans MED 4.*
+C **********************************************************************
+C-----Creation du repere cartesien
+      SEGINI,SANAME
+      IF    (IDIM .EQ. 1)THEN
+        SANAME.ANAME(1)='X'
+        SANAME.AUNIT(1)='NO_UNIT'
+      ELSEIF(IDIM .EQ. 2)THEN
+        SANAME.ANAME(1)='X'
+        SANAME.ANAME(2)='Y'
+        SANAME.AUNIT(1)='NO_UNIT'
+        SANAME.AUNIT(2)='NO_UNIT'
+      ELSEIF(IDIM .EQ. 3)THEN
+        SANAME.ANAME(1)='X'
+        SANAME.ANAME(2)='Y'
+        SANAME.ANAME(3)='Z'
+        SANAME.AUNIT(1)='NO_UNIT'
+        SANAME.AUNIT(2)='NO_UNIT'
+        SANAME.AUNIT(3)='NO_UNIT'
+      ELSE
+        interr(1)=IDIM
+        CALL ERREUR(709)
+        CALL ERREUR(832)
+        GOTO 9998
+      ENDIF
+
+c#DBG      ilon2 = long(name)
+c#DBG      write(ioimp,*)
+c#DBG      write(ioimp,*) 'NAME ='//name(1:ilon2)//'='
+
+      msdim  = IDIM
+      mmdim  = IDIM
+      mmtype = MED_UNSTRUCTURED_MESH
+      desc   = 'MAILLAGE MED sorti par Cast3M'
+      dtunit = 'NO_UNIT'
+      mstype = MED_SORT_DTIT
+      matype = MED_CARTESIAN
+
+      CALL mmhcre(mfid, name, msdim, mmdim, mmtype, desc, dtunit,
+     &            mstype, matype, SANAME.ANAME, SANAME.AUNIT, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr   = 'sormed / mmhcre'
+        interr(1)= mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+
+C **********************************************************************
+C  Ecriture des coordonnees des noeuds compris entre 1 et nnoe
+C **********************************************************************
+      SEGINI,ICOO
+      ii = 0
+      idimp1 = IDIM+1
+      DO inoe = 1, NBPTS
+        jnoe = ICPR8(inoe)
+        IF (jnoe.GT.0) THEN
+          ival1 = (inoe-1)*idimp1
+          DO j = 1, IDIM
+            icoo.COO(j,jnoe) = mcoord.XCOOR(ival1+j)
+          END DO
+          ii = ii + 1
+        END IF
+      END DO
+      IF (ii.NE.nnoe) write(ioimp,*) 'PBM II != NNOE',ii,nnoe
+
+      numdt  = MED_NO_DT
+      numit  = MED_NO_IT
+      dt     = MED_UNDEF_DT
+      mswm   = MED_FULL_INTERLACE
+
+      CALL mmhcow(mfid, name, numdt, numit, dt, mswm, nnoe, icoo.COO,
+     &            mcret)
+      IF (mcret .NE. 0) THEN
+        moterr   = 'sormed / mmhcow'
+        interr(1)= mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+
+C **********************************************************************
+C  Ecriture de la numerotation globale des noeuds (GLobal ID = 1 a nnoe)
+C **********************************************************************
+      numdt  = MED_NO_DT
+      numit  = MED_NO_IT
+      metype = MED_NODE
+      mgtype = MED_NONE
+
+      jg = nnoe
+      SEGINI,mlenti
+      DO inoe = 1, nnoe
+        mlenti.lect(inoe) = inoe
+      ENDDO
+
+      CALL mmhenw(mfid, name, numdt, numit, metype, mgtype,
+     &            nnoe, mlenti.lect(1), mcret)
+
+      SEGSUP,mlenti
+      mlenti = 0
+
+      IF (mcret .NE. 0) THEN
+        moterr    = 'sormed / mmhenw'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+
+C **********************************************************************
+C  Creation des FAMILLES
+C **********************************************************************
+C    +-----------------------------------------------------------------+
+C    |FAMILLE 0 de nom 'FAMILLE_ZERO' (OBLIGATOIRE) : comporte 0 groupe
+C    +-----------------------------------------------------------------+
+      fname = 'FAMILLE_ZERO'
+      mfnum = 0
+      n4    = 0
+      gname = ' '
+      CALL mfacre(mfid, name, fname, mfnum, n4, gname, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'sormed / mfacre'
+        interr(1) = mcret
+        CALL ERREUR(873)
+        GOTO 9998
+      ENDIF
+
+C    +-----------------------------------------------------------------+
+C    |FAMILLE des POINTS nommes : Numerotation positive
+C    +-----------------------------------------------------------------+
+C     Reperage des POINT nommes
+      IF (NBREP1 .NE. 0) THEN
+        nbelt = nnoe
+        SEGINI,INUMFA
+
+        jg = NBREP1
+        SEGINI,MLENTI
+
+        indfam = 0
+        DO indice = 1,NBREP1
+          iob = SREPE1.IREPER(indice)
+c#DBG          write(ioimp,*) '  B110',indice,NBREP1,iob,INUMFA(iob)
+          IF (INUMFA(iob) .EQ. 0) THEN
+            indfam = indfam + 1
+            INUMFA(iob) = indfam
+c#DBG            write(ioimp,*) '     nouvelle famille',indice,iob,indfam
+            kg = NBREP1
+            SEGINI,NOMGRO
+            NOMGRO.NOCO = 0
+            MLENTI.LECT(indfam) = NOMGRO
+          ENDIF
+          ii = INUMFA(iob)
+          NOMGRO = MLENTI.LECT(ii)
+          kg = NOMGRO.NOCO + 1
+          NOMGRO.NOCO = kg
+          NOMGRO.NOGROU(kg) = SREPE1.CREPER(indice)
+c#DBG      write(ioimp,*) '     nouveau groupe',kg,NOMGRO.NOGROU(kg),
+c#DBG     &               'famille',ii
+        END DO
+
+C ***** Ecriture des numeros de famille des POINTS nommes dans Cast3M
+        numdt  = MED_NO_DT
+        numit  = MED_NO_IT
+        metype = MED_NODE
+        mgtype = MED_NONE
+
+        CALL mmhfnw(mfid, name, numdt, numit, metype, mgtype, nnoe,
+     &              INUMFA(1), mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'sormed / mmhfnw'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9998
+        ENDIF
+
+C       Determination du FORMAT automatique
+        IF (indfam.GT.0) THEN
+          IFORMA = INT(LOG10(REAL(indfam))) + 1
+          IF (IFORMA.LT.1 .OR. IFORMA.GE.9) THEN
+            CALL ERREUR(1094)
+            GOTO 9998
+          ENDIF
+          cha4F  ='(I )'
+          WRITE(cha4F(3:3),FMT='(I1)') IFORMA
+          ilong  = 3+IFORMA
+        END IF
+
+        fobj = 'FAP'
+        DO ii = 1, indfam
+
+          WRITE(fobj(4:ilong),FMT= cha4F) ii
+C ***** Creation des groupes de POINTS nommes dans Cast3M
+          fname  = fobj(1:ilong)
+          mfnum  = ii
+          NOMGRO = MLENTI.LECT(ii)
+          n4  = NOMGRO.NOCO
+
+          CALL mfacre(mfid,name, fname, mfnum, n4, NOMGRO.NOGROU, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    ='sormed / mfacre'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 9998
+          ENDIF
+        ENDDO
+
+      ENDIF
+
+C    +-----------------------------------------------------------------+
+C    |FAMILLE d''elements : Numerotation negative
+C    +-----------------------------------------------------------------+
+      nbgrou = SREPER.IREPER(/1)
+c#DBG      write(ioimp,*) 'FAMILLE ELEMENTS : nbgrou=',nbgrou
+      jf     = 20
+      SEGINI,IJGROU,IJFAM
+      NFA    = 0
+      DO ii = 1, nbgrou
+c*        log1 = SREPER.IREPER(ii) .LT. 0
+        IPT1 = ABS(SREPER.IREPER(ii))
+        nomg = SREPER.CREPER(ii)
+
+        IJGROU.IPMAIL(ii)=IPT1
+        IJGROU.CNOMGR(ii)=nomg
+
+        NBSOUS = IPT1.LISOUS(/1)
+        NBSO1  = MAX(NBSOUS,1)
+
+        jg     = NBSO1
+        SEGINI,MLENTI
+        IJGROU.ILENTI(ii)=MLENTI
+
+        IPT2 = IPT1
+
+        jg = 0
+        DO ISOU = 1, NBSO1
+          IF (NBSOUS .GE. 1) THEN
+            IPT2 = IPT1.LISOUS(ISOU)
+          ENDIF
+          itype = IPT2.ITYPEL
+c#DBG      write(ioimp,*) '401',ii,isou,ipt2,itype,MEDEL(itype),MED_NONE
+
+C         Gestion des types d'elements non traites actuellement
+C Test fait auparavant donc a priori inutile ici
+          IF (MEDEL(itype) .EQ. MED_NONE) GOTO 401
+
+C         Recherche de ce MELEME dans les FAMILLES existantes
+          CALL PLACE2(IJFAM.IFAM,NFA,IDANS,IPT2)
+c#DBG      write(ioimp,*) '401-',IDANS,' !!',NFA,IPT2
+          IF (IDANS .EQ. 0) THEN
+            NFA   = NFA + 1
+            IDANS = NFA
+            IF (IDANS .GT. jf) THEN
+              jf = IDANS*2 + 20
+              SEGADJ,IJFAM
+            ENDIF
+
+C           Determination du FORMAT automatique
+            IFORMA= INT(LOG10(REAL(IDANS))) + 1
+            IF (IFORMA.LT.1 .OR. IFORMA.GT.9) THEN
+              CALL ERREUR(1094)
+              GOTO 9998
+            ENDIF
+            ilong = 9+IFORMA
+            cha4F ='(I )'
+            fname ='FAM_'//NOMS(itype)//'_'
+            WRITE(cha4F(3:3)     ,FMT='(I1)') IFORMA
+            WRITE(fname(10:ilong),FMT= cha4F) IDANS
+
+            kg=20
+            SEGINI,NOMGRO
+
+            IJFAM.IFAM(IDANS)   = IPT2
+            IJFAM.INUMF(IDANS)  =-IDANS
+            IJFAM.INOGRO(IDANS) = NOMGRO
+            IJFAM.CNOMFA(IDANS) = fname
+
+          ELSE
+            NOMGRO = IJFAM.INOGRO(IDANS)
+          ENDIF
+
+C         Il faut repenser LIRE 'MED' avant de decommenter le IF qui suit
+C          IF (log1) THEN
+C            IJFAM.INUMF(IDANS)= 0
+C          ELSE
+            kg  = NOMGRO.NOGROU(/2)
+            NOC = NOMGRO.NOCO + 1
+            IF (NOC .GT. kg) THEN
+              kg = NOC*2 + 20
+              SEGADJ,NOMGRO
+            ENDIF
+            NOMGRO.NOCO        = NOC
+            NOMGRO.NOGROU(NOC) = nomg
+C          ENDIF
+
+          jg = jg + 1
+          MLENTI.LECT(jg) = IDANS
+ 401      CONTINUE
+        ENDDO
+        SEGADJ,MLENTI
+      ENDDO
+      IJFAM.NFAM = NFA
+
+C---- Recomposition MAILLAGE global & Ecriture des familles dans MED
+      SEGINI,INBTYP
+
+C-- Cas particulier des POLYGONes (2D) - itype = 32
+      IF (NEPOLY.GT.0) THEN
+        itype = 32
+        jg = MED_MAXCPO
+        SEGINI,mlenti
+        INBTYP(1,itype) = mlenti
+        jg = NCPOLY
+        SEGINI,mlent2
+        INBTYP(2,itype) = mlent2
+        nbelt = NEPOLY
+        SEGINI,INUMFA
+        INBTYP(3,itype) = INUMFA
+      END IF
+
+c#DBG      write(ioimp,*) 'Nombre de familles :',NFA
+      DO ii = 1, NFA
+        mfnum = IJFAM.INUMF(ii)
+        IPT1  = IJFAM.IFAM(ii)
+        itype = IPT1.ITYPEL
+        nbnn  = IPT1.NUM(/1)
+        nbelp = IPT1.NUM(/2)
+
+        SEGINI,IPROFI
+        IJFAM.IPROF(ii) = IPROFI
+
+        INUMFA = INBTYP(3,itype)
+C------ Accretion des maillages du meme type (ITYPEL)
+      if (itype.ne.32) then
+        nbini  = INBTYP(1,itype)
+
+        nbelt  = nbini + nbelp
+        nbelem = nbelt
+        NBSOUS = 0
+        NBREF  = 0
+        INBTYP(1,itype) = nbelt
+        IF (INUMFA .EQ. 0) THEN
+          SEGINI,INUMFA
+          INBTYP(3,itype) = INUMFA
+          SEGINI,IPT2
+          IPT2.ITYPEL = itype
+          INBTYP(2,itype) = IPT2
+        ELSE
+          SEGADJ,INUMFA
+          IPT2   = INBTYP(2,itype)
+          SEGADJ,IPT2
+        ENDIF
+
+C Profil des MAILLAGES et permutation des noeuds Cast3M -> MED
+        IPER = MEDPER(itype)
+        ielt = nbini
+        IF (IPER .GE. 0) THEN
+          nn = nbnn-1
+          DO iel = 1, nbelp
+            ielt = ielt + 1
+            INUMFA(ielt) = mfnum
+            IPROFI(iel)  = ielt
+            IPT2.NUM(1,ielt)=ICPR8(IPT1.NUM(1,iel))
+            DO ino = 1, nn
+              jno = IPERM(IPER+ino)
+              IPT2.NUM(ino+1,ielt)=ICPR8(IPT1.NUM(jno,iel))
+            ENDDO
+          ENDDO
+        ELSE
+          DO iel = 1,nbelp
+            ielt = ielt + 1
+            INUMFA(ielt) = mfnum
+            IPROFI(iel)  = ielt
+            DO ino = 1,nbnn
+              IPT2.NUM(ino,ielt)=ICPR8(IPT1.NUM(ino,iel))
+            ENDDO
+          ENDDO
+        ENDIF
+
+c-- cas des polygones :
+      else
+        mlent2 = INBTYP(2,itype)
+        mlenti = INBTYP(1,itype)
+
+        nbini  = mlenti.LECT(nbnn)
+        nbelt  = nbini + nbelp
+        mlenti.LECT(nbnn) = nbelt
+c#DBG        if (nbelt.gt.LPOLY.LECT(3*nbnn-2)) then
+c#DBG          write(ioimp,*) 'itype 32',nbnn,nbelt,'>>> ?'
+c#DBG        endif
+        ipini = LPOLY.LECT(3*nbnn-1)
+        icini = LPOLY.LECT(3*nbnn)
+
+        ielt = ipini + nbini
+        inoe = icini + (nbnn * nbini)
+
+c#DBG      write(ioimp,*) '32-',nbnn,nbini,nbelp,nbelt
+c#DBG      write(ioimp,*) '   ',ipini,ielt,icini,inoe
+        IPER = MEDPER(itype)
+        IF (IPER .GE. 0) write(ioimp,*) 'cas non prevu'
+
+          DO iel = 1, nbelp
+            ielt = ielt + 1
+            INUMFA(ielt) = mfnum
+            IPROFI(iel)  = ielt
+            DO ino = 1,nbnn
+              inoe = inoe + 1
+              mlent2.LECT(inoe) = ICPR8(IPT1.NUM(ino,iel))
+            ENDDO
+          ENDDO
+
+      endif
+
+        IF (mfnum .NE. 0) THEN
+          fname  = IJFAM.CNOMFA(ii)
+          NOMGRO = IJFAM.INOGRO(ii)
+          n4     = NOMGRO.NOCO
+          CALL mfacre(mfid, name,fname, mfnum,n4, NOMGRO.NOGROU, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'sormed / mfacre'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 9998
+          ENDIF
+        ENDIF
+      ENDDO
+
+C     Boucle sur tous les TYPES d'elements ('POI1', etc.)
+c#DBG      write(ioimp,*)
+c#DBG      write(ioimp,*) 'Boucle sur les types d elements',NOMBR
+      DO ii = 1, NOMBR
+
+        IPT1   = INBTYP(2,ii)
+        IF (IPT1 .EQ. 0) GOTO 503
+
+        numdt  = MED_NO_DT
+        numit  = MED_NO_IT
+        dt     = MED_UNDEF_DT
+        metype = MED_CELL
+        mcmode = MED_NODAL
+        mswm   = MED_FULL_INTERLACE
+
+C------ Ecriture des connectivites
+        if (ii.eq.32) goto 532
+
+C ***** Cas general *****
+        nbnn   = IPT1.NUM(/1)
+        nbelem = IPT1.NUM(/2)
+        itype  = IPT1.ITYPEL
+        mgtype = MEDEL(itype)
+c#DBG        write(ioimp,*) '5xx ',ii,IPT1,itype,mgtype
+
+        CALL mmhcyw(mfid, name, numdt, numit, dt, metype,mgtype,mcmode,
+     &              mswm, nbelem, IPT1.NUM, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'sormed / mmhcyw'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9998
+        ENDIF
+
+        itaill = nbelem
+        GOTO 510
+
+C-- Cas des POLYGONES :
+ 532    CONTINUE
+        mgtype = MEDEL(ii)
+c#DBG        write(ioimp,*) '532 ',ii,IPT1,MED_POLYGON,mgtype
+
+        NEIND = NEPOLY + 1
+        jg = NEIND
+        SEGINI,mlent3
+        iel = 1
+        mlent3.LECT(iel) = 1
+        DO ino = 1, MED_MAXCPO
+          nbelem = LPOLY.LECT(3*ino-2)
+          DO j = 1, nbelem
+            iel = iel + 1
+            mlent3.LECT(iel) = mlent3.LECT(iel-1) + ino
+          END DO
+        END DO
+        mlent2 = INBTYP(2,ii)
+c#DBG        write(ioimp,*) 'MLENT3',NEIND,NEPOLY
+c#DBG        write(ioimp,*) (mlent3.LECT(j),j=1,NEIND)
+c#DBG        write(ioimp,*) 'MLENT2',NCPOLY
+c#DBG        write(ioimp,*) (mlent2.LECT(j),j=1,NCPOLY)
+
+        CALL mmhpgw(mfid, name, numdt, numit, dt, metype, mcmode,
+     &              NEIND,mlent3.LECT(1),mlent2.LECT(1), mcret)
+        SEGSUP,mlent3
+        IF (mcret .NE. 0) THEN
+          moterr    = 'sormed / mmhpgw'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9998
+        ENDIF
+
+        itaill = NEPOLY
+        GOTO 510
+
+C------ Ecriture du numero de famille a laquelle appartiennent les ELEMENTS
+ 510    CONTINUE
+        INUMFA = INBTYP(3,ii)
+        CALL mmhfnw(mfid, name, numdt, numit, metype, mgtype, itaill,
+     &              INUMFA(1), mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'sormed / mmhfnw'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9998
+        ENDIF
+ 
+ 503    CONTINUE
+      ENDDO
+
+C **********************************************************************
+C     Ecriture des CHPOINTS : Creation champs MED: profils et valeurs
+C **********************************************************************
+      IF (LISCHP .GT. 0) THEN
+        CALL SMDCHP(mfid, name, IJGROU, LISCHP, ICPR8)
+      ENDIF
+
+C **********************************************************************
+C     Ecriture des MCHAML : Creation champs MED: profils et valeurs
+C **********************************************************************
+      IF (LISCHA .GT. 0) THEN
+        CALL SMDCHM(mfid, name, IJFAM, IJGROU, LISCHA, ICPR8)
+      ENDIF
+
+C **********************************************************************
+C     Fermeture du fichier MED 4.*
+C **********************************************************************
+ 9998 CONTINUE
+      CALL mficlo(mfid, mcret)
+      IF (mcret .NE. 0) THEN
+        moterr    = 'sormed / mficlo'
+        interr(1) = mcret
+        CALL ERREUR(873)
+      ENDIF
+
+      IF (INBTYP.NE.0) THEN
+        DO ii = 1, NOMBR
+          if (ii.EQ.32) then
+            mlenti = INBTYP(1,ii)
+            IF (mlenti.NE.0) SEGSUP,mlenti
+            mlent2 = INBTYP(2,ii)
+            IF (mlent2.NE.0) SEGSUP,mlent2
+          else
+            IPT1 = INBTYP(2,ii)
+            IF (IPT1 .NE. 0) SEGSUP,IPT1
+          endif
+          INUMFA = INBTYP(3,ii)
+          IF (INUMFA.NE.0) SEGSUP,INUMFA
+        END DO
+        SEGSUP,INBTYP
+      END IF
+
+C **********************************************************************
+C     Fin du traitement - Fermeture/Destruction des segments
+C **********************************************************************
+ 9999 CONTINUE
+
+      IF (NBESC.NE.0) SEGDES,IPILOC
+      SEGDES,MCOORD
+
+      NBMAIL = ITLAC1(/1)
+      IF (NBMAIL.GT.1 .AND. IPT8.GT.0) SEGSUP,IPT8
+      SEGSUP,ITLAC1
+      SEGSUP,LPOLY
+      IF (SREPE1.NE.0) SEGSUP,SREPE1
+      IF (SREPE2.NE.0) SEGSUP,SREPE2
+      IF (SREPE3.NE.0) SEGSUP,SREPE3
+      IF (ICPR8 .NE.0) SEGSUP,ICPR8
+      IF (ICOO  .NE.0) SEGSUP,ICOO
+      IF (LISCHA.NE.0) SEGSUP,LISCHA
+      IF (LISCHP.NE.0) SEGSUP,LISCHP
+
+c      return
+      END
+
+ 

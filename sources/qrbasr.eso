@@ -1,0 +1,265 @@
+C QRBASR    SOURCE    BP208322  22/09/16    21:15:11     11454          
+*
+* creation : bp,2022-09-15         
+* inspiré de : inspiré de : QZBASC    SOURCE    FANDEUR   22/01/03    21:15:37     11136
+*          
+*
+************************************************************************
+*        CREATION D'UNE BASE DE MODES PROPRES REEL POUR VIBC
+*                                             ====
+*        A PARTIR DES RESULTATS DE DSYEV
+************************************************************************
+
+      SUBROUTINE QRBASR (MWORK,MATZ,MELEME,MCOMP,IPBC,NWANTED)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+************************************************************************
+
+-INC CCREEL
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMLCHPO
+-INC SMLMOTS
+-INC SMCHPOI
+-INC SMRIGID
+-INC SMTABLE
+-INC SMCOORD
+
+*     segment de travail = MTRAV modifie pour NNCHPO chpoints
+      SEGMENT MTRAV
+       CHARACTER*(LOCOMP) INCO(NNIN)
+       REAL*8             BB(NNCHPO,NNIN,NNNOE)
+       INTEGER            IBIN(NNIN,NNNOE),IGEO(NNNOE),NHAR(NNIN)
+      ENDSEGMENT
+*
+* ********   INCO(NNIN) CONTIENT LE NOMS DES NNIN INCONNUES DIFFERENTES.
+*
+* ********   BB(I,J) EST LA VALEUR DE LA IEME INCONNUE DU CHAMP POUR
+* ********   LE JEME NOEUD DU TABLEAU IGEO.
+*
+* ********   IBIN(I,J)=1 OU 0. 1 INDIQUE QUE LA I EME INCONNUE DU CHAMP
+* ********   EXISTE POUR LE J EME NOEUD DU TABLEAU IGEO.
+*
+* ********   IGEO(I) EST LE NUMERO A METTRE DANS UN OBJET MELEME POUR
+* ********   REFERENCER LE IEME NOEUD
+*
+* ********   NHAR(I)  EST LE NUMERO D'HARMONIQUE SI CALCUL AXI OU
+* ********   SIGNIFIE CONTRAINTE PLANE,DEFORMATION PLANE OU DEF PLAN GEN
+*
+      SEGMENT ICPR(nbpts)
+*
+      REAL*8 XVAL,SEUIL
+      INTEGER I, J, K, IC, NUMAFF,ERR
+      LOGICAL MODANN, AFFICH,CONV
+      CHARACTER*4 NOMDDL
+*
+*     tableaux pour Lapack
+      SEGMENT MWORK
+      REAL*8 LAMBDA(NWORK),WORK(LWORK)
+      ENDSEGMENT
+
+      POINTEUR MATZ.XMATRI
+      POINTEUR MCOMP.MLMOTS
+*
+
+************************************************************************
+*           DONNEES GENERALES                                          *
+************************************************************************
+
+*     Ecriture des messages pour verification
+
+      AFFICH = IIMPI.GE.11
+*
+      IF (AFFICH)
+     & WRITE (IOIMP,*) 'QRBASR: Extraction des donnees generales...'
+*
+*     seuil pour le denominateur d'une valeur propre
+
+*      SEUIL = (EPSLON(1.0D0)*100)
+      SEUIL = 1.D-99
+
+*     nombre de modes calcules
+      NBMOD1=LAMBDA(/1)
+
+
+****  si on souhaite un nombre de modes inferieur, on devra alors trier
+*     --> pas ici, car DSYEV fournit les vp par module croissant :)
+
+
+****  preparation des CHPOINTs deformees *******************************
+
+*     nombre de ddls (=dimension de MELEME = dimension de MCOMP)
+      SEGACT,MELEME,MCOMP
+      NDDL=MELEME.NUM(/2)
+
+*     on cree ICPR
+      SEGINI,ICPR
+*     on dimensionne au maxi MTRAV
+      NNIN=NDDL
+      NNNOE=NDDL
+      NNCHPO=NBMOD1
+      SEGINI,MTRAV
+      NNIN=0
+      NNNOE=0
+
+*---- traitement de chaque ddl ----------------------------------
+      DO 100 J=1,NDDL
+
+c     - NOEUD
+        IP=NUM(1,J)
+        JNOE=ICPR(IP)
+c       nouveau noeud #IP de numero local #JNOE
+        IF(JNOE.EQ.0) THEN
+          NNNOE=NNNOE+1
+          JNOE=NNNOE
+          ICPR(IP)=JNOE
+          IGEO(JNOE)=IP
+        ENDIF
+
+c     - COMPOSANTE
+        NOMDDL=MCOMP.MOTS(J)
+        IF(NNIN.EQ.0) GOTO 111
+        DO 110 JIN=1,NNIN
+          IF(NOMDDL.EQ.INCO(JIN)) GOTO 112
+c         NOMDDL trouvee dans INCO(JIN)
+ 110    CONTINUE
+
+ 111    CONTINUE
+c       NOMDDL pas trouvee dans INCO(JIN) -> on l'ajoute a la fin
+        NNIN=NNIN+1
+        JIN=NNIN
+        INCO(JIN)=NOMDDL
+c       bp : pour l'instant on laisse NHAR=NIFOUR, mais il faudrait
+c            recuperer IRIGEL(5,:) des rigidites d'entree ou autre ...?
+        NHAR(JIN)=NIFOUR
+
+ 112    CONTINUE
+c       NOMDDL trouvee dans INCO(JIN) et noeud #IP dans IGEO(JNOE)
+
+c       Remplissage de IBIN et BB
+        IBIN(JIN,JNOE)=J
+        DO I=1,NBMOD1
+          BB(I,JIN,JNOE)=MATZ.RE(J,I,1)
+        ENDDO
+
+ 100  CONTINUE
+*---- fin de la boucle sur les ddl ----------------------------------
+
+      SEGSUP,MCOMP,ICPR
+      SEGDES,MELEME
+      SEGADJ,MTRAV
+c       write(*,*) 'IGEO=',(IGEO(iou),iou=1,NNNOE)
+c       write(*,*) 'INCO=',(INCO(iou),iou=1,NNIN)
+c     on va generer N1 chpoints en 1 passage dans une copie de CRECHP
+      N1=NBMOD1
+      SEGINI,MLCHPO
+      CALL CRECH4(MTRAV,MLCHPO)
+      SEGSUP,MTRAV
+
+
+*******************************************
+*    Creation de la table BASE_DE_MODES   *
+*******************************************
+*
+      IF (AFFICH) WRITE(IOIMP,*) 'Creation de la table BASE_DE_MODES...'
+*
+      CALL CRTABL(IPTAB2)
+      CALL ECCTAB(IPTAB2,'MOT',0,0.0D0,'SOUSTYPE',.TRUE.,0,
+     &     'MOT',0,0.0D0,'BASE_DE_MODES',.TRUE.,0)
+      CALL ECCTAB(IPTAB2,'MOT',0,0.0D0,'MAILLAGE',.TRUE.,0,
+     &     'MAILLAGE',0,0.0D0,' ',.TRUE.,MELEME)
+
+
+************************************************************************
+*     BOUCLE SUR LES MODES                                             *
+************************************************************************
+*
+      I=1
+ 80   IF (I .GT. NWANTED) GOTO 20
+
+* ---- frequence infinie ?
+*
+      MODANN = (ABS(LAMBDA(I)).LT.SEUIL)
+
+* ---- oui
+      IF (MODANN) THEN
+ 90      WRITE (IOIMP,*) 'Attention !!! Mode ',I,
+     &        ' annule : frequence infinie.'
+         CALL CRTABL(MTAB1)
+         CALL ECCTAB(MTAB1,'MOT',0,0.0D0,'SOUSTYPE', .TRUE.,0,
+     &        'MOT',0,0.0D0,'MODE_ANNULE',.TRUE.,0)
+         CALL ECCTAB(IPTAB2,'ENTIER',I,0.0D0,' ',.TRUE.,0,
+     &        'TABLE', 0, 0.0D0,' ',.TRUE.,MTAB1)
+
+* ---- non
+      ELSE
+*
+*------- Deformees du mode i
+
+* Recup du CHPOINTs :
+         MCHPO1=ICHPOI(I)
+*
+*
+************************************************
+*           Creation de la table MODE          *
+************************************************
+*
+*----- valeur propre reelle
+*
+* Attention : on n'enregistre pas de frequence puisqu'on ne sait pas ce qu'est lambda
+*
+         IF (AFFICH) WRITE (*,*) 'Construction de la table MODE ...'
+*
+         CALL CRTABL(MTAB1)
+         CALL ECCTAB(MTAB1,'MOT',0,0.0D0,'SOUSTYPE',.TRUE.,0,
+     &        'MOT',0,0.0D0,'MODE',.TRUE.,0)
+*
+         CALL ECCTAB(MTAB1,'MOT',0,0.0D0,'NUMERO_MODE',.TRUE.,0,
+     &        'ENTIER',I,0.0D0,' ',.TRUE.,0)
+         CALL CREPO1(0.0D0,0.0D0,0.0D0,IPOIN)
+         CALL ECCTAB(MTAB1,'MOT',0,0.0D0,'POINT_REPERE',.TRUE.,0,
+     &        'POINT',0,0.0D0,' ',.TRUE.,IPOIN)
+         XVAL=LAMBDA(I)
+         CALL ECCTAB(MTAB1,'MOT',0,0.0D0,'VALEUR_PROPRE',.TRUE.,0
+     $        ,'FLOTTANT',0,XVAL,' ',.TRUE.,0)
+*
+         CALL ECCTAB(MTAB1,'MOT',0,0.0D0,'DEFORMEE_MODALE',
+     &        .TRUE.,0,'CHPOINT',0,0.0D0,' ',.TRUE.,MCHPO1)
+*
+         CALL ECCTAB(IPTAB2,'ENTIER',I,0.0D0,' ',.TRUE.,0,'TABLE',
+     &        0,0.0D0,' ',.TRUE.,MTAB1)
+*
+
+      ENDIF
+
+
+      I = I + 1
+      GOTO 80
+************************************************************************
+*     FIN DE BOUCLE SUR LES MODES                                      *
+************************************************************************
+ 20   CONTINUE
+
+
+********************************************
+*    Creation de la table BASE_MODALE      *
+********************************************
+*
+*
+      CALL CRTABL(IPBC)
+      IF (AFFICH) WRITE (*,*) 'Creation de la table BASE_MODALE #',IPBC
+      CALL ECCTAB(IPBC,'MOT',0,0.0D0,'SOUSTYPE',.TRUE.,0,
+     &     'MOT',0,0.0D0,'BASE_MODALE',.TRUE.,0)
+      CALL ECCTAB(IPBC,'MOT',0,0.0D0,'MODES',.TRUE.,0,
+     &     'TABLE',0,0.0D0,' ',.TRUE.,IPTAB2)
+
+      RETURN
+      END
+ 
+ 
+ 
+ 
+ 

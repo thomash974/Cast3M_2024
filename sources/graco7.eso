@@ -1,0 +1,46 @@
+C GRACO7    SOURCE    PV        21/10/12    21:15:07     11118          
+      SUBROUTINE GRACO7( ilicr1,mvect2,mvect1,inc,nbthr,lenb)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+*  MULTIPLICATION DE LA MATRICE  ASSEMBLEE PAR LE VECTEUR MVECTX
+*  LE RESULTAT EST DANS MVECTY QUI N'EST PAS DESACTIVE
+*  UTILE POUR LE GRADIENT CONJUGUE
+*
+-INC SMMATRI
+-INC SMVECTD
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SILICRE
+      external graco9
+      common/cgraco9c/ilicre,mvect1l,mvect2l,nbthrl,nbinc
+      ilicre=ilicr1
+      segact ilicre
+      mvect1l=mvect1
+      mvect2l=mvect2
+      nbthrl=nbthr
+      nbinc=inc
+C
+C  ****  BOUCLE SUR LES inconnues dispatchee sur les threads
+C
+      do 24 ithr=2,nbthrl
+       call threadid(ithr,graco9)
+  24  continue
+      call graco9(1)
+      do 25 ithr=2,nbthrl
+       call threadif(ithr)
+  25  continue
+      RETURN
+      END
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 

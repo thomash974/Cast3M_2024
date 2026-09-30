@@ -1,0 +1,18 @@
+C EVCHI     SOURCE    CB215821  21/01/28    21:15:04     10867          
+      SUBROUTINE EVCHi(ith) 
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      
+      
+-INC PPARAM
+
+      CHARACTER*(LOCOMP) CMOT1
+      
+C     Subroutine qui réalise l’interface en parallèle
+      COMMON/EVCHC/NBTHR,ICPR1,MCHPOI,CMOT1
+
+
+      CALL EVCH1(NBTHR,ith,ICPR1,MCHPOI,CMOT1)
+      END
+ 

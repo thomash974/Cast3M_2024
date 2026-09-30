@@ -1,0 +1,94 @@
+C RETOP2    SOURCE    GOUNAND   21/04/06    21:15:23     10940          
+      SUBROUTINE RETOP2(TRAVJ,IMPR)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : RETOP2
+C DESCRIPTION : Remplit une topologie inverse avec les NEL premiers
+C     éléments de MELEME. Si NEL est négatif, on prend tous les éléments
+C     de MELEME. Si le premier noeud d'un élément de MELEME est 0,
+C     l'élément est sauté. Si un autre noeud de l'élément est nul , on
+C     part en erreur.
+C         
+C      
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C***********************************************************************
+C SYNTAXE GIBIANE    : 
+C ENTREES            : MELEME (Activé), NEL
+C ENTREES/SORTIES    : TOPINV (Activé *MOD)
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 02/10/2017, version initiale
+C HISTORIQUE : v1, 02/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+      POINTEUR JTOPO.MELEME
+-INC TMATOP1      
+*-INC STOPINV
+*-INC STRAVJ
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans retop2.eso'
+      IDIMP=IDIM+1
+      TOPINV=TRAVJ.TOPI
+      JTOPO=TRAVJ.TOPO
+* Il y a un problème ici ????      
+      NBELEM=JTOPO.NUM(/2)
+      NEL=NVCOU
+      IF (NEL.GT.NBELEM) THEN
+         write(ioimp,*) 'Nombre d''elements a ajouter trop grand'
+         goto 9999
+      ENDIF
+      IF (NEL.GE.0) NBELEM=NEL
+*
+* Remplissage de la topologie inverse
+*
+      DO 1 IEL=1,NEL
+         DO 10 INO=1,IDIMP
+            IP=JTOPO.NUM(INO,IEL)
+*            IF (IP.EQ.0) THEN
+**     On saute l'élément
+*               IF (INO.EQ.1) GOTO 1
+*               write(ioimp,*) 'Meleme incorrect, noeud nul'
+*               goto 9999
+*            ENDIF
+* Ajout de IP dans la bonne liste chaînée 
+            LDGT=LDGT+1
+            IF (IP.NE.0) THEN
+               LAST=TIC(IP)
+               TLC(LDGT)=LAST
+               TIC(IP)=LDGT
+               TDC(IP)=TDC(IP)+1
+            ENDIF
+ 10      CONTINUE
+ 1    CONTINUE
+*
+* Normal termination
+*
+      RETURN
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='RETOP2   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine RETOP2
+*
+      END
+
+ 

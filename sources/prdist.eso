@@ -1,0 +1,54 @@
+C PRDIST    SOURCE    FANDEUR   22/06/02    21:15:06     11371          
+
+      SUBROUTINE PRDIST
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCOORD
+
+      INTEGER IP1,IP2
+      REAL*8 DIST
+      CHARACTER*(8) TYPOBJ
+
+      TYPOBJ = 'POINT   '
+      CALL LIROBJ(TYPOBJ,IP1,1,iret)
+      CALL LIROBJ(TYPOBJ,IP2,1,iret)
+      IF (IERR.NE.0) RETURN
+
+      DIST = 0.D0
+
+      IF (IP1 .NE. IP2) THEN
+
+        SEGACT,MCOORD
+        IDIMP1 = IDIM + 1
+
+        ip1 = (IP1-1)*IDIMP1
+        ip2 = (IP2-1)*IDIMP1
+
+        IF      (IDIM .EQ. 3) THEN
+          DIST =   (XCOOR(ip1+1) - XCOOR(ip2+1))**2
+     &           + (XCOOR(ip1+2) - XCOOR(ip2+2))**2
+     &           + (XCOOR(ip1+3) - XCOOR(ip2+3))**2
+          DIST = SQRT(DIST)
+        ELSE IF (IDIM .EQ. 2) THEN
+          DIST =   (XCOOR(ip1+1) - XCOOR(ip2+1))**2
+     &           + (XCOOR(ip1+2) - XCOOR(ip2+2))**2
+          DIST = SQRT(DIST)
+        ELSE IF (IDIM .EQ. 1) THEN
+          DIST = ABS( XCOOR(ip1+1) - XCOOR(ip2+1) )
+        ELSE
+          CALL ERREUR(5)
+        END IF
+
+      END IF
+
+      CALL ECRREE(DIST)
+
+c      return
+      END
+
+ 

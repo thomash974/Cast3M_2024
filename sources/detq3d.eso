@@ -1,0 +1,134 @@
+C DETQ3D    SOURCE    PV090527  23/02/13    21:15:05     11592          
+      subroutine detq3d (a,a2,ngf,n,d,ifault)
+
+c*********************************************************************72
+c
+cc detq computes the determinant of an orthogonal matrix.
+c
+c  Licensing:
+c
+c    This code is distributed under the GNU LGPL license.
+c
+c  Modified:
+c
+c    16 January 2020
+c
+c  Author:
+c
+c    Original FORTRAN77 version by J C Gower.
+c    This version by John Burkardt
+c
+c  Reference:
+c
+c    J C Gower,
+c    Algorithm AS 82:
+c    The determinant of an orthogonal matrix,
+c    Applied Statistics,
+c    Volume 24, Number 1, 1975, page 150-153.
+c
+c  Input:
+c
+c    real A(N,N), the orthogonal matrix stored by rows or columns.
+c
+c    integer N, the order of the matrix.
+c
+c  Output:
+c
+c    real D, the determinant of A.
+c
+c    integer IFAULT, 
+c    0, no error occurred.
+c    1, an error was detected.
+
+
+      integer n
+      integer ngf
+      real*8 a(ngf,ngf+1)
+      real*8 a2(ngf*ngf)
+      real*8 d
+      integer i
+      integer ifault
+      integer j
+      integer k
+      integer p
+      integer q
+      integer r
+      integer s
+      real*8 tol
+      real*8 x
+      real*8 y
+
+      ifault = 0
+      tol = 1.0d-8
+
+      if ( n .le. 0 ) then
+        write ( *, '(a)' ) ' '
+        write ( *, '(a)' ) 'detq - Fatal error!'
+        write ( *, '(a)' ) '  n <= 0'
+        ifault = 1
+        return
+      end if
+
+      k = 0
+      do i = 1, n
+        do j = 1, n
+          k = k + 1
+          a2(k) = a(i,j)
+        end do
+      end do
+
+      d = 1.0D+00
+      r = 1
+
+      do k = 2, n + 1
+
+        q = r
+        x = a2(r)
+        y = sign ( 1.0D+00, x )
+        d = d * y
+        y = - 1.0D+00 / ( x + y )
+        x = abs ( x ) - 1.0D+00
+
+        if ( tol .lt. abs ( x ) ) then
+
+          if ( 0.0D+00 .lt. x ) then
+            write ( *, '(a)' ) ' '
+            write ( *, '(a)' ) 'detq - Fatal error!'
+            write ( *, '(a)' ) '  x < 0.0'
+            write ( *, '(a,g14.6)' ) '  x = ', x
+            ifault = 1
+            return
+          end if
+
+          if ( k .eq. (n + 1) ) then
+            write ( *, '(a)' ) ' '
+            write ( *, '(a)' ) 'detq - Fatal error!'
+            write ( *, '(a)' ) '  k == n + 1'
+            ifault = 1
+            return
+          end if
+
+          do i = k, n
+            q = q + n
+            x = a2(q) * y
+            p = r
+            s = q
+            do j = k, n
+              p = p + 1
+              s = s + 1
+              a2(s) = a2(s) + x * a2(p)
+            end do
+
+          end do
+
+        end if
+
+        r = r + n + 1
+
+      end do
+
+      return
+      end
+      
+ 
+ 

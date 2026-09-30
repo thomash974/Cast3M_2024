@@ -1,0 +1,132 @@
+C ENLEV7    SOURCE    CB215821  20/07/29    21:15:21     10668          
+************************************************************************
+*
+*                             E N L E V 7
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     ENLEVER UNE FORMULATION OU UN COMPORTEMENT A UN "MMODEL".
+*
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     MOD2  =  ENLE  MOD1  | 'FORM' |  MOT1 ;
+*                          | 'COMP' |
+*
+*     MOD2  (S)  OBJET RESULTAT DE TYPE MMODEL DE POINTEUR MMODEL
+*
+*     MOD1  (E)  OBJET DE TYPE MMODEL FOURNIT EN ENTREE DE
+*                POINTEUR IPMOD1
+*
+*     'FORM' | -> MOT CLE SPECIFIE SI LE MOT A RETIRER EST A CHERCHER
+*     'COMP' | -> DANS FORMULATION (FORMOD) OU COMPORTEMENT (MATMOD)
+*
+*
+*     MOT1       OBJET DE TYPE MOT DONNANT LA PARTIE DU MMODEL MOD1
+*                QUE L'ON SOUHAITE RETIRER
+*
+************************************************************************
+      SUBROUTINE ENLEV7(IPMOD1,IPMOD2)
+C
+      IMPLICIT REAL*8(A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+C
+      CHARACTER*4  NONOM(2)
+      CHARACTER*16 MOT16a,MOT16b
+
+      SEGMENT LIMOTS
+        CHARACTER*16 MOTEMP(NBFORM)
+      ENDSEGMENT
+
+      SEGMENT LIMODE(0)
+C
+      DATA NONOM /'FORM','COMP'/
+      MACRO, (FORMULATION, COMPORTEMENT)
+
+C
+C     LECTURE D'UN MOT CLE
+C
+      CALL LIRMOT(NONOM,2,INOM,1)
+C
+C     LECTURE DU OU DES MOTS FOURNIS PAR L'UTILISATEUR
+C
+      NBFORM = 15
+      SEGINI,LIMOTS
+      ICOND = 1
+      INFOR = 1
+ 10   CONTINUE
+      CALL LIRCHA(MOTEMP(INFOR),ICOND,IRETOU)
+      IF (IERR.NE.0) RETURN
+      IF (IRETOU.NE.0) THEN
+        ICOND = 0
+        INFOR = INFOR + 1
+        IF(INFOR .GT. NBFORM)THEN
+          NBFORM=NBFORM * 2 + 15
+          SEGADJ,LIMOTS
+        ENDIF
+        GOTO 10
+      ENDIF
+      NBFORM = INFOR - 1
+
+C     Extension du MMODEL en cas de modele de MELANGE
+      CALL MODETE(IPMOD1,MMODE1,IMELAN)
+
+      MMODE1 = IPMOD1
+      NSOUS  = MMODE1.KMODEL(/1)
+C
+      IF (NSOUS.EQ.0) THEN
+        IPMOD2 = MMODE1
+        SEGSUP,LIMOTS
+        RETURN
+      ENDIF
+
+C     BOUCLE SUR LES SOUS-MODELES
+      SEGINI,LIMODE
+      DO 20 INDD=1,NBFORM
+        MOT16a=MOTEMP(INDD)
+        DO 30 III = 1,NSOUS
+          IMODE1 = MMODE1.KMODEL(III)
+
+          CASE, INOM
+            WHEN,FORMULATION
+C           ****************
+            NFOR = IMODE1.FORMOD(/2)
+            DO IV = 1,NFOR
+              MOT16b=IMODE1.FORMOD(IV)
+              IF (MOT16b .EQ. MOT16a) GOTO 30
+            ENDDO
+            CALL AJOU(LIMODE,IMODE1)
+
+            WHEN,COMPORTEMENT
+C           *****************
+            NMAT = IMODE1.MATMOD(/2)
+            DO IV = 1,NMAT
+              MOT16b=IMODE1.MATMOD(IV)
+              IF (MOT16b .EQ. MOT16a) GOTO 30
+            ENDDO
+            CALL AJOU(LIMODE,IMODE1)
+          ENDCASE
+ 30     CONTINUE
+ 20   CONTINUE
+
+C     Creation du MMODEL resultat
+      N1=LIMODE(/1)
+      SEGINI,MMODEL
+      IPMOD2=MMODEL
+      DO III=1,N1
+        MMODEL.KMODEL(III)=LIMODE(III)
+      ENDDO
+
+C     MENAGE AVANT DE QUITTER
+      SEGSUP LIMODE, LIMOTS
+
+      END
+ 

@@ -1,0 +1,33 @@
+C DFT       SOURCE    BP208322  20/09/18    21:15:45     10718          
+
+        SUBROUTINE DFT(XT,NDDL,NHBM,NFFT,IGAM,XF) 
+
+*=======================================================================
+* DFT: Transformee de Fourier Directe
+*
+* Entrée: XT   , deplacemente temporaux
+*         IGAM , opérateur DFT discret 
+* Sortie: XF   , coefficients de Fourier 
+*
+*=======================================================================
+c        
+       IMPLICIT INTEGER(I-N)
+       IMPLICIT REAL*8(A-H,O-Z)
+       REAL*8 XT(NDDL,NFFT),XF(NDDL*(2*NHBM+1))
+       REAL*8 IGAM(2*NHBM+1,NFFT)
+*
+*      Boucle sur les DDL
+       DO 11 I = 1,NDDL      
+*      Boucle sur les harmoniques
+          DO 21 J = 1,2*NHBM+1 
+             XF(NDDL*(J-1)+I) = 0.
+*            Boucle sur le temps
+             DO 31 K = 1,NFFT
+                XF(NDDL*(J-1)+I)=XF(NDDL*(J-1)+I)+IGAM(J,K)*XT(I,K)
+31           CONTINUE            
+21        CONTINUE
+11     CONTINUE
+       END
+       
+ 
+ 

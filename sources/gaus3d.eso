@@ -1,0 +1,208 @@
+C GAUS3D    SOURCE    PV090527  23/04/20    21:15:09     11655          
+       subroutine gaus3d(n,a,x,b,ngf,err1,ipzero)
+
+c      resolution d un systeme lineaire
+c      n taille du syteme a resoudre 
+c      ngf taille fixe de la matrice
+
+c   ************************************************************************
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+       
+       integer ngf,n,err1
+       real*8 a(ngf,ngf+1),b(ngf),x(ngf)
+       integer ipzero(ngf)        
+      
+       integer i,j,k,l,ipmax
+       real*8 aux,s
+       real*8 pmax
+       real*8 epsilon1  
+       
+       logical affiche_local
+       parameter (affiche_local=.true.)
+             
+c------sauvegarde de la matrice initiale---------
+c      indispensable en cas de mise a zero des multiplicateurs
+c      plastiques dans fldo3d
+       integer ngf2
+       parameter(ngf2=65)
+       real*8 aa(ngf2,ngf2),bb(ngf2)
+       if(ngf2.lt.ngf) then
+          print*,'pb de dimension de matrice dans model sellier gaus3d'
+          err1=1
+          return
+       else
+          err1=0
+       end if
+       
+       do i=1,n
+        do j=1,n
+         aa(i,j)=a(i,j)
+        end do
+        bb(i)=b(i)
+       end do 
+c------------------------------------------------
+ 
+
+c      test taille du pb
+       if (n.gt.ngf) then
+            print*,'n .gt. ngf dans dans gauss_3d'
+            print*,'n',n,'ngf',ngf
+            read*
+            err1=1
+            return  
+       end if            
+       
+c      precision pivot nul
+       epsilon1=1.0d-14       
+       
+       do i=1,n
+         a(i,n+1)=b(i)
+       end do
+       
+c      print*, 'debut gauss_3d'
+c      do i=1,n
+c         do j=1,n+1
+c            print *,'a(',i,j,')=',a(i,j) 
+c         end do
+c         print*,'b(',i,')=',b(i)
+c      end do 
+c      read*      
+
+       do i=1,n
+c        recherche du pivot dmax1       
+         pmax=0.d0
+         ipmax=i
+         do j=i,n
+            if (dabs(a(j,i)).gt.pmax) then 
+                pmax=dabs(a(j,i))
+                ipmax=j
+            end if
+        end do
+        if(pmax.lt.epsilon1) then
+c           test pivot nul
+            if(affiche_local) then
+                print*,'Pivot nul dans gauss_3d  '
+                print*,'pivot maxi',pmax,'ligne:',i
+                ipzero(i)=1
+                ipmax=i
+                write(*,'(1X,A2)',advance='no') 'aa'
+                do m=1,n
+                  write(*,'(8X,I3)',advance='no') m 
+                end do
+                write(*,'(9X,A2)') 'bb'
+                do l=1,n
+                  write(*,'(1X,I2)',advance='no') l
+                  do m=1,n
+                    write(*,'(1x,e10.3)',advance='no') aa(l,m) 
+                  end do
+c                 read*
+                  write(*,'(1x,e10.3)') bb(l)
+                end do
+            end if
+c           read*
+            err1=1
+c               recuperation de la matrice
+            do l=1,n
+                do j=1,n
+                    a(l,j)=aa(l,j)
+                end do
+                b(l)=bb(l)
+            end do                
+            return
+        else
+            err1=0
+            ipzero(i)=0
+c            ipmax=i
+        end if
+        
+c       intervertion des lignes si necessaire        
+        if(ipmax.ne.i) then
+c            print*,'inversion de ligne',i,'<->',ipmax
+            do j=1,n+1
+                aux=a(i,j)
+                a(i,j)=a(ipmax,j)
+                a(ipmax,j)=aux
+            end do
+        end if
+        
+        if(ipzero(i).ne.1) then
+c        calcul ligne i utile si pmax ne 1, si non on fait rien et on mettra l inconnue a zero
+c        lors de la resolution
+         do j=i+1,n+1
+             a(i,j)=a(i,j)/a(i,i)
+         end do
+        
+c        calcul des autres lignes
+         do k=(i+1),n
+            do j=(i+1),(n+1)
+                a(k,j)=a(k,j)-a(k,i)*a(i,j)
+            end do
+         end do
+        end if
+        
+c       fin de la boucle sur les lignes        
+        end do
+
+c      sortie des inconnues
+       if(ipzero(n).ne.1) then
+         x(n)=a(n,n+1)
+       else
+         x(n)=0.d0
+       end if
+       
+       do i=(n-1),1,-1
+        if(ipzero(i).ne.1) then
+         s=a(i,n+1)
+         do j=i+1,n
+           s=s-a(i,j)*x(j)
+         end do
+         a(i,n+1)=s
+         x(i)=s
+        else
+         print*,'mise a zero de x',i,'ds gauss 3d'
+         x(i)=0.d0
+        end if
+       end do
+       
+c      print*, 'fin gauss_3d'
+c      do i=1,n
+c         do j=1,(n+1)
+c            print *,'a(',i,j,')=',a(i,j) 
+c         end do
+c         print*,'b(',i,')=',b(i)
+c      end do
+
+c------recuperation de la matrice initiale---------
+       do i=1,n
+        do j=1,n
+         a(i,j)=aa(i,j)
+        end do
+        b(i)=bb(i)
+       end do 
+c--------------------------------------------------
+
+ 
+
+c-------test de la solution --------------
+c       do i=1,n
+c        s=0.d0
+c        do j=1,n
+c         s=s+aa(i,j)*x(j)
+c        end do
+c        print*,'ax',i,'=',s,'=?=',bb(i)
+c       end do
+c       read*
+c-----------------------------------------
+                  
+ 
+       return
+       end       
+                     
+                     
+            
+            
+       
+       
+ 
+ 

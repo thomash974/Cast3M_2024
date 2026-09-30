@@ -1,0 +1,20 @@
+C INTRPO    SOURCE    PV090527  23/01/27    21:15:43     11574          
+      subroutine intrpo(x0,x1,y0,y1,xint,yint)
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)     
+      
+      real*8 x0,x1,y0,y1,xint,yint,a0,b0   
+         
+c calcul du coefficient directeur de la droite
+         
+         a0=(y1-y0)/(x1-x0)
+c calcul de l'ordonnée à l'origine
+         b0=y1-a0*x1 
+
+c calcul de la valeur intrpoée         
+         yint=a0*xint+b0 
+         
+         return
+         end
+ 

@@ -1,0 +1,51 @@
+C FGRF3D    SOURCE    FD218221  24/02/07    21:15:11     11834          
+        subroutine fgrf3d(NDIMG,NDIMPL,NTMAX,DPFDS,icr,JSP,PF,
+     #  PF_GRAD_PF,affiche)
+      
+c       calcul du gradient d une fonction scalaire de l espace generalise de l ecoulement (36)    
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+
+c       i numero du critere en cours 
+        integer NDIMG,NTMAX,icr
+        integer lnumcrt(NTMAX)
+        real*8 DPFDS(NTMAX,NDIMG)
+        real*8 jsp(NDIMG,NDIMPL)
+        real*8 PF(NTMAX),PF_GRAD_PF(NDIMPL)
+        logical affiche, affiche_local
+
+        
+        integer i,j,k
+        
+        affiche_local=affiche
+        
+        if(affiche_local) then
+            print*,'On est ds fgrf3d pour le critere:',icr
+        end if
+      
+
+        do i=1,NDIMPL
+c           grad f
+            PF_GRAD_PF(i)=0.d0            
+            do j=1,NDIMG
+                PF_GRAD_PF(i)=PF_GRAD_PF(i)+DPFDS(icr,j)*JSP(j,i)
+C                 print*,'DPFDS(',icr,j,')=',DPFDS(icr,j),
+C      #                 'JSP(',j,i,')=',JSP(j,i)
+            end do
+c           f grad f
+            PF_GRAD_PF(i)=PF(icr)*PF_GRAD_PF(i)
+        end do
+        
+        if (affiche_local) then
+             do i=1,NDIMG
+                write(*,'(A11,2(1x,I2),1X,A1,E10.3)') 'PF.Grad(PF)',
+     #          icr,i,'=',PF_GRAD_PF(i)
+             end do
+             read*
+        end if
+        return
+        end
+        
+ 
+ 

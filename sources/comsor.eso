@@ -1,0 +1,391 @@
+C COMSOR    SOURCE    JK148537  23/03/20    21:15:04     11638          
+      SUBROUTINE COMSOR(iqmod,ililuc,iwrk52,iwrk53,iwrk54,
+     &     ib,igau,iecou,xecou)
+*
+**********************************************************************
+* range les resultats du tableau wrk52 dans les melval
+**********************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMMODEL
+* segment deroulant le mcheml
+-INC DECHE
+
+      CHARACTER*8  MOT8
+      CHARACTER*16 CFORMO
+      CHARACTER*(LCONMO) MOdec,MOmod
+      LOGICAL      BDIFF,LMELA
+
+      SEGMENT IECOU
+       INTEGER icow1,icow2,icow3,icow4,icow5,icow6,icow7,
+C      INTEGER NYOG, NYNU, NYALFA,NYSMAX,NYN, NYM,  NYKK,
+     1  icow8,icow9,icow10,icow11,icow12,icow13,icow14,icow15, IND,
+C    .  NYALF1,NYBET1,NYR,  NYA,   NYRHO,NSIGY,  NNKX,  NYKX,  IND,
+     2  NSOM,  NINV, NINCMA,NCOMP,icow21,icow22,icow23,icow24,
+C    .  NSOM,  NINV, NINCMA,NCOMP, JELEM, LEGAUS,INAT,  NCXMAT,
+     3 icow25,icow26,icow27,icow28,icow29,icow30,icow31,
+C    .  LTRAC, MFR,  IELE,  NHRM,   NBNN, NBELEM,ICARA,
+     4  icow32,icow33,icow34,icow35,icow36,icow37,icow38,
+C    .  LW2,   NDEF,  NSTRSS,MFR1,  NBGMAT,NELMAT,MSOUPA,
+     5  icow39,icow40,icow41,icow42,icow43,icow44,NYOG1,
+C    .  NUMAT1,LENDO, NBBB,  NNVARI,KERR1, MELEME,NYOG1,
+     6  NYNU1,NYALFT1,NYSMAX1,NYN1,NYM1,NYKK1,NYALF2,
+C    .  NYNU1,NYALFT1,NYSMAX1,NYN1,NYM1,NYKK1,NYALF2,
+     7  NYBET2,NYR1,NYA1,NYQ1,NYRHO1,NSIGY1
+C    .  NYBET2,NYR1,NYA1,NYQ1,NYRHO1,NSIGY1
+      ENDSEGMENT
+      SEGMENT XECOU
+        REAL*8 DTOPTI, TSOM,TCAR,xcow4,xcow5,xcow6, xcow7
+      ENDSEGMENT
+*
+      imodel = iqmod
+      CFORMO =formod(1)
+      BDIFF  =CFORMO .eq. 'DIFFUSION       '
+      LMELA = CFORMO.eq.'MELANGE         '
+      liluc = ililuc
+      nbluc1 = liluc(/1)
+      wrk52 = iwrk52
+      wrk53 = iwrk53
+      wrk54 = iwrk54
+*
+*-------------------------------------------
+*     rearrangement pour milieu poreux
+*-------------------------------------------
+      IF (MFR.EQ.33.AND.MATE.EQ.1) THEN
+        ICAS=2
+        CALL COMEFF(IQMOD,IWRK52,IWRK53,IWRK54,ICAS,IRETOU)
+      ENDIF
+C
+      DO 1000 INO = 1,NBLUC1
+        if (BDIFF) goto 47
+        if(LMELA.and.ino.eq.23) goto 47
+*tctc on ne garde que contraintes deformation defiela varinter
+        if(ino.ne.11.and.ino.ne.20.and.ino.ne.24.and.ino.ne.12.
+     $ and.ino.ne.13.and.ino.ne.14) go to 1000
+ 47     continue
+        pilnec = liluc(ino,2)
+        if (pilnec.le.0) goto 1000
+        mran = pilobl(/2)
+* mran doit correspondre a indeso : indice du deche resultat
+        if (mran.le.0) goto 1000
+        mobl = pilobl(/1)
+        mfac = pilfac(/1)
+C
+C       ---------------------------------------------------------------
+C       COMPOSANTES OBLIGATOIRES
+C
+        if (mobl.le.0) goto 101
+        DO 100 IC = 1,MOBL
+          if (pilobl(ic,mran).gt.0) then
+            deche = pilobl(ic,mran)
+* on ne modifie que les champs lies au constituant
+
+C           Pour optimisation COMPARE_STRING
+            MOdec=condec
+            MOmod=conmod
+            if (MOdec.ne.MOmod) goto 100              
+C           Cas des MELVALS d'entree
+            IF(ieldec .LT. 0)GOTO 100
+            melval =ABS(ieldec)
+          else
+            goto 100
+          endif
+C
+C       AIGUILLAGE SUIVANT MOT CLE
+C
+        if (ino.gt.nmot) goto 98
+        GOTO ( 1, 2, 1, 1, 1, 6, 7,99,99,10,11,12,13,14,15,16, 17,18,
+     1        99,20,21,99,23,24,99) ino
+C
+  99      CONTINUE
+C
+C         Pas de composantes pour ce champ
+          RETURN
+C
+   1      CONTINUE
+          passe1 = scalf(ic)
+          GOTO 120
+C
+   2      CONTINUE
+          passe1 = tempf
+          GOTO 120
+C
+   6      CONTINUE
+          passe1 = deplf(ic)
+          GOTO 120
+C
+   7      CONTINUE
+          passe1 = forcf(ic)
+          GOTO 120
+C
+  10      CONTINUE
+          passe1 = gradf(ic)
+          GOTO 120
+C
+  11      CONTINUE
+          passe1 = SIGF(ic)
+          GOTO 120
+C
+  12      CONTINUE
+          passe1 = epstf(ic)
+          GOTO 120
+C
+  13      CONTINUE
+          passe1 = xmatf(ic)
+          GOTO 120
+C
+  14      CONTINUE
+          passe1 = xcarbf(ic)
+          GOTO 120
+C
+  15      CONTINUE
+          passe1 = turef(ic)
+          GOTO 120
+C
+  16      CONTINUE
+          passe1 = prinf(ic)
+          GOTO 120
+C
+  17      CONTINUE
+          passe1 = mahof(ic)
+          GOTO 120
+C
+  18      CONTINUE
+          passe1 = hotaf(ic)
+          GOTO 120
+C
+  20      CONTINUE
+          passe1 = VARF(ic)
+          GOTO 120
+C
+  21      CONTINUE
+          passe1 = graff(ic)
+          GOTO 120
+C
+  23      CONTINUE
+          passe1 = rhasf(ic)
+          GOTO 120
+C
+  24      CONTINUE
+          IF(IND.EQ.1.OR.INPLAS.EQ.31.OR.INPLAS.EQ.30
+     &      .OR.INPLAS.EQ.37.OR.INPLAS.EQ.66.OR.INPLAS.EQ.118
+     &      .OR.INPLAS.EQ.141.OR.INPLAS.EQ.176.OR.INPLAS.EQ.165)THEN
+             passe1 =EPINF(IC)
+          ELSE
+             passe1= epin0(ic) + defp(IC)
+          ENDIF
+          GOTO 120
+C
+  98      CONTINUE
+          passe1 = exova1(ic)
+C         GOTO 120
+*
+ 120      CONTINUE
+
+          if (typree) then
+            IBMN=MIN(IB,VELCHE(/2))
+            IGMN=MIN(IGAU,VELCHE(/1))
+            VELCHE(IGMN,IBMN)=passe1
+          else
+            IBMN=MIN(IB,IELCHE(/2))
+            IGMN=MIN(IGAU,IELCHE(/1))
+            IELCHE(IGMN,IBMN)=int(passe1)
+*           kich un cas particulier --- plus dificile traiter cas géneral
+            if ((.NOT. TYPREE).and.IELCHE(/2).eq.1
+     &           .and.IELCHE(/2).eq.1.and.int(passe1).eq.0) then
+              segsup melval
+              indec = -1
+              pilobl(ic,mran) = 0
+            endif
+          endif
+C
+ 100    CONTINUE
+ 101    CONTINUE
+C       ---------------------------------------------------------------
+C       COMPOSANTES FACULTATIVES
+C
+*       if (mfac.le.0) goto 301
+* mran doit correspondre a indeso, indice du deche resultat
+        do 200 ic = 1,mfac
+          if (pilfac(ic,mran).gt.0) then
+            deche = pilfac(ic,mran)
+
+C           Pour optimisation COMPARE_STRING
+            MOdec=condec
+            MOmod=conmod
+            if (MOdec.ne.MOmod) goto 200           
+C           Cas des MELVALS d'entree
+            IF(ieldec .LT. 0)GOTO 200
+            melval =ABS(ieldec)
+          else
+            goto 200
+          endif
+*
+*       AIGUILLAGE SUIVANT MOT CLE
+*
+        GOTO ( 201,202,201,201,201,206, 207,299,299,210,211,
+     & 212,213,214,215,216, 217,218,299,220,221,299,223,224,299) ino
+        if (ino.gt.nmot) goto 298
+*
+ 299      CONTINUE
+C
+C         Pas de composantes pour ce champ
+          RETURN
+C
+  201     CONTINUE
+          passe1 = scalf(mobl+ic)
+          GOTO 320
+C
+  202     CONTINUE
+          GOTO 320
+C
+  206     CONTINUE
+          passe1 = deplf(mobl+ic)
+          GOTO 320
+C
+  207     CONTINUE
+          passe1 = forcf(mobl+ic)
+          GOTO 320
+C
+  210     CONTINUE
+          passe1 = gradf(mobl+ic)
+          GOTO 320
+C
+  211     CONTINUE
+          passe1 = SIGF(mobl+ic)
+          GOTO 320
+C
+  212     CONTINUE
+          passe1 = epstf(mobl+ic)
+          GOTO 320
+C
+  213     CONTINUE
+          passe1 = xmatf(mobl+ic)
+          GOTO 320
+C
+  214     CONTINUE
+          passe1 = xcarbf(mobl+ic)
+c stockage du pas de temps optimal
+
+        IF ( INPLAS .EQ. 17 .OR.
+     2   ( INPLAS .GE. 19 .AND. INPLAS .LE. 25) .OR.
+     4     INPLAS .EQ. 61 .OR. INPLAS .EQ. 53 .OR.
+     1     INPLAS .EQ. 65 .OR. INPLAS .EQ. 29 .OR.
+     1     INPLAS .EQ. 142 .OR.
+     2     INPLAS .EQ. 44 .OR. INPLAS .EQ. 45 .OR.
+     9     INPLAS .EQ. 76 .OR. INPLAS .EQ. 77  .OR.
+     9     INPLAS .EQ. 70 .OR. INPLAS .EQ. 165) THEN
+
+C Remarque :
+C Le vecteur comcar est rempli par COMVAL : on note le nom de la
+C composante lors du premier passage (pour le premier point de Gauss
+C du premier element) en recopiant le nom que l'on trouve dans lesobl
+C (composante obligatoire) ou lesfac (composante facultative).
+C Les vecteurs lesobl et lesfac ont ete remplis par COMOU2 qui pour les
+C caracteristiques geometriques a appele IDCARB : en aucun cas on ne
+C trouve 'DTOPTI' parmi la liste des composantes geometriques reconnues.
+C Qui plus est elle constituerait une exception car 6 caracteres au lieu
+C des 4 habituels.
+C
+C Conclusion : LE TEST CI-DESSOUS if (comcar(mobl+ic).eq.'DTOPTI')
+C N'EST JAMAIS SATISFAIT, il n'y a pas stockage du pas de temps optimal.
+C
+C De plus, on n'a pas trouve de composante 'DTOPTI' ou 'DTOP' dans
+C aucune des routines IDxxxx, donc on peut dire que 'DTOPTI' n'est
+C une composante d'aucun champ de type connu.
+C En particulier, 'DTOPTI' n'est pas une composante materielle ou une
+C variable interne reconnue d'un quelconque modele.
+C
+            MOT8 = comcar(mobl+ic)
+            if (MOT8.eq.'DTOPTI  ') then
+         TMOY = TSOM/NCOMP
+         NMOY = NSOM/NCOMP
+         IF (IIMPI.GE.1) THEN
+         WRITE(IOIMP,*)' NBRE DE SS PAS : MOYENNE ',NMOY,
+     1                    ' MAX ',NINCMA
+            IF (NINV.NE.0) THEN
+            WRITE(IOIMP,*)' NBRE D"INVERSION ',NINV,'/',NCOMP
+            END IF
+         ENDIF
+         TECAR = SQRT(ABS(TCAR/NCOMP - TMOY*TMOY))
+         DTOPTI = MAX(TMOY-TECAR/2.D0,DTOPTI)
+         passe1=dtopti
+
+            endif
+          ENDIF
+          GOTO 320
+C
+  215     CONTINUE
+          passe1 = turef(mobl+ic)
+          GOTO 320
+C
+  216     CONTINUE
+          passe1 = prinf(mobl+ic)
+          GOTO 320
+C
+  217     CONTINUE
+          passe1 = mahof(mobl+ic)
+          GOTO 320
+C
+  218     CONTINUE
+          passe1 = hotaf(mobl+ic)
+          GOTO 320
+C
+  220     CONTINUE
+          passe1 = VARF(mobl+ic)
+          GOTO 320
+C
+  221     CONTINUE
+          passe1 = graff(mobl+ic)
+          GOTO 320
+C
+  223     CONTINUE
+          passe1 = rhasf(mobl+ic)
+          GOTO 320
+C
+  224     CONTINUE
+          IF(IND.EQ.1.OR.INPLAS.EQ.31.OR.INPLAS.EQ.30
+     &      .OR.INPLAS.EQ.37.OR.INPLAS.EQ.66)THEN
+            passe1 =EPINF(mobl+ic)
+          ELSE
+            passe1=epin0(mobl+ic) + defp(mobl+ic)
+          ENDIF
+          GOTO 320
+C
+  298     CONTINUE
+          passe1 =exova1(mobl + ic)
+          GOTO 320
+C
+  320     CONTINUE
+
+          if (typree) then
+            IBMN=MIN(IB,VELCHE(/2))
+            IGMN=MIN(IGAU,VELCHE(/1))
+            VELCHE(IGMN,IBMN) = passe1
+          else
+            IBMN=MIN(IB,IELCHE(/2))
+            IGMN=MIN(IGAU,IELCHE(/1))
+            IELCHE(IGMN,IBMN)= int(passe1)
+*           kich un cas particulier --- plus dificile traiter cas géneral
+            if ((.NOT. TYPREE).and.IELCHE(/2).eq.1
+     &           .and.IELCHE(/2).eq.1.and.int(passe1).eq.0) then
+              segsup melval
+              indec = -1
+              pilfac(ic,mran) = 0
+            endif
+          endif
+C
+ 200    CONTINUE
+ 301    CONTINUE
+C----------------------------------------------------------------------
+C
+ 1000 CONTINUE
+C
+      END
+ 
+ 

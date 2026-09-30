@@ -1,0 +1,235 @@
+C ANNO      SOURCE    CB215821  23/07/11    21:15:09     11703          
+C***********************************************************************
+C NOM         : ANNO
+C DESCRIPTION : Cree des objets de type ANNOTATI
+C***********************************************************************
+      SUBROUTINE ANNO
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMANNOT
+-INC SMCOORD
+-INC SMELEME
+
+      CHARACTER*4        CHA4
+      CHARACTER*8        CHA8
+      CHARACTER*(LOCHAI) CH70,TXT
+      LOGICAL            BOOL
+
+      PARAMETER (NCLE=2)
+      CHARACTER*4 MCLE(NCLE)
+      DATA MCLE/'CATE','ETIQ'/
+
+      PARAMETER (NPOS=9)
+      CHARACTER*4 MPOS(NPOS)
+      DATA MPOS/'SO','S','SE','O','C','E','NO','N','NE'/
+
+
+C     BRANCHEMENT VERS LE SOUS-TYPE DEMANDE
+      CHA4 = ' '
+      CALL LIRCHA(CHA4,0,ICLE)
+      IF (ICLE.GT.0) CALL PLACE(MCLE,NCLE,ICLE,CHA4)
+      IF (ICLE.EQ.0) THEN
+          MOTERR(1:4) = CHA4
+          MOTERR(5:40) = 'CATE ETIQ'
+          CALL ERREUR(1052)
+      ENDIF
+      GOTO (100,200),ICLE
+
+
+
+C     **************************************************************
+C     CREATION D'UNE ENTREE DE LEGENDE DE TYPE "CATEGORIE"
+C     **************************************************************
+
+ 100  CONTINUE
+      KTXTD = 0
+      KCLRD = 0
+
+*     on veut obligatoirement lire un texte quelconque et une couleur,
+*     dans n'importe quel ordre
+ 101  CONTINUE
+      CALL LIRCHA(CH70,1,LCHA)
+      IF (IERR.NE.0) RETURN
+
+      IF (LCHA.LE.4) THEN
+          CALL PLACE(NCOUL,NBCOUL,ICOUL1,CH70(1:LCHA))
+          IF (ICOUL1.NE.0) THEN
+*             CHOIX ARBITRAIRE
+*             si on trouve deux mots correspondant a des couleurs,
+*             c'est le premier qui est pris comme texte de la categorie
+              IF (KCLRD.EQ.1) THEN
+                  TXT = NCOUL(ICOUL)
+                  KTXTD = 1
+              ELSE
+                  ICOUL = ICOUL1
+                  KCLRD = 1
+              ENDIF
+          ENDIF
+      ELSE
+          IF (KTXTD.EQ.1) THEN
+              MOTERR = CH70(1:4)
+              CALL ERREUR(1055)
+              RETURN
+          ELSE
+              TXT = CH70(1:LCHA)
+              KTXTD = 1
+          ENDIF
+      ENDIF
+
+      IF (KTXTD.EQ.0.OR.KCLRD.EQ.0) GOTO 101
+
+      SEGINI,MCATE1
+      MCATE1.ICLRC = ICOUL - 1
+      MCATE1.TXCAT = TXT
+
+      ICLAS1 = 1
+      ISEGT1 = MCATE1
+      GOTO 9000
+
+
+C     **************************************************************
+C     CREATION D'UNE ETIQUETTE
+C     **************************************************************
+
+ 200  CONTINUE
+
+      IPOS=9
+      ICOUL=IDCOUL
+      DIS=0.D0
+      BOOL=.TRUE.
+      INUM=0
+
+      ILOOP=0
+      KPOSD=0
+      KCLRD=0
+      KTXTD=0
+
+*     les seuls arguments obligatoires sont un POINT et un MOT
+*     on peut lire en option un MOT pour la couleur et un autre MOT
+*     pour la position
+*     on peut aussi lire en option un FLOTTANT et un LOGIQUE
+*     tous ces objets peuvent etre specifies DANS N'IMPORTE QUEL ORDRE
+ 201  CONTINUE
+      ILOOP=ILOOP+1
+
+      CALL QUETYP(CHA8,0,IRET)
+      IF (IRET.EQ.0) GOTO 299
+
+      IF (CHA8.EQ.'MOT') THEN
+          CALL LIRCHA(CH70,1,LCHA)
+          IF (IERR.NE.0) RETURN
+          IF (LCHA.LE.4) THEN
+              CALL PLACE(MPOS,NPOS,IPOS1,CH70(1:LCHA))
+              IF (IPOS1.NE.0) THEN
+                  IPOS2 = IPOS1
+                  KPOSD = ILOOP
+                  GOTO 201
+              ENDIF
+              CALL PLACE(NCOUL,NBCOUL,ICOUL1,CH70(1:4))
+              IF (ICOUL1.NE.0) THEN
+                  ICOUL2 = ICOUL1
+                  KCLRD = ILOOP
+                  GOTO 201
+              ENDIF
+          ENDIF
+          TXT = CH70(1:LCHA)
+          KTXTD = ILOOP
+
+      ELSEIF (CHA8.EQ.'FLOTTANT') THEN
+          CALL LIRREE(DIS,1,IRET)
+          IF (IERR.NE.0) RETURN
+
+      ELSEIF (CHA8.EQ.'POINT') THEN
+          CALL LIROBJ('POINT',INUM,1,IRET)
+          IF (IERR.NE.0) RETURN
+*         Conversion en MELEME pour des raisons pratiques (il n'y a pas de PILE de POINT)
+          NBNN   = 1
+          NBELEM = 1
+          NBSOUS = 0
+          NBREF  = 0
+          SEGINI,MELEME
+          MELEME.NUM(1,1)=INUM
+
+
+      ELSEIF (CHA8.EQ.'LOGIQUE') THEN
+          CALL LIRLOG(BOOL,1,IRET)
+          IF (IERR.NE.0) RETURN
+      ENDIF
+
+      GOTO 201
+
+ 299  CONTINUE
+
+      IF (MELEME .EQ. 0) THEN
+          MOTERR = 'MAILLAGE'
+          CALL ERREUR(37)
+          RETURN
+      ENDIF
+
+      IF (KTXTD.GT.0) THEN
+          IF (KPOSD.GT.0) IPOS=IPOS2
+          IF (KCLRD.GT.0) ICOUL=ICOUL2 - 1
+
+*     si le texte n'est pas defini mais que la position ou la couleur
+*     l'est, c'est parce que l'utilisateur voulait peut-etre afficher
+*     un mot tel que 'ROUG', 'VERT', 'SE', 'C'...
+      ELSE
+          IF (KPOSD.GT.0.OR.KCLRD.GT.0) THEN
+*             CHOIX ARBITRAIRE
+*             on utilise le mot (definissant la couleur ou la position)
+*             apparaissant en premier dans l'instruction pour definir
+*             le texte (la couleur/position reprend alors sa valeur
+*             par defaut)
+              IF (KPOSD.LT.KCLRD) THEN
+                 TXT = MPOS(IPOS2)
+                 ICOUL = ICOUL2 - 1
+              ELSE
+                 TXT = NCOUL(ICOUL2)
+                 IPOS = IPOS2
+              ENDIF
+          ELSE
+              MOTERR(1:8) = 'MOT'
+              CALL ERREUR(37)
+              RETURN
+          ENDIF
+      ENDIF
+
+      SEGINI,METIQ1
+      METIQ1.INUPT = MELEME
+      METIQ1.ICLRE = ICOUL
+      METIQ1.KPOSI = IPOS
+      METIQ1.DEPOR = DIS
+      METIQ1.BLIEN = BOOL
+      METIQ1.TXETI = TXT
+
+      ICLAS1 = 2
+      ISEGT1 = METIQ1
+      GOTO 9000
+
+
+C     **************************************************************
+C     CREATION DE L'OBJET ANNOTATION
+C     **************************************************************
+
+ 9000 CONTINUE
+
+      NBANNO = 1
+      SEGINI,MANNO1
+      MANNO1.ICLAS(1) = ICLAS1
+      MANNO1.ISEGT(1) = ISEGT1
+
+      CALL ACTOBJ('ANNOTATI',MANNO1,1)
+      CALL ECROBJ('ANNOTATI',MANNO1)
+
+
+      END
+
+
+
+ 

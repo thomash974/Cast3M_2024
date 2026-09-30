@@ -1,0 +1,144 @@
+C DFST3D    SOURCE    PV090527  23/01/27    21:15:25     11574          
+      subroutine dfst3d(NBRINC,NDIMG,FRAC,GCH,DFDST,AFFICHE)
+c     calcul des direction d ecoulement pour la plasticite de traction
+c     pour incl3d 
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     nombre maxi d inclusion consideree pour les declarations locales      
+      integer NBRINC      
+c     indicateur de diffusion produits chimiques dans fissure
+      real*8 GCH(0:NBRINC) 
+c     fractions volumiques des phases      
+      real*8 FRAC(0:NBRINC) 
+c     derivee des criteres par rapport aux contrainte effectives
+      real*8 DFDST(NDIMG,NDIMG)
+      logical AFFICHE
+      
+      f=FRAC(1)
+
+      t1 = 0.1D1 - f
+      t1 = 0.1D1 / t1
+      t2 = Gch(0) ** 2
+      t3 = f ** 2
+      t4 = t1 ** 2
+      t2 = f * (-t2 * t3 * t4 / 0.18D2 + 0.2D1 + t2 * f * t4 * (-0.4D1 /
+     # 0.9D1 * f + 0.1D1 / 0.2D1))
+      t4 = f * (-0.4D1 / 0.3D1 * Gch(1) - 0.2D1 / 0.3D1 * Gch(0) * f * t
+     #1)
+      t5 = Gch(0) * f * t1 * (-0.5D1 / 0.6D1 * f + 0.1D1 / 0.3D1)
+      t6 = -0.2D1 * t5
+      t7 = (0.2D1 / 0.3D1 * Gch(1) + Gch(0) * f * t1 / 0.3D1) * f
+      t8 = Gch(0) * t3 * t1 / 0.6D1
+      t1 = Gch(0) * t3 * t1 / 0.3D1
+      t3 = 0.6D1 / 0.35D2 * f
+      t9 = 0.12D2 / 0.35D2 * f
+      t10 = 0.17D2 / 0.35D2 * f
+      t11 = Gch(1) ** 2
+      t11 = f * (0.2D1 * t11 + 0.16D2 / 0.7D1)
+      t12 = -0.22D2 / 0.35D2 * f
+      t13 = -0.34D2 / 0.7D1 * f + 0.2D1
+      dfdst(1,1) = t2
+      dfdst(1,4) = t8
+      dfdst(1,5) = -t1
+      dfdst(1,6) = -t1
+      dfdst(1,7) = t7
+      dfdst(1,8) = t4
+      dfdst(1,9) = t4
+      dfdst(1,10) = t5
+      dfdst(1,11) = t6
+      dfdst(1,12) = t6
+      dfdst(2,2) = t2
+      dfdst(2,4) = -t1
+      dfdst(2,5) = t8
+      dfdst(2,6) = -t1
+      dfdst(2,7) = t4
+      dfdst(2,8) = t7
+      dfdst(2,9) = t4
+      dfdst(2,10) = t6
+      dfdst(2,11) = t5
+      dfdst(2,12) = t6
+      dfdst(3,3) = t2
+      dfdst(3,4) = -t1
+      dfdst(3,5) = -t1
+      dfdst(3,6) = t8
+      dfdst(3,7) = t4
+      dfdst(3,8) = t4
+      dfdst(3,9) = t7
+      dfdst(3,10) = t6
+      dfdst(3,11) = t6
+      dfdst(3,12) = t5
+      dfdst(4,1) = t8
+      dfdst(4,2) = -t1
+      dfdst(4,3) = -t1
+      dfdst(4,4) = t3
+      dfdst(4,7) = t9
+      dfdst(4,10) = t10
+      dfdst(5,1) = -t1
+      dfdst(5,2) = t8
+      dfdst(5,3) = -t1
+      dfdst(5,5) = t3
+      dfdst(5,8) = t9
+      dfdst(5,11) = t10
+      dfdst(6,1) = -t1
+      dfdst(6,2) = -t1
+      dfdst(6,3) = t8
+      dfdst(6,6) = t3
+      dfdst(6,9) = t9
+      dfdst(6,12) = t10
+      dfdst(7,1) = t7
+      dfdst(7,2) = t4
+      dfdst(7,3) = t4
+      dfdst(7,4) = t9
+      dfdst(7,7) = t11
+      dfdst(7,10) = t12
+      dfdst(8,1) = t4
+      dfdst(8,2) = t7
+      dfdst(8,3) = t4
+      dfdst(8,5) = t9
+      dfdst(8,8) = t11
+      dfdst(8,11) = t12
+      dfdst(9,1) = t4
+      dfdst(9,2) = t4
+      dfdst(9,3) = t7
+      dfdst(9,6) = t9
+      dfdst(9,9) = t11
+      dfdst(9,12) = t12
+      dfdst(10,1) = t5
+      dfdst(10,2) = t6
+      dfdst(10,3) = t6
+      dfdst(10,4) = t10
+      dfdst(10,7) = t12
+      dfdst(10,10) = t13
+      dfdst(11,1) = t6
+      dfdst(11,2) = t5
+      dfdst(11,3) = t6
+      dfdst(11,5) = t10
+      dfdst(11,8) = t12
+      dfdst(11,11) = t13
+      dfdst(12,1) = t6
+      dfdst(12,2) = t6
+      dfdst(12,3) = t5
+      dfdst(12,6) = t10
+      dfdst(12,9) = t12
+      dfdst(12,12) = t13
+
+
+
+      
+ 
+      if(affiche) then
+        print*,'DFDST dans DFST3D'
+        do i=1,18
+            write(*,'(18(1X,E10.3))')
+     #      (dfdst(i,j),j=1,18) 
+        end do
+       end if        
+
+
+      
+      return
+      end
+      
+ 

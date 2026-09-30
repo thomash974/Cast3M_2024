@@ -1,0 +1,291 @@
+C CFLUO3D   SOURCE    FD218221  24/02/07    21:15:04     11834          
+C CFLU3D    SOURCE    PV090527  23/02/07    11:58:34     11592          
+c     A.Sellier nov 2023       
+      SUBROUTINE cfluo3d(WRK52,WRK53,WRK54,MWRKXE,WR14,
+     # nbnb,idimb,teta1b,teta2b,nvarib,nstrsb,ifourb,dtb,trefb)
+      
+C     WRK52,53,54 segments déclarés dans le common DECHE
+     
+C     XMAT(NCOMAT)  =  COMPOSANTES DE MATERIAU
+C     IVAL(NCOMAT)  =  INDICE DES COMPOSANTES DE MATERIAU
+C     NCOMAT        = NOMBRE DE COMPOSANTES DE MATERIAU
+C     XCAR(ICARA)   =  CARACTERISTIQUES
+C     MFR           =  NUMERO DE LA FORMULATION DE L'ELEMENT FINI
+C                   = 1       MASSIF
+C                   = 3       COQUE MINCE ( COQ2 , COQ3  ET DKT )
+C                   = 5       COQUE EPAISSE ( COQ6 , COQ8 )
+C                   = 7       POUTRE
+C                   = 9       COQUE MINCE AVEC CISAILLEMENT TRANSVERSE  ( COQ4 ET DST )
+C                   = 11      LIQUIDE
+C                   = 13      TUYAU
+C                   = 15      LINESPRING
+C                   = 17      TUYAU FISSURE
+C                   = 19      RACCORD MASSIF
+C                   = 21      RACCORD COQUE
+C                   = 23      SURFACE LIBRE
+C                   = 25      MEMBRANE
+C                   = 27      UNIAXIALE
+C                   = 29      THERMIQUE
+C                   = 31      INCOMPRESSIBLES
+C                   = 33      POREUX
+C                   = 35      JOINT
+C                   = 37      HOMOGENEISE
+C                   = 39      TUYO
+C                   = 41      TUYAU ACOUSTIQUE PURE
+C                   = 43      RACCORD TUYAU FLUIDE
+c*    DDAUX = MATRICE DE HOOKE ELASTIQUE
+c*    NSTRS = NBRE DE COMPOSANTES DES DEFORMATIONS
+c*    CMATE = NOM DU MATERIAU
+c*    VALMAT= TABLEAU DE CARACTERISTIQUES DU MATERIAU
+c*    VALCAR= TABLEAU DE CARACTERISTIQUES GEOMETRIQUES
+c*    N2EL  = NBRE D ELEMENTS DANS SEGMENT DE HOOKE
+c*    N2PTEL= NBRE DE POINTS DANS SEGMENT DE HOOKE
+c*    MFR   = NUMERO DE LA FORMULATION
+c*    IFOU  = type de formulation
+c*    IB    = NUMERO DE L ELEMENT COURANT
+c*    IGAU  = NUMERO DU POINT COURANT
+c*    EPAIST= EPAISSEUR
+c*    NBPGAU= NBRE DE POINTS DE GAUSS
+c*    MELE  = NUMERO DE L ELEMENT FINI
+c*    NPINT = NBRE DE POINTS D INTEGRATION
+c*    NBGMAT= NBRE DE POINTS DANS SEGMENT DE CARACTERISTIQUES
+c*    NELMAT= NBRE D ELEMENTS DANS SEGMENT DE CARACTERISTIQUES
+c*    SECT  = SECTION
+c*    LHOOK = TAILLE DE LA MATRICE DE HOOKE
+c*    TXR,XLOC,XGLOB,D1HOOK,ROTHOO,DDHOMU,CRIGI = TABLEAUX UTILISES
+c*    POUR LE CALCUL DE LA MATRICE DE HOOKE
+c*    matrice de Hoocke DDHOOK(LHOOK,LHOOK)
+C-----------------------------------------------------------------------    
+C      VARIABLES PASSEES PAR LES COMMONS COPTIO , ECOU  ET NECOU             
+C                                                                           
+C  IFOUR    INDICE DU TYPE DE PROBLEME
+C            -3  DEFORMATIONS PLANES GENERALISEES
+C            -2  CONTRAINTES PLANES                                         
+C            -1  DEFORMATIONS PLANES                                       
+C             0  AXISYMETRIQUE                                             
+C             1  SERIE DE FOURIER                                          
+C             2  TRIDIMENSIONNEL                                      
+C  ITYP      TYPE DE FORMULATION MECANIQUE                              
+C  --------------- ATTENTION ---------------
+C     IL EST ACTIF APRES L APPEL DE VISAVI
+C  -----------------------------------------
+C       ITYP=1   CAS DES ELEMENTS MASSIFS                          
+C       ITYP=2   CAS DES COQUES
+C       ITYP=3   CAS DES MEMBRANES                               
+C       ITYP=4   CAS DES CABLES ET DES BARRES                       
+C       ITYP=5   CAS QUELCONQUE                                          
+C       ITYP=6   CAS DES CONTRAINTES PLANES                      
+C       ITYP=7   CAS DES COQUES A NU=0. OU CONTRAINTES PLANES        
+C       ITYP=8   CAS DES MEMBRANES A NU=0. OU CONTRAINTES PLANES   
+C       ITYP=9   CAS DES COQUES EPAISSES                           
+C       ITYP=10  CAS DES JOINTS                                          
+C       ITYP=11  CAS DES POUTRES                                            
+C       ITYP=12  CAS DES TUYAUX                                              
+C       ITYP=13  CAS DES COQUES AVEC CISAILLEMENT TRANSVERSE    
+C            
+C     ISTEP      flag utilise pour separer les etapes dans un calcul non local
+C                ISTEP=0 -----> calcul local
+C                ISTEP=1 -----> calcul non local etape 1 on calcule les seuils
+C                ISTEP=2 -----> calcul non local etape 2 on continue le calcul
+C                               a partir des seuils moyennes
+C                ISTEP=3 ----->sous iteration de Helmholtz
+C                ISTEP est défini par DEFINI.ESO      
+C                                                                 
+C     EPIN0      déformations inélastiques initiales
+C     EPINF      déformations inélastiques finales
+C     epst0      déformation totale initiale
+C     EPSTF      déformation totale finale
+C
+C-----------------------------------------------------------------------    
+C  SORTIES                                                                   
+C     SIGF(NSTRS)   = CONTRAINTES FINALES                                    
+C     VARF(NVARI)   = VARIABLES INTERNES FINALES
+C     DEFP          = DEFORMATIONS PLASTIQUES                               
+C     KERRE         = 0    TOUT OK
+C-----------------------------------------------------------------------
+
+      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+c     ajout sellier 2022
+-INC PPARAM
+c     fin ajout sellier 2022
+-INC CCOPTIO
+-INC DECHE
+*
+      SEGMENT IECOU
+*      COMMON/IECOU/NYOG,NYNU,NYALFA,NYSMAX,NYN,NYM,NYKK,
+       INTEGER icow1,icow2,icow3,icow4,icow5,icow6,icow7,
+C      INTEGER NYOG, NYNU, NYALFA,NYSMAX,NYN, NYM,  NYKK,
+     1  icow8,icow9,icow10,icow11,icow12,icow13,icow14,icow15,icow16,
+C    .  NYALF1,NYBET1,NYR,  NYA,   NYRHO,NSIGY,  NNKX,  NYKX,  IND,
+     2 icow17,icow18,icow19,icow20,icow21,icow22,icow23,icow24,
+C    .  NSOM,  NINV, NINCMA,NCOMP, JELEM, LEGAUS,INAT,  NCXMAT,
+     3 icow25,icow26,icow27,icow28,icow29,icow30,ICARA,
+C    .  LTRAC, MFR,  IELE,  NHRM,   NBNN, NBELEM,ICARA,
+     4  icow32,icow33,NSTRS1,MFR1,icow36,icow37,icow38,
+C    .  LW2,   NDEF,  NSTRSS,MFR1,  NBGMAT,NELMAT,MSOUPA,
+     5  icow39,icow40,icow41,icow42,icow43,icow44
+C    .  NUMAT1,LENDO, NBBB,  NNVARI,KERR1, MELEME
+        INTEGER icow45,icow46,icow47,icow48,icow49,icow50,
+     .          icow51,icow52,icow53,icow54,icow55,icow56
+     .          icow57,icow58
+      ENDSEGMENT
+      SEGMENT XECOU
+*      COMMON/XECOU/DTOPTI,TSOM,TCAR,DTT,DT,TREFA,TEMP00
+      REAL*8 xcow1, xcow2,xcow3,xcow4,DT,xcow6, xcow7
+C     REAL*8 DTOPTI,TSOM, TCAR, DTT,  DT,TREFA,TEMP00
+      ENDSEGMENT
+      
+c     segment de coordonnees des noeuds de l element
+      integer nbnb,insb,idimb
+      SEGMENT MWRKXE
+        REAL*8 XE(3,nbnb)
+      ENDSEGMENT  
+
+*     
+*     sellier/millard segment pour les Helmholtz 04 04 2020
+      integer NBVIA
+      SEGMENT WR14
+        INTEGER INLVIA(NBVIA)
+      ENDSEGMENT     
+      
+c----- nombre de noeuds max et table locale des coordonnees ------------
+-INC HNBRNEU
+c     rappel du contenu de HNBRNEU 
+C     tableau local des coordonnees des noeuds de lEF
+C     integer NBNMAX3D
+C     nbr de noeuds maxi par element
+C     parameter (NBNMAX3D=20)
+C     tableau des coordonnees des noeuds      
+C     real*8 XE3D(3,NBNMAX3D)
+c----------------------------------------------------------------------- 
+
+c-------------- Parametres pour le non locale --------------------------
+-INC HNBRHEL
+c     NB_HELM: Nombre de variable d etat principales 
+c     NB_PARA_PAR_HELM: Nombre de parametres par variable d etat 
+c     NB_VARI_PAR_HELM: Nombre de variable internes par variables d etat 
+c     NB_PARA_HELM: nombre de parametre total resultant 
+c     NB_VARI_HELM: nombre de variables internes totales resultantes 
+c     INLVIA3D(NB_HELM):copie du pointeur sur les numeros des vari traitee par helmholtz 
+c     NBVIA3D: recuperation du nombre de Helmholtz actives 
+c     declaration des tableaux pour helmholtz
+-INC HDECHEL 
+
+
+c----------------Parametres pour les renforts --------------------------
+c-INC HNBRREN
+c     NB_RENF
+c     NB_PARA_PAR_RENF
+c     NB_PARA_RENF
+c     NB_VARI_PAR_RENF
+c     NB_VARI_RENF
+
+c------------- Nombre de parametres pour le modele de fibre ------------ 
+c-INC HNBRF3D
+c     pas de fibre pour l instant dans FLUISO3D
+    
+c-----------------------------------------------------------------------
+
+       
+c-- transfert des coordonnees des noeuds -------------------------------
+
+c      recuperation de la dimension hors plan en cas de calcul 2D
+c      boucle sur les noeuds
+       if(nbnb.le.NBNMAX3D) then
+           NBNB3D=nbnb
+           if(idimb.le.3) then
+              idimb3d=idimb
+           else
+              print*,'pb table de coord des noeuds ds cfluo3d'
+              kerre=1
+              return
+           end if
+       else
+          print*,'Element avec + de noeuds que capacite declaree dans'
+          print*,'HNBRNEU.INC'
+          kerre=1
+          return
+       end if
+
+c      chargement des coordonnees des noeuds        
+       do insb=1,NBNB3D
+          do j=1,idimb3d       
+c             print*,'xe(',j,insb,')=',xe(j,insb)   
+             XE3D(j,insb)=xe(j,insb)
+          end do
+          if (idimb.lt.3) then           
+            do j=idimb+1,3
+              XE3D(j,insb)=0.d0
+            end do
+          end if            
+       end do
+
+c      on double les neouds si le probleme est 2D       
+       if ((ifourb.eq.0).or.(ifourb.eq.-1)) then
+         if(mfr.ne.33) then
+c           position de la dimension en non poreux
+            dimension3=XMAT3D(16)
+         else
+c           position en poreux
+            print*,'dans cfluo3d ajouter dimension3'
+            kerre=1
+            return
+         end if
+         NBNB3D=2*nbnb
+         do insb=nbnb+1,NBNB3D
+            do j=1,2       
+c               print*,'xe(',j,insb,')=',xe(j,insb)   
+                XE3D(j,insb)=XE3D(j,(insb-nbnb))
+            end do
+            XE3D(3,insb)=dimension3
+         end do
+       end if
+                                  
+       
+c------------- test du nombre de variables de Helmholtz ----------------
+
+c      transfert dans un tableau de fluendo3d dimensionne au max des
+c      facultative helmholtz de IDMATR (actuellement 10)
+
+       if(NBVIA.GT.NB_HELM) then
+          print*,'Pb de dimensionnement avec les variables de Helmholtz'
+          print*,'dans cflui3d:',NBVIA,' > ',NB_HELM
+          print*,'Verifier NB_HELM et nbr de non locales'
+          print*,'declarees nombre_helmholtz.h (NBRHEL.INC)'
+       else
+c         transfert vers les variables locales
+          if (NBVIA.gt.0) then
+             NBVIA3D=NBVIA
+             do i=1,NB_HELM
+                 if(i.le.NBVIA3D) then
+                     INLVIA3D(i)=INLVIA(i)
+                 else
+                     INLVIA3D(i)=0
+                 end if
+             end do 
+          else
+             NBVIA3D=NBVIA
+             do i=1,NB_HELM
+                 INLVIA3D(i)=0
+             end do
+          end if
+       end if
+c------------ fin de recuperation des numeros des variables Helmholtz -- 
+      
+
+c------------- appel au modele  ----------------------------------------  
+ 
+      call FLUO3D(XMAT,NMAT,SIG0,SIGF,DEPST,NSTRSb,VAR0,VARF,
+     # NVARIb,TETA1b,TETA2b,DTb,KERRE,MFR,IFOURB,ISTEP,EPST0,
+     # EPSTF,TREFB,NBVIA3d,INLVIA3d,NBNMAX3D,NBNB3D,IDIMB3D,XE3D)
+
+      return
+      end
+      
+c***********************************************************************
+ 
+ 
+ 
+ 

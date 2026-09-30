@@ -1,0 +1,121 @@
+C NOEINC    SOURCE    OF166741  23/03/03    21:15:03     11416          
+
+C***********************************************************************
+C NOM         : noeinc.eso
+C DESCRIPTION : Tableau des MELEME / POINTS nommes dont les numeros de
+C               noeuds sont strictement inclus dans ICPR1
+C***********************************************************************
+C HISTORIQUE :  10/10/2018 : BERTHINC : Creation
+C               01/08/2022 : OF       : Modifications diverses
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : SORMED.ESO
+C***********************************************************************
+C ENTREES    : CTYP, ICPR1
+C SORTIES    : IREP1
+C***********************************************************************
+
+      SUBROUTINE NOEINC(ICPR1,CTYP,IREP1)
+
+      IMPLICIT INTEGER(i-n)
+      IMPLICIT REAL*8(a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCMED
+
+-INC SMELEME
+-INC SMMED
+
+      CHARACTER*(*) CTYP
+
+C     Segment de travail
+      SEGMENT icpr(ic)
+
+      icpr = ICPR1
+c*      segact,icpr  <- suppose actif en entree
+      IREP1 = 0
+
+C***********************************************************************
+C     On recupere les entites nommes et leurs noms
+      CALL REPER1(CTYP, SREPER)
+      IF (IERR.NE.0) RETURN
+
+      NBENT  = SREPER.IREPER(/1)
+      NBENT1 = 0
+
+C  ****************************************************************
+C  * CAS des objets de type 'MAILLAGES'
+C  ****************************************************************
+C  Note : Les maillages nommes ne sont pas necessairement actives !
+C         Ils sont actives puis desactives si non retenus.
+      IF    (CTYP .EQ. 'MAILLAGE') THEN
+C       On repere quel MELEME nomme est inclus dans IMEL1
+        DO ii = 1, NBENT
+          IPT1 = SREPER.IREPER(ii)
+          SEGACT,IPT1
+          NBSOUS = IPT1.LISOUS(/1)
+          ides = 1
+C  Cas MELEME SIMPLE
+          IF (NBSOUS .EQ. 0) THEN
+            DO iel = 1, IPT1.NUM(/2)
+              DO inoe = 1, IPT1.NUM(/1)
+                IF(icpr(IPT1.NUM(inoe,iel)) .EQ. 0) GOTO 10
+              ENDDO
+            ENDDO
+C  Cas MELEME COMPLEXE
+          ELSE
+            DO isous=1,NBSOUS
+              IPT2 = IPT1.LISOUS(isous)
+              SEGACT,IPT2
+              DO iel=1,IPT2.NUM(/2)
+                DO inoe=1,IPT2.NUM(/1)
+                  IF(icpr(IPT2.NUM(inoe,iel)) .EQ. 0) GOTO 10
+                ENDDO
+              ENDDO
+            ENDDO
+          ENDIF
+          ides = 0
+
+          NBENT1=NBENT1+1
+          SREPER.IREPER(NBENT1)=IPT1
+          SREPER.CREPER(NBENT1)=SREPER.CREPER(ii)
+
+ 10       CONTINUE
+          IF (ides.EQ.1) SEGDES,IPT1
+        ENDDO
+
+C  ****************************************************************
+C  * CAS des objets de type 'POINT'
+C  ****************************************************************
+      ELSE IF (CTYP .EQ. 'POINT   ')THEN
+C       On repere quel POINT nomme est inclus dans IMEL1
+        DO ii = 1, NBENT
+          inoe = SREPER.IREPER(ii)
+          IF (icpr(inoe) .NE. 0) THEN
+            NBENT1=NBENT1+1
+            SREPER.IREPER(NBENT1)=inoe
+            SREPER.CREPER(NBENT1)=SREPER.CREPER(ii)
+          END IF
+        ENDDO
+
+      ELSE
+        CALL ERREUR(5)
+      ENDIF
+
+C  Ajustement final
+      IF (NBENT1 .NE. NBENT) THEN
+        NBENT=NBENT1
+        SEGADJ,SREPER
+      ENDIF
+      IREP1 = SREPER
+
+c      segdes,icpr
+
+c      return
+      END
+
+ 

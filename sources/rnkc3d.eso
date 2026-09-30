@@ -1,0 +1,93 @@
+C RNKC3D    SOURCE    FD218221  24/02/07    21:15:26     11834          
+        subroutine RanKinc3d(NDIMG,NTMAX,icr,idir,
+     #  SEFFG,EPSTG,RTG,RFG,FTHG,FT,DPFTDS,DGFTDS,ACTIFT,
+     #  Log_RTG,precision3d,affiche,err1)
+      
+c       criteres de rankine
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+        integer NDIMG,NTMAX,icr,idir,err1
+        real*8 SEFFG(NDIMG),EPSTG(NDIMG),RTG(NDIMG),RFG(NDIMG)
+        real*8 FTHG(NDIMG)
+        real*8 FT(NTMAX),DPFTDS(NTMAX,NDIMG),DGFTDS(NTMAX,NDIMG)
+        logical ACTIFT(NTMAX),Log_RTG(NTMAX)
+        real*8 precision3d
+        logical affiche,affiche_local
+        
+        affiche_local=affiche
+c       affiche_local=.true.
+        
+        
+        if(affiche_local) then
+            print*,'on est dans Rankinc3d'
+        end if
+        FT(icr)=0.d0
+        
+        if(SEFFG(idir).ge.(RTG(idir)*precision3d)) then
+c           critere d ouverture            
+            FT(icr)=SEFFG(idir)-RTG(idir)
+            if(FT(icr).gt.precision3d*RTG(idir)) then
+                if(FTHG(idir).gt.0.d0) then
+c                   ecoulement admissible                    
+                    ACTIFT(icr)=.true. 
+                    DPFTDS(icr,idir)=1.d0 
+                    DGFTDS(icr,idir)=1.d0
+                    Log_RTG(icr)=.false. 
+                end if                    
+            end if
+        else
+            if(SEFFG(idir).le.(-RFG(idir)*precision3d)) then 
+c               critere de refermeture                 
+                FT(icr)=-SEFFG(idir)-RFG(idir)
+                if(FT(icr).gt.precision3d*RFG(idir) )then 
+                    if(FTHG(idir).lt.0.d0) then                                           
+                        if(EPSTG(idir).gt.precision3d) then
+c                           ecoulement admissible                        
+                            ACTIFT(icr)=.true.
+                            DPFTDS(icr,idir)=-1.d0 
+                            DGFTDS(icr,idir)=-1.d0                                
+                            Log_RTG(icr)=.true.                                  
+                        end if                              
+                    end if
+                    if(.not.ACTIFT(icr)) then
+c                       remise  a zero du critere pour l ordre
+                        FT(icr)=0.d0
+                    end if
+                end if               
+            end if
+        end if
+        
+        if (affiche_local) then
+            write(*,'(2(A10,I3,1X))')
+     #      ' Critere: ',icr,'Direction:',idir        
+            write(*,'(1X,A3,I2,A2,E10.3,1X,A7,L3,1X,A8,L3)') 
+     #      'FT(',icr,')=',FT(icr),
+     #      'ACTIFT=',ACTIFT(icr),
+     #      'Log_RTG=',Log_RTG(icr)
+            write(*,'(5(A7,I2,A2,E10.3,1X))')
+     #      '   RTG(',icr,')=',RTG(icr),
+     #      '   RFG(',icr,')=',RFG(icr),
+     #      ' SEFFG(',icr,')=',seffg(icr),
+     #      '  FTHG(',icr,')=',FTHG(icr),
+     #      ' EPSTG(',icr,')=',EPSTG(icr)
+            do idir=1,ndimg
+                write(*,'(2(A7,I2,I2,A2,E10.3,1X))')
+     #          'DPFTDS(',icr,idir,')=',DPFTDS(icr,idir),
+     #          'DGFTDS(',icr,idir,')=',DGFTDS(icr,idir)
+            end do
+*            read*
+        end if
+        err1=0
+        
+        
+        return
+        end
+        
+        
+        
+        
+        
+ 
+ 

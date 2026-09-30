@@ -1,0 +1,102 @@
+C MPMAGV    SOURCE    CB215821  23/11/02    21:15:07     11779          
+      SUBROUTINE MPMAGV
+
+* ---------------------------------------------------------------------
+*
+*                               ROUTINE MPMAGV
+*
+* ---------------------------------------------------------------------
+* Auteur : Nikola JERANCE
+*
+* Historique :
+*
+*       20/09/2022 - Première écriture (N. Jerance)
+*
+*
+* Descriptif :
+*
+* Calcul de la matrice  qui exprime le potentiel vecteur magnétique
+* à partir de la densité de courant J. En entrée on a un maillage 2D
+* ayant une épaisseur donnée et en sortie on a une liste de rééls
+* (qui est en fait une matrice M).
+* Pour calculer le potentiel vecteur (en 3D) par la suite, il faut multiplier M
+*   par la densité de courant J, en appelant la procédure JPMAGV.
+*  Ce calcul correspond, par exemple, à la géométrie d'une galette supraconductrice
+* La densite de courant n'a que 2 composantes.
+*
+*
+* Arguments :
+*
+*       (E)     MMODE1 = Pointeur sur un MODELE, dont on extrait le maillage
+*       (E)     XEPAIS = Epaisseur
+**      (S)     ILREE1 = Pointeur sur la liste de réels (résultat)
+*
+* ---------------------------------------------------------------------
+
+* ----------------------------------------------------------------------
+*
+*                         0 - DECLARATIONS ET IMPORTS
+*
+* ----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+-INC SMLREEL
+-INC SMMODEL
+
+
+      POINTEUR IMAIL1.MELEME
+      REAL*8 EPAIS
+
+      SEGMENT INFO
+        INTEGER INFELL(JG)
+      ENDSEGMENT
+
+
+
+*      CALL LIROBJ('MAILLAGE',IMAIL,1,IRETOU)
+
+      CALL LIROBJ('MMODEL',MMODE1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MMODEL',MMODE1,1)
+      IF (IERR.NE.0) RETURN
+
+* Contrôle du nombre de IMODEL : MODELE ELEMENTAIRE. On veut un modèle
+* simple, i.e. avec un seul IMODEL
+      NBMOD = MMODE1.KMODEL(/1)
+      IF (NBMOD .GT. 1) THEN
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+
+* Ouverture du segment IMODEL : MODELE ELEMENTAIRE
+      IMODE1 = MMODE1.KMODEL(1)
+      SEGACT,IMODE1
+
+* Ouverture du segment MELEME
+      IMAIL1 = IMODE1.IMAMOD
+      IELTYP = IMAIL1.ITYPEL
+      CALL ELQUOI(IELTYP,0,2,IPINF,IMODE1)
+      IF (IERR .NE. 0) RETURN
+
+      EPAIS=1.D0
+      CALL LIRREE(EPAIS,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+      ILREE1 = 0
+      CALL MPMAG1(IMAIL1,EPAIS,ILREE1)
+
+* On calcule les valeurs du champ par élément
+      CALL ACTOBJ('LISTREEL',ILREE1,1)
+      CALL ECROBJ('LISTREEL',ILREE1)
+
+      RETURN
+      END
+ 

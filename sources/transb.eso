@@ -1,0 +1,27 @@
+C TRANSB    SOURCE    PV        21/08/02    21:15:04     11080          
+C    SOUS PROGRAMME DE VERIFICATION QU'UN SEGMENT POTENTIEL (LL1 LL2)
+C    EST DU BON COTE DU CONTOUR (LL3 LL1 LL4)
+C
+      SUBROUTINE TRANSB(X,IRECL,LL1,LL2,LL3,LL4,xcmp)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION X(3,1)
+      xcmp2=xcmp*xcmp
+      IRECL=1
+      X41=X(1,LL1)-X(1,LL4)
+      Y41=X(2,LL1)-X(2,LL4)
+      X31=X(1,LL1)-X(1,LL3)
+      Y31=X(2,LL1)-X(2,LL3)
+      UV=X41*Y31-X31*Y41
+      X21=X(1,LL1)-X(1,LL2)
+      Y21=X(2,LL1)-X(2,LL2)
+      VX=X41*Y21-Y41*X21
+      UX=X21*Y31-Y21*X31
+      IF (UV.GE.xcmp2.AND.VX.GT.xcmp2.AND.UX.GT.xcmp2) IRECL=0
+      IF (UV.LT.xcmp2.AND.(VX.GT.xcmp2.OR.UX.GT.xcmp2)) IRECL=0
+      RETURN
+      END
+
+
+ 
+ 

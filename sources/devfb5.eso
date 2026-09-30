@@ -1,0 +1,292 @@
+C DEVFB5    SOURCE    BP208322  20/09/18    21:15:30     10718          
+      SUBROUTINE  DEVFB5(ITYP,FTOTB,XPTB,IPALB,IPLIB,XPALB,XVALB,
+     &        NLIAB,NPLB,IND,IND1,INDM1,NPA,NPAM1,IND2,PDT,PDTS2,
+     &        FEXPSM,NPC1,I,XABSCI,XORDON,NIP,IANNUL)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE : algorithme de Fu - de Vogelaere               *
+*     ________________________________________________               *
+*                                                                    *
+*     Calcul des forces de choc sur base B pour les liaisons de      *
+*     type POINT_POINT_DEPLACEMENT_PLASTIQUE.                        *
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+* e   ITYP    type de la liaison.                                    *
+* es  FTOTB   Forces exterieures totalisees sur la base B.           *
+* e   XPTB    Tableau des deplacements des points                    *
+* e   IPALB   Renseigne sur la liaison.                              *
+* e   IPLIB   Tableau contenant les numeros "DYNE" de la liaison.    *
+* e   XPALB   Tableau contenant les parametres de la liaison.        *
+* es  XVALB   Tableau contenant les variables internes de liaisons.  *
+* e   NLIAB   Nombre de liaisons sur la base B.                      *
+* e   NPLB    Nombre total de points intervenant dans les liaisons.  *
+* e   IND     Indice du pas.                                         *
+* e   I       numero de la liaison.                                  *
+* e   XABSCI  Tableau contenant les abscisses de la loi plastique    *
+*             pour la liaison point-point-plastique                  *
+* e   XORDON  Tableau contenant les ordonnees de la loi plastique    *
+*             pour la liaison point-point-plastique                  *
+* e   NIP     Nombre de points dans l'evolution de la loi            *
+*                                                                    *
+*     Auteur, date de creation:                                      *
+*                                                                    *
+*     Nicolas WECXSTEEN 04/96 point-point- ... -plastique            *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+      INTEGER IPALB(NLIAB,*),IPLIB(NLIAB,*)
+      REAL*8  XPALB(NLIAB,*),XPTB(NPLB,2,*),FTOTB(NPLB,*)
+      REAL*8  XVALB(NLIAB,4,*),FEXPSM(NPLB,NPC1,2,*)
+      REAL*8  XABSCI(NLIAB,*),XORDON(NLIAB,*)
+
+*
+* --- choc elementaire POINT_POINT_DEPLACEMENT_PLASTIQUE sans amortissement
+*
+      IF (ITYP.EQ.16) THEN
+         NPOA   = IPLIB(I,1)
+         NPOB   = IPLIB(I,2)
+         IDIM   = IPALB(I,3)
+         IPERM  = IPALB(I,5)
+         XJEU   = XPALB(I,1)
+         XDPLAS = XPALB(I,2+IDIM)
+         XELA   = XPALB(I,3+IDIM)
+         XDPLAC = XPALB(I,4+IDIM)
+         XDEP = 0.D0
+         XAMO = 0.d0
+         XVIT = 0.d0
+         DO 10 ID = 1,IDIM
+            IDA = 3 + ID
+            IDB = 3 + IDIM + ID
+            XDEA = XPTB(NPOA,1,ID)
+            XDEB = XPTB(NPOB,1,ID)
+            XVALB(I,IND,IDA) = XDEA
+            XVALB(I,IND,IDB) = XDEB
+            XDEA = XDEA + FEXPSM(NPOA,NPA,IND1,ID)
+            XDEB = XDEB + FEXPSM(NPOB,NPA,IND1,ID)
+*           XPALB(I,1+ID) = normale
+            XDEP = XDEP + (XDEA - XDEB) * XPALB(I,1+ID)
+ 10      CONTINUE
+* On appel DYCHEC, SP qui calcul ,avec le deplacement xdep,
+* la force xfla et le dep plastique xdplas sur l'evolution xabsci/xordon
+* (loi de comportement)
+*
+         call DYCHEC(XDEP,XDPLAS,XDPLAC,XJEU,IPERM,XABSCI,
+     &                  XORDON,I,XFLA,NLIAB,NIP,XVIT,XAMO,iannul)
+
+         XFLB = -1.D0 * XFLA
+         XVALB(I,IND,1) = XFLA
+         XVALB(I,IND,2) = XFLB
+         XPALB(I,2+IDIM) = XDPLAS
+         XPALB(I,3+IDIM) = XELA
+         XPALB(I,4+IDIM) = XDPLAC
+         XVALB(I,IND,13) = XDPLAS
+         XVALB(I,IND,14) = XELA
+         XVALB(I,IND,15) = XDPLAC
+
+         DO 12 ID = 1,IDIM
+            FTOTB(NPOA,ID) = FTOTB(NPOA,ID) + XFLA * XPALB(I,1+ID)
+            FTOTB(NPOB,ID) = FTOTB(NPOB,ID) + XFLB * XPALB(I,1+ID)
+ 12      CONTINUE
+*
+* --- choc elementaire POINT_POINT_DEPLACEMENT_PLASTIQUE avec amortissement
+*
+      ELSE IF (ITYP.EQ.17) THEN
+         NPOA   = IPLIB(I,1)
+         NPOB   = IPLIB(I,2)
+         IDIM   = IPALB(I,3)
+         IPERM  = IPALB(I,5)
+         XJEU   = XPALB(I,1)
+         XAMO   = XPALB(I,2)
+         XDPLAS = XPALB(I,3+IDIM)
+         XELA   = XPALB(I,4+IDIM)
+         XDPLAC = XPALB(I,5+IDIM)
+         XDEP = 0.D0
+cbp,2020-09         XDEPM1 = 0.D0
+         XVIT   = 0.D0
+         DO 20 ID = 1,IDIM
+            IDA = 3 + ID
+            IDB = 3 + IDIM + ID
+*  Ici, l'indice IND2 sert a calculer les vitesses
+            XDEA = XPTB(NPOA,1,ID)
+cbp,2020-09            XDMA = XPTB(NPOA,IND2,ID)
+            XDEB = XPTB(NPOB,1,ID)
+cbp,2020-09            XDMB = XPTB(NPOB,IND2,ID)
+            XVALB(I,IND,IDA) = XDEA
+            XVALB(I,IND,IDB) = XDEB
+            XDEA = XDEA + FEXPSM(NPOA,NPA,IND1,ID)
+            XDEB = XDEB + FEXPSM(NPOB,NPA,IND1,ID)
+cbp,2020-09            XDMA = XDMA + FEXPSM(NPOA,NPAM1,INDM1,ID)
+cbp,2020-09            XDMB = XDMB + FEXPSM(NPOB,NPAM1,INDM1,ID)
+cbp,2020-09:erreur de copier-coller?    XDEB = XDEB + FEXPSM(NPOB,NPA,IND1,ID)
+*
+*           XPALB(I,2+ID) = normale
+            XDEP = XDEP + (XDEA - XDEB) * XPALB(I,2+ID)
+cbp,2020-09            XDEPM1 = XDEPM1 + (XDMA - XDMB) * XPALB(I,2+ID)
+cbp,2020-09: nouveau calcul de la vitesse (neglige les pseudo-modes)
+            XVIT = XVIT 
+     &      + (XPTB(NPOA,2,ID)-XPTB(NPOB,2,ID))*XPALB(I,2+ID)
+ 20      CONTINUE
+cbp,2020-09         XVIT = (XDEP - XDEPM1) / PDTS2
+         XVALB(I,IND,3) = XVIT
+*
+* Appel a DYCHEC pour calcul de la force et depla plastique
+        call DYCHEC(XDEP,XDPLAS,XDPLAC,XJEU,IPERM,XABSCI,
+     &                  XORDON,I,XFLA,NLIAB,NIP,XVIT,XAMO,iannul)
+
+         XFLB = -1.D0 * XFLA
+         XVALB(I,IND,1) = XFLA
+         XVALB(I,IND,2) = XFLB
+         XPALB(I,3+IDIM) = XDPLAS
+         XPALB(I,4+IDIM) = XELA
+         XPALB(I,5+IDIM) = XDPLAC
+         XVALB(I,IND,13) = XDPLAS
+         XVALB(I,IND,14) = XELA
+         XVALB(I,IND,15) = XDPLAC
+*
+         DO 22 ID = 1,IDIM
+            FTOTB(NPOA,ID) = FTOTB(NPOA,ID) + XFLA * XPALB(I,2+ID)
+            FTOTB(NPOB,ID) = FTOTB(NPOB,ID) + XFLB * XPALB(I,2+ID)
+ 22      CONTINUE
+*
+C   Rotule [
+*
+* --- choc elementaire POINT_POINT_ROTATION_PLASTIQUE sans amortissement
+*
+      ELSE IF (ITYP.EQ.50) THEN
+         NPOA   = IPLIB(I,1)
+         NPOB   = IPLIB(I,2)
+         IDIM   = IPALB(I,3)
+         IPERM  = IPALB(I,5)
+         XJEU   = XPALB(I,1)
+         XDPLAS = XPALB (I,2+IDIM)
+         XELA   = XPALB (I,3+IDIM)
+         XDPLAC = XPALB(I,4+IDIM)
+         XROT = 0.D0
+         xamo = 0.d0
+         xvit = 0.d0
+         DO 30 ID = 1,IDIM
+            IDA = 3 + ID
+            IDB = 3 + IDIM + ID
+*
+* On recupere les rotations des points A et B
+* XROA = rotation point A
+* XROB = rotation point B
+*
+            XROA = XPTB(NPOA,1,ID+3)
+            XROB = XPTB(NPOB,1,ID+3)
+            XVALB(I,IND,IDA) = XROA
+            XVALB(I,IND,IDB) = XROB
+            XROA = XROA + FEXPSM(NPOA,NPA,IND1,ID+3)
+            XROB = XROB + FEXPSM(NPOB,NPA,IND1,ID+3)
+*           XPALB(I,1+ID) = axe de rotation
+            XROT = XROT + (XROA - XROB) * XPALB(I,1+ID)
+ 30      CONTINUE
+* On appel DYCHEC, SP qui calcul ,avec la rotation xrot,
+* le moment xmla et la rota plastique xdplas sur l'evolution xabsci/xordon
+* (loi de comportement)
+*
+        call DYCHEC(XROT,XDPLAS,XDPLAC,XJEU,IPERM,XABSCI,
+     &                  XORDON,I,XMLA,NLIAB,NIP,XVIT,XAMO,iannul)
+
+         XMLB = -1.D0 * XMLA
+         XVALB(I,IND,1) = XMLA
+         XVALB(I,IND,2) = XMLB
+         XPALB(I,2+IDIM) = XDPLAS
+         XPALB(I,3+IDIM) = XELA
+         XPALB(I,4+IDIM) = XDPLAC
+         XVALB(I,IND,13) = XDPLAS
+         XVALB(I,IND,14) = XELA
+         XVALB(I,IND,15) = XDPLAC
+*
+         DO 32 ID = 1,IDIM
+            FTOTB(NPOA,ID+3) = FTOTB(NPOA,ID+3) + XMLA * XPALB(I,1+ID)
+            FTOTB(NPOB,ID+3) = FTOTB(NPOB,ID+3) + XMLB * XPALB(I,1+ID)
+ 32      CONTINUE
+*
+* --- choc elementaire POINT_POINT_ROTATION_PLASTIQUE avec amortissement
+*
+      ELSE IF (ITYP.EQ.51) THEN
+         NPOA   = IPLIB(I,1)
+         NPOB   = IPLIB(I,2)
+         IDIM   = IPALB(I,3)
+         IPERM  = IPALB(I,5)
+         XJEU   = XPALB(I,1)
+         XAMO   = XPALB(I,2)
+         XDPLAS = XPALB(I,3+IDIM)
+         XELA   = XPALB(I,4+IDIM)
+         XDPLAC = XPALB(I,5+IDIM)
+         XROT   = 0.D0
+cbp,2020-09         XDRPM1 = 0.D0
+         XVIT   = 0.D0
+         DO 40 ID = 1,IDIM
+            IDA = 3 + ID
+            IDB = 3 + IDIM + ID
+*  Ici, l'indice IND2 sert a calculer les vitesses
+            XROA = XPTB(NPOA,1,ID+3)
+cbp,2020-09            XDMA = XPTB(NPOA,IND2,ID+3)
+            XROB = XPTB(NPOB,1,ID+3)
+cbp,2020-09            XDMB = XPTB(NPOB,IND2,ID+3)
+            XVALB(I,IND,IDA) = XROA
+            XVALB(I,IND,IDB) = XROB
+** Verifier indice pseudo-modes***
+            XROA = XROA + FEXPSM(NPOA,NPA,IND1,ID+3)
+            XROB = XROB + FEXPSM(NPOB,NPA,IND1,ID+3)
+cbp,2020-09            XDMA = XDMA + FEXPSM(NPOA,NPAM1,INDM1,ID+3)
+cbp,2020-09            XDMB = XDMB + FEXPSM(NPOB,NPAM1,INDM1,ID+3)
+C
+*           XPALB(I,2+ID) = normale
+            XROT = XROT + (XROA - XROB) * XPALB(I,2+ID)
+cbp,2020-09            XDRPM1 = XDRPM1 + (XDMA - XDMB) * XPALB(I,2+ID)
+cbp,2020-09: nouveau calcul de la vitesse (neglige les pseudo-modes)
+            XVIT = XVIT 
+     &      + (XPTB(NPOA,2,ID+3)-XPTB(NPOB,2,ID+3))*XPALB(I,2+ID)
+ 40         CONTINUE
+*        end do
+cbp,2020-09         XVIT = (XROT - XDRPM1) / PDTS2
+         XVALB(I,IND,3) = XVIT
+*
+* Appel a DYCHEC pour calcul du moment et rotation plastique XDPLAS
+*
+        call DYCHEC(XROT,XDPLAS,XDPLAC,XJEU,IPERM,XABSCI,
+     &                  XORDON,I,XMLA,NLIAB,NIP,XVIT,XAMO,iannul)
+
+         XMLB = -1.D0 * XMLA
+         XVALB(I,IND,1) = XMLA
+         XVALB(I,IND,2) = XMLB
+         XPALB(I,3+IDIM) = XDPLAS
+         XPALB(I,4+IDIM) = XELA
+         XPALB(I,5+IDIM) = XDPLAC
+         XVALB(I,IND,13) = XDPLAS
+         XVALB(I,IND,14) = XELA
+         XVALB(I,IND,15) = XDPLAC
+*
+         DO 42 ID = 1,IDIM
+            FTOTB(NPOA,ID+3) = FTOTB(NPOA,ID+3) + XMLA * XPALB(I,2+ID)
+            FTOTB(NPOB,ID+3) = FTOTB(NPOB,ID+3) + XMLB * XPALB(I,2+ID)
+ 42      CONTINUE
+*
+C   Rotule ]
+C
+*        end do
+*
+* --- choc ...........
+*
+*     ELSE IF (ITYP.EQ.  ) THEN
+*        .......
+*        .......
+*
+      ENDIF
+*
+      END
+
+
+
+
+
+
+
+ 
+ 

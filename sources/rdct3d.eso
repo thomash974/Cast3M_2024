@@ -1,0 +1,123 @@
+C RDCT3D    SOURCE    PV090527  23/01/27    21:16:01     11574          
+       subroutine rdct3d(a,x,b,ngf,ipzero,err1,nxn,lnxn,na,nc)
+     
+c      reduction du systeme lineaire aux lignes dont les multiplicateurs
+c      sont positifs (on eleve les nxn lignes dont le numero sont ds lnxn)
+
+       implicit real*8 (a-h,o-z)
+       implicit integer (i-n)
+
+       integer ngf,n,err1
+       integer ipzero(ngf)
+       real*8 a(ngf,ngf+1),b(ngf),x(ngf)
+       integer nxn,lnxn(nc)
+       
+       integer dim1,inxn
+       integer ns
+       parameter(ns=40)
+       real*8 as(ns,ns+1),bs(ns)
+       
+       if(ns.ne.ngf) then
+         print*,'ns.ne.ngf dans reduc3d'
+         print*,'recompiler avec ns.eq.ngf dans rdct3d'
+         err1=1
+         return
+       end if
+       
+c      sauvegarde de la matrice initiale en cas de sous iteration
+       do i=1,18+na
+          do j=1,18+na+1
+            as(i,j)=a(i,j)
+          end do
+          bs(i)=b(i)
+       end do
+
+c      reduction de la matrice initiale
+       dim1=18+na
+       do i=1,nxn
+c       numero de la ligne et colonne a supprimer    
+c       comme on a deja supprimer i-1 lignes et colonne la numerotation
+c       est decallee d autant  : numero de la ligne a supprimer 
+        j=lnxn(i)+18-(i-1)
+        if(j.lt.dim1) then
+c          on remonte les lignes inferieures et colonnes suivantes
+           do k=j,dim1-1
+              do l=1,dim1
+                 a(k,l)=a(k+1,l)
+              end do
+              b(k)=b(k+1)
+           end do
+           do k=j,dim1-1
+              do l=1,dim1
+                a(l,k)=a(l,k+1)
+              end do
+           end do
+           dim1=dim1-1
+        else
+c         pas de lignes inferieures il suffit de reduire la taille
+          dim1=dim1-1
+        end if
+       end do
+      
+c      resolution du systeme reduit
+       call gaus3d(dim1,a,x,b,ngf,err1,ipzero)
+       if(err1.eq.1) then
+         print*,'Pb avec gaus3d dans reduc3d'
+         return
+       end if 
+c      affectation de la nouvelle solution dans x
+c       print*,'apres rdct3d'
+       inxn=1
+       do i=1,na
+         if(i.eq.lnxn(inxn)) then
+c          on decalle vers le bas les suivants si on est pas au dernier
+           if(i.lt.na) then
+c             on commence par le bas car les plus bas sont inutiles           
+              do k=na,i+1,-1      
+                x(18+k)=x(18+k-1)
+              end do
+           end if
+c          et comme il s agit d un multiplicateur mis a zero, on met a zero
+           x(18+i)=0.d0           
+c          on incremente le nombre de critere mis a zero
+           inxn=inxn+1
+         end if          
+       end do
+c       print*,'a la fin de rdct3d'
+c       do i=1,na
+c           do j=1,nxn
+c              if(i.eq.lnxn(j)) then
+c                 print*,i,'a ete mis a zero'
+c              end if
+c           end do
+c           print*,'xn',i,'=',x(18+i)
+c       end do
+c       read*
+
+c      restitution de la matrice initiale
+       do i=1,18+na
+          do j=1,18+na+1
+            a(i,j)=as(i,j)
+          end do
+          b(i)=bs(i)
+       end do
+       
+c      test de la solution obtenue si necessaire       
+c       print*,'test de la solution reduite dans rdct3d'
+c       do i=1,na
+c          s=0.d0
+c          do j=1,18+na
+c              s=s+a(18+i,j)*x(j)
+c          end do
+c          print*,'bx',18+i,'=',s,'=?=',b(18+i)
+c       end do
+c       read*
+
+         
+       return
+       end
+       
+           
+
+    
+ 

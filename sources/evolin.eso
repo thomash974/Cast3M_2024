@@ -1,0 +1,352 @@
+C EVOLIN    SOURCE    CB215821  20/01/28    22:06:20     10508          
+      SUBROUTINE EVOLIN (IEV1,XX1,IEV2,XX2,IEV3)
+*____________________________________________________________________
+*
+*            Interpolation d'une courbe (type EVOLUTION)
+*        en fouction de deux autres courbes (type EVOLUTION)
+*
+*  ENTREES :
+*  ---------
+*
+*     IEV1   Pointeur sur un objet de type EVOLUTION
+*     IEV2   Pointeur sur le deuxieme objet de type EVOLUTION
+*     XX1    Flottant donnant le rapport entre la courbe
+*            a calculer et la courbe designee par IEV2
+*     XX2    Flottant donnant le rapport entre la courbe
+*            a calculer et la courbe designee par IEV1.
+*            Il existe la relation (XX1 + XX2)=1
+*
+*
+*  SORTIE :
+*  --------
+*
+*      IEV3  Pointeur sur l'objet EVOLUTION resultat
+*            =0 si operation impossible
+*
+*____________________________________________________________________
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC CCASSIS
+-INC SMEVOLL
+-INC SMLREEL
+-INC SMLENTI
+
+      LOGICAL LOG0, LOG2
+      REAL*8  XNAN
+C             XNAN : Ne pas l'initialiser, c'est fait expres
+
+      POINTEUR MREX.MLREEL,MREY.MLREEL,MREY2.MLREEL
+
+      MEVOL1=IEV1
+      MEVOL2=IEV2
+      IF(MEVOL1.EQ.0 .OR. MEVOL2.EQ.0) THEN
+        MOTERR(1:8)='EVOLUTIO'
+        CALL ERREUR(37)
+        IEV3=0
+        RETURN
+      ENDIF
+
+      N1=MEVOL1.IEVOLL(/1)
+      N2=MEVOL2.IEVOLL(/1)
+
+C  QUELQUES TESTS SUR LES EVOLUTIONS
+      IF(N1.NE.1) THEN
+         MOTERR(1:8)='EVOLUTIO'
+         INTERR(1)=MEVOL1
+         CALL ERREUR(110)
+         IEV3=0
+         RETURN
+      ENDIF
+
+      IF(N2.NE.1) THEN
+         MOTERR(1:8)='EVOLUTIO'
+         INTERR(1)=MEVOL2
+         CALL ERREUR(110)
+         IEV3=0
+         RETURN
+      ENDIF
+
+      IF(MEVOL1.ITYEVO.NE.'REEL    '.OR.
+     $   MEVOL2.ITYEVO.NE.'REEL    ') THEN
+         MOTERR(1:8)='EVOLUTIO'
+         MOTERR(9:16)='REEL    '
+         CALL ERREUR(79)
+         IEV3=0
+         RETURN
+      ENDIF
+
+      KEVOL1=MEVOL1.IEVOLL(1)
+      KEVOL2=MEVOL2.IEVOLL(1)
+      IF(KEVOL1.TYPX.NE.'LISTREEL'.OR.KEVOL1.TYPY.NE.'LISTREEL')THEN
+         MOTERR(1:8)='EVOLUTIO'
+         MOTERR(9:16)='LISTREEL'
+         INTERR(1)=MEVOL1
+         CALL ERREUR(630)
+         IEV3=0
+         RETURN
+      ENDIF
+      IF(KEVOL2.TYPX.NE.'LISTREEL'.OR.KEVOL2.TYPY.NE.'LISTREEL')THEN
+         MOTERR(1:8)='EVOLUTIO'
+         MOTERR(9:16)='LISTREEL'
+         INTERR(1)=MEVOL2
+         CALL ERREUR(630)
+         IEV3=0
+         RETURN
+      ENDIF
+      IF(KEVOL1.NOMEVX.NE.KEVOL2.NOMEVX) THEN
+         MOTERR(1:9)='abscisses'
+         MOTERR(10:17)='EVOLUTIO'
+         INTERR(1)=MEVOL1
+         INTERR(2)=MEVOL2
+         CALL ERREUR(631)
+         IEV3=0
+         RETURN
+      ENDIF
+      IF(KEVOL1.NOMEVY.NE.KEVOL2.NOMEVY) THEN
+         MOTERR(1:9)='ordonnees'
+         MOTERR(10:17)='EVOLUTIO'
+         INTERR(1)=MEVOL1
+         INTERR(2)=MEVOL2
+         CALL ERREUR(631)
+         IEV3=0
+         RETURN
+      ENDIF
+
+      MLREEL=KEVOL1.IPROGX
+      MLREE1=KEVOL1.IPROGY
+      MLREE2=KEVOL2.IPROGX
+      MLREE3=KEVOL2.IPROGY
+      
+C     Recherche de la precision pour fusionner des ABSCISSES
+      JG0=MLREEL.PROG(/1)
+      JG2=MLREE2.PROG(/1)
+      XPRECR=XZPREC * 100.D0
+      XMIN= 1.D0/XPETIT
+      XMAX=-XMIN
+      DO III=1,JG0
+        XV0 =MLREEL.PROG(III)
+        XMIN=MIN(XMIN,XV0)
+        XMAX=MAX(XMAX,XV0)
+      ENDDO
+      DO III=1,JG2
+        XV2 =MLREE2.PROG(III)
+        XMIN=MIN(XMIN,XV2)
+        XMAX=MAX(XMAX,XV2)
+      ENDDO
+      XPREC=MAX(XPRECR*(XMAX-XMIN),XPETIT)
+
+C  DECOMPTE pour trouver la taille des LISTREELS sans faire de SEGADJ
+      JGMAX=JG0+JG2
+      JG   =0
+      IJ0  =1
+      IJ2  =1
+      DO III=1,JGMAX
+        IF(IJ0.EQ.1)THEN
+          XV0 = MLREEL.PROG(1)
+          IF(IJ2.LE.JG2)THEN
+            XV2 = MLREE2.PROG(IJ2)
+            IF    (XV0 .GT. XV2+XPREC)THEN
+              LOG0=.FALSE.
+              XV0 = XNAN
+            ELSE
+              LOG0=.TRUE.
+            ENDIF
+          ELSE
+            LOG0=.TRUE.
+          ENDIF
+        ELSEIF(IJ0 .LE. JG0)THEN
+          XV0 = MLREEL.PROG(IJ0)
+          LOG0=.TRUE.
+        ELSE
+          XV0 = XNAN
+          LOG0=.FALSE.
+        ENDIF
+
+        IF(IJ2.EQ.1)THEN
+          XV2 = MLREE2.PROG(1)
+          IF(IJ0.LE.JG0)THEN
+            IF(LOG0)THEN
+              XV0 = MLREEL.PROG(IJ0)
+              IF    (XV2 .GT. XV0+XPREC)THEN
+                LOG2=.FALSE.
+                XV2 = XNAN
+              ELSE
+                LOG2=.TRUE.
+              ENDIF
+            ELSE
+              LOG2=.TRUE.
+            ENDIF
+          ELSE
+            LOG2=.TRUE.
+          ENDIF
+        ELSEIF(IJ2 .LE. JG2)THEN
+          XV2 = MLREE2.PROG(IJ2)
+          LOG2=.TRUE.
+        ELSE
+          XV2 = XNAN
+          LOG2=.FALSE.
+        ENDIF
+
+        IF    (.NOT. LOG0 .AND. .NOT. LOG2)THEN
+C         Plus aucun points : on quitte
+          GOTO 101
+        ELSEIF(      LOG0 .AND. .NOT. LOG2)THEN
+C         Ajout du pt de la 1ere courbe
+          JG  = JG +1
+          IJ0 = IJ0+1
+        ELSEIF(.NOT. LOG0 .AND.       LOG2)THEN
+C         Ajout du pt de la 2eme courbe
+          JG  = JG +1
+          IJ2 = IJ2+1
+        ELSE
+          IF    (ABS(XV2-XV0) .LT. XPREC)THEN
+C           Pts confondus
+            JG  = JG +1
+            IJ0 = IJ0+1
+            IJ2 = IJ2+1
+          ELSEIF(XV0 .LT. XV2)THEN
+C           Ajout du pt de la 1ere courbe
+            JG  = JG +1
+            IJ0 = IJ0+1
+          ELSE
+C           Ajout du pt de la 2eme courbe
+            JG  = JG +1
+            IJ2 = IJ2+1
+          ENDIF
+        ENDIF
+
+      ENDDO
+ 101  CONTINUE
+
+C     Creation du resultat
+      N=1
+      IF(nbesc.NE.0)CALL oooprl(1)
+      SEGINI,MEVOLL,KEVOLL,MREX,MREY
+      IF(nbesc.NE.0)CALL oooprl(0)
+
+C     Remplissage du resultat
+      MEVOLL.ITYEVO   =MEVOL1.ITYEVO
+      MEVOLL.IEVTEX   =MEVOL1.IEVTEX
+      MEVOLL.IEVOLL(1)=KEVOLL
+      KEVOLL.IPROGX   =MREX
+      KEVOLL.IPROGY   =MREY
+      KEVOLL.NUMEVX   =KEVOL1.NUMEVX
+      KEVOLL.NUMEVY   =KEVOL1.NUMEVY
+      KEVOLL.TYPX     =KEVOL1.TYPX
+      KEVOLL.TYPY     =KEVOL1.TYPY
+      KEVOLL.NOMEVX   =KEVOL1.NOMEVX
+      KEVOLL.NOMEVY   =KEVOL1.NOMEVY
+      KEVOLL.KEVTEX   =KEVOL1.KEVTEX
+      IEV3=MEVOLL
+
+      JGMAX=JG
+      JG   =0
+      IJ0  =1
+      IJ2  =1
+      DO III=1,JGMAX
+        IF(IJ0.EQ.1)THEN
+          XV0 = MLREEL.PROG(1)
+          YV0 = MLREE1.PROG(1)
+          IF(IJ2.LE.JG2)THEN
+            XV2 = MLREE2.PROG(IJ2)
+            IF    (XV0 .GT. XV2+XPREC)THEN
+              LOG0=.FALSE.
+              XV0 = XNAN
+            ELSE
+              LOG0=.TRUE.
+            ENDIF
+          ELSE
+            LOG0=.TRUE.
+          ENDIF
+        ELSEIF(IJ0 .LE. JG0)THEN
+          XV0 = MLREEL.PROG(IJ0)
+          YV0 = MLREE1.PROG(IJ0)
+          LOG0=.TRUE.
+        ELSE
+          XV0 = XNAN
+          YV0 = MLREE1.PROG(JG0)
+          LOG0=.FALSE.
+        ENDIF
+
+        IF(IJ2.EQ.1)THEN
+          XV2 = MLREE2.PROG(1)
+          YV2 = MLREE3.PROG(1)
+          IF(IJ0.LE.JG0)THEN
+            IF(LOG0)THEN
+              XV0 = MLREEL.PROG(IJ0)
+              IF    (XV2 .GT. XV0+XPREC)THEN
+                LOG2=.FALSE.
+                XV2 = XNAN
+              ELSE
+                LOG2=.TRUE.
+              ENDIF
+            ELSE
+              LOG2=.TRUE.
+            ENDIF
+          ELSE
+            LOG2=.TRUE.
+          ENDIF
+        ELSEIF(IJ2 .LE. JG2)THEN
+          XV2 = MLREE2.PROG(IJ2)
+          YV2 = MLREE3.PROG(IJ2)
+          LOG2=.TRUE.
+        ELSE
+          XV2 = XNAN
+          YV2 = MLREE3.PROG(JG2)
+          LOG2=.FALSE.
+        ENDIF
+
+        IF    (.NOT. LOG0 .AND. .NOT. LOG2)THEN
+C         Plus aucun points : on a mal compte ??
+          CALL ERREUR(5)
+        ELSEIF(      LOG0 .AND. .NOT. LOG2)THEN
+C         Ajout du pt de la 1ere courbe
+          JG  = JG +1
+          MREX.PROG(JG)=XV0
+          MREY.PROG(JG)=XX1*YV0+XX2*YV2
+          IJ0 = IJ0+1
+        ELSEIF(.NOT. LOG0 .AND.       LOG2)THEN
+C         Ajout du pt de la 2eme courbe
+          JG  = JG +1
+          MREX.PROG(JG)=XV2
+          MREY.PROG(JG)=XX1*YV0+XX2*YV2
+          IJ2 = IJ2+1
+        ELSE
+          IF    (ABS(XV2-XV0) .LT. XPREC)THEN
+C           Pts confondus
+            JG  = JG +1
+            MREX.PROG(JG)=0.5D0*(XV0+XV2)
+            MREY.PROG(JG)=XX1*YV0+XX2*YV2
+            IJ0 = IJ0+1
+            IJ2 = IJ2+1
+          ELSEIF(XV0 .LT. XV2)THEN
+C           Ajout du pt de la 1ere courbe
+            JG  = JG +1
+            MREX.PROG(JG)=XV0
+            Xd   =MLREE2.PROG(IJ2-1)
+            Yd   =MLREE3.PROG(IJ2-1)
+            YIPOL=Yd+(YV2-Yd)*((XV0-Xd)/(XV2-Xd))
+            MREY.PROG(JG)=XX1*YV0+XX2*YIPOL
+            IJ0 = IJ0+1
+          ELSE
+C           Ajout du pt de la 2eme courbe
+            JG  = JG +1
+            MREX.PROG(JG)=XV2
+            Xd   =MLREEL.PROG(IJ0-1)
+            Yd   =MLREE1.PROG(IJ0-1)
+            YIPOL=Yd+(YV0-Yd)*((XV2-Xd)/(XV0-Xd))
+            MREY.PROG(JG)=XX1*YV0+XX2*YIPOL
+            MREY.PROG(JG)=XX2*YV2 + XX1*YIPOL
+            IJ2 = IJ2+1
+          ENDIF
+        ENDIF
+      ENDDO
+      END
+ 
+ 

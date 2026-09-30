@@ -1,0 +1,158 @@
+C RAFLRE    SOURCE    PASCAL    20/06/08    21:15:10     10623          
+      SUBROUTINE RAFLRE(ILRE1,KR1,XR1,ICAS,ILRE2)
+C----------------------------------------------------------------------C
+C     Sous-programme de raffinement d'un LISTREEL (Operateur RAFF)     C
+C----------------------------------------------------------------------C
+C
+C Syntaxe   : LRE2 = RAFF LRE1 | ENT1 ;
+C                              | FLOT1 ;
+C
+C Entrees :
+C - ILRE1 : pointeur sur LISTREEL
+C - KR1   : ENTIER, nb de coupes de chaque intervalles
+C - XR1   : FLOTTANT, taille cible des intervalles
+C - ICAS  : ICAS = 1 : syntaxe avec un entier
+C           ICAS = 2 : syntaxe avec un flottant
+C
+C Sortie  :
+C - ILRE2 : pointeur sur LISTREEL resultat
+C   
+C----------------------------------------------------------------------C
+      IMPLICIT REAL*8(A-H,O-Z)
+      IMPLICIT INTEGER(I-N)
+C
+-INC SMLREEL
+-INC CCREEL
+-INC PPARAM
+-INC CCOPTIO
+C
+      MLREEL = ILRE1
+      SEGACT,MLREEL
+      NL1 = PROG(/1)
+C
+C---- CAS OU LE LISTREEL EST VIDE OU N'A QU'UNE SEULE VALEUR
+C     => on le renvoie en sortie
+      IF (NL1.LE.1) THEN
+        ILRE2 = ILRE1
+        RETURN
+      ENDIF 
+
+C---- ANALYSE DES ARGUMENTS si donnee d'un ENTIER :
+      IF (ICAS.EQ.1) THEN
+C
+C       Si LE NOMBRE DE COUPES EST EGAL A 1 OU -1
+C       => on renvoie le LISTREEL en entree (identite)
+        IF (ABS(KR1).EQ.1) THEN
+          ILRE2 = ILRE1
+          RETURN
+        ENDIF
+C
+C       Si LE NOMBRE DE COUPES EST NUL => erreur
+        IF (KR1.EQ.0) THEN
+          INTERR(1) = KR1
+          CALL ERREUR(36)
+          RETURN
+        ENDIF
+
+C---- Cas donnee d'un FLOTTANT
+      ELSEIF (ICAS.EQ.2) THEN
+        KR1 = 1
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+C
+C---- CAS GENERAL
+C     Initialisation du LISTREEL resultat
+      JG = ABS(KR1)*(NL1-1)+1
+      JG = 5*JG
+      SEGINI,MLREE1
+      ILRE2 = MLREE1
+C
+C     Sous-decoupage des intervalles
+      XKR1 = REAL(KR1)
+      VAL1 = MLREEL.PROG(1)
+      DVI1 = 0.D0
+      ICP1 = 1 
+      MLREE1.PROG(ICP1) = VAL1 
+      DO 20 I=2,NL1
+        VAL2 = MLREEL.PROG(I)
+        DVI2 = VAL2 - VAL1
+C        IF (I.EQ.2) DVI1 = DVI2
+        VALM = MAX(VAL1,VAL2)
+        TOL1 = MAX(XZPREC*VALM,XPETIT)
+        IF (ABS(DVI2).GT.TOL1) THEN
+C         write(6,*) 'Cas DVI2 non nul'
+          IF (ICAS.EQ.2) THEN
+            IF (ABS(XR1).LT.TOL1) THEN
+              REAERR(1) = XR1
+              CALL ERREUR(1009)
+              RETURN
+            ELSE
+              XKR1 = DVI2/XR1
+              KR1  = INT(XKR1+0.5D0)
+              KR1   = MAX(1,KR1)
+            ENDIF
+          ENDIF
+          DEN2 = 1.D0 / ABS(XKR1)
+          IF(ABS(DVI1).GT.TOL1.AND.ICAS.EQ.1)THEN
+            DEN1 = ABS(DVI1 / (XKR1 * DVI2))
+          ELSE
+            DEN1 = DEN2
+          ENDIF
+C         Si FLOT1 donne, alors KR1 peut valoir 1
+          IF (KR1.GT.1) THEN
+C           Appel a decoup 
+C           write(6,*) 'DEN1, DEN2',DEN1,DEN2
+            KR2  = KR1
+            CALL DECOUP(KR2,DEN1,DEN2,A1,NBE,DENI,DECA,DVI2)
+C           write(6,*) 'NBE,A1,DENI = ',NBE,A1,DENI
+            XVA1 = A1*DENI
+            XVA1 = XVA1 + VAL1
+            ICP1 = ICP1 + 1
+            IF(ICP1 .GT. JG)THEN
+              JG = ICP1*2 + 20
+              SEGADJ,MLREE1
+            ENDIF
+            MLREE1.PROG(ICP1) = XVA1
+            XXVA = XVA1
+            DO 21 J=1,NBE-2
+              XXVA = A1*(XXVA - VAL1) + XVA1
+              ICP1 = ICP1 + 1
+              IF(ICP1 .GT. JG)THEN
+                JG = ICP1*2 + 20
+                SEGADJ,MLREE1
+              ENDIF
+              MLREE1.PROG(ICP1) = XXVA
+ 21         CONTINUE
+          ENDIF
+          ICP1 = ICP1 + 1
+          IF(ICP1 .GT. JG)THEN
+            JG = ICP1*2 + 20
+            SEGADJ,MLREE1
+          ENDIF
+          MLREE1.PROG(ICP1) = VAL2
+        ELSE
+C         write(6,*) 'Cas DVI2 nul'
+          IF (ICAS.EQ.2) KR1 = 1
+          DO 22 J=1,ABS(KR1)
+            ICP1 = ICP1 + 1
+            IF(ICP1 .GT. JG)THEN
+              JG = ICP1*2 + 20
+              SEGADJ,MLREE1
+            ENDIF
+            MLREE1.PROG(ICP1) = MLREE1.PROG(ICP1-1)
+ 22       CONTINUE
+        ENDIF
+        DVI1 = DVI2
+        VAL1 = VAL2 
+ 20   CONTINUE
+      JG = ICP1
+      SEGADJ,MLREE1
+      
+      SEGACT,MLREE1*NOMOD
+C
+      END
+ 
+ 
+ 

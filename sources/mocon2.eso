@@ -1,0 +1,63 @@
+C MOCON2    SOURCE    PV090527  23/05/09    21:15:04     11666          
+C  Mise en forme du maillage des conditions de dirichlet
+C conversion du maillage en les elements support des conditions avec creation des  mult lagrange 
+
+      SUBROUTINE MOCON2(MELEME,ipt7)
+*
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM 
+-INC CCOPTIO
+-INC SMCOORD
+-INC SMELEME
+      segment icpr(nbpts)                 
+
+
+*  decompte des noeuds
+      segini icpr
+      segact meleme
+      ipt1=meleme
+      np=0
+      do is=1,max(1,lisous(/1))
+        if (lisous(/1).ne.0) ipt1=lisous(is)
+        segact ipt1
+        do iel=1,ipt1.num(/2)
+        do ip=1,ipt1.num(/1)
+          ipt=ipt1.num(ip,iel)
+          if(icpr(ipt).eq.0) then 
+           np=np+1
+           icpr(ipt)=np
+          endif
+        enddo
+        enddo
+      enddo
+*  creation maillage support, mults
+**    write(6,*) ' mocon2 nombre d elements',np
+      nbnn=2
+      nbelem=np
+      nbsous=0
+      nbref=0
+      segini ipt7
+      ipt7.itypel=22
+      nbptso=nbpts
+      nbpts=nbptso+np
+      segadj mcoord
+      do ipt=1,icpr(/1)
+      if (icpr(ipt).ne.0) then
+        lag1=nbptso+icpr(ipt)
+        xcoor((lag1-1)*(idim+1)+1)=xcoor((i-1)*(idim+1)+1)
+        xcoor((lag1-1)*(idim+1)+2)=xcoor((i-1)*(idim+1)+2)
+        xcoor((lag1-1)*(idim+1)+3)=xcoor((i-1)*(idim+1)+3)
+        if (idim.eq.3) 
+     >    xcoor((lag1-1)*(idim+1)+4)=xcoor((i-1)*(idim+1)+4)
+        ipt7.num(1,icpr(ipt))=lag1
+        ipt7.num(2,icpr(ipt))=ipt
+**      write(6,*) 'pt lagrange ',ipt,icpr(ipt),lag1
+      endif 
+      enddo
+
+      end  
+ 

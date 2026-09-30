@@ -1,0 +1,132 @@
+C TRLINI    SOURCE    GOUNAND   21/04/06    21:15:39     10940          
+      SUBROUTINE TRLINI(NELMOY,NNM,ityp,TRAVL)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TRLINI
+C DESCRIPTION : Initialisation d'un segment TRAVL et de ses sous-objets.
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C APPELES          : 
+C APPELES (E/S)    : 
+C APPELES (BLAS)   :
+C APPELES (CALCUL) :
+C APPELE PAR       :
+C***********************************************************************
+C SYNTAXE GIBIANE    :
+C ENTREES            :
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 07/11/2017, version initiale
+C HISTORIQUE : v1, 07/11/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP2
+-INC TMATOP1
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+      POINTEUR IPBTL.MELEMX
+-INC SMLENTI
+      POINTEUR LIDXCA.MLENTI
+      POINTEUR LOKVOL.MLENTI
+      POINTEUR LNQUAL.MLENTI
+      POINTEUR LINDI.MLENTI
+      POINTEUR LINDJ.MLENTI
+-INC SMLREEL
+      POINTEUR LQUALS.MLREEL
+*-INC STRAVL
+      logical lchang
+      INTEGER IMPR,IRET
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans trlini.eso'
+*
+      SEGINI TRAVL
+*!!! A changer !      
+      TRAVL.NCMAX=NELMOY
+*      NNMAX=KEXTO.NUM(/1)
+      NNMAX=NNM
+*!!! A changer !      
+      NLMAX=TRAVL.NCMAX*NELMOY
+*      NLMAX=0
+      SEGINI LMCANS
+*      LMCANS.ITYPEX=KEXTO.ITYPEL
+      LMCANS.ITYPEX=ityp
+      LMCANS.NNCOU=NNMAX
+      TRAVL.MCANS=LMCANS
+      JG=TRAVL.NCMAX+1
+      SEGINI LIDXCA
+      LIDXCA.LECT(1)=1
+      TRAVL.IDXCA=LIDXCA
+      JG=TRAVL.NCMAX
+      SEGINI LOKVOL
+      TRAVL.OKVOL=LOKVOL
+      JG=LMCANS.NUMX(/2)
+      SEGINI LQUALS
+      TRAVL.QUALS=LQUALS
+      JG=TRAVL.NCMAX
+      SEGINI LNQUAL
+      TRAVL.NQUAL=LNQUAL
+      JG=TRAVL.NCMAX
+      SEGINI LINDI
+      TRAVL.INDI=LINDI
+      JG=TRAVL.NCMAX
+      SEGINI LINDJ
+      TRAVL.INDJ=LINDJ
+*      
+*!!! A changer !      
+*      NNC=2
+*      NNL=NNC*IDIMP
+*      CALL TRLADJ(TRAVL,NNC,NNL,lchang,'trlini : TRAVL')
+*      if (ierr.ne.0) return
+      
+*
+*     Segment de travail pour stocker les points du contour
+*      
+      NNMAX=1
+      NLMAX=NELMOY
+      SEGINI IPBTL
+      IPBTL.NNINI=NNMAX
+      IPBTL.NNCOU=NNMAX
+      IPBTL.NLINI=NLMAX
+      IPBTL.NLCOU=0
+      IPBTL.ITYPEX=1
+      TRAVL.PBTL=IPBTL
+
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 286  FORMAT ('Segment TRAV=',I8,' nbel max ajusté de ',I6,' à ',I6,
+     $     ' (nbel. courant=',I6,')') 
+* 187  FORMAT (5X,10I8)
+* 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+* 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+*     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TRLINI  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TRLINI
+*
+      END
+
+ 

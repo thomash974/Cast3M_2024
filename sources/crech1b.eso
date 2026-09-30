@@ -1,0 +1,52 @@
+C CRECH1B   SOURCE    PV        20/03/24    21:16:32     10554          
+*  nettoyage du  preconditionnement si le maillage est plus grand que les coordonnees
+      subroutine crech1b
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCPRECO
+-INC SMELEME
+-INC SMCOORD
+
+      ith=oothrd
+**    write (6,*) ' premel avant ',(premel(i,ith),i=1,nbemel)
+      do 30 i=1,nbemel
+       if (premel(i,ith).eq.0) goto 40
+       meleme=premel(i,ith)
+       segact meleme
+  30  continue
+  40  continue
+      do 10 i=1,nbemel
+        if (premel(i,ith).eq.0) goto 20
+        meleme=premel(i,ith)
+        do j=1,num(/2)
+         if (num(1,j).gt.nbpts) premel(i,ith)=0
+        enddo
+  10  continue
+  20  continue
+      il=0
+      do i=1,nbemel
+       if (premel(i,ith).ne.0) then
+        il=il+1
+        premel(il,ith)=premel(i,ith)
+        nbso(il,ith)=nbso(i,ith)
+        hash1(il,ith)=hash1(i,ith)
+        hash2(il,ith)=hash2(i,ith)
+       endif
+      enddo
+      do i=il+1,nbemel
+       premel(i,ith)=0
+      enddo
+**    write (6,*) ' premel apres ',(premel(i,ith),i=1,nbemel)
+      return
+      end
+
+
+
+
+
+
+ 
+ 
+ 
+ 

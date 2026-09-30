@@ -1,0 +1,1077 @@
+C MFILTE    SOURCE    PV        22/04/19    16:18:06     11344          
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC Subroutine for generating a (rigidity) matrix used for filtering fields
+CC
+CC Authors:
+CC Guenhael Le Quilliec (LaMe - Polytech Tours)
+CC Thomas Fournier (Internship 2020 at LaMe - Polytech Tours under the supervision of G. Le Quilliec)
+CC
+CC Version:
+CC 1.0 2021/01/04 Original version (based on previous source file matrigv5.eso)
+CC 1.1 2021/01/07 The size of the cells is not anymore an option
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+C     TODO GLQ : pour répartir plus rapidement les noeuds dans les cellules,
+C          retirer Xmin, Ymin et Zmin aux coordonnées X, Y et Z de
+C          tous les noeuds puis diviser par R et arrondir.
+C          On obtient ainsi les indices des cellules de chaque noeud.
+C          Sans doute plus rapide que l'approche actuelle?
+
+C     TODO GLQ : tirer profit de la parallélisation pour accélérer la
+C          construction de la matrice.
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Initialisation de la subroutine
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+      SUBROUTINE MFILTE
+
+C     Ces lignes indique que toutes les variables dont le nom commence par
+C     une lettre comprise entre I et N soient des entiers et
+C     celles avec un nom commençant par une lettre entre A et H ou O et Z
+C     soient des flottants (sur 8 octets / double précision)
+      IMPLICIT INTEGER  (I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+C     Inclusion des segments standards utilisés dans cette subroutine
+C     ***************************************************************
+
+-INC PPARAM
+-INC CCOPTIO
+C  Segment maillage
+-INC SMELEME
+C  Segment champ par point
+-INC SMCHPOI
+C  Segment liste d'entiers
+-INC SMLENTI
+C  Segment liste de réels
+-INC SMLREEL
+C  Segment coordonnées des noeuds
+-INC SMCOORD
+C  Segment matrice de rigidité
+-INC SMRIGID
+
+C     Déclaration de segments complémentaires dédiés à cette subroutine
+C     *****************************************************************
+
+C     Grille (type tableau 2D ou 3D) contenant les pointeurs des listes
+C     de noeuds du maillage contenus dans chacune des cellules.
+C     Comme la taille de grille n'est pas connue à l'avance,
+C     on passe par la définition d'un segment pour limiter
+C     l'occupation mémoire.
+      SEGMENT GRID2SEG
+          INTEGER GRID2(NX0,NY0)
+      ENDSEGMENT
+      SEGMENT GRID3SEG
+          INTEGER GRID3(NX0,NY0,NZ0)
+      ENDSEGMENT
+
+C     Tableau contenant les indices maximum suivant X des cellules
+C     voisines dans un rayon R0 d'une cellule de référence
+C     Comme la taille de ce tableau n'est pas connue à l'avance,
+C     on passe par la définition d'un segment pour limiter
+C     l'occupation mémoire.
+      POINTEUR INDEX2.MLENTI
+      SEGMENT INDEX3SEG
+          INTEGER INDEX3(JG,JG)
+      ENDSEGMENT
+
+C     Diverses variables
+C     ******************
+
+C     Noms des inconnues primales et duales
+      CHARACTER*8 NOMP0, NOMD0
+
+C     Diverses initialisations
+C     ************************
+
+C     On indique une fois pour toutes le nombre d'inconnues duales
+C     des sous-matrices de rigidité qui seront créées (toujours 1)
+      NLIGRD = 1
+
+C     Initialisation du nombre  de sous-matrices
+      NRIGEL = 0
+
+C     Initialisation du nombre maximum de voisins
+      NBVMAX0 = 0
+
+C     Initialisation du nombre de cellules non vides
+      NBNEC0 = 0
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Lecture des données d'entrée, traitement et vérifications
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+C     Lecture des données d'entrée
+C     ****************************
+
+C     Lecture du champ par point des volumes
+      CALL LIROBJ('CHPOINT ',MCHPOI,1,IRETOU)
+      CALL ACTOBJ('CHPOINT ',MCHPOI,1)
+      IF (IERR.NE.0) RETURN
+
+C     Lecture des données optionnelles :
+C     - le rayon R
+      R0 = 0.0
+      CALL LIRREE(R0,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+C     - l'exposant MU
+      EMU0 = 1.0
+      CALL LIRREE(EMU0,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+C     - la borne minimale des poids à ignorer TODO effectuer une vérification que sa valeur est bien entre 0.0 et 1.0
+      CRI0 = 0.0
+      CALL LIRREE(CRI0,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+C     - la taille d'une cellule pour le classement des noeuds
+      C0 = R0
+c      CALL LIRREE(C0,0,IRETOU) >>> On supprime cette option car C0=R0 donne les meilleurs résultats dans la plus part des général
+C     - le nom des inconnues primales
+      NOMP0 = 'SCAL'
+      CALL LIRCHA(NOMP0,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+C     - le nom des inconnues duales
+      NOMD0 = NOMP0
+      CALL LIRCHA(NOMD0,0,IRETOU)
+      IF (IERR.NE.0) RETURN
+
+C     traitement et vérifications
+C     ***************************
+
+C     Activation du segment MCOORD de coordonnées des noeuds XCOOR
+      SEGACT MCOORD
+
+C     On vérifie qu'il contient bien une et une seule partition géométrique
+      IF(IPCHP(/1).NE.1) THEN
+C         Si le champ est vide, on renvoie un entier égal à 1
+          IF(IPCHP(/1).EQ.0) THEN
+              CALL ECRREE(1.0d0)
+              RETURN
+          ENDIF
+C         Si il y a plus d'une partition on génère une erreur
+C         "Donnees incompatibles"
+          CALL ERREUR(21)
+      ENDIF
+
+C     On suppose qu'il ne repose que sur une partition géométrique unique
+C     dont on récupère le sous-champ TODO à améliorer pour le cas où il y en a plusieurs
+      MSOUPO = IPCHP(1)
+C     On vérifie qu'il n'y a bien qu'une composante sinon on génère une erreur
+C     "Il faut specifier un champ par point avec une seule composante"
+      IF (NOCOMP(/2).NE.1) CALL ERREUR(180)
+C     On récupère le pointeur du tableau de valeurs du sous-champ
+      MPOVAL = IPOVAL
+C     On récupère le pointeur du maillage de la partition géométrique
+      MELEME = IGEOC
+C     On récupère le nombre de noeuds du maillage
+      NBN0 = NUM(/2)
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Si le rayon de filtrage est nul,
+CC  création d'une matrice de rigidité 'identité'
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+      IF(R0.GT.0.0) GO TO 2
+
+C     La matrice contiendra une seule sous-matrice de NBN0 matrices élémentaires
+      NRIGEL = 1
+      NELRIG = NBN0
+C     On indique son nombre d'inconnues duales (déjà fait au début)
+C      NLIGRD = 1
+C     Elle possède une inconnue primale
+      NLIGRP = 1
+C     Le maillage correspondant aura NBN0 éléments à 1 noeud
+      NBNN = 1
+      NBELEM = NBN0
+      NBSOUS = 0
+      NBREF = 0
+C     Initialisation des segments matrice de rigidité, sous-matrice, descripteur et maillage
+      SEGINI MRIGID, XMATRI, DESCR, IPT1
+C     On indique son type de matrice
+      MTYMAT = 'RIGIDITE'
+      IFORIG = mchpoi.IFOPOI
+C     L'inconnue duale et l'inconnue primale porteront sur le premier (et seul)
+C     noeud de l'élément correspondant
+      NOELED(1) = 1
+      NOELEP(1) = 1
+C     Nom des inconnues
+      LISINC(1) = NOMP0
+      LISDUA(1) = NOMD0
+C     On indique que la matrice ne possède pas de symétries
+      SYMRE = 2
+C     On met à 1 les poids contenus dans la sous-matrice
+      DO 1 I = 1, NBN0
+          IPT1.NUM(1,I) = NUM(1,I)
+          RE(1,1,I) = 1.0
+1     CONTINUE
+C     Affectation du maillage, du descripteur et du contenu de la sous-matrice
+      IRIGEL(1,1) = IPT1
+      IRIGEL(3,1) = DESCR
+      IRIGEL(4,1) = XMATRI
+C     On indique que la matrice globale ne possède pas de symétries
+      IRIGEL(7,1) = 2
+C     On précise son coefficient multiplicateur
+      COERIG(1) = 1
+
+C     Passage direct à la fin de la subroutine
+      GO TO 99
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Sinon, création d'une matrice de rigidité
+CC  dont les sous-matrices contiennent chacune toutes
+CC  les matrices élémentaires de mêmes tailles
+CC  (nombre de noeuds influents identiques)
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+2     CONTINUE
+
+C     Initialisation de diverses listes
+C     *********************************
+
+C     Liste d'entiers contenant les numéros des noeuds d'une cellule
+      POINTEUR MLENTC.MLENTI
+
+C     Liste d'entiers contenant les numéros des noeuds du voisinage d'une cellule
+      POINTEUR MLENTV.MLENTI
+
+C     Liste d'entiers contenant les numéros des voisins du noeud en cours de traitement
+      POINTEUR MLENTN.MLENTI
+
+C     Liste de réels contenant les poids attribués aux voisins du noeud en cours de traitement
+      POINTEUR MLREEP.MLREEL
+
+C     Liste des indices des sous-matrices de rigidité non vides
+      POINTEUR MLENTS.MLENTI
+C     Initialisation du segment
+      JG = 0
+      SEGINI MLENTS
+
+C     Listes d'entiers pour stocker les matrices élémentaires, maillages et descripteurs des différentes sous-matrices
+      POINTEUR MLENTX.MLENTI
+      POINTEUR MLENTM.MLENTI
+      POINTEUR MLENTD.MLENTI
+C     Initialisation des segments
+      JG = 0
+      SEGINI MLENTX, MLENTM, MLENTD
+
+C     Listes des indices des cellules non vides
+      POINTEUR NECX.MLENTI
+      POINTEUR NECY.MLENTI
+      POINTEUR NECZ.MLENTI
+      JG = 0
+      SEGINI NECX, NECY, NECZ
+
+C     Passage à la partie dédiée selon la dimension courante,
+      IF(IDIM.EQ.2) GO TO 20
+      IF(IDIM.EQ.3) GO TO 30
+
+C     Sinon on provoque une erreur d'incompatibilité      
+C     "Fonction indisponible en dimension %i1."
+      INTERR(1) = IDIM
+      CALL ERREUR(709)
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Dimension 2 (basé sur celui de dimension 3 avec Z en moins)
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+20    CONTINUE
+
+C     Recherche des bornes min/max des noeuds du maillage
+C     ***************************************************
+
+      IND0 = (NUM(1,1)-1)*(IDIM+1)
+      XMIN0 = XCOOR(IND0+1)
+      YMIN0 = XCOOR(IND0+2)
+      XMAX0 = XCOOR(IND0+1)
+      YMAX0 = XCOOR(IND0+2)
+      DO 21 I = 1, NBN0
+          IND0 = (NUM(1,I)-1)*(IDIM+1)
+          X1 = XCOOR(IND0+1)
+          Y1 = XCOOR(IND0+2)
+          IF(X1.LT.XMIN0) XMIN0 = X1
+          IF(X1.GT.XMAX0) XMAX0 = X1
+          IF(Y1.LT.YMIN0) YMIN0 = Y1
+          IF(Y1.GT.YMAX0) YMAX0 = Y1
+21    CONTINUE
+
+C     Nombre de cellules suivant X et Y de la grille de cellules
+C     **********************************************************
+
+      NX0 = INT((XMAX0-XMIN0)/C0) + 1
+      NY0 = INT((YMAX0-YMIN0)/C0) + 1
+
+C     Répartition des noeuds dans les cellules (GRID2)
+C     ************************************************
+
+C     Initialisation du segment contenant notre grille de cellules GRID2
+C     avec les dimensions NX0 et NY0 calculées juste avant
+      SEGINI GRID2SEG
+C     Boucle sur l'ensemble des noeuds
+      DO 22 I = 1, NBN0
+C         Récupération des coordonnées du noeud actuel
+          IND0 = (NUM(1,I)-1)*(IDIM+1)
+          X1 = XCOOR(IND0+1)
+          Y1 = XCOOR(IND0+2)
+C         Indices de la cellule contenant le noeud actuel
+          IX1 = INT((X1-XMIN0)/C0) + 1
+          IY1 = INT((Y1-YMIN0)/C0) + 1
+C         Ajout du noeud à la cellule correspondante
+C         Si la cellule n'existe pas encore
+          IF(GRID2(IX1,IY1).EQ.0) THEN
+C             Initialisation d'une liste d'entiers de taille 1
+C             des noeuds de cette cellule
+              JG = 1
+              SEGINI MLENTC
+C             On y ajoute le noeud actuel
+              MLENTC.LECT(1) = I
+C             On sauvegarde le pointeur de cette liste dans la grille
+              GRID2(IX1,IY1) = MLENTC
+C             On incrémente le nombre de cellule non vide
+              NBNEC0 = NBNEC0 + 1
+C             On ajoute les indices X et Y de la nouvelle cellule
+C             à la liste des indices des cellules non vides
+              JG = NBNEC0
+              SEGADJ NECX, NECY
+              NECX.LECT(JG) = IX1
+              NECY.LECT(JG) = IY1
+          ELSE
+C             On récupère le pointeur de la liste des noeuds de la cellule
+              MLENTC = GRID2(IX1,IY1)
+C             On ajuste la taille de cette liste
+              JG = MLENTC.LECT(/1) + 1
+              SEGADJ MLENTC
+C             On y ajoute le noeud actuel
+              MLENTC.LECT(JG) = I
+          ENDIF
+22    CONTINUE
+
+C     Calcul des indices X maximum des cellules distantes de R0 d'une
+C     cellule de référence d'indices X=0, Y=IMAX0+1 (INDEX2)
+C     ***************************************************************
+
+C     Nombre maximum de cellules sur une distance de R0
+      IMAX0 = INT(R0/C0)
+      IF((R0/C0).GT.IMAX0) IMAX0 = IMAX0 + 1
+C     Cette même valeur + 1 (car souvent utilisée)
+      IMAX1 = IMAX0 + 1
+C     Initialisation du segment contenant les indices
+C     des cellules voisines à la cellule de référence
+      JG = 2*IMAX0 + 1
+      SEGINI INDEX2
+
+C     La cellule la plus éloignée de la cellule de référence suivant X
+C     et dans un rayon R0 a pour coordonnées (IMAX0, IMAX0+1)
+C     On sauve donc IMAX0 à l'indice IMAX0+1 dans INDEX2
+      INDEX2.LECT(IMAX1) = IMAX0
+
+
+C     On parcourt les autres indices Y compris dans R0
+C     Boucle sur Y
+      DO 50 J = 1, IMAX0
+C         Calcul de l'indice X (IM1) de la cellule ayant pour indice
+C         Y=IMAX0+1+J la plus éloignée de la cellule de référence
+C         dans un rayon de R0
+C         x² + y² = r² => x = sqrt(r² - y²)
+          A0 = SQRT(R0**2 - ((J-1)*C0)**2)/C0
+          IM1 = INT(A0)
+          IF(A0.GT.IM1) IM1 = IM1 + 1
+C         Ajout de cette valeur à INDEX2 pour Y=IMAX0+1+J
+          INDEX2.LECT(IMAX1+J) = IM1
+C         La valeur de IM1 reste la même pour Y=IMAX0+1-J (symétrie)
+          INDEX2.LECT(IMAX1-J) = IM1
+50    CONTINUE
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C     Calcul des poids du voisinage de chaque noeud
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+C     On parcourt la liste des cellules non vides
+C     *******************************************
+
+      DO 23 I = 1, NBNEC0
+
+C         Coordonnées de la cellule actuelle
+          IX0 = NECX.LECT(I)
+          IY0 = NECY.LECT(I)
+
+C         On génère la liste des noeuds voisins (MLENTV)
+C         °°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°
+
+C         Initialisation liste de voisins potentiels pour toute la cellule
+          SEGINI MLENTV
+C         On initialise le nombre de noeuds voisins
+          JG = 0
+C         Boucles sur l'indices Y des cellules voisines
+          DO 51 J = 1, 2*IMAX0+1
+              IY1 = IY0 + IMAX1 - J
+C             Si l'indice Y de cellule voisine est un indice valide
+              IF((IY1.GE.1).AND.(IY1.LE.NY0)) THEN
+                  IM1 = INDEX2.LECT(J)
+C                 Boucle l'indice X des cellules voisines
+                  DO 52 K = -IM1, IM1
+                      IX1 = IX0 + K
+C                     Si l'indice X de cellule voisine est un indice valide
+                      IF((IX1.GE.1).AND.(IX1.LE.NX0)) THEN
+C                         Pointeur de la liste des noeuds de la cellule voisine
+                          MLENTC = GRID2(IX1,IY1)
+C                         Si la cellule voisine contient des noeuds
+                          IF(MLENTC.NE.0) THEN
+                              NBPC1 = MLENTC.LECT(/1)
+C                             On ajoute ces noeuds aux noeuds voisins de la cellule actuelle
+                              NBPV0 = JG
+                              JG = JG + NBPC1
+                              SEGADJ MLENTV
+                              DO 53 L = 1, NBPC1
+                                  MLENTV.LECT(NBPV0+L) = MLENTC.LECT(L)
+53                            CONTINUE
+                          ENDIF
+                      ENDIF
+52                CONTINUE
+              ENDIF
+51        CONTINUE
+
+C         On parcourt les noeuds de la cellule actuelle
+C         °°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°
+
+C         Pointeur de la liste des noeuds de la cellule actuelle
+          MLENTC = GRID2(IX0,IY0)
+C         Nombre de noeuds contenus dans la cellule actuelle
+          NBPC0 = MLENTC.LECT(/1)
+C         Boucle sur chaque noeud de la cellule actuelle
+          DO 54, J = 1, NBPC0
+C             Récupération du noeud actuel
+              INDM0 = MLENTC.LECT(J)
+              NO0 = NUM(1,INDM0)
+              IND0 = (NO0-1)*(IDIM+1)
+C             Récupération des coordonnées du noeud actuel
+              X0 = XCOOR(IND0+1)
+              Y0 = XCOOR(IND0+2)
+C             Coordonnées -/+ R0
+              XLD0 = X0-R0
+              XLU0 = X0+R0
+              YLD0 = Y0-R0
+              YLU0 = Y0+R0
+
+C             On génère la liste des noeuds voisins du noeud (MLENTN)
+C             du noeud actuel ainsi que leurs poids associés (MLREEP)
+C             -------------------------------------------------------
+
+C             Initialisation de la liste des noeuds voisins (MLENTN)
+C             et de la liste de leurs poids respectifs (MLREEP)
+              JG = 1
+              SEGINI MLENTN, MLREEP
+C             On ajoute le noeud lui même et son  poids propre (pour qu'il soit en premier dans la liste d'éléments pour que le dual corresponde)
+              MLENTN.LECT(1) = NO0
+              SELFW0 = VPOCHA(INDM0,1)
+              MLREEP.PROG(1) = SELFW0
+C             Initialisation de la somme des poids des noeuds voisins
+              SUMFAC0 = SELFW0
+C             On parcourt la liste des voisins potentiels
+              DO 24 K = 1, MLENTV.LECT(/1)
+C                 Récupération du noeud voisin
+                  INDM1 = MLENTV.LECT(K)
+C                 Si le noeud voisin traité est différent du noeud actuel
+                  IF(INDM1.NE.INDM0) THEN
+                      NO1 = NUM(1,INDM1)
+                      IND1 = (NO1-1)*(IDIM+1)
+C                     Coordonnées X du noeud voisin
+                      X1 = XCOOR(IND1+1)
+C                     Si la différence de coordonnées n'excède pas R0
+                      IF(X1.GE.XLD0.AND.X1.LE.XLU0) THEN
+C                         Coordonnées Y du noeud voisin
+                          Y1 = XCOOR(IND1+2)
+C                         Si la différence n'excède pas R0
+                          IF(Y1.GE.YLD0.AND.Y1.LE.YLU0) THEN
+                              A0 = R0 - SQRT((X0-X1)**2 +
+     *                                       (Y0-Y1)**2)
+C                             Si la distance n'excède pas R0
+                              IF(A0.GT.0.0) THEN
+C                                 Calcul du poids pour ce voisin
+                                  FAC0 = (A0/R0)**EMU0
+     *                                   * VPOCHA(INDM1,1)
+C                                 On sauvegarde le noeud voisin
+C                                 à la liste des noeuds voisins
+C                                 ainsi que son poids associé
+                                  JG = JG + 1
+                                  SEGADJ MLENTN, MLREEP
+                                  MLENTN.LECT(JG) = NO1
+                                  MLREEP.PROG(JG) = FAC0
+C                                 On met à jour la somme des poids
+                                  SUMFAC0 = SUMFAC0 + FAC0
+                              ENDIF
+                          ENDIF
+                      ENDIF
+                  ENDIF
+24            CONTINUE
+
+C             On ne conserve que les noeuds voisins de poids supérieur au critère
+C             -------------------------------------------------------------------
+
+C             On boucle sur les noeuds voisins
+              A0 = CRI0 * SUMFAC0
+              DO 26 K = JG, 2, -1
+                  IF(MLREEP.PROG(K).LE.A0) THEN
+C                     On retire de la somme des poids
+C                     le poids du noeud voisin à éliminer
+                      SUMFAC0 = SUMFAC0 - MLREEP.PROG(K)
+C                     On élimine le noeud voisin et le poids associé
+C                      IF(K.NE.JG) THEN >> ce test est inutile car la boucle est ignorée si K>JG
+                          DO 27 L = K, JG-1
+                              MLENTN.LECT(L) = MLENTN.LECT(L+1)
+                              MLREEP.PROG(L) = MLREEP.PROG(L+1)
+27                        CONTINUE
+C                      ENDIF
+C                     On met à jour le nombre de noeuds voisins
+                      JG = JG - 1
+C                     On ajuste la taille des listes
+                      SEGADJ MLENTN, MLREEP
+                  ENDIF
+26            CONTINUE
+
+C             Ajout d'une matrice élémentaire à la matrice de rigidité
+C             --------------------------------------------------------
+
+C             On définit le nombre d'inconnues primales (= nombre de voisins)
+              NLIGRP = JG
+C             On définit le nombre de noeuds de l'élément de la matrice élémentaire
+              NBNN = JG
+              
+              IF(JG.GT.NBVMAX0) THEN
+C                 Si besoin on ajuste la taille de MLENTS
+                  NBVMAX0 = JG
+                  SEGADJ,MLENTS
+              ENDIF
+              
+C             Les matrices élémentaires de même nombre de noeuds (ou voisins) sont regroupées dans une même sous-matrice.
+C             Si la sous-matrice pour ce nombre de voisins n'existe pas encore, on l'initialise
+              IF((JG.GT.NBVMAX0).OR.(MLENTS.LECT(JG).EQ.0)) THEN
+C                 On met à jour le nombre de sous matrices
+                  NRIGEL = NRIGEL + 1
+C                 Sauvegarde de l'indice de cette nouvelle sous-matrice
+                  MLENTS.LECT(JG) = NRIGEL
+C                 Initialisation du segment descripteur de la sous-matrice
+C                 On indique son nombre d'inconnues duales (déjà fait au début)
+C                  NLIGRD = 1
+                  SEGINI DESCR
+C                 La première et unique inconnue duale correspondant au 1er noeud voisin (le noeud actuel)
+                  NOELED(1) = 1
+C                 Nom de l'inconnue dual
+                  LISDUA(1) = NOMD0
+C                 Les inconnues primales, allant simplement de 1 au nombre de voisins,
+C                 portent toutes le même nom
+                  DO 28 L = 1, NLIGRP
+                      NOELEP(L) = L
+                      LISINC(L) = NOMP0
+28                        CONTINUE
+C                 Initialisation d'un maillage
+                  NBELEM = 1
+                  NBSOUS = 0
+                  NBREF = 0
+                  SEGINI IPT1
+C                 Initialisation de la sous-matrice
+C                 Elle contiendra au moins 1 élément, qui va être ajouté
+                  NELRIG = 1
+                  SEGINI XMATRI
+C                 On indique que la matrice ne possède pas de symétries
+                  SYMRE = 2
+C                 On ajuste le nombre de sous matrices
+                  JG2 = JG
+                  JG = NRIGEL
+                  SEGADJ MLENTD, MLENTM, MLENTX
+                  JG = JG2
+C                 Sauvegarde des pointeurs des 3 segments crées ci-dessus
+                  MLENTD.LECT(NRIGEL) = DESCR
+                  MLENTM.LECT(NRIGEL) = IPT1
+                  MLENTX.LECT(NRIGEL) = XMATRI
+C             Si la sous-matrice existe, on la récupère
+              ELSE
+                  IPT1   = MLENTM.LECT(MLENTS.LECT(JG))
+                  XMATRI = MLENTX.LECT(MLENTS.LECT(JG))
+C                 On incrémente le nombre d'éléments du maillage
+C                 et le nombre de matrices élémentaires de la sous-matrice
+                  NBELEM = IPT1.NUM(/2) + 1
+                  NELRIG = RE(/3) + 1
+                  SEGADJ IPT1, XMATRI
+              ENDIF
+C             On boucle sur les noeuds voisins
+              DO 29 K = 1, JG
+C                 Dans IPT1, on ajoute la liste de noeuds voisins au maillage
+                  IPT1.NUM(K,NBELEM) = MLENTN.LECT(K)
+C                 Dans XMATRI, on ajoute la liste des composantes de la nouvelle matrice de rigidité élémentaire (chacun des poids / somme des poids)
+                  RE(1,K,NELRIG) = MLREEP.PROG(K) / SUMFAC0
+29            CONTINUE
+
+54        CONTINUE
+23    CONTINUE
+C     On supprime les segments devenus inutiles
+      SEGSUP GRID2SEG, INDEX2
+
+      GO TO 98
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Dimension 3
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+30    CONTINUE
+
+C     Recherche des bornes min/max des noeuds du maillage
+C     ***************************************************
+
+      IND0 = (NUM(1,1)-1)*(IDIM+1)
+      XMIN0 = XCOOR(IND0+1)
+      YMIN0 = XCOOR(IND0+2)
+      ZMIN0 = XCOOR(IND0+3)
+      XMAX0 = XCOOR(IND0+1)
+      YMAX0 = XCOOR(IND0+2)
+      ZMAX0 = XCOOR(IND0+3)
+      DO 31 I = 2, NBN0
+          IND0 = (NUM(1,I)-1)*(IDIM+1)
+          X1 = XCOOR(IND0+1)
+          Y1 = XCOOR(IND0+2)
+          Z1 = XCOOR(IND0+3)
+          IF(X1.LT.XMIN0) XMIN0 = X1
+          IF(X1.GT.XMAX0) XMAX0 = X1
+          IF(Y1.LT.YMIN0) YMIN0 = Y1
+          IF(Y1.GT.YMAX0) YMAX0 = Y1
+          IF(Z1.LT.ZMIN0) ZMIN0 = Z1
+          IF(Z1.GT.ZMAX0) ZMAX0 = Z1
+31    CONTINUE
+
+C     Nombre de cellules suivant X, Y et Z de la grille de cellules
+C     *************************************************************
+
+      NX0 = INT((XMAX0-XMIN0)/C0) + 1
+      NY0 = INT((YMAX0-YMIN0)/C0) + 1
+      NZ0 = INT((ZMAX0-ZMIN0)/C0) + 1
+
+C     Répartition des noeuds dans les cellules (GRID2)
+C     ************************************************
+
+C     Initialisation du segment contenant notre grille de cellules GRID3
+C     avec les dimensions NX0, NY0 et NZ0 calculées juste avant
+      SEGINI GRID3SEG
+C     Boucle sur l'ensemble des noeuds
+      DO 32 I = 1, NBN0
+C         Récupération des coordonnées du noeud actuel
+          IND0 = (NUM(1,I)-1)*(IDIM+1)
+          X1 = XCOOR(IND0+1)
+          Y1 = XCOOR(IND0+2)
+          Z1 = XCOOR(IND0+3)
+C         Indices de la cellule contenant le noeud actuel
+          IX1 = INT((X1-XMIN0)/C0) + 1
+          IY1 = INT((Y1-YMIN0)/C0) + 1
+          IZ1 = INT((Z1-ZMIN0)/C0) + 1
+C         Ajout du noeud à la cellule correspondante
+C         Si la cellule n'existe pas encore
+          IF(GRID3(IX1,IY1,IZ1).EQ.0) THEN
+C             Initialisation d'une liste d'entiers de taille 1
+C             des noeuds de cette cellule
+              JG = 1
+              SEGINI MLENTC
+C             On y ajoute le noeud actuel
+              MLENTC.LECT(1) = I
+C             On sauvegarde le pointeur de cette liste dans la grille
+              GRID3(IX1,IY1,IZ1) = MLENTC
+C             On incrémente le nombre de cellule non vide
+              NBNEC0 = NBNEC0 + 1
+C             On ajoute les indices X, Y et Z de la nouvelle cellule
+C             à la liste des indices des cellules non vides
+              JG = NBNEC0
+              SEGADJ NECX, NECY, NECZ
+              NECX.LECT(JG) = IX1
+              NECY.LECT(JG) = IY1
+              NECZ.LECT(JG) = IZ1
+          ELSE
+C             On récupère le pointeur de la liste des noeuds de la cellule
+              MLENTC = GRID3(IX1,IY1,IZ1)
+C             On ajuste la taille de cette liste
+              JG = MLENTC.LECT(/1) + 1
+              SEGADJ MLENTC
+C             On y ajoute le noeud actuel
+              MLENTC.LECT(JG) = I
+          ENDIF
+32    CONTINUE
+
+C     Calcul des indices X maximum des cellules distantes de R0 d'une
+C     cellule de référence d'indices X=0, Y=IMAX0+1, Z=IMAX0+1 (INDEX3)
+C     *****************************************************************
+
+C     Nombre maximum de cellules sur une distance de R0
+      IMAX0 = INT(R0/C0)
+      IF((R0/C0).GT.IMAX0) IMAX0 = IMAX0 + 1
+C     Cette même valeur + 1 (car souvent utilisée)
+      IMAX1 = IMAX0 + 1
+C     Initialisation du segment contenant les indices
+C     des cellules voisines à la cellule de référence
+      JG = 2*IMAX0 + 1
+      SEGINI INDEX3SEG
+
+C     La cellule la plus éloignée de la cellule de référence suivant X
+C     et dans un rayon R0 a pour coordonnées (IMAX0, IMAX0+1, IMAX0+1)
+C     On sauve donc IMAX0 à l'indice IMAX0+1, IMAX0+1 dans INDEX3
+      INDEX3(IMAX1,IMAX1) = IMAX0
+
+C     On parcourt les autres indices Y et Z compris dans R0
+C     Boucle sur Y
+      DO 60 J = 1, IMAX0
+C         Calcul de l'indice X (IM1) de la cellule ayant pour indice
+C         Y=IMAX0+1+J et pour indice Z=IMAX0+1 la plus éloignée de la
+C         cellule de référence dans un rayon de R0
+C         x² + y² = r² => x = sqrt(r² - y²), pour z = 0
+          A0 = SQRT(R0**2 - ((J-1)*C0)**2)/C0
+          IM1 = INT(A0)
+          IF(A0.GT.IM1) IM1 = IM1 + 1
+C         Ajout de cette valeur à INDEX3 pour Y=IMAX0+1+J et Z=IMAX0+1
+          INDEX3(IMAX1+J,IMAX1) = IM1
+C         La valeur de IM1 reste la même pour Y=IMAX0+1-J (symétrie)
+          INDEX3(IMAX1-J,IMAX1) = IM1
+C         Enfin la valeur de IM1 reste la même quand on inverse Y et Z
+          INDEX3(IMAX1,IMAX1+J) = IM1
+          INDEX3(IMAX1,IMAX1-J) = IM1
+C         Boucle sur Z
+          DO 61 K = 1, IM1
+C             Calcul de l'indice X (IM2) de la cellule ayant pour
+C             indice Y=IMAX0+1+J et pour indice Z=IMAX0+1+K la plus
+C             éloignée de la cellule de référence dans un rayon de R0
+C             x² + y² + z² = r² => x = sqrt(r² - y² - z²)
+              A0 = SQRT(R0**2 - ((J-1)*C0)**2 - ((K-1)*C0)**2)/C0
+              IM2 = INT(A0)
+              IF(A0.GT.IM2) IM2 = IM2 + 1
+C             Ajout du cette valeur à INDEX3
+              INDEX3(IMAX1+J,IMAX1+K) = IM2
+C             Symétrie
+              INDEX3(IMAX1+J,IMAX1-K) = IM2
+C             Inversion de Y et Z
+              INDEX3(IMAX1-J,IMAX1+K) = IM2
+              INDEX3(IMAX1-J,IMAX1-K) = IM2
+61        CONTINUE
+60    CONTINUE
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C     Calcul des poids du voisinage de chaque noeud
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+C     On parcourt la liste des cellules non vides
+C     *******************************************
+
+      DO 33 I = 1, NBNEC0
+
+C         Indices de la cellule actuelle
+          IX0 = NECX.LECT(I)
+          IY0 = NECY.LECT(I)
+          IZ0 = NECZ.LECT(I)
+
+C         On génère la liste des noeuds voisins (MLENTV)
+C         °°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°
+
+C         Initialisation liste de voisins potentiels de la cellule actuelle
+          SEGINI MLENTV
+C         On initialise le nombre de noeuds voisins
+          JG = 0
+C         Boucles sur l'indices Y des cellules voisines
+          DO 62 J = 1, 2*IMAX0+1
+              IY1 = IY0 + IMAX1 - J
+C             Si l'indice Y de cellule voisine est un indice valide
+              IF((IY1.GE.1).AND.(IY1.LE.NY0)) THEN
+                  IM1 = INDEX3(J,IMAX1)
+C                 Boucle l'indice Z des cellules voisines
+                  DO 63 K = IMAX1-IM1, IMAX1+IM1
+                      IZ1 = IZ0 + IMAX1 - K
+C                     Si l'indice Z de cellule voisine est un indice valide
+                      IF((IZ1.GE.1).AND.(IZ1.LE.NZ0)) THEN
+                          IM2 = INDEX3(J,K)
+C                         Boucle l'indice X des cellules voisines
+                          DO 64 L = -IM2, IM2
+                              IX1 = IX0 + L
+C                             Si l'indice X de cellule voisine est un indice valide
+                              IF((IX1.GE.1).AND.(IX1.LE.NX0)) THEN
+C                                 Pointeur de la liste des noeuds de la cellule voisine
+                                  MLENTC = GRID3(IX1,IY1,IZ1)
+C                                 Si la cellule voisine contient des noeuds
+                                  IF(MLENTC.NE.0) THEN
+                                      NBPC0 = MLENTC.LECT(/1)
+C                                     On ajoute ces noeuds aux noeuds voisins de la cellule actuelle
+                                      NBPV0 = JG
+                                      JG = JG + NBPC0
+                                      SEGADJ MLENTV
+                                      DO 65 M = 1, NBPC0
+                                          MLENTV.LECT(NBPV0+M) =
+     *                                        MLENTC.LECT(M)
+65                                    CONTINUE
+                                  ENDIF
+                              ENDIF
+64                        CONTINUE
+                      ENDIF
+63                CONTINUE
+              ENDIF
+62        CONTINUE
+
+C         On parcourt les noeuds de la cellule actuelle
+C         °°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°
+
+C         Pointeur de la liste des noeuds de la cellule actuelle
+          MLENTC = GRID3(IX0,IY0,IZ0)
+C         Nombre de noeuds contenus dans la cellule actuelle
+          NBPC0 = MLENTC.LECT(/1)
+C         Boucle sur chaque noeud de la cellule actuelle
+          DO 66, J = 1, NBPC0
+C             Récupération du noeud actuel
+              INDM0 = MLENTC.LECT(J)
+              NO0 = NUM(1,INDM0)
+              IND0 = (NO0-1)*(IDIM+1)
+C             Récupération des coordonnées du noeud actuel
+              X0 = XCOOR(IND0+1)
+              Y0 = XCOOR(IND0+2)
+              Z0 = XCOOR(IND0+3)
+C             Coordonnées -/+ R0
+              XLD0 = X0-R0
+              XLU0 = X0+R0
+              YLD0 = Y0-R0
+              YLU0 = Y0+R0
+              ZLD0 = Z0-R0
+              ZLU0 = Z0+R0
+
+C             On génère la liste des noeuds voisins du noeud (MLENTN)
+C             du noeud actuel ainsi que leurs poids associés (MLREEP)
+C             -------------------------------------------------------
+
+C             Initialisation de la liste des noeuds voisins (MLENTN)
+C             et de la liste de leurs poids respectifs (MLREEP)
+              JG = 1
+              SEGINI MLENTN, MLREEP
+C             On ajoute le noeud lui même et son  poids propre (pour qu'il soit en premier dans la liste d'éléments pour que le dual corresponde)
+              MLENTN.LECT(1) = NO0
+              SELFW0 = VPOCHA(INDM0,1)
+              MLREEP.PROG(1) = SELFW0
+C             Initialisation de la somme des poids des noeuds voisins
+              SUMFAC0 = SELFW0
+C             On parcourt la liste des voisins potentiels
+              DO 34 K = 1, MLENTV.LECT(/1)
+C                 Récupération du noeud voisin
+                  INDM1 = MLENTV.LECT(K)
+C                 Si le noeud voisin traité est différent du noeud actuel
+                  IF(INDM1.NE.INDM0) THEN
+                      NO1 = NUM(1,INDM1)
+                      IND1 = (NO1-1)*(IDIM+1)
+C                     Coordonnées X du noeud voisin
+                      X1 = XCOOR(IND1+1)
+C                     Si la différence de coordonnées n'excède pas R0
+                      IF(X1.GE.XLD0.AND.X1.LE.XLU0) THEN
+C                         Coordonnées Y du noeud voisin
+                          Y1 = XCOOR(IND1+2)
+C                         Si la différence n'excède pas R0
+                          IF(Y1.GE.YLD0.AND.Y1.LE.YLU0) THEN
+C                             Coordonnées Z du noeud voisin
+                              Z1 = XCOOR(IND1+3)
+C                             Si la différence n'excède pas R0
+                              IF(Z1.GE.ZLD0.AND.Z1.LE.ZLU0) THEN
+                                  A0 = R0 - SQRT((X0-X1)**2 +
+     *                                       (Y0-Y1)**2 + (Z0-Z1)**2)
+C                                 Si la distance n'excède pas R0
+                                  IF(A0.GT.0.0) THEN
+C                                     Calcul du poids pour ce voisin
+                                      FAC0 = (A0/R0)**EMU0
+     *                                       * VPOCHA(INDM1,1)
+C                                     On sauvegarde le noeud voisin
+C                                     à la liste des noeuds voisins
+C                                     ainsi que son poids associé
+                                      JG = JG + 1
+                                      SEGADJ MLENTN, MLREEP
+                                      MLENTN.LECT(JG) = NO1
+                                      MLREEP.PROG(JG) = FAC0
+C                                     On met à jour la somme des poids
+                                      SUMFAC0 = SUMFAC0 + FAC0
+                                  ENDIF
+                              ENDIF
+                          ENDIF
+                      ENDIF
+                  ENDIF
+34            CONTINUE
+
+C             On ne conserve que les noeuds voisins de poids supérieur au critère
+C             -------------------------------------------------------------------
+
+C             On boucle sur les noeuds voisins
+              A0 = CRI0 * SUMFAC0
+              DO 36 K = JG, 2, -1
+                  IF(MLREEP.PROG(K).LE.A0) THEN
+C                     On retire de la somme des poids
+C                     le poids du noeud voisin à éliminer
+                      SUMFAC0 = SUMFAC0 - MLREEP.PROG(K)
+C                     On élimine le noeud voisin et le poids associé
+C                      IF(K.NE.JG) THEN >> ce test est inutile car la boucle est ignorée si K>JG
+                          DO 38 L = K, JG-1
+                              MLENTN.LECT(L) = MLENTN.LECT(L+1)
+                              MLREEP.PROG(L) = MLREEP.PROG(L+1)
+38                        CONTINUE
+C                      ENDIF
+C                     On met à jour le nombre de noeuds voisins
+                      JG = JG - 1
+C                     On ajuste la taille des listes
+                      SEGADJ MLENTN, MLREEP
+                  ENDIF
+36            CONTINUE
+
+C             Ajout d'une matrice élémentaire à la matrice de rigidité
+C             --------------------------------------------------------
+
+C             On définit le nombre d'inconnues primales (= nombre de voisins)
+              NLIGRP = JG
+C             On définit le nombre de noeuds de l'élément de la matrice élémentaire
+              NBNN = JG
+              
+              IF(JG.GT.NBVMAX0) THEN
+C                 Si besoin on ajuste la taille de MLENTS
+                  NBVMAX0 = JG
+                  SEGADJ MLENTS
+              ENDIF
+              
+C             Les matrices élémentaires de même nombre de noeuds (ou voisins) sont regroupées dans une même sous-matrice.
+C             Si la sous-matrice pour ce nombre de voisins n'existe pas encore, on l'initialise
+              IF((JG.GT.NBVMAX0).OR.(MLENTS.LECT(JG).EQ.0)) THEN
+C                 On met à jour le nombre de sous matrices
+                  NRIGEL = NRIGEL + 1
+C                 Sauvegarde de l'indice de cette nouvelle sous-matrice
+                  MLENTS.LECT(JG) = NRIGEL
+C                 Initialisation du segment descripteur de la sous-matrice
+C                 On indique son nombre d'inconnues duales (déjà fait au début)
+C                  NLIGRD = 1
+                  SEGINI DESCR
+C                 La première et unique inconnue duale correspondant au 1er noeud voisin (le noeud actuel)
+                  NOELED(1) = 1
+C                 Nom de l'inconnue dual
+                  LISDUA(1) = NOMD0
+C                 Les inconnues primales, allant simplement de 1 au nombre de voisins,
+C                 portent toutes le même nom
+                  DO 39 L = 1, NLIGRP
+                      NOELEP(L) = L
+                      LISINC(L) = NOMP0
+39                            CONTINUE
+C                 Initialisation d'un maillage
+                  NBELEM = 1
+                  NBSOUS = 0
+                  NBREF = 0
+                  SEGINI IPT1
+C                 Initialisation de la sous-matrice
+C                 Elle contiendra au moins 1 élément, qui va être ajouté
+                  NELRIG = 1
+                  SEGINI XMATRI
+C                 On indique que la matrice ne possède pas de symétries
+                  SYMRE = 2
+C                 On ajuste le nombre de sous matrices
+                  JG2 = JG
+                  JG = NRIGEL
+                  SEGADJ MLENTD, MLENTM, MLENTX
+                  JG = JG2
+C                 Sauvegarde des pointeurs des 3 segments crées ci-dessus
+                  MLENTD.LECT(NRIGEL) = DESCR
+                  MLENTM.LECT(NRIGEL) = IPT1
+                  MLENTX.LECT(NRIGEL) = XMATRI
+C             Si la sous-matrice existe, on la récupère
+              ELSE
+                  IPT1 = MLENTM.LECT(MLENTS.LECT(JG))
+                  XMATRI = MLENTX.LECT(MLENTS.LECT(JG))
+C                 On incrémente le nombre d'éléments du maillage
+C                 et le nombre de matrices élémentaires de la sous-matrice
+                  NBELEM = IPT1.NUM(/2) + 1
+                  NELRIG = RE(/3) + 1
+                  SEGADJ IPT1, XMATRI
+              ENDIF
+C             On boucle sur les noeuds voisins
+              DO 40 K = 1, JG
+C                 Dans IPT1, on ajoute la liste de noeuds voisins au maillage
+                  IPT1.NUM(K,NBELEM) = MLENTN.LECT(K)
+C                 Dans XMATRI, on ajoute la liste des composantes de la nouvelle matrice de rigidité élémentaire (chacun des poids / somme des poids)
+                  RE(1,K,NELRIG) = MLREEP.PROG(K) / SUMFAC0
+40            CONTINUE
+66        CONTINUE
+33    CONTINUE
+C     On supprime les segments devenus inutiles
+      SEGSUP GRID3SEG, INDEX3SEG
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Combinaison des sous-matrices dans une matrice globale de rigidité
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+98    CONTINUE
+
+C     On initialise le segment de la matrice de rigidité globale
+C     qui prendra la taille de NRIGEL
+      SEGINI MRIGID
+C     On indique son type de matrice
+      MTYMAT = 'RIGIDITE'
+      IFORIG = mchpoi.IFOPOI
+
+C     On remplit la matrice de rigidité avec les matrices élémentaires,
+C     descripteurs et maillages correspondant à chaque sous-matrice
+      DO 11 I = 1, NRIGEL
+C               Récupération des segments du descripteur,
+C               de la sous-matrice et de la liste des noeuds
+                DESCR  = MLENTD.LECT(I)
+                XMATRI = MLENTX.LECT(I)
+                IPT1   = MLENTM.LECT(I)
+C               Affectation du maillage, du descripteur et du contenu de la sous-matrice
+                MRIGID.IRIGEL(1,I) = IPT1
+                MRIGID.IRIGEL(3,I) = DESCR
+                MRIGID.IRIGEL(4,I) = XMATRI
+C               Retrait du caractère *MOD des SEGMENTS crees dans ce SP                
+                SEGACT,IPT1,DESCR,XMATRI
+C               On indique que la matrice globale ne possède pas de symétries
+                MRIGID.IRIGEL(7,I) = 2
+C               On précise son coefficient multiplicateur
+                MRIGID.COERIG(I) = 1.D0
+11    CONTINUE
+      SEGACT,MRIGID
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC  Nettoyage final et sortie
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+C     On supprime les segments utiles seulement au sein de la subroutine et quand R0 != 0
+      SEGSUP MLENTX, MLENTD, MLENTM, MLENTN, MLREEP, NECX, NECY, NECZ
+
+99    CONTINUE
+      
+      SEGDES MCOORD
+
+C     On renvoie la matrice de rigidité
+      CALL ECROBJ('RIGIDITE',MRIGID)
+
+      RETURN
+      END
+ 
+ 
+ 

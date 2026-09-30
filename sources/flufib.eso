@@ -1,0 +1,420 @@
+C FLUFIB    SOURCE    FD218221  20/01/10    21:15:02     10494          
+      SUBROUTINE FLUFIB(IMOD,PROPS,DEPS,SIG0,VAR0,SIGF,VARF,TIME0,TIMEF,
+     &                  NPROPS,NVAR)
+C-----------------------------------------------------------------------
+C     RESOLUTION DES MODELES DE FLUAGE POUR LES POUTRES A FIBRE
+C     - Implementation des lois de fluage pour les modeles de poutre
+C       a fibre (modeles de section)
+C     - Les modeles sont ecrits en dimension 1, dans la direction des
+C       fibres de la poutre. Ainsi :
+C       -- la contrainte equivalente est definie comme la valeur absolue
+C          de la contrainte axiale (composante XX)
+C       -- la vitesse de deformation equivalente de fluage est definie
+C          comme la valeur absolue de la vitesse de deformation de
+C          fluage axiale (composante XX)
+C     - Le schema d'integration est de type Runge-Kutta a l'ordre 4
+C       avec controle de l'erreur et adaptation du pas de temps
+C     - Liste des modeles de fluage actuelement disponibles:
+C       -- Norton      (IMOD=15)
+C       -- Polynomial  (IMOD=16)
+C       -- Blackburn   (IMOD=17)
+C       -- Blackburn 2 (IMOD=18)
+C       -- Lemaitre    (IMOD=19)
+C     Francois Di Paola (nov 2019)
+C-----------------------------------------------------------------------
+C
+C     Entrees
+C     -------
+C     IMOD   : Numero du modele a fibre
+C     PROPS  : Caracteristiques du materiaux
+C     NPROPS : Taille du tableau PROPS
+C     DEPS   : Increment de deformations totales sur le pas de temps (modele section)
+C     SIG0   : Contraintes au debut du pas de temps (modele section)
+C     VAR0   : Variables internes au debut du pas de temps
+C     NVAR   : Taille du tableau VAR0 (et aussi VARF)
+C     TIME0  : Instant initial (debut du pas de temps)
+C     TIMEF  : Instant final   (fin   du pas de temps)
+C
+C     Sorties
+C     -------
+C     SIGF  : Contraintes a la fin du pas de temps (modele section)
+C     VARF  : Variables internes a la fin du pas de temps
+C
+C
+C     Detail des composantes de materiau
+C     ----------------------------------
+C     PROPS(1) : 'YOUN' Module de Young
+C     PROPS(2) : 'NU  ' Coefficient de Poisson
+C     PROPS(3) : 'RHO ' Masse volumique
+C     PROPS(4) : 'ALPH' Coefficient de dilatation thermique
+C     PROPS(.) : puis les autres composantes, selon le modele
+C
+C     Detail des composantes des variables
+C     ------------------------------------
+C     DEPS(1) = D Epsilon_xx       SIG0(1) SIGF(1) = Sig_xx
+C     DEPS(2) = D Gamma_xy         SIG0(2) SIGF(2) = Sig_xy
+C     DEPS(3) = D Gamma_xz         SIG0(3) SIGF(3) = Sig_xz
+C
+C
+C-----------------------------------------------------------------------
+C
+C     Quelques declarations
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+      PARAMETER(XZER=0.D0,XPETIT=1.D-6,
+     &          UNDEMI=0.5D0,UN=1.D0,DEUX=2.D0,TROIS=3.D0,SIX=6.D0)
+C
+C     Declaration de quelques tableaux d'entree/sortie de la subroutine
+      REAL*8 PROPS(NPROPS),DEPS(3),SIG0(3),VAR0(NVAR),SIGF(3),VARF(NVAR)
+C
+      LOGICAL DTLIBR
+C
+C=======================================================================
+C 1 - Recuperation de l'etat mecanique au debut du pas
+C=======================================================================
+C     Pas de temps
+      DT=TIMEF-TIME0
+C     Contrainte au debut du pas
+      SIG=SIG0(1)
+C     Variables internes au debut du pas
+      IF (IMOD.EQ.19) THEN
+        XXIN=VAR0(1)
+        EPSIN=VAR0(2)
+      ELSE
+        EPSIN=VAR0(1)
+      ENDIF
+C     Increment de deformation totale sur le pas
+      DEPST=DEPS(1)
+C     Recuperation des parametres materiau
+      YOU=PROPS(1)
+      XNU=PROPS(2)
+      G=YOU/(DEUX*(UN+XNU))
+C
+C=======================================================================
+C 2 - Initialisations pour le schema de Runge-Kutta 4
+C=======================================================================
+      PRECIS=1.D-5
+      DTLIBR=.TRUE.
+      IF (DT.LT.0.0) THEN
+        PRINT*,'ERREUR DT < 0 !'
+        CALL ERREUR(414)
+        RETURN
+      ENDIF
+      IF (DT.EQ.0.0) DT=1.D-20
+      VSIG= YOU*DEPST/DT
+      XMM1=XM-UN
+      DTLEFT=DT
+      BORNE=2.0
+      RMAX=1.3
+      RMIN=0.7
+      DIV=7.0
+      FAC=3.0
+      MSOUPA=10000
+      XMAX=YOU*1.D-3
+C
+C=======================================================================
+C 3 - Initialisations avant iterations en sous-increments
+C=======================================================================
+      ITERO=0
+ 10   CONTINUE
+      ITERO=1+ITERO
+      IF (ITERO.NE.1) THEN
+        DTLIBR=.TRUE.
+        PRECIS=PRECIS*7.D0
+        IF (ITERO.GT.3) THEN
+          PRINT*,'ERREUR : INCREMENT DE CHARGEMENT TROP GRAND !'
+          CALL ERREUR(268)
+          RETURN
+        ENDIF
+      ENDIF
+      DTLEFT=DT
+      TAU=DTLEFT
+      ASIG=ABS(SIG)
+      ERRABS=PRECIS*ASIG
+      IF (XMAX.GT.ASIG) ERRABS=PRECIS*XMAX
+C
+C=======================================================================
+C 4 - Iterations en sous increments / fin si DTLEFT = 0
+C=======================================================================
+      NSSINC=0
+      NITERA=0
+  20  CONTINUE
+      NSSINC=NSSINC+1
+      IF (NSSINC.GT.MSOUPA) THEN
+        DTLIBR=.FALSE.
+        GOTO 10
+      ENDIF
+C     [1.1] Vitesses de contrainte et de deformation inelastique a partir de l'etat debut du pas
+      SEQ=ABS(SIG)
+      IF (SEQ.LT.XPETIT) THEN
+        VEPSIN1=XZER
+        IF (IMOD.EQ.19) VXX1=XZER
+      ELSE
+C       Modele de Norton
+        IF(IMOD.EQ.15) THEN
+          CALL NORTON(SEQ,EPSIN,TAU,PROPS(6),PROPS(7),PROPS(8),VEPSIN1)
+C       Modele Polynomial
+        ELSEIF(IMOD.EQ.16) THEN
+          VEPSIN1=PROPS(6)+PROPS(7)*(SEQ**PROPS(8))+
+     &                     PROPS(9)*(SEQ**PROPS(10)) +
+     &                     PROPS(11)*(SEQ**PROPS(12))
+C       Modele de Blackburn
+        ELSEIF(IMOD.EQ.17) THEN
+          CALL SOLUTN(20,SEQ,EPSIN,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU) TIMEX=ABS(TAU)
+          CALL EQUATN(20,SEQ,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN1=VEPSINA+VEPSINB
+C       Modele de Blackburn_2
+        ELSEIF(IMOD.EQ.18) THEN
+          CALL SOLUTN(61,SEQ,EPSIN,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU) TIMEX=ABS(TAU)
+          CALL EQUATN(61,SEQ,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN1=VEPSINA+VEPSINB
+C       Modele de Lemaitre
+        ELSEIF(IMOD.EQ.19) THEN
+          CALL LEMAIT(SEQ,XXIN,VXX1,TAU,PROPS,VEPSIN1)
+        ENDIF
+      ENDIF
+      VSIG1=DSIGN(YOU*VEPSIN1,SIG)
+C     Debut des iterations sur tau optimal / fin si RA
+      NITERA=0
+  30  CONTINUE
+      NITERA=NITERA+1
+      TAU2=TAU*UNDEMI
+C     [1.2] 1ere estimation a mi-pas, avec la vitesse debut de pas
+      SIG1=SIG+(TAU2*(VSIG-VSIG1))
+      EPSIN1=EPSIN+TAU2*VEPSIN1
+      IF (IMOD.EQ.19) XX1=XXIN+TAU2*VXX1
+C     [2.1] Vitesses de contrainte et de deformation inelastique a partir de l'etat a mi-pas [1.2]
+      SEQ1=ABS(SIG1)
+      IF (SEQ1.LT.XPETIT) THEN
+        VEPSIN2=XZER
+        IF (IMOD.EQ.19) VXX2=XZER
+      ELSE
+C       Modele de Norton
+        IF(IMOD.EQ.15) THEN
+          CALL NORTON(SEQ1,EPSIN1,TAU2,PROPS(6),PROPS(7),PROPS(8),
+     &                VEPSIN2)
+C       Modele Polynomial
+        ELSEIF(IMOD.EQ.16) THEN
+          VEPSIN2=PROPS(6)+PROPS(7)*(SEQ1**PROPS(8))+
+     &                     PROPS(9)*(SEQ1**PROPS(10)) +
+     &                     PROPS(11)*(SEQ1**PROPS(12))
+C       Modele de Blackburn
+        ELSEIF(IMOD.EQ.17) THEN
+          CALL SOLUTN(20,SEQ1,EPSIN1,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(20,SEQ1,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN2=VEPSINA+VEPSINB
+C       Modele de Blackburn_2
+        ELSEIF(IMOD.EQ.18) THEN
+          CALL SOLUTN(61,SEQ1,EPSIN1,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(61,SEQ1,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN2=VEPSINA+VEPSINB
+C       Modele de Lemaitre
+        ELSEIF(IMOD.EQ.19) THEN
+          CALL LEMAIT(SEQ1,XX1,VXX2,TAU2,PROPS,VEPSIN2)
+        ENDIF
+      ENDIF
+      VSIG2=DSIGN(YOU*VEPSIN2,SIG1)
+C     [2.2] 2nde estimation a mi-pas, avec la vitesse moyenne sur le mi-pas
+      VEPSIN12=UNDEMI*(VEPSIN1+VEPSIN2)
+      VSIG12=UNDEMI*(VSIG1+VSIG2)
+      SIG2=SIG+(TAU2*(VSIG-VSIG12))
+      EPSIN2=EPSIN+TAU2*VEPSIN12
+      IF (IMOD.EQ.19) XX2=XXIN+TAU2*(UNDEMI*(VXX1+VXX2))
+C     [3.1] Vitesses de contrainte et de deformation inelastique a partir de l'etat a mi-pas [2.2]
+      SEQ2=ABS(SIG2)
+      IF (SEQ2.LT.XPETIT) THEN
+        VEPSIN3=XZER
+        IF (IMOD.EQ.19) VXX3=XZER
+      ELSE
+C       Modele de Norton
+        IF(IMOD.EQ.15) THEN
+          CALL NORTON(SEQ2,EPSIN2,TAU2,PROPS(6),PROPS(7),PROPS(8),
+     &                VEPSIN3)
+C       Modele Polynomial
+        ELSEIF(IMOD.EQ.16) THEN
+          VEPSIN3=PROPS(6)+PROPS(7)*(SEQ2**PROPS(8))+
+     &                     PROPS(9)*(SEQ2**PROPS(10)) +
+     &                     PROPS(11)*(SEQ2**PROPS(12))
+C       Modele de Blackburn
+        ELSEIF(IMOD.EQ.17) THEN
+          CALL SOLUTN(20,SEQ2,EPSIN2,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(20,SEQ2,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN3=VEPSINA+VEPSINB
+C       Modele de Blackburn_2
+        ELSEIF(IMOD.EQ.18) THEN
+          CALL SOLUTN(61,SEQ2,EPSIN2,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(61,SEQ2,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN3=VEPSINA+VEPSINB
+C       Modele de Lemaitre
+        ELSEIF(IMOD.EQ.19) THEN
+          CALL LEMAIT(SEQ2,XX2,VXX3,TAU2,PROPS,VEPSIN3)
+        ENDIF
+      ENDIF
+      VSIG3=DSIGN(YOU*VEPSIN3,SIG2)
+C     [3.2] 1ere estimation a la fin du pas, avec la vitesse a mi-pas
+      SIG3=SIG2+(TAU2*(VSIG-VSIG3))
+      EPSIN3=EPSIN2+TAU2*VEPSIN3
+      IF (IMOD.EQ.19) XX3=XXIN+TAU2*VXX3
+C     [4.1] Vitesses de contrainte et de deformation inelastique a partir de l'etat a la fin du pas [3.2]
+      SEQ3=ABS(SIG3)
+      IF (SEQ3.LT.XPETIT) THEN
+        VEPSIN4=XZER
+        IF (IMOD.EQ.19) VXX4=XZER
+      ELSE
+C       Modele de Norton
+        IF(IMOD.EQ.15) THEN
+          CALL NORTON(SEQ3,EPSIN3,TAU2,PROPS(6),PROPS(7),PROPS(8),
+     &                VEPSIN4)
+C       Modele Polynomial
+        ELSEIF(IMOD.EQ.16) THEN
+          VEPSIN4=PROPS(6)+PROPS(7)*(SEQ3**PROPS(8))+
+     &                     PROPS(9)*(SEQ3**PROPS(10)) +
+     &                     PROPS(11)*(SEQ3**PROPS(12))
+C       Modele de Blackburn
+        ELSEIF(IMOD.EQ.17) THEN
+          CALL SOLUTN(20,SEQ3,EPSIN3,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(20,SEQ3,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN4=VEPSINA+VEPSINB
+C       Modele de Blackburn_2
+        ELSEIF(IMOD.EQ.18) THEN
+          CALL SOLUTN(61,SEQ3,EPSIN3,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(61,SEQ3,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN4=VEPSINA+VEPSINB
+C       Modele de Lemaitre
+        ELSEIF(IMOD.EQ.19) THEN
+          CALL LEMAIT(SEQ3,XX3,VXX4,TAU2,PROPS,VEPSIN4)
+        ENDIF
+      ENDIF
+      VSIG4=DSIGN(YOU*VEPSIN4,SIG3)
+C     [4.2] 2nde estimation a la fin du pas, avec la vitesse moyenne sur le mi-pas
+      VEPSIN34=UNDEMI*(VEPSIN3+VEPSIN4)
+      VSIG34=UNDEMI*(VSIG3+VSIG4)
+      SIG4=SIG2+(TAU2*(VSIG-VSIG34))
+      EPSIN4=EPSIN2+TAU2*VEPSIN34
+      IF (IMOD.EQ.19) XX4=XXIN+TAU2*(UNDEMI*(VXX3+VXX4))
+C     [5.1] Vitesse de contrainte et de deformation inelastique a partir de l'etat a la fin du pas [4.2]
+      SEQ4=ABS(SIG4)
+      IF (SEQ4.LT.XPETIT) THEN
+        VEPSIN5=XZER
+        IF (IMOD.EQ.19) VXX5=XZER
+      ELSE
+C       Modele de Norton
+        IF(IMOD.EQ.15) THEN
+          CALL NORTON(SEQ4,EPSIN4,TAU2,PROPS(6),PROPS(7),PROPS(8),
+     &                VEPSIN5)
+C       Modele Polynomial
+        ELSEIF(IMOD.EQ.16) THEN
+          VEPSIN5=PROPS(6)+PROPS(7)*(SEQ4**PROPS(8))+
+     &                     PROPS(9)*(SEQ4**PROPS(10)) +
+     &                     PROPS(11)*(SEQ4**PROPS(12))
+C       Modele de Blackburn
+        ELSEIF(IMOD.EQ.17) THEN
+          CALL SOLUTN(20,SEQ4,EPSIN4,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(20,SEQ4,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN5=VEPSINA+VEPSINB
+C       Modele de Blackburn_2
+        ELSEIF(IMOD.EQ.18) THEN
+          CALL SOLUTN(61,SEQ4,EPSIN4,PROPS,DX,TIMEX)
+          IF(TIMEX.LT.TAU2) TIMEX=ABS(TAU2)
+          CALL EQUATN(61,SEQ4,TIMEX,XZER,PROPS,VEPSINA,VEPSINB)
+          VEPSIN5=VEPSINA+VEPSINB
+C       Modele de Lemaitre
+        ELSEIF(IMOD.EQ.19) THEN
+          CALL LEMAIT(SEQ4,XX4,VXX5,TAU2,PROPS,VEPSIN5)
+        ENDIF
+      ENDIF
+      VSIG5=DSIGN(YOU*VEPSIN5,SIG4)
+C     [5.2] 3eme estimation a la fin du pas avec les vitesses debut [1.1], mi [3.1] et fin de pas [5.1]
+      VEPSI135=((VEPSIN1+VEPSIN5)/SIX)+(VEPSIN3*DEUX/TROIS)
+      VSIG135=((VSIG1+VSIG5)/SIX)+(VSIG3*DEUX/TROIS)
+      SIG5=SIG+(TAU*(VSIG-VSIG135))
+      EPSIN5=EPSIN+TAU*VEPSI135
+      IF (IMOD.EQ.19) VXX135=((VXX1+VXX5)/SIX)+(VXX3*DEUX/TROIS)
+      IF (IMOD.EQ.19) XX5=XXIN+TAU*VXX135
+C     Calcul du rapport : erreur calculee / erreur admise
+      XX=SIG5-SIG4
+      RA=ABS(XX)/ERRABS
+      SQRA=SQRT(RA)
+C     Test de fin d'iterations / mise a jour de tau
+C     DIV =7   BORNE = 2
+C     Si   SQRA>7   alors TAU = TAU/7  puis nouvel essai
+C     Si  2<RA<7*7  on vise RA = 1     puis nouvel essai
+      IF (DTLIBR) THEN
+C       Petite ruse pour dejouer l'optimisation
+        RA1=RA*UN
+        IF ((RA.GT.DIV*DIV).OR.(RA.NE.RA1)) THEN
+          TAU=TAU/DIV
+          IF(TAU.LT.1.D-30) THEN
+            CALL ERREUR(5)
+          ENDIF
+          TTAUF=TTAU0+TAU
+          GOTO 30
+        ELSEIF (RA.GT.BORNE) THEN
+          TAU = TAU/SQRA
+          IF(TAU.LT.1.D-30) THEN
+            CALL ERREUR(5)
+          ENDIF
+          TTAUF=TTAU0+TAU
+          GOTO 30
+        ENDIF
+      ENDIF
+C
+C     Fin des iterations sur tau optimal / mise a jour des variables
+C     Ici RA < BORNE
+C     On avance en temps
+      SIG=SIG4
+      EPSIN=EPSIN+TAU2*(VEPSIN12+VEPSIN34)
+      IF (IMOD.EQ.19) XXIN=XX5
+C     Test de fin des iterations en sous increments / mise a jour de tau
+C     Si   SQRA<1/3        TAU = TAU*3
+C     Si   1/3<SQRA<RMIN   on vise RA = 1
+C     Si   RMIN<SQRA<RMAX  TAU inchange
+C     Si   SQRA>RMAX       on vise RA = 1
+C     Fin des boucles en sous increments si tau = DTLEFT
+      IF (TAU.LT.DTLEFT) THEN
+        TTAU0=TTAU0+TAU
+        DTLEFT=DTLEFT-TAU
+        IF (FAC*SQRA.LT.UN) THEN
+          TAU=TAU*FAC
+        ELSEIF ((SQRA.LT.RMIN).OR.(SQRA.GT.RMAX)) THEN
+          TAU=TAU/SQRA
+        ENDIF
+        IF (TAU.GT.DTLEFT) TAU=DTLEFT
+        TTAUF=TTAU0+TAU
+        GOTO 20
+      ENDIF
+C     Ici, on a atteint une subdivision du pas de temps trop petite,
+C     --> on sort en erreur
+      IF (ABS(TAU-DTLEFT).GT.(TAU/1000.)) THEN
+        PRINT*,'ERREUR NBR. MAX. DE SUBDIVISION DU PAS DE TEMPS ATTEINT'
+        CALL ERREUR(996)
+        RETURN
+      ENDIF
+C
+C=======================================================================
+C 5 - Stockage des resultats et sortie
+C=======================================================================
+      SIGF(1)=SIG
+      SIGF(2)=SIG0(2)+(G*DEPS(2))
+      SIGF(3)=SIG0(3)+(G*DEPS(3))
+      IF (IMOD.EQ.19) THEN
+        VARF(1)=XXIN
+        VARF(2)=EPSIN
+      ELSE
+        VARF(1)=EPSIN
+      ENDIF
+C     Sortie du programme
+      RETURN
+      END
+
+ 
+ 

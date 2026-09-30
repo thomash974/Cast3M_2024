@@ -1,0 +1,96 @@
+C MIXE      SOURCE    KICH      20/10/02    21:15:01     10733          
+      SUBROUTINE MIXE
+
+C_______________________________________________________________________
+C
+C    OPERATEUR DE MELANGE
+C
+C_______________________________________________________________________
+C      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMMODEL
+
+      character*4  mcle(1)
+      data  mcle/'NOER'/
+
+      IPCHE1 = 0
+      IPCHE2 = 0
+      IPCHE3 = 0
+      IPCHP4 = 0
+
+      IPCHA2 = 0
+      IPCHA1 = 0
+      noer=0
+      call lirmot(mcle,1,noer,0)
+
+      CALL LIROBJ('MMODEL  ',IPMOD0,1,irt1)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MMODEL  ',IPMOD0,1)
+* On deroule le modele initial IPMOD0 et on ne garde que les sous-
+* modeles d interet -> on cree un nouveau modele IPMODL
+      mmodel = IPMOD0
+      NSOUS = mmodel.kmodel(/1)
+      IPMODL = IPMOD0
+
+      N1 = NSOUS
+      segini mmode1
+      k1 = 0
+      DO 10 im = 1, NSOUS
+        imodel = mmodel.kmodel(im)
+        IF (imodel.formod(1)(1:7).NE.'MELANGE') GOTO 10
+         k1 = k1 + 1
+         mmode1.kmodel(k1) = imodel
+ 10   CONTINUE
+      
+      if (k1.gt.0) then
+        n1 = k1
+        segadj mmode1
+        IPMODL = mmode1
+      endif
+
+
+C- 1 ER  CHAMP/ELEMENT
+C
+      CALL LIROBJ('MCHAML  ',IPIN1,1,irt1)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('MCHAML  ',IPIN1,1)
+      CALL REDUAF(IPIN1,IPMODL,IPCHA1,0,IR1,KER)
+      IF(IERR .NE. 0) RETURN
+
+C- 2 EME CHAMP/ELEMENT
+C
+      CALL LIROBJ('MCHAML  ',IPIN2,1,irt1)
+      IF (IERR.NE.0) RETURN
+        CALL ACTOBJ('MCHAML  ',IPIN2,1)
+        CALL REDUAF(IPIN2,IPMODL,IPCHA2,0,IR2,KER)
+        IF(IERR .NE. 0) RETURN
+
+      IF(IR1  .NE. 1.OR.IR2  .NE. 1) CALL ERREUR(KER)
+      IF(IR1  .EQ. 1) THEN
+         IPCHE1 = IPCHA1
+         IPCHE2 = IPIN2
+      ELSEIF(IR2 .EQ. 1) THEN
+         IPCHE1 = IPCHA2
+         IPCHE2 = IPIN1
+      ENDIF
+
+      CALL MIXEMP(IPMODL,IPCHE1,IPCHE2,IPCHE3,IRET,NOER)
+      IF (IERR.EQ.2 ) RETURN
+      if (iret.eq.1.or.(iret.eq.0.and.IPCHE3.GT.0)) then
+C
+
+      CALL ACTOBJ('MCHAML  ',IPCHE3,1)
+      CALL ECROBJ('MCHAML  ',IPCHE3)
+      endif
+
+
+      RETURN 
+      END
+
+ 

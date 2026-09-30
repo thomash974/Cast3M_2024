@@ -1,0 +1,230 @@
+C INFOPN    SOURCE    PV090527  23/01/06    23:15:14     11542          
+      SUBROUTINE INFOPN(IAREA,IRET)
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC CQALITE
+      SAVE SNOTICE
+      SAVE nbnoti
+      SEGMENT SNOTICE
+*  nomcom nom du fichier de la notice
+*  nomcou nom de la de la notice
+       CHARACTER*(LOCHAI) nomcom(notidim)
+       CHARACTER*(LONOM)  nomcou(notidim)
+      ENDSEGMENT
+      segment STEMP
+      CHARACTER*(LOCHAI) nomco2(notidim)
+      ENDSEGMENT
+
+      integer notidim
+      external long
+      CHARACTER*(*) IAREA
+      character*(lochai) rep,entr,cvarenv,dirb,nomnot
+      character*20 premc
+      character*(LONOM) nomf,nomm,noml
+      equivalence(cvarenv,ivarenv)
+      equivalence(entr   ,ientr  )
+*  initialistion segment notice
+      notidim=1000
+      segini snotice,stemp
+* recherche et ouverture des repertoires
+      cvarenv='CASTEM_NOTICE' //char(0)
+      l=lochai
+      call ooozen(ivarenv,l)
+      if (l.gt.1) then
+        rep=cvarenv(1:l)
+      else
+        rep='./:./notice/:/home/castem-public/castem/notice/'
+      endif
+      l=long(rep)
+**    write(6,*) 'rep: ',l,rep
+      idrep=1
+      ifrep=l
+      nbnoti=0
+*  boucle sur les repertoires indiques
+  20  continue
+*  recherche debut fin du repertoire
+%IF WIN32,WIN64
+      ind=index(rep(idrep:ifrep),';')
+%ELSE
+      ind=index(rep(idrep:ifrep),':')
+%ENDIF
+**    ind=index(rep(idrep:ifrep),';')
+**    if (ind.eq.0) ind=index(rep(idrep:ifrep),':')
+      if(ind.eq.0)  ind=ifrep-idrep+2
+      ifrep=ind+idrep-2
+      dirb=rep(idrep:ifrep)
+      lgb=long(dirb)
+*     write(6,*)' ouverture de:',dirb(1:lgb),lgb
+%IF WIN32,WIN64
+      if(dirb(lgb:lgb).ne.'/'.and.dirb(lgb:lgb).ne.'\') then
+%ELSE
+      if(dirb(lgb:lgb).ne.'/') then
+%ENDIF
+**      write(6,*) 'ajout de / '
+        dirb(1:lgb+1)=dirb(1:lgb)//'/'
+        lgb=lgb+1
+      endif
+      call fopendir(dirb(1:lgb)//char(0),iret,iajout)
+**    write(6,*) ' ouverture repertoire ',dirb(1:lgb)
+      if (iret.ne.0) then
+         lgbt=min(lgb,128)
+        moterr        =dirb(1:lgbt)
+        if(dirb(1:lgb).ne.'./notice/') call erreur(1133)
+      else
+*  lecture du contenu
+***   write(6,*) ' infopn,iajout ',iajout
+*  si il y a un index valide, on l'utilise au lieu de lire tou les fichiers
+      if (iajout.eq.1.and.lgb.ne.2) then
+       open(unit=36,file=dirb(1:lgb)//'INDEX',status='OLD',
+     >       form='FORMATTED',iostat=ios)
+       if(ios.eq.0) then
+           read(36,fmt='(I7)',err=10,end=10) nbindex
+         if(nbnoti+nbindex.gt.notidim) then
+           notidim=notidim+1000
+           segadj snotice,stemp
+         endif
+**       write(6,*) ' lgb = ',lgb
+         read(36,36,err=10,end=10) (nomcou(in),
+     >         nomco2(in),in=nbnoti+1,nbnoti+nbindex)
+         do in=nbnoti+1,nbnoti+nbindex
+               nomcom(in)=dirb(1:lgb)//nomco2(in)
+**        write(6,*) nomcom(in)(1:100)
+         enddo
+**36     format(A (lonom), A (lochai))
+  36     format(A 8    , A 512   )
+         close(36)
+         do in=nbnoti+1,nbnoti+nbindex
+        do j=1,nbnoti
+         if (nomcou(j).eq.nomcou(in)) then
+          moterr=nomcou(in)
+          call erreur(-379)
+         endif
+        enddo
+         enddo
+         nbnoti=nbnoti+nbindex
+         goto 11
+       endif
+      endif
+
+  10  continue
+      entr=char(0)
+      call freaddir(ientr)
+      if(ichar(entr(1:1)).ne.0) then
+       lg=long(entr)-1
+**     write(6,*) 'entr',lg,entr(1:50)
+       ind=index(entr(max(1,lg-6):lg),'.notice')
+       if(ind.ne.0) then
+        ind=ind+lg-7
+        nomf=entr(1:ind-1)
+**      write(6,*) 'fichier notice trouve:', nomf
+*  lecture premiere carte pour avoir le nom
+        close(unit=36)
+        nomnot=dirb(1:lgb)//entr(1:lg)
+**      write(6,*) 'ouverture ',nomnot
+        open(file=nomnot(1:lgb+lg),unit=36,iostat=ios)
+        if(ios.ne.0) goto 1010
+        premc=' '
+        read(36,fmt='(A20)',end=1020) premc(1:20)
+ 1020   continue
+        if (premc(1:5).ne.'$$$$ ') goto 1010
+        if (premc(15:20).ne.'NOTICE'.and.
+     >      premc(15:20).ne.'      ') goto 1010
+        close(36)
+        nomf=premc(6:13)
+        call chcass(nomf,1,nomm)
+**      write(6,*) ' nom de la notice ',nomf
+        do j=1,nbnoti
+         if (nomcou(j).eq.nomm) then
+          moterr=nomm
+          call erreur(-379)
+          iqpro=1
+          goto 10
+         endif
+        enddo
+        nbnoti=nbnoti+1
+        if(nbnoti.gt.notidim) then
+           notidim=notidim+1000
+           segadj snotice,stemp
+        endif
+        nomcou(nbnoti)=nomm
+        nomcom(nbnoti)=
+     >    dirb(1:lgb)//entr(1:lg-7)//'.notice'//char(0)
+**      write(6,*) nomcou(nbnoti),' ',nomcom(nbnoti)
+       endif
+       goto 10
+ 1010  continue
+**     write(6,*) 'apres 1010 ios premc',ios,premc(1:5),premc(15:20)
+       moterr=dirb(1:lgb)//entr(1:lg)
+       call erreur(-380)
+       goto 10
+      endif
+      call fclosedir
+*  ecriture index si possible
+       if (lgb.ne.2) then
+       open(unit=36,file=dirb(1:lgb)//'INDEX',status='UNKNOWN',
+     >       form='FORMATTED',iostat=ios)
+       if(ios.eq.0) then
+          write(36,fmt='(I7)',err=37) nbnoti
+         do in=1,nbnoti
+          nomco2(in)=nomcom(in)(lgb+1:)
+         enddo
+          write(36,36,err=37) 
+     >      (nomcou(in),nomco2(in),in=1,nbnoti)
+          close(36)
+  37   continue
+       endif
+       endif
+  11  continue
+
+      endif
+*  il faut sauter le separateur
+      idrep=ifrep+2
+      ifrep=l
+      if (idrep.lt.l) goto 20
+      notidim=nbnoti
+      segadj snotice          
+      segsup stemp
+      return
+*
+*  lecture notice
+      entry infoli(iarea,iret)
+**     write(6,*) 'iret en entree',iret
+       read (36,fmt='(A500)',end=1000) iarea
+       iret=iret+1
+       if(iarea(1:4).eq.'$$$$')
+     > read (36,fmt='(A500)',end=1000) iarea
+       return
+ 1000  continue
+       iret=99999
+
+      return
+conversion nom numero
+      entry infol2(noml,iret)
+      do i=1,nbnoti
+       if(nomcou(i).eq.noml) then
+          iret=i
+          return
+       endif
+      enddo
+      iret=0
+      return
+*  ouverture notice
+      entry infopo(iargu,iret)
+       close(unit=36)
+       segact snotice
+       if (iargu.gt.nbnoti) call erreur(5)
+       if (iargu.le.0) call erreur(5)
+**     write(6,*) ' ouverture de ',nomcom(iargu)
+       open(file=nomcom(iargu),unit=36,iostat=ios)
+       if (ios.ne.0) call erreur(5)
+       iret=9999
+       return
+      end
+ 
+ 
+ 
+ 
+ 

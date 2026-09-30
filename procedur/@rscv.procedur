@@ -1,0 +1,36 @@
+$$$$ @RSCV
+* @RSCV     PROCEDUR  CB215821  19/11/18    21:15:02     10383          
+*----------------------------------------------------------------------
+*      CETTE METHODE A ETE MISE GRACIEUSEMENT
+*      A DISPOSITION DE  LA COMMUNAUTE CAST3M
+*      PAR TAMASKOVICS N.
+*     (Freiberg Institut für Geotechnik )
+*----------------------------------------------------------------------
+'DEBM'  @RSCV  VAL*'LISTREEL'  DBG/'ENTIER' ;
+*----------------------------------------------------------------------
+* La methode @RSCV fait parti de l'objet @RSTH et est appelee avec
+*    l'abbreviation %'SCV'.
+*----------------------------------------------------------------------
+ 'SI' ('EXIS' DBG ) ;
+  !DBG = DBG ;
+ 'SINO' ;
+  !DBG = 0 ;
+ 'FINS' ;
+*
+ !IX   ='DIME' VAL ;
+ !IIX  = 2 * !IX ;
+ !VALS ='PROG' !IIX * 0.0 ;
+*
+ !NN   = 0.0 ;
+ !XX   = 0.0 ;
+ !JX   = 2   ;
+*
+ 'REPE' I !IX ;
+  !VALI ='EXTR'  VAL  &I;
+  'REPE' J !JX ;
+   !JJ =(2 * (&I-1)) + &J;
+   'REMP'  !VALS  !JJ  !VALI ;
+  'FIN' J ;
+ 'FIN' I ;
+*
+'FINM'  !VALS ;

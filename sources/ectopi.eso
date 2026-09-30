@@ -1,0 +1,101 @@
+C ECTOPI    SOURCE    GOUNAND   21/04/06    21:15:07     10940          
+      SUBROUTINE ECTOPI(TOPINV,INIV)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : ECTOPI
+C DESCRIPTION : Ecrit une topologie inverse.
+C               INIV=1 : Ecrit la topologie telle quelle
+C               INIV=2 : Pour chaque noeud, les éléments qui le touche
+C      
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C***********************************************************************
+C SYNTAXE GIBIANE    : 
+C ENTREES            : TOPINV (Activé)
+C ENTREES/SORTIES    :
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 03/10/2017, version initiale
+C HISTORIQUE : v1, 03/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP1      
+*-INC STOPINV
+-INC SMLENTI
+      CHARACTER*24 FORMA
+*     
+* Executable statements
+*
+      IDIMP=IDIM+1
+      WRITE(IOIMP,185) 'SEGMENT TOPINV',TOPINV
+      NBELEM=TLC(/1)/IDIMP
+      NBPTS=TIC(/1)
+      write(ioimp,186) 'NBELEM',NBELEM,'NBPTS',NBPTS,'LDGT',LDGT
+     $     ,'LDGT/D',LDGT/IDIMP
+      if (iniv.eq.1) then
+         WRITE(FORMA,FMT='("(1(",I1,"I6,2X))")') IDIMP
+*     write(ioimp,*) 'forma=',forma
+         write(ioimp,*) 'TIC'
+         write(ioimp,187)  (TIC(I),I=1,TIC(/1))
+         write(ioimp,*) 'TLC'
+         write(ioimp,forma)  (TLC(I),I=1,TLC(/1))
+         write(ioimp,*) 'TDC'
+         write(ioimp,187)  (TDC(I),I=1,TDC(/1))
+      elseif (iniv.EQ.2) then
+         jg=0
+         do ip=1,nbpts
+            jg=max(jg,tdc(ip))
+         enddo
+         segini mlenti
+         do ip=1,nbpts
+            ig=0
+            LAST=TIC(IP)
+            LDG=TDC(IP)
+            DO IDG=1,LDG
+               IL=((LAST-1)/IDIMP)+1
+               ig=ig+1
+               lect(ig)=il
+               LAST=TLC(LAST)
+            ENDDO
+*            write(ioimp,*) 'noeud ip=',ip,' relie aux elements'
+            write(ioimp,184) ip
+            write(ioimp,187) (lect(I),I=1,ig)
+         enddo
+         segsup mlenti
+      else
+         write(ioimp,*) 'iniv=',iniv,' incorrect'
+         goto 9999
+      endif
+
+ 184  FORMAT (2X,'noeud ip=',i4,' relie aux elements')
+ 185  FORMAT (/2X,10(A16,'=',I8,2X)/)
+ 186  FORMAT (2X,10(A6,'=',I6,2X))
+ 187  FORMAT (5X,10I8)
+*
+* Normal termination
+*
+      RETURN
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='ECTOPI  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine ECTOPI
+*
+      END
+
+ 

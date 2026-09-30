@@ -1,0 +1,69 @@
+C REDU3D    SOURCE    PV090527  23/01/27    21:16:02     11574          
+        subroutine redu3d(NBRINC,NINC,NDIMG,DEPSE1,DEPSM1,DEPSK1,
+     #  DEPST1,DEPSC1,DEPSL1,LogReducGEL,reduc,dbgvd,Mbg,dbgpg,
+     #  precision3d,ierr1,affiche)
+      
+c       reduction de l increment de la solution dans l espace generalise
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n) 
+        
+        integer NBRINC,NINC,NDIMG
+c       vecteur deformations solutions       
+        real*8 DEPSE1(NDIMG),DEPSM1(NDIMG),DEPSK1(NDIMG)
+        real*8 Mbg(0:NBRINC,0:1)
+c       poro meca gels
+        real*8 dbgPg(0:NBRINC)
+c       vecteur solution def anelastiques      
+        real*8 DEPST1(NDIMG),DEPSC1(NDIMG)
+        real*8 DEPSL1(NDIMG)
+        real*8 reduc,precision3d
+        integer ierr1
+        logical affiche        
+        integer idir
+        logical affiche_local
+        logical LogReducGEL
+        real*8 dbgvd(0:NBRINC)       
+        
+        affiche_local=affiche    
+
+        if ((reduc.gt.0.d0).and.
+     #      (reduc.lt.1.d0))then          
+c           application de la reduction     
+            do idir=1,NDIMG
+c               elastiques                     
+                DEPSE1(idir)=DEPSE1(idir)*reduc
+c               maxwell                
+                DEPSM1(idir)=DEPSM1(idir)*reduc
+c               kelvin                
+                DEPSK1(idir)=DEPSK1(idir)*reduc
+c               plasticite traction                
+                DEPST1(idir)=DEPST1(idir)*reduc 
+c               cisiallement                
+                DEPSC1(idir)=DEPSC1(idir)*reduc 
+c               localisee                
+                DEPSL1(idir)=DEPSL1(idir)*reduc                   
+            end do
+            if(LogReducGEL) then
+                do iphase=0,ninc
+                    dbgvd(iphase)=reduc*dbgvd(iphase)
+                    dbgpg(iphase)=-MBG(iphase,1)*dbgvd(iphase)
+                end do
+            end if
+            if(affiche_local) then
+                print*,'Dans redu3d reduc=',reduc
+            end if
+        else
+            if( (reduc.gt.1.d0).or.
+     #          (reduc.lt.0.d0)) then
+                print*,'Probleme dans reducinc3d',reduc
+                ierr1=1
+                return
+            end if
+        end if
+        
+        return
+        end
+        
+        
+ 

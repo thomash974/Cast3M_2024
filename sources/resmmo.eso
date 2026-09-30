@@ -1,0 +1,171 @@
+C RESMMO    SOURCE    FANDEUR   22/09/01    21:15:03     11395          
+
+      SUBROUTINE RESMMO (ICOLAC,ITLACC,IMAX1,IDEB)
+
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Restauration des pointeurs issus de la pile des MODELEs.       *
+*                                                                    *
+*--------------------------------------------------------------------*
+C***********************************************************************
+C HISTORIQUE : 06/11/98 : rajout de la restitution de la table
+C                         pour le modele 'NAVIER_STOKES'
+C              On ne fait pas comme MILL car on ne comprend pas
+C              sa modification (en fait, on ne comprend pas
+C              pourquoi elle n'est pas faite dans tous les
+C              objets (cf. restch.eso pour les CHPOINTs))
+C
+C***********************************************************************
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC TMCOLAC
+
+      character*8 cmate,MOTa
+      character*8 ityp1
+*
+      EXTERNAL LONG
+      character*(LOCHAI) m_libe,m_mode
+      logical b_z
+*
+*     Boucle sur les MODELEs contenus dans la pile:
+*
+      ITLAC1 = KCOLA(1)
+      ITLAC2 = KCOLA(10)
+      ITLAC3 = KCOLA(40)
+      ITLAC4 = KCOLA(29)
+      DO 10 IEL=IDEB,IMAX1
+         MMODEL = ITLAC(IEL)
+         IF (MMODEL.EQ.0) GOTO 10
+         SEGACT,MMODEL
+         NSOUMO = KMODEL(/1)
+         DO 20 ISOU=1,NSOUMO
+            IMODEL=KMODEL(ISOU)
+            IF (IMODEL.NE.0) THEN
+               SEGACT,IMODEL*MOD
+               IVA = IMAMOD
+               IF (IVA.LT.0) IMAMOD = ITLAC1.ITLAC(ABS(IVA))
+C  Point support DEFO.GENE.
+               IVA = IPDPGE
+               IF (IVA.LT.0) IPDPGE = ITLAC1.ITLAC(ABS(IVA))
+C    cas 'NAVIER_STOKES' : INFMOD(2) contient une table
+               NFOR=FORMOD(/2)
+               MN3 =INFMOD(/1)
+               do 715 iou=1,ivamod(/1)
+                  ityp1=tymode(iou)
+                  call typfil(ityp1,j)
+                  iva=abs(ivamod(iou))
+                  if(j.le.0) go to 715
+                  itlac5=KCOLA(J)
+                  if( ivamod(iou).le.0) ivamod(iou)=itlac5.itlac(iva)
+  715          continue
+
+               IF (NFOR.GT.0) THEN
+                  IF ((FORMOD(1).EQ.'NAVIER_STOKES') .OR.
+     *                (FORMOD(1).EQ.'DARCY').OR.
+     *                (FORMOD(1).EQ.'EULER')) THEN
+                     IF (MN3.GT.1) THEN
+                        IVA=ABS(INFMOD(2))
+                        IF(IVA.NE.0) INFMOD(2)=ITLAC2.ITLAC(IVA)
+                     ENDIF
+                  ENDIF
+                  do iou=3,mn3
+                    if(iou.ne.9.and.iou.ne.13) then
+                      if(infmod(iou).lt.0) then
+                        iva=abs(infmod(iou))
+                        if(iou.eq.14) then
+                          infmod(iou)=itlac4.itlac(iva)
+                        else
+                          infmod(iou)=itlac3.itlac(iva)
+                        endif
+                      endif
+                    endif
+                  enddo
+               ENDIF
+               if(mn3.lt.8.and.(formod(1).EQ.'MECANIQUE' .OR.
+     &                          formod(1).EQ.'POREUX'    .OR.
+     &                          formod(1).EQ.'CHARGEMENT'    ))then
+                 mn3=8
+                 nfor=formod(/2)
+                 nmat=matmod(/2)
+                 nobmod=ivamod(/1)
+                 segadj,imodel
+                 call prquoi(imodel)
+
+* initialisation des nomid
+               IF (FORMOD(1).NE.'NAVIER_STOKES'.AND.
+     &             FORMOD(1).NE.'EULER'        .AND.
+     &             FORMOD(1).NE.'MELANGE'           ) THEN
+                 if (CMATE.NE.'MODAL'.AND.CMATE.NE.'STATIQUE')  then
+                  lucvar=0
+                  lucmat=0
+                  lucmaf=0
+                  luparx=0
+                  call inomid(imodel,'        ',iret,lucvar,lucmat,
+     &                        lucmaf,luparx)
+                 endif
+               ENDIF
+             endif
+
+             if (NFOR.eq.1) then
+               NOBMOD = IVAMOD(/1)
+               if (nobmod.eq.0) goto 200
+               if (inatuu.ge.0) goto 200
+
+               noblib = 0
+               DO II=1,NOBMOD
+                 IF(TYMODE(II) .EQ. 'MOT   ')THEN
+                   IVA=IVAMOD(II)
+                   CALL QUEVAL(IVA,'MOT     ',ier,lgmot,r_z,MOTa,b_z,io)
+                   IF(ier .NE. 0) CALL ERREUR(5)
+                   IF( MOTa     .EQ. 'LMEEXT'        .AND.
+     &                (formod(1).EQ. 'MECANIQUE' .OR.
+     &                 formod(1).EQ. 'POREUX'        )    ) THEN
+                    noblib = II+1
+                    imoLib = ivamod(II+2)
+                    imoFct = ivamod(II+3)
+                    GOTO 220
+                   ELSEIF(MOTa     .EQ. 'LDIEXT' .AND.
+     &                    formod(1).EQ. 'DIFFUSION'   ) THEN
+                     noblib = II+1
+                     imoLib = ivamod(II+2)
+                     imoFct = ivamod(II+3)
+                     GOTO 220
+                   ENDIF
+                 ENDIF
+               ENDDO
+ 220           CONTINUE
+               IF (noblib.LE.0) GOTO 200
+
+               call queval(imoLib,'MOT',ier,lli,r_z,m_libe,b_z,io)
+               IF (ier .NE. 0) CALL ERREUR(5)
+               call queval(imoFct,'MOT',ier,lmo,r_z,m_mode,b_z,io)
+               IF (ier .NE. 0) CALL ERREUR(5)
+               ivamod(noblib) = 0
+               ip = -1
+               CALL LEXTOP(m_libe,m_mode,ip,m_iloi,m_ptre)
+               if (m_iloi.gt.0) ivamod(noblib) = m_ptre
+               lli = LONG(m_libe)
+               CALL POSCHA(m_libe(1:lli),imoLib)
+               ivamod(noblib+1) = imoLib
+               lmo = LONG(m_mode)
+               CALL POSCHA(m_mode(1:lmo),imoFct)
+               ivamod(noblib+2) = imoFct
+
+ 200           continue
+             endif
+
+               SEGDES,IMODEL
+            ENDIF
+ 20      CONTINUE
+         SEGDES,MMODEL
+ 10   CONTINUE
+
+      RETURN
+      END
+
+ 

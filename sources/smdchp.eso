@@ -1,0 +1,218 @@
+C SMDCHP    SOURCE    OF166741  24/03/28    21:15:10     11811          
+
+C***********************************************************************
+C NOM         : smdchp.eso
+C DESCRIPTION : Sortie des CHPOINT dans un fichier au format MED
+C***********************************************************************
+C HISTORIQUE :  16/10/2017 : RPAREDES : CREATION
+C HISTORIQUE :  07/03/2019 : CB215821 : Compatibilite avec Salome > 9.2
+C HISTORIQUE :  01/08/2022 : OF : Ameliorations diverses
+C HISTORIQUE :  12/01/2024 : OF : Ameliorations diverses
+C HISTORIQUE :  24/01/2024 : OF : Menues modifications
+C HISTORIQUE :  31/01/2024 : OF : Menues modifications (2)
+C HISTORIQUE :  08/02/2024 : OF : Correction du profil avec numerotation
+C HISTORIQUE :  12/02/2024 : OF : Passage a bibliotheque MED-64 bits
+C***********************************************************************
+C Priere de PRENDRE LE TEMPS DE COMPLETER LES COMMENTAIRES
+C en cas de modification de ce sous-programme afin de faciliter
+C la maintenance !
+C***********************************************************************
+C APPELE PAR : operateur (SORT 'MED') sormed.eso
+C***********************************************************************
+C ENTREES :   mfid    : Id du fichier
+C             name    : Nom du MAILLAGE MED courant
+C             IJGROU  : SEGMENT contenant la liste des GROUPES
+C             LISCHP  : SEGMENT contenant la liste des MPOVAL
+C             ICPR8   : SEGMENT de correspondance numero MED / Cast3M
+C SORTIES :   aucune
+C***********************************************************************
+
+      SUBROUTINE smdchp (mfid, name, IJGROU, LISCHP, ICPR8)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCMED
+
+-INC SMELEME
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMLENTI
+-INC SMMED
+      SEGMENT ICPR8(nnic)
+
+      CHARACTER*(*) name
+
+      CHARACTER*(4) cha4F
+
+C-----Definition des reels
+      REAL*8    dt
+
+C-----Chaines de Caractere de longueur MED_NAME_SIZE=64
+      CHARACTER*(MED_NAME_SIZE) fname
+      CHARACTER*(MED_NAME_SIZE) lname
+      CHARACTER*(MED_NAME_SIZE) mname
+      CHARACTER*(MED_LNAME_SIZE) pname
+
+C-----Chaines de Caractere de longueur MED_SNAME_SIZE=16
+      CHARACTER*(MED_SNAME_SIZE) dtunit
+
+C-----SEGMENT pour stocker les profils des familles (numero d'element local)
+      SEGMENT IPROFI(nbelp)
+      SEGMENT IPROF1(nbelp)
+
+C-----Information sur les GROUPES
+      SEGMENT IJGROU
+        INTEGER                    ILENTI(nbgrou)
+        INTEGER                    IPMAIL(nbgrou)
+        CHARACTER*(MED_LNAME_SIZE) CNOMGR(nbgrou)
+C       nbgrou : Nombre de groupes
+C       ILENTI : pointeur LISTENTI des numeros de famille composant les groupes
+C       IPMAIL : pointeur MELEME du groupe en question
+C       CNOMGR : Noms des groupes
+      ENDSEGMENT
+
+C-----SCHMED : Proprietes des CHAMPS a sortir
+      SEGMENT SCHMED
+        CHARACTER*(MED_NAME_SIZE) CCHMED(nchmed)
+        CHARACTER*(MED_NAME_SIZE) CPRMED(nchmed)
+C       CCHMED : Nom du champ  MED a creer
+C       CPRMED : Nom du profil MED a creer
+      ENDSEGMENT
+
+      SEGMENT SLISCO
+        CHARACTER*(MED_SNAME_SIZE) LISSCP(nbcomp)
+        CHARACTER*(MED_SNAME_SIZE) LCUNIT(nbcomp)
+      ENDSEGMENT
+
+C Une petite chaine pour les formats
+      cha4F = '(I )'
+
+      mcret = 0
+
+C **********************************************************************
+C     Traitement des CHPOINT : Champ, Profil et Valeurs
+C **********************************************************************
+      nbgrou  = IJGROU.IPMAIL(/1)
+      nchmed  = LISCHP.NBENTI
+
+C Initialisations des segments de travail : SCHMED, SLISCO et IPROFI
+C Dimensionnement au maximum pour SLISCO(nbcomp)
+      nbelp  = 0
+      nbcomp = 0
+      DO ia = 1, nchmed
+        IPT1   = LISCHP.LIMAIL(ia)
+        MSOUPO = LISCHP.LICHAP(ia)
+        nbelp  = MAX(nbelp, IPT1.NUM(/2))
+        nbcomp = MAX(nbcomp, MSOUPO.NOHARM(/1))
+        if (ipt1.num(/1).ne.1) then
+          write(ioimp,*) 'SMDCHP - support chpoint incoherent',ia,ipt1
+        endif
+      END DO
+
+      SEGINI,SCHMED,SLISCO,IPROFI
+
+      DO ie = 1, nbcomp
+        SLISCO.LISSCP(ie) = ' '
+        SLISCO.LCUNIT(ie) = 'NO_UNIT'
+      END DO
+
+      nbch = 0
+      nbpr = 0
+      DO ia = 1, nchmed
+        IPT1   = LISCHP.LIMAIL(ia)
+        fname  = LISCHP.NOCHAP(ia)
+        MSOUPO = LISCHP.LICHAP(ia)
+        nsize  = IPT1.NUM(/2)
+        nbcomp = MSOUPO.NOHARM(/1)
+
+        CALL PLACE(SCHMED.CCHMED, nbch, iplace, fname)
+        IF (iplace .EQ. 0) THEN
+C-------  Creation du Champ
+          nbch = nbch + 1
+          SCHMED.CCHMED(nbch)=fname
+          DO ie = 1,nbcomp
+            SLISCO.LISSCP(ie) = MSOUPO.NOCOMP(ie)
+          ENDDO
+
+          mftype = MED_FLOAT64
+          n4     = nbcomp
+          dtunit = 'NO_UNIT'
+          mname  = name
+
+          CALL mfdcre(mfid, fname, mftype, n4,
+     &        SLISCO.LISSCP,SLISCO.LCUNIT, dtunit, mname, mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'smdchp / mfdcre'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 9999
+          ENDIF
+        ENDIF
+
+C       Verification de controle au CAS OU on aurait oublie un MAILLAGE
+        CALL PLACE2(IJGROU.IPMAIL,nbgrou,IDANS,IPT1)
+        IF (IDANS .EQ. 0) THEN
+C         Determination du FORMAT automatique
+          IFORMA = INT(LOG10(REAL(IPT1))) + 1
+          IF (IFORMA.LT.1 .OR. IFORMA.GT.9) THEN
+            CALL ERREUR(1094)
+            GOTO 9999
+          ENDIF
+          WRITE(cha4F(3:3),'(I1)') IFORMA
+          WRITE(pname     , cha4F) IPT1
+        ELSE
+          pname  = IJGROU.CNOMGR(IDANS)
+        ENDIF
+
+        CALL PLACE(SCHMED.CPRMED, nbpr, iplace, pname)
+        IF (iplace .EQ. 0) THEN
+C-------  Creation du Profil
+          nbpr = nbpr + 1
+          SCHMED.CPRMED(nbpr)=pname
+C- Prise en compte de la numerotation locale pour le profil
+          DO i = 1, nsize
+            IPROFI(i) = ICPR8(IPT1.NUM(1,i))
+          ENDDO
+          CALL mpfprw(mfid, pname, nsize, IPROFI(1), mcret)
+          IF (mcret .NE. 0) THEN
+            moterr    = 'smdchp / mpfprw'
+            interr(1) = mcret
+            CALL ERREUR(873)
+            GOTO 9999
+          ENDIF
+        ENDIF
+
+C------ Ecriture des Valeurs du Champ
+        MPOVAL = MSOUPO.IPOVAL
+        numit  = MED_NO_IT
+        numdt  = LISCHP.PNUMDT(ia)
+        dt     = LISCHP.XTEMPS(ia)
+        metype = MED_NODE
+        mgtype = MED_NONE
+        mtsf   = MED_COMPACT_STMODE
+        lname  = ' '
+        mswm   = MED_NO_INTERLACE
+        mcs    = MED_ALL_CONSTITUENT
+        n4     = nsize
+
+        CALL mfdrpw(mfid, fname, numdt, numit, dt, metype,mgtype, mtsf,
+     &              pname, lname, mswm, mcs, n4, MPOVAL.VPOCHA, mcret)
+        IF (mcret .NE. 0) THEN
+          moterr    = 'smdchp / mfdrpw'
+          interr(1) = mcret
+          CALL ERREUR(873)
+          GOTO 9999
+        ENDIF
+      ENDDO
+
+ 9999 CONTINUE
+      SEGSUP,SCHMED,SLISCO,IPROFI
+
+C      RETURN
+      END
+
+ 

@@ -1,0 +1,168 @@
+C EVCOMP    SOURCE    FANDEUR   22/04/14    21:15:02     11333          
+      SUBROUTINE EVCOMP(ICOUL)
+C=======================================================================
+C   OPTION COMP DE L'OPERATEUR EVOL
+C
+C   POUR RENTRER UN OBJET DE TYPE EVOLUTION DE SOUS TYPE COMPLEXE
+C   SYNTAXE :
+C
+c   EVOL = EVOL (COUL) 'COMP'  | ('REIM') |   ...
+c                              | ('MOPH') |
+C
+c               ... ('LEGE' TITOR1 TITOR2) ...
+C
+c               ... NOMX PRGX (NOMOR1) PRGY1  (NOMOR2) PRGY2 ;
+C
+C   COUL   : COULEUR DE LA COURBE (FACULTATIVE)
+C
+C   PRGX   : LISTE DE REELS (ABSCISSES)
+C
+C   PRGY1  : LISTE DE REELS (PARTIE REELLE OU MODULE)
+C
+C   PRGY2  : LISTE DE REELS (PARTIE IMAGINAIRE OU PHASE)
+C
+C   CREATION : 04/12/87, F. ROULLIER
+C   MODIFS   : 2015-05-07 BP, ajout du titre de la LEGEnde
+C
+C======================================================================
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMEVOLL
+-INC SMLREEL
+
+      CHARACTER*72 MTIT1
+      CHARACTER*12 MOTITR
+      CHARACTER*4 MOTCMP(2,2),MOTOPT(2)
+      CHARACTER*4 MOTIT1(1)
+      DATA MOTCMP/'MODU','PHAS','PREE','PIMA'/
+      DATA MOTOPT/'MOPH','REIM'/
+      DATA MOTIT1/'LEGE'/
+      LOPT=2
+
+C  LECTURE OPTIONNELLE DU TYPE (MOPH ou REIM)
+      CALL LIRMOT (MOTOPT,LOPT,IOPT,0)
+      IF (IERR.NE.0) RETURN
+      IF (IOPT.EQ.0) IOPT=2
+
+C  CREATION DE L'EVOLUTION MERE
+      N=2
+      SEGINI MEVOLL
+      IPVO=MEVOLL
+      IEVTEX(1:72)=TITREE(1:72)
+      ITYEVO='COMPLEXE'
+
+C  CREATION DES 2 SOUS-EVOLUTIONS
+      SEGINI KEVOL1,KEVOL2
+      IEVOLL(1)=KEVOL1
+      IEVOLL(2)=KEVOL2
+
+      KEVOL1.NUMEVX=ICOUL
+      KEVOL1.NUMEVY='    '
+      KEVOL1.TYPX='LISTREEL'
+      KEVOL1.TYPY='LISTREEL'
+      KEVOL1.NOMEVX='            '
+      KEVOL1.NOMEVY='            '
+      KEVOL1.KEVTEX='        '
+
+      KEVOL2.NUMEVX=ICOUL
+      KEVOL2.NUMEVY='    '
+      KEVOL2.TYPX='LISTREEL'
+      KEVOL2.TYPY='LISTREEL'
+      KEVOL2.NOMEVX='            '
+      KEVOL2.NOMEVY='            '
+      KEVOL2.KEVTEX='        '
+
+C  LECTURE OPTIONNELLE DES TITRES DES SOUS EVOLUTIONS DE LA COURBE (LEGE) :
+      ITIT1=0
+      CALL LIRMOT(MOTIT1,1,ITIT1,0)
+      IF (IERR.NE.0) RETURN
+      IF(ITIT1.EQ.1) THEN
+         MTIT1=' '
+         CALL LIRCHA(MTIT1,1,IRETOU)
+         IF (IERR.NE.0) RETURN
+         KEVOL1.KEVTEX=MTIT1
+         MTIT1=' '
+         CALL LIRCHA(MTIT1,1,IRETOU)
+         IF (IERR.NE.0) RETURN
+         KEVOL2.KEVTEX=MTIT1
+      ELSE
+        IF(IOPT.EQ.1) THEN
+          KEVOL1.KEVTEX='Amp'
+          KEVOL2.KEVTEX='\j'
+        ELSE
+          KEVOL1.KEVTEX='Re'
+          KEVOL2.KEVTEX='Im'
+        ENDIF
+      ENDIF
+
+C  LECTURE DES TITRES ET LISTREELS DE L'ABSCISSE + 2 ORDONNEES
+c     boucle sur les 3 objets dans cet ordre
+      DO K=1,2
+       DO J=1,K
+
+C   *** TITRE DES ABSCISSES / ORDONNEES SOUS FORME DE CHAINE DE CARACTERES
+        MOTITR=' '
+        CALL LIRCHA(MOTITR,0,IRETOU)
+        IF (IERR.NE.0) RETURN
+        IF (IRETOU.GT.0) THEN
+          IF (K.EQ.1) THEN
+            KEVOL1.NOMEVX=MOTITR
+            KEVOL2.NOMEVX=MOTITR
+          ELSE
+            IF(J.EQ.1) KEVOL1.NOMEVY=MOTITR
+            IF(J.EQ.2) KEVOL2.NOMEVY=MOTITR
+          ENDIF
+        ENDIF
+
+C   *** LECTURE DE LISTREEL
+        CALL LIROBJ('LISTREEL',IMOT,1,IRET)
+        IF (IERR.NE.0) RETURN
+        IF (K.EQ.1) THEN
+C          ABSCISSES DES 2 COURBES
+           KEVOL1.IPROGX=IMOT
+           KEVOL2.IPROGX=IMOT
+           MLREEL=IMOT
+           SEGACT MLREEL
+           LX  = MLREEL.PROG(/1)
+           SEGDES MLREEL
+        ELSE
+           IF (J.EQ.1) THEN
+C               ORDONNEES DE LA PREMIERE COURBE
+                KEVOL1.IPROGY=IMOT
+                KEVOL1.NUMEVY=MOTCMP(1,IOPT)
+                MLREEL=IMOT
+                SEGACT MLREEL
+                LY1 = MLREEL.PROG(/1)
+                SEGDES MLREEL
+           ELSE
+C               ORDONNEES DE LA DEUXIEME COURBE
+                KEVOL2.IPROGY=IMOT
+                KEVOL2.NUMEVY=MOTCMP(2,IOPT)
+                MLREEL=IMOT
+                SEGACT MLREEL
+                LY2 = MLREEL.PROG(/1)
+                SEGDES MLREEL
+           ENDIF
+        ENDIF
+
+       ENDDO
+      ENDDO
+
+      SEGDES KEVOL1,KEVOL2
+      SEGDES MEVOLL
+
+      IF((LX.NE.LY1).OR.(LY1.NE.LY2)) THEN
+          CALL ERREUR(263)
+C     LES 3 PROGRESSIONS DOIVENT ETRE DE MEME LONGUEUR
+          RETURN
+      ENDIF
+
+      CALL ECROBJ('EVOLUTIO',IPVO)
+
+c      RETURN
+      END
+
+ 

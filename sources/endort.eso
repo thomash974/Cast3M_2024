@@ -1,0 +1,122 @@
+C ENDORT    SOURCE    FD218221  24/02/07    21:15:10     11834          
+      subroutine endort(epspg6,dgt3,dgc3,dmaxi,drgimaxi,ekdg,
+     #alphar,epsseuil0,sigft61,sigfc61)
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)  
+      
+c     variables externes       
+      real*8 epspg6(6),epsseuil0,dgt3(3),dgc3(3),dmaxi,drgimaxi,ekdg
+      real*8 alphar
+      real*8 sigft61(6),sigfc61(6)
+       
+c     variables locales       
+      real*8 epspg33(3,3),epspg3(3),vepspg33(3,3),vepspg33t(3,3)
+      real*8 sigft6p(6),sigfc6p(6),sigft6d(6),sigfc6d(6)
+      logical endor
+      real*8 xx1
+      integer i,k,l
+
+c***********************************************************************
+c      calcul de l endommagement due au franchissement d une critere 
+c      orthotrope (rgi ou capillaire par exple)
+c***********************************************************************
+      if(ekdg.gt.0.) then
+c     valeurs propres des deformations plastiques de rgi
+c     passage 33      
+      call x6x33(epspg6,epspg33) 
+     
+c     diagonalisation      
+      call b3_v33(epspg33,epspg3,vepspg33)
+c     construction matrice de passage inverse         
+      call traps1(vepspg33t,vepspg33,3)
+c     calcul des endommagements 
+      endor=.false.
+      do i=1,3
+         xx1=epspg3(i)-epsseuil0
+         if(xx1.gt.0.d0) then
+            endor=.true.
+         else
+            xx1=0.d0
+         end if
+c        endo de rgi et borne de dgt         
+         dgt3(i)=min(dmaxi,drgimaxi,max((xx1/(xx1+ekdg)),0.d0))
+c        print*,'ds endort dgt3(',i,')',dgt3(i)
+      end do
+c***********************************************************************      
+c     test utilite endo de rgi     
+      if(endor) then      
+c         calcul des endommagements de compression de rgi
+          do i=1,3
+             if(alphar.gt.0.) then          
+c                complementarite par orthogonalite      
+                 call indce1(i,k,l)
+                 dgc3(i)=1.d0-((1.d0-dgt3(k))*(1.d0-dgt3(l)))**alphar
+                 dgc3(i)=min(dmaxi,drgimaxi,dgc3(i))
+             else
+                 dgc3(i)=0.d0
+             end if
+c             print*,'dgc3(',i,')',dgc3(i)
+          end do
+
+c***********************************************************************
+c        prise en compte des endo rgi de traction
+c***********************************************************************
+c         passage  des contraintes effectives dans la base prin des endo
+          call chrep6(sigft61,vepspg33,.false.,sigft6p)  
+c         application du tenseur d endommagement aux
+c         contraintes de tractions
+          do i=1,6
+                if(i.le.3) then
+                    sigft6d(i)=(1.d0-dgt3(i))*sigft6p(i)
+                else
+                    call indce0(i,k,l)
+                    sigft6d(i)=(1.d0-max(dgt3(k),dgt3(l)))*sigft6p(i)
+                end if
+          end do
+c         retour des contraintes positives en base fixe
+          call chrep6(sigft6d,vepspg33t,.false.,sigft61)
+          
+c***********************************************************************
+c         prise en compte des endo rgi de compression
+c***********************************************************************
+c         passage  des contraintes effectives dans la base prin des endo
+          call chrep6(sigfc61,vepspg33,.false.,sigfc6p)  
+c         application du tenseur d endommagement aux contraintes de tractions
+          do i=1,6
+             if(alphar.gt.0.) then
+                if(i.le.3) then
+c                print*,'dgc3(',i,')=',dgc3(i)
+c                if(dgc3(i).ge.1.)stop
+                    sigfc6d(i)=(1.d0-dgc3(i))*sigfc6p(i)
+                else
+                    call indce0(i,k,l)
+                    sigfc6d(i)=(1.d0-max(dgc3(k),dgc3(l)))*sigfc6p(i)
+                end if
+             else
+                sigfc6d(i)=sigfc6p(i)
+             end if
+c            print*,'av',sigfc6p(i),' ap',sigfc6d(i)
+c            print*,'effacement effect dgc'
+c            sigfc6d(i)=sigfc6p(i)
+          end do
+c         retour des contraintes  en base fixe
+          call chrep6(sigfc6d,vepspg33t,.false.,sigfc61) 
+      else
+c        inutile de calculer les endo de compression      
+          do i=1,3
+             dgc3(i)=0.d0
+          end do
+      end if
+      else
+c         pas de calcul d endo orthotrope dans ce cas      
+          do i=1,3
+             dgc3(i)=0.d0
+             dgt3(i)=0.d0
+          end do      
+      end if
+      return
+      end
+      
+ 
+ 

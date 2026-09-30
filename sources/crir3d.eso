@@ -1,0 +1,525 @@
+C CRIR3D    SOURCE    FD218221  24/02/07    21:15:08     11834          
+c***********************************************************************
+      subroutine crir3d(bg,pg,bs,ps,bw,pw,rteff,cwrt,kwrt,reft,
+     #rceff,kwrc,delta,beta,rteff_app,rceff_app,actif,factif,nc,err1,
+     #na,sig13,cg,hplg,cs,hpls,cw,hplw,epspg6p,epsps6p,epspt6p,
+     #epspc6p,alphadp3,betadp3,refermtl,taudp,taudpmax,complet,CPTCR)
+     
+c     criteres de plasticite pour fldo3d,
+c     cf. coupl3d pour l ordre des criteres :
+
+c------variables -----------N° inconnue ---------N° critere ------------
+c       dsigm (rankine)          25-27       criteres: 10-12
+c       dscrg (rag)              28-30       criteres: 1-3
+c       dscrs (def)              31-33       criteres: 4-6
+c       dscrw (capillaire)       34-36       criteres: 7-9
+c       dsDP  (Drucker Prager)   37          critere : 13 
+c-----------------------------------------------------------------------
+         
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)     
+
+c     variables externes
+      real*8 bg,pg,bs,ps,bw,pw,rt,cwrt,kwrt,reft,rc,kwrc
+      real*8 delta,beta,rteff_app,rceff_app
+      integer nc
+      logical actif(nc),complet(nc)
+      logical CPTCR(nc,nc)
+      real*8 factif(nc)
+      integer err1,na
+      real*8 sig13(3)
+      real*8 epspg6p(6),epsps6p(6),epspt6p(6),epspc6p(6)
+      real*8 alphadp3(3),betadp3(3)
+
+c     variables locales      
+      real*8 bgpg,bwpw,bsps,sqrt3,sig_th,rt_dp
+      integer i
+      real*8 sigma,sigeq,siglim,taur,sigms,sigmd3(3),sigc3(3),taueq
+      logical confdp,refermtl
+      real*8 coeffdp,taudpmax,limit,fdp,xdp
+
+c     gestion de la precision
+      real*8 precision1,precision2
+      parameter(precision1=1.0d-5,precision2=1.0d-6)
+
+c     priorisation des criteres en pression
+      logical crpr  
+c     couplage refermeture avec DP
+      logical casr(3),cast(3) 
+c     nombre de rankine localises actifs
+      integer nr      
+      
+
+c***********************************************************************
+c     calcul des contraintes intraporeuses
+      bgpg=bg*pg
+      bwpw=bw*pw
+      bsps=bs*ps
+      
+c***********************************************************************
+c     calcul des resistances effectives totales (apparentes avant endo)
+      rteff_app=rteff-bwpw*kwrt
+      rceff_app=rceff-bwpw*kwrc     
+
+c***********************************************************************      
+c     test de la coherence des pressions intra poreuses
+      if((bgpg.lt.0.d0).or.(bwpw.gt.precision2).or.(bsps.lt.0.d0)) then
+         print*,'cas de pression intraporeuse imprevue dans crir3d'
+         print*,'bgpg:',bgpg,'bwpw:',bwpw,'bsps:',bsps
+c         err1=1
+c         na=0
+c         return
+      end if
+        
+c***********************************************************************      
+c     verif debut de l ecrouissage de compression pour eviter les
+c     interactions avec la traction directe
+      sqrt3=sqrt(3.d0) 
+      if(delta.ge.sqrt3) then
+         print*,'delta > sqrt(3) impossible dans fldo3d et crir3d'
+         err1=1
+         na=0
+         return
+      else 
+c        valeur min du criter de dp pour eviter les interactions avec rankine         
+         sig_th=rteff_app*((sqrt3+delta)/(sqrt3-delta))
+c        non interaction avec rteff_app triaxial
+         sig_th=max(sig_th,(rteff_app*3.d0*delta)/(sqrt3-delta))
+c        marge pour eviter la confusion numerique         
+         sig_th=sig_th*(1.d0+precision2)
+c        test de compatibilites des criteres traction compression
+         if(sig_th.gt.rceff_app) then
+             print*,'Dans crir3d'
+             print*,'DP atteignable par traction triaxiale ds crir3d'
+             print*,'augmenter Rc ou diminuer ept  (ou ept=rteff/E)'
+             print*,'rt:',rteff_app
+             print*,'rc:',rceff_app
+             print*,'sig_th minimun necessaire pour DP:',sig_th
+c             rt max pour eviter l interaction             
+              rt_dp=rceff_app*min((((sqrt3+delta)/(sqrt3-delta))**(-1)),
+     #        (((3.d0*delta)/(sqrt3-delta))**(-1)))
+     #        *(1.d0-2.d0*precision2)    
+c              print*,'On adopte rt_dp<rteff_app ds crir3d',rt_dp
+             err1=1
+             return
+         else
+              rt_dp=rteff_app
+         end if         
+      end if    
+
+      
+c***********************************************************************      
+c     test des criteres 
+c***********************************************************************
+
+c     initialisation des indicateurs par defaut    
+      do i=1,nc
+        actif(i)=.false.
+        complet(i)=.true.
+        factif(i)=0.d0
+      end do
+c     indicateur de refermeture de fissure de traction localisee      
+      refermtl=.false.
+c     indicateur d activite d au moins un critere de pression
+      crpr=.false.      
+c     boucle sur les criteres
+      na=0 
+ 
+      do i=1,nc
+c        print*,'crir3d, test du critere :',i 
+ 
+        if(i.le.3) then
+        
+c----------critere pression de gel sur scrg-----------------------------
+
+            j=i
+c           verifier CPTCR avec couplage3d            
+            sigma=sig13(j)-bwpw-bgpg-bsps
+c           verifier CPTCR avec couplage3d             
+            if(sigma.le.0.d0) then  
+                 if(epspt6p(j).gt.precision2) then
+c                   refermeture possible  sigma est limite par reft
+                    if(sigma.lt.-reft) then            
+                         sigeq=cg*pg-reft
+c                        on indique au solveur que le critere est tronqué de la contrainte totale                        
+c                         complet(i)=.false.
+                         complet(i)=.true.
+                    else
+                         sigeq=cg*pg+sigma
+                         complet(i)=.true.
+                    end if
+                 else
+c                   la fissure est deja refermee
+                    sigeq=cg*pg+sigma
+                    complet(i)=.true.
+                 end if                            
+            else
+                 if(sigma.lt.rteff_app) then
+                     sigeq=cg*pg+sigma
+                     complet(i)=.true.
+                 else
+                     sigeq=cg*pg+rteff_app
+c                     complet(i)=.false.
+                         complet(i)=.true.
+                 end if
+            end if
+c           la resistance a la traction dépend de la capillarite
+c           et de l ecrouissage a considerer dans coupl3d si ce critere actif            
+            siglim=rteff_app+hplg*max(epspg6p(j),0.d0) 
+c           precision sur le critere            
+            fglim=siglim*precision1            
+            factif(i)=sigeq-siglim
+            if(factif(i).gt.fglim) then
+c               le critere est actif
+                actif(i)=.true.
+                do k=1,nc
+                     if((.not.CPTCR(i,k)).and.actif(k)) then
+c                        incompatibilite detectee, on desactive le critere                 
+                         actif(i)=.false.
+                     end if
+                end do
+                if (actif(i)) then
+                     crpr=.true.                
+c                    actualisation nbr de criteres actifs                
+                     na=na+1
+                end if
+            end if 
+C        if((pg.gt.0.).and.(.not.(actif(i)))) then
+C        write (*,'(a16,e10.3,1x,a3,e10.3,1x,a6,i2,a2,e10.3,1x,a7,e10.3)')          
+C      #     'Dans crir3d: pg=',pg,'cg=',cg,
+C      #     'sigma(',i,')=',sigma,'siglim=',siglim
+C        write (*,'(a5,e10.3,1x,a8,e10.3,1x,a10,e10.3)')
+C      #    'hplg=',hplg,'epspg6p=',epspg6p(j),'rteff_app=',rteff_app
+C        write (*,'(a2,e10.3,a2,l2)')
+C      #    'f=',factif(i),'A=',actif(i)  
+C        read*
+C       end if             
+     
+        else if ((i.ge.4).and.(i.le.6)) then
+        
+c----------critere pression de def sur scrs-----------------------------        
+
+            j=i-3
+c           verifier CPTCR avec couplage3d            
+            sigma=sig13(j)-bwpw-bgpg-bsps
+c           verifier CPTCR avec couplage3d
+            if(sigma.lt.0.d0) then  
+                 if(epspt6p(j).gt.precision2) then
+c                   refermeture possible  sigma est limite par reft
+                    if(sigma.lt.-reft) then            
+                         sigeq=cs*ps-reft
+c                        on indique au solveur que le critere est tronqué                         
+c                         complet(i)=.false.
+                         complet(i)=.true.
+                    else
+                         sigeq=cs*ps+sigma
+                         complet(i)=.true.
+                    end if
+                 else
+c                   la fissure est deja refermee
+                    sigeq=cs*ps+sigma
+                 end if
+            else
+                 if(sigma.lt.rteff_app) then
+                     sigeq=cs*ps+sigma
+                     complet(i)=.true.
+                 else
+                     sigeq=cs*ps+rteff_app
+c                     complet(i)=.false.
+                         complet(i)=.true.
+                 end if
+            end if
+c           la resistance a la traction dépend de la capillarite
+c           et de l ecrouissage a considerer dans coupl3d si critere actif            
+            siglim=rteff_app+hpls*max(epsps6p(j),0.d0) 
+c           precision sur le critere            
+            fglim=siglim*precision1            
+            factif(i)=sigeq-siglim
+            if(factif(i).gt.fglim) then
+c               le critere est actif
+                actif(i)=.true.
+                do k=1,nc
+                     if((.not.CPTCR(i,k)).and.actif(k)) then
+c                        incompatibilite detectee, on desactive le critere                 
+                         actif(i)=.false.
+                     end if
+                end do
+                if (actif(i)) then
+                     crpr=.true.                
+c                    actualisation nbr de criteres actifs                
+                     na=na+1
+                end if
+            end if
+          
+       else if ((i.ge.7).and.(i.le.9)) then
+       
+c----------critere pression d eau sur scrw------------------------------        
+
+            j=i-6
+c           verifier CPTCR avec couplage3d            
+            sigma=sig13(j)-bwpw-bgpg-bsps
+c           verifier CPTCR avec couplage3d 
+            if(sigma.lt.0.d0) then            
+                 if(epspt6p(j).gt.precision1) then
+c                   refermeture possible  sigma est limite par reft
+                    if(sigma.lt.-reft) then            
+                         sigeq=-cw*bwpw-reft
+c                        on indique au solveur que le critere est tronqué                         
+                         complet(i)=.false.
+                    else
+                         sigeq=-cw*bwpw+sigma
+                    end if
+                 else
+                     sigeq=-cw*bwpw+sigma
+                 end if
+            else
+                 sigeq=-cw*bwpw
+                 complet(i)=.false.
+            end if
+c           la resistance a la traction dépend de la capillarite           
+            siglim=rteff_app
+c           precision sur le critere            
+c           fglim=siglim*precision1            
+            factif(i)=sigeq-siglim 
+            factif(i)=max(factif(i),0.d0)
+c           pas d ecoulement pour ce critere, car seulement endo  
+c           hydrique contraintes effectives            
+            actif(i)=.false.    
+          
+            
+       else if ((i.ge.10).and.(i.le.12)) then
+       
+c----------critere traction localisee ----------------------------------        
+
+            j=i-9
+c           verifier CPTCR avec couplage3d            
+            sigma=sig13(j)-bwpw-bgpg-bsps
+c           verifier CPTCR avec couplage3d             
+            sigeq=sigma
+c           la resistance a la traction dépend de la capillarite
+c           et de l ecrouissage a considerer dans coupl3d si critere actif
+            if(sigeq.gt.0.) then            
+                 siglim=rteff_app
+            else
+                if(epspt6p(j).ge.precision2) then
+c                   refermeture possible 
+                    siglim=reft
+                else
+                    siglim=rteff_app
+                end if
+            end if 
+C            print*,'direction', j,'sigma',sigma,'siglim',siglim               
+c           precision sur le critere            
+            fglim=siglim*precision1 
+            if(sigeq.gt.0.d0) then
+c                le critere a annuler est positif            
+                 factif(i)=sigeq-siglim
+                 if(factif(i).gt.fglim) then
+c                    le critere est actif
+                     actif(i)=.true.
+                     do k=1,nc
+                         if((.not.CPTCR(i,k)).and.actif(k)) then
+c                             incompatibilite detectee, on desactive le critere  
+C                               print*,'Incompatibilite',i ,'avec', k  
+C                               read*             
+                              actif(i)=.false.
+                         end if
+                     end do
+                     if (actif(i)) then              
+c                         actualisation nbr de criteres actifs                
+                          na=na+1
+                     end if
+                end if               
+            else
+                if(epspt6p(j).ge.precision2) then
+c                 le critere a annuler est negatif pour ne pas modifier coupl3d            
+                  factif(i)=sigeq+siglim
+                  if(factif(i).lt.-fglim) then                 
+                     actif(i)=.true.
+c                    le critere est actif
+                     actif(i)=.true.
+                     do k=1,nc
+                         if(.not.CPTCR(i,k).and.actif(k)) then
+c                             incompatibilite detectee, on desactive le critere                 
+                              actif(i)=.false.
+                         end if
+                     end do
+                     if (actif(i)) then              
+c                         actualisation nbr de criteres actifs                
+                          na=na+1
+c                         indicateur de refermeture active                          
+                          refermtl=.true.                         
+                     end if                     
+                  end if
+                end if
+            end if
+ 
+           
+       else if (i.eq.13) then
+       
+c----------critere de cisaillement -------------------------------------
+        
+c       ce critere n est traitee qu'apres les refermetures de fissures
+c       localisees de traction 
+c       contrainte hydrostatique (totale)      
+        sigms=0.d0         
+        do j=1,3
+             sigc3(j)=min(sig13(j)-bwpw-bgpg-bsps,rt_dp)
+c            modif en fonction des couplages avec les refermetures             
+             if(actif(9+j)) then
+                 if(factif(9+j).lt.0.) then
+c                    on referme la fissure elle est donc > (-reft) et 
+c                    ne va pas varier car doit verifier l autre critere                    
+                     sigc3(j)=max(sigc3(j),-reft)
+                     casr(j)=.true.
+                     cast(j)=.false.
+                 else
+c                    on ouvre la fissure elle est donc <rteff_app et 
+c                    ne va pas varier car doit verifier l autres critere
+                     sigc3(j)=min(sigc3(j),rteff_app) 
+                     cast(j)=.true.
+                     casr(j)=.false.
+                 end if
+             else  
+                 casr(j)=.false.
+                 cast(j)=.false.   
+             end if                 
+             sigms=sigms+sigc3(j)
+        end do
+        sigms=sigms/3.d0
+c        if(sigms.gt.0.) then
+c            print*,'Dans crir3d sigms=', sigms
+c        end if            
+c       deviateur et contrainte de Von Mises         
+        taueq=0.d0
+        do j=1,3
+            sigmd3(j)=sigc3(j)-sigms             
+            taueq=taueq+sigmd3(j)**2
+        end do
+        taueq=sqrt(taueq/2.d0)
+c       contrainte de Drucker Prager 
+        if(sigms.lt.0.d0) then
+c           effet favorable du confinement
+            taudp=taueq+delta*sigms
+            confdp=.true.
+        else
+c           effet du deconfinement non pris en compte
+            taudp=taueq
+            confdp=.false.
+c           print*,'ds crir3d pas de confinement sur dp'
+        end if
+c       Critere de Drucker Prager limite 
+        if (confdp) then
+             coeffdp=(1.d0/sqrt(3.d0)-delta/3.d0)
+        else
+             coeffdp=1.d0/sqrt(3.d0)
+        end if
+        taudpmax=coeffdp*rceff_app
+        limit=taudpmax*precision1
+        fdp=taudp-taudpmax
+c       calcul des coeffs pour l ecoulement de Drucker Prager        
+        if((taueq.gt.0.).and.(fdp.ge.limit)) then
+             do j=1,3
+                 xdp=0.5d0*sigmd3(j)/taueq
+                 if (confdp) then
+                     alphadp3(j)=xdp+delta/3.d0
+                 else
+                     alphadp3(j)=xdp
+                 end if
+                 if(casr(j).or.cast(j)) then
+c                    refermeture ou ouverture simultane direction j                 
+                     betadp3(j)=0.d0
+                 else
+c                    cas normal                 
+                     betadp3(j)=xdp+beta/3.d0
+                 end if                     
+c                 print*,'crir3d:',j,alphadp3(j),betadp3(j)
+             end do
+        else
+             do j=1,3
+                alphadp3(j)=0.d0
+                betadp3(j)=0.d0
+             end do
+        end if
+c       test du critere  
+        factif(i)=fdp      
+        if(fdp.ge.limit) then
+c            le critere est actif
+             actif(i)=.true.
+             do k=1,nc
+                 if((.not.CPTCR(i,k)).and.actif(k)) then
+c                     incompatibilite detectee, on desactive le critere                 
+                      actif(i)=.false.
+                 end if
+             end do
+             if (actif(i)) then              
+c                actualisation nbr de criteres actifs                
+                 na=na+1
+c                on compte les criteres de traction / refermeture actif 
+                 nr=0               
+                 do k=1,3
+                     if(actif(9+k)) then
+                       nr=nr+1
+                       if(factif(9+k).lt.0.) then
+c                           on a une refermeture dans la direction j et 
+c                           un ecoulement DP dans cette meme direction
+c                           on garde le couplage 
+                            continue
+                       else
+c                           on a un ecoulement dp et une traction dans
+c                           la meme direction, on ne garde que DP
+c                           on repousse la verification de traction a
+c                           une autre sous iteration
+                            actif(9+k)=.false.
+                            nr=nr-1
+                            na=na-1                            
+                       end if
+                     end if                       
+                 end do
+c                on comptabilise DP dans les actifs
+                 if(nr.eq.3) then
+c                    on annule le couplage avec DP car on a trois 
+c                    couplages avec les refermetures, on fait dabord les
+c                    3 refermetures
+                     actif(i)=.false.
+                     na=na-1
+                     if(na.eq.0) then
+                         print*,'Desactivation DP ds crir3d'
+                         print*,'Pb ds crir3d na=0 et refermtl=T !'
+                         do k=1,13
+                              print*,factif(k)
+                         end do
+                         err1=1
+                         return
+                    end if                       
+                 end if
+             end if                
+        end if
+c        do j=1,3
+c          if((sig13(j).lt. -rceff_app).and.(.not.actif(13)).and.
+c     #    (.not.refermtl)) then
+c               print*,'DP faux et sigeff',j,'=',sig13(j)
+c               do k=1,3
+c                 print*,'sig',k,'=',sig13(k)
+c               end do
+c               print*,'rceff_app=',rceff_app
+c               err1=1
+c               return
+c          end if
+c        end do
+c       fin de test des criteres          
+       end if 
+c      fin de boucle sur les criteres       
+      end do  
+C       print*,'Dans crir3d'
+C       do i=1,13
+C          write(*,'(A7,I3,L1,E10.3)') 'critere', i, actif(i),factif(i)
+C       end do 
+C       read*         
+      return       
+      end
+      
+      
+      
+ 
+ 

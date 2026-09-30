@@ -1,0 +1,389 @@
+C HHOEPS    SOURCE    OF166741  24/05/06    21:15:09     11082          
+C HHOEPS    SOURCE    FANDEUR                                           
+
+C-----------------------------------------------------------------------*
+C Elements massifs HHO en FORMULATION 'MECANIQUE'
+C HHO        calcul des deformations (HHP), du gradient
+C-----------------------------------------------------------------------*
+
+      SUBROUTINE HHOEPS(chaopt, imoHHO, ichDEP,nmoDEP,
+     &                  IIPDPG,UZDPG,RYDPG,RXDPG,
+     &                  IVACAR, NCARR, IPMINT, NBPTEL,
+     &                  IVAEPS,NCEPS, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCHAML
+-INC SMCOORD
+-INC SMELEME
+-INC SMMODEL
+-INC SMINTE
+-INC SMLENTI
+      POINTEUR mlent4.mlenti
+-INC SMLMOTS
+-INC SMLREEL
+      POINTEUR mlrdef.mlreel, mlrdec.mlreel, mlrmbh.mlreel
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS)
+        INTEGER IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      SEGMENT MWKHHO
+        INTEGER TABINT(NBINT)
+        REAL*8  TABFLO(NBFLO)
+      ENDSEGMENT
+
+      CHARACTER*(*) chaopt
+
+      DIMENSION UDPGE(3)
+
+      iret = 0
+
+C- OPTION DE CALCUL : GRADIENT DU DEPLACEMENT OU TENSEUR DES DEFORMATIONS
+      IF      (chaopt(1:4).EQ.'EPSI') THEN
+        NCHOPT = 1
+        IF (NCEPS.GT.9) THEN
+          write(ioimp,*) 'HHOEPS: NCEPS incorrect (> 9)'
+          iret = 5
+          RETURN
+        END IF
+      ELSE IF (chaopt(1:4).EQ.'GRAD') THEN
+        NCHOPT = 2
+        IF (NCEPS.NE.9) THEN
+          write(ioimp,*) 'HHOGRA: NCGRA incorrect (/= 9)'
+          iret = 5
+          RETURN
+        END IF
+      ELSE
+        NCHOPT = 0
+        write(ioimp,*) 'HHOEPS '//chaopt(1:4)//' unknown option'
+        iret = 5
+        RETURN
+      END IF
+
+      imodel = imoHHO
+c*      segact,imodel <- actif en entree/sortie
+
+C- Premieres verifications :
+      CALL HHONOB(imoHHO, nobHHO, iret)
+      IF (nobHHO.LE.0)THEN
+        write(ioimp,*) 'HHOEPS: IMODEL incorrect (not HHO)'
+        iret = 5
+        RETURN
+      END IF
+
+C- Introduction du point autour duquel se fait le mouvement
+C  de la section en defo plane generalisee
+C  IIPDPG = numero du noeud/point support si defini pour le modele
+C  NDPGE > 0 si prise en compte du point support
+      IF (IIPDPG.GT.0) THEN
+        write(ioimp,*) 'HHOEPS: GENE mode not implemented!'
+        iret = 5
+        return
+        IF (IFOUR.EQ.-3) THEN
+          NDPGE = 3
+          UDPGE(1) = UZDPG
+          UDPGE(2) = RYDPG
+          UDPGE(3) = RXDPG
+C          SEGACT,MCOORD
+          IREF = (IIPDPG-1)*(IDIM+1)
+          XDPGE = XCOOR(IREF+1)
+          YDPGE = XCOOR(IREF+2)
+        ELSE IF (IFOUR.EQ.11) THEN
+          NDPGE = 2
+          UDPGE(1) = UZDPG
+          UDPGE(2) = RXDPG
+          UDPGE(3) = XZero
+          XDPGE = XZero
+          YDPGE = XZero
+        ELSE IF (IFOUR.EQ. 7 .OR. IFOUR.EQ. 8 .OR. IFOUR.EQ. 9 .OR.
+     &           IFOUR.EQ.10 .OR. IFOUR.EQ.14) THEN
+          NDPGE = 1
+          UDPGE(1) = UZDPG
+          UDPGE(2) = XZero
+          UDPGE(3) = XZero
+          XDPGE = XZero
+          YDPGE = XZero
+        else
+          write(ioimp,*) 'HHOEPS: ERREUR NDPGE'
+          iret = 5
+          return
+        ENDIF
+      ELSE
+        NDPGE = 0
+        UDPGE(1) = XZero
+        UDPGE(2) = XZero
+        UDPGE(3) = XZero
+        XDPGE = XZero
+        YDPGE = XZero
+      END IF
+
+C- Recuperation des donnees de infell en entree
+c*      MELE   = imodel.NEFMOD
+c*      MFR    = imodel.infele(13)
+      meleme = imodel.IMAMOD
+      NBNOE  = meleme.NUM(/1)
+      NBELT  = meleme.NUM(/2)
+
+      mlenti = imodel.IVAMOD(nobHHO+1)
+c*      segact,mlenti
+      mlent3 = imodel.IVAMOD(nobHHO+3)
+c*      segact,mlent3
+      mlent4 = imodel.IVAMOD(nobHHO+4)
+c*      segact,mlent4
+
+      n_d_face = mlenti.lect(3)
+      n_d_cell = mlenti.lect(5)
+      nb_faces = mlenti.lect(7)
+      NBPGAU   = mlenti.lect(8)
+      idifo    = mlenti.lect(9)
+      NBDDL    = mlenti.lect(11)
+      NDEPF    = idifo * n_d_face
+      NDEPC    = idifo * n_d_cell
+      lhook    = 9
+
+      nbel3 = mlent3.lect(/1) / 2
+      nbfa3 = 2 * nb_faces
+      nbel4 = mlent4.lect(/1) / 2
+
+      IF (mlenti.lect(6).NE.NBNOE) THEN
+        write(ioimp,*) 'HHOEPS: Bizarre nb_vertices'
+      END IF
+      IF (NBDDL .NE. imodel.INFELE(9)) then
+        write(ioimp,*) 'HHOEPS: Bizarre NBDDL'
+      END IF
+c NBPGAU =? (NBPTEL = imodel.INFELE(4))
+      IF (NBPGAU .NE. imodel.INFELE(4)) then
+        write(ioimp,*) 'HHOEPS: Bizarre nb.p.gau(1)'
+      END IF
+c NBPGAU =? minte.POIGAU(/1)
+      minte = IPMINT
+c*      SEGACT minte <- actif en E/S
+      if (NBPGAU .NE. minte.POIGAU(/1)) then
+        write(ioimp,*) 'HHOEPS: Bizarre nb.p.gau (2)'
+      end if
+c-dbg      write(ioimp,*) 'HHOEPS nbpgau=',NBPGAU
+c-dbg      write(ioimp,*) 'HHOEPS: dof face/cell',n_d_face,n_d_cell,nb_faces
+      if (nbel3.NE.(NBELT*nb_faces)) then
+        write(ioimp,*) 'HHOEPS: Bizarre nbel3'
+      end if
+      if (nbel4.NE.NBELT) then
+        write(ioimp,*) 'HHOEPS: Bizarre nbel4'
+      end if
+
+      ivid = 1
+C- Deplacements des faces et des cellules :
+      nomid = nmoDEP
+c*      segact,nomid
+      JGN = nomid.lesobl(/1)
+c-dbg      write(ioimp,*) 'HHOEPS=',NDEPC,NDEPF,lesobl(/2),lesfac(/2)
+      nfac = 0
+C Deplacements des cellules - Points supports des cellules
+      JGM = NDEPC + nfac
+      SEGINI,mlmots
+      DO i = 1, NDEPC
+        mlmots.MOTS(i)(1:JGN) = nomid.lesobl(i)(1:JGN)
+      END DO
+c*      DO i = 1, nfac
+c*        mlmots.MOTS(NDEP+i)(1:JGN) = nomid.lesfac(i)(1:JGN)
+c*      END DO
+      CALL EXTR23(ichDEP,mlmots,MPCHHO,mlrDEC,ivid)
+      SEGACT,mlrDEC
+c*      IF (IERR.NE.0) THEN
+c*        iret = 21
+c*        return
+c*      END IF
+c-dbg      write(ioimp,*) 'mlmots DEPC ',(mots(i),i=1,mots(/2))
+c-dbg      write(ioimp,*) 'U.CELL',mlrdec.prog(/1),NCEHHO,NDEPC
+c-dbg      write(ioimp,*) '      ',(mlrdec.prog(i),i=1,mlrdec.prog(/1))
+c-dbg      write(ioimp,*)
+
+C Deplacements des faces - Points supports des faces
+      JGM = NDEPF + nfac
+      SEGADJ,mlmots
+      DO i = 1, NDEPF
+        mlmots.MOTS(i)(1:JGN) = nomid.lesobl(NDEPC+i)(1:JGN)
+      END DO
+c*      DO i = 1, nfac
+c*        mlmots.MOTS(NDEP+i)(1:JGN) = nomid.lesfac(i)(1:JGN)
+c*      END DO
+      CALL EXTR23(ichDEP,mlmots,MPFHHO,mlrDEF,ivid)
+      SEGACT,mlrDEF
+c*      IF (IERR.NE.0) THEN
+c*        iret = 21
+c*        return
+c*      END IF
+c-dbg      write(ioimp,*) 'mlmots DEPF ',(mots(i),i=1,mots(/2))
+c-dbg      write(ioimp,*) 'U.FACE',mlrdef.prog(/1),NFAHHO,NDEPF
+c-dbg      write(ioimp,*) '      ',(mlrdef.prog(i),i=1,mlrdef.prog(/1))
+c-dbg      write(ioimp,*)
+
+C- Verification des caracteristiques :
+      mptval = IVACAR
+      IVMBHO = mptval.IVAL(NCARR)
+      melval = IVMBHO
+      IGMB = melval.IELCHE(/1)
+      IEMB = melval.IELCHE(/2)
+c-dbg      write(ioimp,*) 'IVMBHO',melval,igmb,iemb,tyval(nvmat)
+      mlrmbh = melval.IELCHE(1,1)
+c*      segact,mlrmbh
+c*      write(ioimp,*) 'HHOEPS MBHHO SIZE:',mlrmbh.prog(/1),
+c*     &               NBDDL,9*NBDDL,mlenti.lect(14)
+      IF ((mlrmbh.prog(/1).NE.(9*NBDDL)) .OR. 
+     &    (mlrmbh.prog(/1).NE.mlenti.lect(14))) THEN
+        write(ioimp,*) 'HHOEPS: BHHO matrix size incorrect'
+        iret = 21
+        RETURN
+      END IF
+
+C- Indices et tableau de travail
+      ir_coo =          0
+c* si besoin des coordonnees      ir_eps = ir_coo + (IDIM*NBNOE)
+      ir_eps = ir_coo + 0
+      ir_uce = ir_eps + lhook
+      ir_ufa = ir_uce + NDEPC
+      ir_uge = ir_ufa + (NDEPF*nb_faces)
+      ir_fin = ir_uge + NDPGE
+
+      NBINT = 1
+      NBFLO = ir_fin
+      SEGINI,MWKHHO
+
+      IF (NDPGE.GT.0) THEN
+        DO ic = 1, NDPGE
+          TABFLO(ir_uge+ic) = UDPGE(ic)
+        END DO
+      END IF
+c* si besoin des coordonnees        SEGACT,MCOORD*NOMOD
+
+C-------------------------
+C Boucle sur les elements
+C-------------------------
+      DO IEL = 1, NBELT
+
+C- Recuperation des coordonnees des noeuds de l element IEL
+c*        CALL HHOCOO(meleme.num,NBNOE, mcoord.xcoor, IEL,
+c*    &               TABFLO(ir_coo+1), iret)
+c*        IF (iret.NE.0) RETURN
+
+C- Valeurs des inconnues primales pour l'element IEL (cell+faces)
+        in1 = IEL * 2
+        je = mlent4.lect(in1-1)
+        ip = mlent4.lect(in1)
+      if (ip.le.0) write(ioimp,*) 'HHOEPS ICEL Bizarre...',iel,je,ip
+        jp = ip + NBCHHO(je-1)
+
+        DO ic = 1, NDEPC
+          jc = NCEHHO * (ic - 1)
+          TABFLO(ir_uce + ic) = mlrDEC.prog(jp + jc)
+        END DO
+c-dbg      write(ioimp,*) 'HHOEPS ICEL',iel,je,ip,jp,ir_uce
+c-dbg      write(ioimp,*) (TABFLO(ir_uce+ic),ic=1,ndepc)
+
+        in1 = (IEL-1) * nbfa3
+        ir_kc = ir_ufa
+        DO j1 = 1, nb_faces
+          in2 = in1 + (2 * j1)
+          je = mlent3.lect(in2-1)
+          ip = ABS(mlent3.lect(in2))
+      if (ip.eq.0) write(ioimp,*) 'HHOEPS IFAE Bizarre...',iel,j1,je,ip
+          jp = ip + NBFHHO(je-1)
+          DO ic = 1, NDEPF
+            jc = NFAHHO * (ic - 1)
+            TABFLO(ir_kc + ic) = mlrDEF.prog(jp + jc)
+          END DO
+c-dbg      write(ioimp,*) 'HHOEPS IFAE',iel,j1,je,ip,jp,ir_kc
+c-dbg      write(ioimp,*) (TABFLO(ir_kc+ic),ic=1,ndepf)
+          ir_kc = ir_kc + NDEPF
+        END DO
+
+c-dbg      write(ioimp,*) 'HHOEPS ...',ir_uce,ir_kc,NBDDL
+
+        JEMB = MIN(IEL,IEMB)
+C--  --  --  --  --  --  --  --  --
+C - Boucle sur les points de Gauss
+C--  --  --  --  --  --  --  --  --
+        DO IGAU = 1, NBPGAU
+
+          melval = IVMBHO
+          JGMB = MIN(IGAU,IGMB)
+          mlrmbh = melval.IELCHE(JGMB,JEMB)
+c*          segact,mlrmbh
+c* !! matrice BHHO stockee colonne par colonne : lhook*NBDDL
+          DO ic = 1, lhook
+            r_z = XZero
+            DO jc = 1, NBDDL
+              jnc = lhook * (jc-1)
+              r_z = r_z + mlrmbh.prog(ic + jnc) * TABFLO(ir_uce + jc)
+            END DO
+            TABFLO(ir_eps + ic) = r_z
+          END DO
+
+          mptval = IVAEPS
+C -- Remplissage du segment contenant les "deformations"
+          IF (NCHOPT.EQ.1) THEN
+C -- Deformations "Diagonales" EP (11,22,33)
+            melval = mptval.IVAL(1)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 1)
+            melval = mptval.IVAL(2)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 2)
+            melval = mptval.IVAL(3)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 3)
+C -- Glissements "hors diagonale" GA (12,13,23)
+            melval = mptval.IVAL(4)
+            melval.velche(IGAU,IEL) =  TABFLO(ir_eps + 4)
+     &                               + TABFLO(ir_eps + 5)
+            IF (NCEPS.GT.4) THEN
+              melval = mptval.IVAL(5)
+              melval.velche(IGAU,IEL) =  TABFLO(ir_eps + 6)
+     &                                 + TABFLO(ir_eps + 7)
+              melval = mptval.IVAL(6)
+              melval.velche(IGAU,IEL) =  TABFLO(ir_eps + 8)
+     &                                 + TABFLO(ir_eps + 9)
+            END IF
+C -- Remplissage du segment contenant le "gradient du deplacement"
+          ELSE IF (NCHOPT.EQ.2) THEN
+            melval = mptval.IVAL(1)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 1)
+            melval = mptval.IVAL(2)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 4)
+            melval = mptval.IVAL(3)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 6)
+            melval = mptval.IVAL(4)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 5)
+            melval = mptval.IVAL(5)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 2)
+            melval = mptval.IVAL(6)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 8)
+            melval = mptval.IVAL(7)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 7)
+            melval = mptval.IVAL(8)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 9)
+            melval = mptval.IVAL(9)
+            melval.velche(IGAU,IEL) = TABFLO(ir_eps + 3)
+          END IF
+C--  --  --  --  --  --  --  --  --
+        END DO
+C--  --  --  --  --  --  --  --  --
+
+C-------------------------
+      END DO
+C-------------------------
+      SEGSUP,MWKHHO
+      SEGSUP,mlrdec,mlrdef
+      SEGSUP,mlmots
+
+c*      RETURN
+      END
+
+ 

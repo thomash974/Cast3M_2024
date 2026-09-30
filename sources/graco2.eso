@@ -1,0 +1,544 @@
+C GRACO2    SOURCE    PV090527  23/12/20    21:15:06     11813          
+      SUBROUTINE GRACO2(MMATRX)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C  TANT QUE OOOVAL(1,4) NE MARCHE PAS SUR CRAY
+C
+C COPIE DE CHOLE POUR FAIRE UN CHOLEVSKI INCOMPLET DE PLUS ON GARDE LA
+C MATRICE ASSEMBLEE ( SEGMENT LLIGN)
+C
+      PARAMETER (LPCRAY=10000)
+      INTEGER OOOVAL,OOOLEN
+      dimension ittime(4)
+C
+C  ****  MISE SOUS FORME A=Lt D L  DE LA MATRICE MMATRX
+C        SEULES LES VALEURS INITIALEMENT NON NULLES SONT CALCULEES
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMATRI
+-INC CCASSIS
+-INC CCHOLE
+-INC CCREEL
+      SEGMENT KIVPO(IIMAX)
+      SEGMENT KIVLO(IIMAX)
+
+      external graco5i
+      DATA COEAUG/0.75000000000000/
+      SAVE IPASV
+      DATA IPASV/0/
+C     character*8 zen
+C     equivalence (zen,izen)
+      call timespv(ittime,oothrd)
+      kcour=(ittime(1)+ittime(2))/10
+      kcourp=kcour
+      kcouri=kcour
+      kdiff=0
+      kcour=0
+      nbchan=1
+      nbopit=0
+      iposm=0
+C     zen='CPU'//char(0)
+C     le=4
+      lolig=0
+      nvaor=0
+      nbthro=nbthrs
+      ithrd=0
+      if (nbthro.gt.1) then
+       ithrd=1
+       call threadii
+      endif
+      nbthr=nbthro
+      do ith=1,nbthro
+       nbop(ith)=0
+      enddo
+C* en fait la parallelisation apporte peu    car la matrice est trop creuse
+C*    nbthr=1
+      MACTIT=OOOVAL(1,1)
+      prec=xspeti
+      nvstrm=0
+      MMATRI=MMATRX
+      SEGACT,MMATRI*MOD
+      MILIG1=IILIGN
+      IASLIG= IILIGN
+      SEGINI,MILIGN=MILIG1
+      IILIGN = MILIGN
+      INO=ILIGN(/1)
+      MDIA1=IDIAG
+      IASDIA=IDIAG
+      SEGINI,MDIAG=MDIA1
+C------------------------
+      IDIAG = MDIAG
+C-------------------------
+      NBLIG=INO
+C* comme la matrice est beaucoup plus creuse qu'en direct, on prend un masdim plus petit
+      precc=prec
+      INC=DIAG(/1)
+      INCC=INC
+      MIMIK=IIMIK
+      MINCPO=IINCPO
+      SEGACT,MINCPO,MIMIK
+      IPLUMI=IMIK(/2)*2 +4
+      IL2=0
+      LTRK=MAX(LPCRAY+1,OOOVAL(1,4))
+      IIMAX=((((IJMAX+IPLUMI) +LTRK)/LTRK)+1)*LTRK
+      SEGINI KIVPO,KIVLO
+      INEG=0
+      NBLAG=0
+      NENSLX=0
+      NVSTOC=0
+      NVSTOR=0
+C
+C
+C
+C  **** DEBUT DE LA TRIANGULARISATION. ON PREND NOEUD A NOEUD,
+C  **** DECOMPACTAGE PUIS TRAVAIL SUR LES LIGNES DU NOEUDS
+C
+C  ****  LA LONGUEUR DE LA PLUS GRANDE LIGNE EST DONNEE PAR IMAX
+C
+  1   CONTINUE
+      IVALMA=IJMAX+IPLUMI
+      IL1=IL2+1
+      IMIN=IL1
+
+
+      DO 2 I=IL1,INO
+
+      LLIGN=    ILIGN(I)
+      SEGACT /ERR=3/LLIGN
+
+
+      NA=  IMMMM(/1)
+C*    write (6,*) ' chole ligne noeud inconnues ',i,ipno(i),na
+      NBPAR=NA+1
+      NVALL=  NJMAX
+      LMASQ=NVALL/MASDIM+2
+
+      SEGINI /ERR=3/ LIGN
+
+
+
+
+
+
+C  recuperer la longueur du segment
+
+
+
+*  ilu(0) pas de remplissage
+*     lglig = (nvall/na)**1.333333333333333333333
+      lglig = (nvall/na)**2
+
+
+      NVSTOC=NVSTOC + NVALL
+      IVALMA=IVALMA + NVALL
+
+
+      nvaor = nvaor + xxva(/1)
+C
+C  ****  DECOMPACTAGE
+C
+      IPA=1
+      valmi=xgrand
+      valma=xpetit
+      DO 121 JPA=1,NA
+      IVPO(JPA)=IPA
+      KPA=IPPO(JPA+1)-IPPO(JPA)
+      IPP=IPPO(JPA)
+      IPPVV(JPA)=IPA-1
+      LPA=LDEB(JPA)
+      LPA1=LPA-IPA
+      DO 122 MPA=1,KPA
+      LL=LINC(MPA+IPP)
+      IPLA=LL-LPA1
+      if(abs(xxva(mpa+ipp)).gt.xpetit/xzprec) then
+        VAL(IPLA)=XXVA(MPA+IPP)
+        IMASQ(IPLA/MASDIM+1)=1
+        valmi=min(valmi,XVAL1)
+        XVAL1 = abs(val(ipla))
+        valma=max(valma,XVAL1)
+      endif
+122   CONTINUE
+      IPAHAU=IPA+IMMMM(JPA)-LPA
+      IPA=IPA+IMMMM(JPA)-LPA+1
+      IMMM(JPA)=IPNO(LPA)
+      IF(IMIN.GT.IPNO(LPA)) IMIN=IPNO(LPA)
+ 121  CONTINUE
+
+      if (na.gt.0) then
+          IPREL=  IMMMM(1)
+          IDERL=  IMMMM(NA)
+      endif
+      IPPVV(NA+1)=IPA-1
+C     SEGSUP LLIGN
+C     SEGDES LLIGN
+      ILIGN(I)=LIGN
+      IF(IIMPI.EQ.1525)  THEN
+       WRITE( IOIMP,4987)   I
+ 4987  FORMAT (' NOEUD NUMERO ',I5)
+       LL=VAL(/1)
+       WRITE(IOIMP, 4926)(VAL(MPA),MPA=1,LL)
+4926  FORMAT(' VAL ' , 10E11.4)
+      ENDIF
+      nbthro=min(nbthrs,lglig/400+1)
+      if (i+1-il1.ge.nbthro) then
+       nbthro=min(nbthrs,i+1-il1)
+         il2=i
+         GOTO 4
+      endif
+    2 CONTINUE
+      IL2=INO
+      GO TO 4
+    3 IL2=I-1
+      if(lign.ne.0) segsup lign
+
+    4 CONTINUE
+      nbthro=min(nbthrs,nbthro)
+      nbthr=nbthro
+
+      IF(IL2.GE.IL1) GO TO 40
+C
+C ****  APPEL AUX ERREURS  MESSAGE PAS ASSEZ DE PLACE MEMOIRE
+C
+      ITYP=48
+      CALL ERREUR(48)
+      if (ithrd.eq.1) call threadis
+      RETURN
+   40 CONTINUE
+      IM=INC
+
+
+
+
+      DO 352 IH=IL2 ,IL1,-1
+      LIGN=   ILIGN(IH  )
+      IL=INC
+      DO 354 JH=1,    IMMM(/1)
+      IM=MIN(IM,    IMMM(JH))
+      IL=MIN(IL,    IMMM(JH))
+ 354  CONTINUE
+      IML=IL
+      IMM=ipno(IM)
+  352 CONTINUE
+C  353 CONTINUE
+      LIGN=ILIGN(IL1)
+      IL11=IPREL
+C
+C  ****  BOUCLE  *5*  TRAVAILLE SUR LE NOEUD I QUI EST EN LECTURE
+C
+      ipos=0
+      iper=imin
+      ider=imin-1
+
+      DO 5 I=IMIN,IL2
+      if (ierr.ne.0) then
+       if (ithrd.eq.1) call threadis
+       return
+      endif
+      LIG1=ILIGN(I)
+      IF(I.LT.IL1)  GO TO 7
+C
+C  ******* LE NOEUD I EST EN MEMOIRE IL EST TRIANGULE JUSQU'A
+C  ******* IPREL  IL FAUT CONTINUER TOUTE LES LIGNES PUIS CALCULER
+C  ******* LE TERME DIAGONAL
+C
+      LIGN=LIG1
+      DO 156 KHG=1,IMMM(/1)
+      II=IPREL-1+KHG
+      IMMM(KHG)=0
+      NN=IPPVV(KHG+1)
+      NNM1=IPPVV(KHG)
+      N=NN-NNM1
+      DIAG(II)=VAL(NN)
+      IF(N.EQ.1)  GO TO 8
+      NMI=N-II
+      IDEP=MAX(IL11,2-NMI)
+      KIDEP=IDEP+NMI
+      KI1=N-1
+      KQ=-NMI
+      VAL(NN)=VAL(NN)+
+     # GRACO3(ILIGN,LIGN,VAL(1+IPPVV(KHG)),DIAG(1-NMI),IPNO(1-NMI),
+     # IPPVV(1),KHG,IVPO(1),KIDEP,KI1,KQ,IMASQ(1),1+IPPVV(KHG),
+     # PREC,ittr(1),nc)
+       imasq(nn/masdim+1)=1
+       imasq(n/masdim+1)=1
+   8  CONTINUE
+      if (diag(ii).ne.0.d0) then
+       if (ittr(ii).eq.0) then
+        if (abs(val(nn)).lt.abs(diag(ii))*coeaug) then
+**      write(6,*) 'augmentation raideur ii ',ii,val(nn),diag(ii)
+        val(nn)=diag(ii)*coeaug
+        endif
+       else
+        if (abs(val(nn)).lt.abs(diag(ii))*coeaug) then
+**      write(6,*) 'augmentation raideur ii ',ii,val(nn),diag(ii)
+        val(nn)=diag(ii)*coeaug
+        endif
+       endif
+      endif
+
+      IF(ITTR(II).EQ.0.AND.
+     & ABS(VAL(NN)).GT.ABS(DIAG(II))*1.E-10)  GO TO 12
+      IF(ITTR(II).NE.0.AND.
+     & ABS(VAL(NN)).GT.ABS(DIAG(II))*1.E-6)  GO TO 12
+C
+C  **** ON VIENT DE DETECTER UN MODE D'ENSEMBLE
+C  **** ON AJOUTE A LA STRUCTURE UN RESSORT EGAL A CELUI QUI EXISTAIT
+C  **** AU PREALABLE SUR CETTE INCONNUE.
+C
+      VAL(NN)=DIAG(II)*1d-4
+      NENS=NENS+1
+      IMMM(KHG)=NENS
+      if(ittr(ii).NE.0) NENSLX=NENSLX+1
+   12 CONTINUE
+       IMASQ(NN/MASDIM+1)=1
+      DIAG(II)=VAL(NN)
+      IF(DIAG(II).NE.0.d0)  GO TO 41
+      KQ1=1+NNM1
+      KQN=N+NNM1
+      DO 16 LFG=KQ1,KQN
+      if (imasq(lfg/masdim+1).le.0) goto 16
+      IF(VAL(LFG).NE.0.d0)  GO TO 17
+   16 CONTINUE
+      DIAG(II)=1.D0
+      if (ittr(ii).ne.0) diag(ii)=-1d0
+      VAL(NN)=DIAG(II)
+      GO TO 41
+   17 CONTINUE
+C
+C  ****  ENVOI ERREUR MATRICE SINGUIERE
+C
+      ITYP=49
+      INTERR(1)=I
+      CALL ERREUR(49)
+      if (ithrd.eq.1) call threadis
+      RETURN
+C
+C  ****  ON COMPTE LE NOMBRE DE TERMES DIAGONAUX NEGATIFS
+C        ET LE NOMBRE DE MULTIPLICATEUR DE LAGRANGE
+C
+   41 IF(DIAG(II).LT.0.D0)  INEG=INEG+1
+      IF(ITTR(II).NE.0) NBLAG=NBLAG+1
+      diag(ii)=1.d0/diag(ii)
+  156 CONTINUE
+      NA=IMMM(/1)
+C
+C  RECOMPACTAGE DE LIGN (DEJA ENTIEREMENT TRAITEE)
+C
+      izro=0
+      CALL COMPAC(VAL(1),NBPAR,KIVPO(1),KIVLO(1),
+     #    NVALL,IPPVV(1),izro ,NA ,xpetit/xzprec,imasq(1),iprel,iderl)
+C on recree lign car la compacter en place emiette la memoire
+       lmasq=0
+       segini,lig1
+*  deplacement fait ici maintenant, avec unrolling
+      do 300 nbp=1,nbpar-1
+       kdif =kivpo(nbp)-kivlo(nbp)
+       do     iv=kivlo(nbp),kivlo(nbp+1)-4,4
+          lig1.val(iv)=val(iv+kdif )
+          lig1.val(iv+1)=val(iv+1+kdif )
+          lig1.val(iv+2)=val(iv+2+kdif )
+          lig1.val(iv+3)=val(iv+3+kdif )
+       enddo
+       do     iv1=iv,kivlo(nbp+1)-1
+          lig1.val(iv1)=val(iv1+kdif )
+       enddo
+ 300  continue
+       do it=1,na
+        lig1.immm(it)=immm(it)
+        lig1.ippvv(it)=ippvv(it)
+       enddo
+        lig1.ippvv(na+1)=ippvv(na+1)
+        lig1.iml=iml
+        lig1.iprel=iprel
+        lig1.iderl=iderl
+        lig1.iml=iml
+        lcara(2,i)=lig1.iprel
+        lcara(3,i)=lig1.iderl
+        lcara(1,i)=lig1.iml
+        segsup lign
+       lign =lig1
+       ilign(i)=lign
+
+      NVSTOR=NVSTOR+NVALL
+      nvstrm=max(nvstrm,nvall)
+      DO 143 LHG=1,NBPAR
+       IVPO(2*LHG-1)=KIVPO(LHG)
+       IVPO(2*LHG)=KIVLO(LHG)
+ 143  CONTINUE
+      if (i.gt.1) then
+       lig1=ilign(i-1)
+       segdes lig1
+       iderac=min(iderac,i-2)
+      endif
+C*    WRITE (6,*) ' NOEU ',I,' DIAG INVERSE ',VAL(VAL(/1))
+C*    WRITE (6,*) ' LIGNE APRES COMPACTION VAL '
+C*    WRITE (6,*) (VAL(IK),IK=1,VAL(/1))
+C*    WRITE (6,*) 'KIVPO '
+C*    WRITE (6,*) (KIVPO(IK),IK=1,NBPAR)
+C*    WRITE (6,*) 'KIVLO '
+C*    WRITE (6,*) (KIVLO(IK),IK=1,NBPAR)
+
+C  ****  ON TRIANGULARISE LES AUTRES LIGNES
+C
+      il1=il1+1
+      if (il1.gt.il2) goto 5
+      LIG1=ILIGN(I)
+      lign=ilign(il1)
+      IL11=IPREL
+      goto 7
+  71  continue
+C      soit parce qu'on a fini, soit parce qu'on manque de memoire
+C      il faut executer les lignes activees puis les desactiver
+C      lancer les chole3 et attendre qu'ils soient finis
+      if (ipos.ne.0) then
+**     write (6,*) ' lancement thread ',iper,ider,il1,il2
+       if (iper.gt.ider) then
+        write (6,*) ' erreur interne chole '
+        write (6,*) ' noeud ',i,' sur ',ino
+        write (6,*) ' nombre de termes actuels ',nvstor
+        call erreur(5)
+       endif
+       nbthr=min(nbthr,il2-il1+1)
+       do ith=1,nbthr-1
+        call threadid(ith,graco5i)
+       enddo
+        call graco5i(nbthr)
+       do ith=nbthr-1,1,-1
+        call threadif(ith)
+       enddo
+      endif
+
+C  test ctrlC
+      if (ierr.ne.0) goto 9999
+      iposm=max(iposm,ipos)
+      ipos=0
+      iderf=ider-1
+      if (ider.ne.il1-1) iderf=ider
+      do il=iderf,iper,-1
+        lign=ilign(il)
+        segdes lign
+C       write (6,*) ' desactivation ligne ',il
+      enddo
+       iderac=min(iderac,iper-1)
+      iper=ider+1
+C     write (6,*) ' iper ider il1 ',iper,ider,il1
+      if (iper.ne.il1) goto 7
+
+      goto 5
+    7 CONTINUE
+      SEGACT/err=71/LIG1
+      ipos=ipos+1
+      ider=i
+      if (i.gt.iderac) iderac=i
+      if (i.eq.il1-1)   goto 71
+    5 CONTINUE
+C     write (6,*) ' il1 il2 apres 5 ',il1,il2
+C      DO 11 I=IL1,IL2
+C        LIGN=   ILIGN(I)
+        SEGDES,LIGN
+
+
+C   11 CONTINUE
+      nbopt=0
+      do ith=1,nbthro
+       nbopt=nbopt+nbop(ith)
+       nbop(ith)=0
+      enddo
+      nbopin=nbopt
+      nbopit=nbopit+nbopin
+      call timespv(ittime,oothrd)
+      kcourp=kcour
+      kcour=(ittime(1)+ittime(2))/10
+      kdiff=kcour-kcourp
+C*      write (6,*) ' nb operation temps ',nbopin,kdiff
+      iderac=min(iderac,il1-1)
+      IF(IL2.LT.INO)  GO TO 1
+C  ON MET A JOUR LE NOMBRE DE TERMES DIAGONAUX NEGATIF
+C   ON ENLEVE LE NOMBRE DE MULTIPLICATEUR DE LAGRANGE
+C       INEG=INEG-NBLAG
+C     on ne compte pas 2 fois les multiplicateurs qui vont etre
+C     elimines lors de la resolution car mode d'ensemble
+      INEG=INEG-(NBLAG-NENSLX)
+      if (iimpi.ne.0.and.NENSLX.gt.0) WRITE(IOIMP,4820) NENSLX
+ 4820 FORMAT(I12,' MODES D ENSEMBLE PORTANT SUR DES MULTIPLICATEURS',
+     1' DE LAGRANGE DETECTES')
+
+      IF(IIMPI.EQ.1) WRITE(IOIMP,4821) NVSTOC
+ 4821 FORMAT( ' NOMBRE DE VALEURS  DANS LE PROFIL',I12)
+      IF(IIMPI.EQ.1) WRITE(IOIMP,4822) NVSTOR
+ 4822 FORMAT( ' NOMBRE DE VALEURS STOCKEES DANS LE PROFIL',I12)
+      INTERR(1)=NVSTOR
+      reaerr(1)=nvstor/inc**(4./3)
+      reaerr(2)=2*nbopit/1D3/max(1,(kcour-kcouri))
+      IF (IPASV.EQ.0) CALL ERREUR(-278)
+      IPASV=1
+      SEGDES,MINCPO
+      SEGDES,MIMIK
+      SEGDES,MMATRI
+      SEGDES,MILIGN
+      SEGDES,MDIAG
+      MMATRX=MMATRI
+      SEGSUP KIVPO,KIVLO
+ 9999 continue
+      if (ithrd.eq.1) call threadis
+      RETURN
+      END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

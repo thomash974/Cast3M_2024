@@ -1,0 +1,14 @@
+C TSEG2A    SOURCE    OF166741  23/12/04    21:15:19     11800          
+C
+C ===>  SOUS-PROGRAMME  TSEG2A  PLUS UTILISE    <===
+C ===>  SUBROUTINE              NO LONGER USED  <===
+C
+      SUBROUTINE TSEG2A
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      RETURN
+      END
+
+ 

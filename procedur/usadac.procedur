@@ -1,0 +1,54 @@
+$$$$ USADAC
+* USADAC    PROCEDUR  MB234859  24/02/06    21:15:02     11833          
+************************************************************************
+*                         PROCEDURE USADAC
+*
+* Procedure qui approxime la largeur de la zone de contact L en fonction 
+* du nombre de cycle N via une fonction de la forme :
+*
+*                    L(N) = L0 + [L1 '*' N '**' L2]
+*                dL(N)/dN = L1 '*' L2 '*' N '**' (L2 '-' 1)
+*
+* Cette procedure est celle a fournir a LEVM pour determiner les valeurs 
+* des parametres L1 et L2 au cours de la resolution.
+*
+* Lorsque DlCyc  = 0, elle retourne dL(N)/dN
+*
+* Lorsque DlCyc /= 0, elle calcule  : 
+*                  L(N) '-' L0 = L1 '*' N '**' L2
+*                      dL/dL1  = N '**' L2
+*                      dL/dL2  = L1 '*' LOG N '*' N '**' L2
+*
+* Il s'agit du schema developpe par Q.Caradec lors de sa these.
+*
+* Entrees :
+*   T1    : Table de PASAPAS
+*
+* Appelee par USACCE et utilisee par LEVM
+*
+************************************************************************
+'DEBP' USADAC lCyc*'LISTREEL' lLambda*'LISTREEL';
+*
+  DlCyc   = 'DIME' lCyc ;
+  lambda1 = 'EXTR' lLambda 1;
+  lambda2 = 'EXTR' lLambda 2;
+*-----------------------------------------------------------------------
+  'SI' ('EGA' DlCyc 0) ;
+    Llcont  = 0. ;
+    Ncycle  = 'EXTR' lLambda 3;
+    Ldlcont = lambda1 '*' lambda2 '*' (NCycle '**' (lambda2 '-' 1.));
+  'SINON' ;
+    Llcont = 'PROG' ; Ldlcont = 'PROG' ;
+    'REPE' i DlCyc ;
+      Cyc_i = 'EXTR' lCyc &i;
+      dlcl1 = Cyc_i '**' lambda2 ;
+      lcont = lambda1 '*' dlcl1 ;
+      dlcl2 = lambda1 '*' (LOG Cyc_i) '*' dlcl1 ;
+*     
+      Llcont  = Llcont  'ET' lcont ;
+      Ldlcont = Ldlcont 'ET' dlcl1 'ET' dlcl2 ;
+    'FIN' i;
+  'FINSI' ;
+*-----------------------------------------------------------------------
+'FINP' Llcont Ldlcont ;
+ 

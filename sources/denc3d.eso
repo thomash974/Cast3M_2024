@@ -1,0 +1,355 @@
+C DENC3D    SOURCE    FD218221  24/02/07    21:15:09     11834          
+        subroutine denc3d(ngf,NDIMG,ndima,NTMAX,NCMAX,NLMAX,
+     #  nbract,ft,lnumcrt,dpftds,dgftds,REST,PFT_GRAD_PFT,PFT_GRAD_GFT,
+     #  nbracc,fc,lnumcrc,dpfcds,dgfcds,RESC,PFC_GRAD_PFC,PFC_GRAD_GFC,
+     #  nbracl,fl,lnumcrl,dpflds,dgflds,RESL,PFL_GRAD_PFL,PFL_GRAD_GFL,
+     #  jse,jea,aai,aap,jsp,Je1epg,DEPST1,DEPSL1,DEPSC1,reduc_resg,
+     #  NDIMPL,RgR,ninc,NBRINC,Jsgep,ACTIFT,ACTIFC,ACTIFL,PFG_GRAD_PFG,
+     #  precision3d,err1,affiche)
+
+c       calcul des ecoulements dans l espace des deformations plastiques
+
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+        
+c       dimension espace generalise
+        integer NDIMG,ndima,nbract,err1,ngf,NTMAX,NCMAX,NLMAX
+        integer nbracc,nbracl,ninc,NBRINC
+c       activite des criteres      
+        logical ACTIFT(NTMAX),ACTIFC(NCMAX),ACTIFL(NLMAX)
+        real*8 aai(ngf,ngf+1)
+        
+c       criteres de traction 
+        real*8 ft(NTMAX),rest
+c       criteres de cisaillement
+        real*8 fc(NCMAX),resc 
+c       traction localisee
+        real*8 fl(NCMAX),resl       
+        integer lnumcrt(NTMAX),lnumcrc(NCMAX),lnumcrl(NLMAX)
+c       inverse de a
+        real*8 jea(NDIMG,ndima)
+c       regiddite generalisee
+        real*8 jse(NDIMG,NDIMG)
+c       derivee du critere par rapport à la contrainte
+        real*8 DPFTDS(NTMAX,NDIMG),DPFCDS(NCMAX,NDIMG)
+        real*8 DPFLDS(NLMAX,NDIMG)  
+c       derivee du critere par rapport à la contrainte
+        real*8 DGFTDS(NTMAX,NDIMG),DGFCDS(NCMAX,NDIMG) 
+        real*8 DGFLDS(NLMAX,NDIMG)
+
+c       dimension de l espace de minimisation des residus plastiques
+        integer NDIMPL
+c       jacobienne Je1epg dans la base des ecoulements plastiques
+        real*8 Je1epg(NDIMG,NDIMPL) 
+c       matrice jsp=dseff/depsp generalise
+        real*8 jsp(NDIMG,NDIMPL)
+c       preparation de la matrice inv(A).Jea
+        real*8 AAP(NDIMG,NDIMPL)
+        
+c       gradient des fonctions seuil et pseudo potentiels, direction ecoulement
+        real*8 PFT_GRAD_PFT(NDIMPL),PFT_GRAD_GFT(NDIMPL) 
+c       gradient des fonctions seuil et pseudo potentiels, direction ecoulement
+        real*8 PFC_GRAD_PFC(NDIMPL),PFC_GRAD_GFC(NDIMPL)
+c       gradient des fonctions seuil et pseudo potentiels, direction ecoulement
+        real*8 PFL_GRAD_PFL(NDIMPL),PFL_GRAD_GFL(NDIMPL)
+c       par de fgradf due a la pression de gel pour les criteres de decollement
+        real*8 PFG_GRAD_PFG(NDIMPL)
+c       precision3
+        real*8 precision3d
+c       def plastique
+        real*8 DEPST1(NDIMG),DEPSC1(NDIMG),DEPSL1(NDIMG)
+c       coeff de relaxation du residu
+        real*8 reduc_resg
+c       matrice d bgpg / d ea ds l espace de minimisation
+        real*8 Jsgep(NDIMG,NDIMPL)
+c       Vecteur R.grad(R) dans l espace de minimisation
+        real*8 RgR(NDIMPL)       
+
+c       controle affichage        
+        logical affiche,affiche_local
+        integer icr,jcr,idir,ityp
+
+c       calcul de lambda
+        real*8 lambda,numerateur,denom
+        
+        affiche_local=affiche
+c        affiche_local=.true.
+        if(affiche_local) then
+            print*,'Dans denc3d'
+        end if
+      
+c----------------- preparation des matrice  pour le retour radial ------
+
+c       on est en base generali des deformations plastique (3*12=32 ep)
+c       01-12: d eps pt
+c       13-24: d eps pc
+c       25-36: d eps pl
+c       avec un seule inclusion NDIMG=12
+c       et avec 3 types de plasticite NDIMPL=3*NDIMG=36
+c       l indice g est ici relatif a la base de dimansion NDIMPL
+       
+c       ---------- calcul de la matrice AAp=inv(1-Je1ee)*Je1ep(g) ------
+
+c       AAp=d epse_e(epsg) / d eps_p(ecoul)
+        do i=1,NDIMG
+            do j=1,NDIMPL
+                AAp(i,j)=0.d0
+                do k=1,NDIMG
+                     AAp(i,j)=AAp(i,j)+AAi(i,k)*Je1epg(k,j)
+                end do
+c               print*,i,j,aap(i,j)               
+            end do
+        end do  
+
+c       ---------matrice Jsp=H*AAp -------------------------------------
+
+c       Jsp= d sigma(epsg)/ d eps_p(ecoul)
+        do i=1,NDIMG
+            do j=1,NDIMPL
+                Jsp(i,j)=0.d0
+                do k=1,NDIMG
+                    Jsp(i,j)=Jsp(i,j)+Jse(i,k)*AAp(k,j)
+                end do
+            end do
+        end do
+        
+c----------------calcul des gradient ponderes elementaires ------------- 
+
+c       les gradients  sont calcules ici dans l espace des variables
+c       d ecoulement plastique de dimension = NBTYP_PLAST*NDIMG
+10      do i=1,NDIMPL
+c           initialisation du f*gradient de f
+            RgR(i)=0.d0
+        end do   
+     
+c       --------- criteres de traction diffuse -------------------------
+        rest=0.d0       
+        if(nbract.ne.0) then
+            do jcr=1,nbract
+                icr=lnumcrt(jcr) 
+                rest=rest+FT(icr)**2
+                call fgrf3d(NDIMG,NDIMPL,NTMAX,DPFTDS,icr,JSP,FT,
+     #          PFT_GRAD_PFT,affiche_local)
+c               actualisation du gradient complet  
+                do idir=1,NDIMPL
+                    RgR(idir)=RgR(idir)+PFT_GRAD_PFT(idir)
+                end do                   
+            end do
+        end if
+
+c       --------- criteres de cisaillement -----------------------------
+        resc=0.d0        
+        if(nbracc.ne.0) then
+            do jcr=1,nbracc
+                icr=lnumcrc(jcr) 
+                resc=resc+FC(icr)**2
+                call fgrf3d(NDIMG,NDIMPL,NCMAX,DPFCDS,icr,JSP,FC,
+     #          PFC_GRAD_PFC,affiche_local)
+c               actualisation du gradient complet  
+                do idir=1,NDIMPL
+                    RgR(idir)=RgR(idir)+PFC_GRAD_PFC(idir)
+                end do                   
+            end do
+        end if
+
+c       --------- criteres de traction decollement localise ------------
+        resl=0.d0
+        if(nbracl.ne.0) then
+            do jcr=1,nbracl
+                icr=lnumcrl(jcr) 
+                resl=resl+FL(icr)**2
+c               actualisation de la part de gradient du a sigma'
+                call fgrf3d(NDIMG,NDIMPL,NLMAX,DPFLDS,icr,JSP,FL,
+     #          PFL_GRAD_PFL,affiche_local)
+c               mise a jour du gradient global dans l espace des 
+                do idir=1,NDIMPL
+                    RgR(idir)=RgR(idir)+PFL_GRAD_PFL(idir)
+                end do 
+c               actualisation de la part de gradient du a digma gel
+                call fgrf3d(NDIMG,NDIMPL,NLMAX,DPFLDS,icr,JSGEP,FL,
+     #          PFG_GRAD_PFG,affiche_local)
+c               mise a jour du gradient global dans l espace des 
+                do idir=1,NDIMPL
+                    RgR(idir)=RgR(idir)+PFG_GRAD_PFG(idir)
+                end do 
+            end do
+        end if
+        
+c------------ multiplicateur plastique ---------------------------------
+       
+c       ---denominateur-------------------------------------------------
+
+c       initialisation du produit scalaire fgradf*fgradF
+        denom=0.d0
+
+c       ---- prise en compte des ecoulements de traction diffuse -------
+        if(nbract.ne.0) then
+            do i=1,NBRACT
+                icr=lnumcrt(i) 
+c               on limite le produit sur les ndimg du critere de traction 
+                if(ninc.eq.1) then
+                    idebut=0
+                else
+c                   pour les idebut des autres inclusions il faut
+c                   pouvoir calculer idebut
+                    print*,'Il manque un traitement  ninc>1 ds denc3d'
+                    err1=1
+                    return
+                end if
+c               contribution de ce critere sur le denominateur
+                do idir=1,NDIMG
+                    denom=denom+
+     #              RgR(idebut+idir)*DGFTDS(icr,idir)*FT(icr)
+                end do 
+            end do
+        end if
+
+c       ---- prise en compte des ecoulements de cisaillement diffuse ---
+        if(nbracc.ne.0) then 
+            do i=1,nbracc
+                icr=lnumcrc(i)
+                if(ninc.eq.1) then
+                    idebut=NDIMG
+                else
+c                   pour les idebut des autres inclusions il faut
+c                   pouvoir calculer idebut
+                    print*,'Il manque un traitement  ninc>1 ds denc3d'
+                    err1=1
+                    return
+                end if
+c               contribution de ce critere sur le denominateur
+                do idir=1,NDIMG
+                    denom=denom+
+     #              RgR(idebut+idir)*DGFCDS(icr,idir)*FC(icr)
+                end do             
+            end do
+        end if
+
+c       ----- prise en compte des ecoulements de de decollement --------
+        if(nbracl.ne.0) then
+            do i=1,NBRACL
+                icr=lnumcrl(i)  
+                if(ninc.eq.1) then
+                    idebut=2*NDIMG
+                else
+c                   pour les idebut des autres inclusions il faut
+c                   pouvoir calculer idebut
+                    print*,'Il manque un traitement  ninc>1 ds denc3d'
+                    err1=1
+                    return
+                end if
+c               contribution de ce critere sur le denominateur
+                do idir=1,NDIMG
+                    denom=denom+
+     #              RgR(idebut+idir)*DGFLDS(icr,idir)*FL(icr)
+                end do
+            end do
+        end if
+
+c       ---numerateur --------------------------------------------------
+
+        numerateur=-(rest+resc+resl)
+
+c       ---multiplicateur plastique generalise--------------------------
+        if(denom.ne.0.) then
+          lambda=numerateur/denom
+        else
+          if(numerateur.lt.0.) then
+            print*,'Dans denc3d le denominateur de lambda est nul'
+            print*,'NBRACT traction diffuse',NBRACT
+            do i=1,NTMAX
+                icr=lnumcrt(i)
+                write(*,'(a4,i3,1x,a4,i3,1x,a3,e10.3,L2)')
+     #           'num:',i,'dir:',icr,'Ft:',ft(icr),actift(icr)
+            end do
+            print*,'NBRACT cisaillement',NBRACC
+            do i=1,NCMAX
+                icr=lnumcrc(i)
+                write(*,'(a4,i3,1x,a4,i3,1x,a3,e10.3,L2)')
+     #           'num:',i,'dir:',icr,'Fc:',fc(icr),actifc(icr)
+            end do
+            print*,'NBRACT traction decollement localise',NBRACL
+            do i=1,NLMAX
+                icr=lnumcrl(i)
+                write(*,'(a4,i3,1x,a4,i3,1x,a3,e10.3,L2)')
+     #           'num:',i,'dir:',icr,'Fl:',fl(icr),actifl(icr)
+            end do
+c           arret
+            err1=1
+            return
+          else
+            print*,'Mise a zero du multiplicateur dans denc3d'
+            lambda=0.d0
+          end if
+        end if
+
+c----------- deformations plastiques -----------------------------------
+
+c       prise en compte de la relaxation du residu                
+        lambda=lambda*reduc_resg
+        
+c       initialisation des ecoulements
+        do idir=1,NDIMG
+            DEPST1(idir)=0.d0
+            DEPSC1(idir)=0.d0
+            DEPSL1(idir)=0.d0
+        end do
+
+c       ---- prise en compte des ecoulements de traction diffuse -------
+        if(nbract.ne.0) then
+            do i=1,NBRACT
+                icr=lnumcrt(i) 
+c               contribution de ce critere sur le denominateur
+                do idir=1,NDIMG
+                    DEPST1(idir)=DEPST1(idir)+
+     #              lambda*DGFTDS(icr,idir)*FT(icr)
+                end do 
+            end do
+        end if
+
+c       ---- prise en compte des ecoulements de cisaillement diffuse ---
+        if(nbracc.ne.0) then 
+            do i=1,nbracc
+                icr=lnumcrc(i)
+c               contribution de ce critere sur le denominateur
+                do idir=1,NDIMG
+                    DEPSC1(idir)=DEPSC1(idir)+
+     #              lambda*DGFCDS(icr,idir)*FC(icr)
+                end do             
+            end do
+        end if
+        
+c       ----- prise en compte des ecoulements de decollement -----------
+        if(nbracl.ne.0) then
+            do i=1,NBRACL
+                icr=lnumcrl(i)  
+c               contribution de ce critere sur le denominateur
+                do idir=1,NDIMG
+                    DEPSL1(idir)=DEPSL1(idir)+
+     #              lambda*DGFLDS(icr,idir)*FL(icr)
+                end do
+            end do
+        end if
+
+
+        if(affiche_local) then
+            do i=1,NDIMG
+                write(*,'(A6,I2,A2,E10.3)')
+     #          'DEPST(',i,')=',DEPST1(i)
+            end do
+            do i=1,NDIMG
+                write(*,'(A6,I2,A2,E10.3)')
+     #          'DEPSC(',i,')=',DEPSC1(i)
+            end do
+            do i=1,NDIMG
+                write(*,'(A6,I2,A2,E10.3)')
+     #          'DEPSL(',i,')=',DEPSL1(i)
+            end do
+        end if
+
+
+        return
+        end
+        
+ 
+ 

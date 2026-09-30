@@ -1,0 +1,329 @@
+C PROVC3    SOURCE    CB215821  20/11/04    21:20:41     10766          
+C 
+      SUBROUTINE PROVC3(IPCHE1,IPCHE2,IPLMO1,IPLMO2,IPLMO3,IPCHE3)
+*********************************************************************
+*                 PRODUIT VECTORIEL DE 2 CHAMELEMS (en 3D)
+*********************************************************************
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C--------------------------------------------------------------------
+C  ENTREE
+C     IPCHE1   CHAMELEM
+C     IPCHE2   CHAMELEM
+C     MLMOT1  LISTMOTS DE COMPOSANTES ASSOCIEES AU 1-ER  CHAMP
+C     MLMOT2  LISTMOTS DE COMPOSANTES ASSOCIEES AU 2-EME CHAMP
+C     MLMOT3  LISTMOTS DE COMPOSANTES ASSOCIEES AU 3-EME CHAMP
+C  SORTIE
+C     IPCHE3    POINTEUR SUR LE MCHAML RESULTAT
+c
+c BP,2020 : inspire de SCACHA.eso, voir aussi PROVC2.eso
+c
+C--------------------------------------------------------------------
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+-INC SMCHAML
+-INC SMELEME
+-INC SMLMOTS
+C
+      CHARACTER*(LOCOMP) NOIN
+c     tableau des indices pour le produit vectoriel
+      INTEGER     KCOMP1(3),KCOMP2(3)
+      DATA        KCOMP1/2,3,1/
+      DATA        KCOMP2/3,1,2/
+C
+      IPCHE3=0
+C
+C=========================================================
+C     RECUP DES LISTMOTS + VERIF DES DIMENSIONS
+C=========================================================
+
+*     LISTE 1
+      MLMOT1=IPLMO1
+      SEGACT MLMOT1
+      NINC = MLMOT1.MOTS(/2)
+*     LISTE 2
+      MLMOT2=IPLMO2
+      SEGACT MLMOT2
+      IF(MLMOT2.MOTS(/2).NE.NINC) THEN
+        SEGDES MLMOT1,MLMOT2
+        MOTERR(1:4)='PVEC'
+        MOTERR(5:12)='LISTMOTS'
+        CALL ERREUR(125)
+        RETURN
+      ENDIF
+      
+*     liste 3
+      MLMOTS=IPLMO3
+      SEGACT MLMOTS
+      IF(MOTS(/2).NE.NINC) THEN
+        SEGDES MLMOTS
+        MOTERR(1:4)='PVEC'
+        MOTERR(5:12)='LISTMOTS'
+        CALL ERREUR(125)
+        RETURN
+      ENDIF
+      
+
+C=========================================================
+C     VERIFICATION DU LIEU SUPPORT DES MCHAML
+C       presence des memes sous zones
+C       presence des composantes declarées
+C       identité des points supports
+C=========================================================
+C
+      MCHEL1=IPCHE1
+      MCHEL2=IPCHE2
+      SEGACT MCHEL1,MCHEL2
+      N1=MCHEL1.IMACHE(/1)
+      NP1=MCHEL2.IMACHE(/1)
+C  verification du nombre de sous zones geometriques
+      if(N1.ne.NP1)  then
+        CALL ERREUR(329)
+        segdes MCHEL1,mchel2
+        return
+      endif
+
+      if(mchel1.ifoche.ne.mchel2.ifoche) then
+        call erreur(21)
+        segdes MCHEL1,mchel2
+        return
+      endif
+
+      L1=11
+      N3=6
+      SEGINI MCHEL3,MCHEL4
+C
+C   on fabrique deux CHAMPS temporaires ordonnés
+C
+      ipb1 = 0
+c---- boucle sur les sous-zones -----------------
+      DO 10  ISOUS = 1,N1
+      
+        in1 = 0
+        in2 = 0
+        
+        IPT1 = MCHEL1.IMACHE(ISOUS)
+        MCHAM1 = MCHEL1.ICHAML(ISOUS)
+        SEGACT MCHAM1
+        N2=NINC
+        SEGINI MCHAM3,MCHAM4
+        
+        do 16 j=1,ninc
+        do 17 k=1,MCHAM1.nomche(/2)
+          noin = MCHAM1.nomche(k)
+          if(noin.eq.MLMOT1.MOTS(j)) then
+            in1= in1 + 1
+            MCHEL3.IMACHE(isous)=IPT1
+            MCHEL3.ICHAML(isous)=MCHAM3
+            inf1 = mchel1.infche(isous,3)
+            inf2 = mchel1.infche(isous,4)
+            melva1= MCHAM1.IELVAL(k)
+            segini ,melval=melva1
+            MCHAM3.IELVAL(in1)=melval
+            MCHAM3.NOMCHE(in1)=noin
+              segdes melva1
+*bp,2020      segdes melval
+            goto 16
+          endif
+17      continue
+16      continue
+C
+        segdes mcham1
+C
+        DO 12  ii = 1,N1
+          IPT2 = MCHEL2.IMACHE(II)
+          if(ipt2.eq.ipt1) then
+            MCHAM2 = MCHEL2.ICHAML(II)
+            SEGACT MCHAM2
+            do 18 j=1,ninc
+            do 19 k=1,MCHAM2.nomche(/2)
+            noin = MCHAM2.nomche(k)
+            if(noin.eq.MLMOT2.MOTS(j)) then
+              in2= in2 + 1
+              if(mchel2.infche(II,3).ne.inf1.or.
+     &           mchel2.infche(II,4).ne.inf2) then
+                ipb1 = 1
+              endif
+              MCHEL4.IMACHE(isous) = IPT2
+              MCHEL4.ICHAML(isous) = MCHAM4
+              melva1 = MCHAM2.IELVAL(k)
+              segini , melval=melva1
+              MCHAM4.IELVAL(in2) = melval
+              MCHAM4.NOMCHE(in2)=noin
+              segdes melva1
+*bp,2020      segdes melval
+              goto 18
+            endif
+19          continue
+18          continue
+            segdes mcham2
+          endif
+12      CONTINUE
+
+c       erreur 175 : supports incompatibles
+        if(ipb1.eq.1) then
+          moterr(1:8) = MCHEL1.TITCHE(1:8)
+          moterr(9:16)= MCHEL2.TITCHE(1:8)
+          segdes mchel1,mchel2
+          segsup MCHAM3,MCHAM4,MCHEL3,MCHEL4
+          call erreur(175)
+          RETURN
+        endif
+        
+C       erreur : Probleme  entre composantes des champs et les LISTMOTS
+        if(in1.ne.ninc.or.in2.ne.ninc) then
+          segdes mchel1,mchel2
+          segsup MCHAM3,MCHAM4,MCHEL3,MCHEL4
+          call erreur(911)
+          RETURN
+        endif
+
+10    CONTINUE
+c---- fin de boucle sur les sous-zones -----------------
+C
+      if (mchel1.ne.mchel2) segdes mchel2
+
+
+C=========================================================
+C     CREATION DU MCHELM
+C=========================================================
+C
+      L1=4
+      N3=6
+C
+      SEGINI MCHELM
+      TITCHE='PVEC'
+
+      IFOCHE=MCHEL1.IFOCHE
+      IPCHE3=MCHELM
+C____________________________________________________________________
+C
+C     DEBUT DE LA BOUCLE SUR LES DIFFERENTES ZONES
+C____________________________________________________________________
+C
+      DO 500 ISOUS=1,N1
+*
+*     INITIALISATION
+*
+
+      MELEME = MCHEL1.IMACHE(ISOUS)
+      IMACHE(ISOUS)= MELEME
+      CONCHE(ISOUS)= MCHEL1.CONCHE(ISOUS)
+C
+C
+      INFCHE(ISOUS,1)=0
+      INFCHE(ISOUS,2)=0
+      INFCHE(ISOUS,3)=MCHEL1.INFCHE(ISOUS,3)
+      INFCHE(ISOUS,4)=MCHEL1.INFCHE(ISOUS,4)
+      INFCHE(ISOUS,5)=0
+      INFCHE(ISOUS,6)=MCHEL1.INFCHE(ISOUS,6)
+C
+C     RECHERCHE DE LA TAILLE DES MELVAL A ALLOUER
+C     bp (septembre 2009): modif pour permettre d'avoir des zones de champs
+C     cst et d'autres variables => differentes tailles de supports
+C     bp,2020: ajout du cas : MELVA1 cst * MELVA2 variable
+C
+      MCHAM3=MCHEL3.ICHAML(ISOUS)
+      MCHAM4=MCHEL4.ICHAML(ISOUS)
+      N1PTEL = 0
+      N1EL   = 0
+      DO ICOMP=1,NINC
+        MELVA1 = MCHAM3.IELVAL(ICOMP)
+        MELVA2 = MCHAM4.IELVAL(ICOMP)
+        SEGACT MELVA1,MELVA2
+        N1PTEL = max(N1PTEL,MELVA1.VELCHE(/1))
+        N1EL   = max(N1EL  ,MELVA1.VELCHE(/2))
+        N1PTEL = max(N1PTEL,MELVA2.VELCHE(/1))
+        N1EL   = max(N1EL  ,MELVA2.VELCHE(/2))
+cbp,2020         SEGDES MELVA1,MELVA2
+      ENDDO
+C
+C     CREATION DU MCHAML RESULTAT DE LA SOUS ZONE
+C
+      N2=NINC
+      SEGINI MCHAML
+
+      ICHAML(ISOUS)=MCHAML
+
+c
+c----- BOUCLE SUR LES COMPOSANTES RESULTATS ---------------      
+c
+       DO 110  ICOMP=1,NINC
+       
+c        Creation du MELVAL resultat
+         NOMCHE(ICOMP)=MLMOTS.MOTS(ICOMP)
+         TYPCHE(ICOMP)='REAL*8'
+         N2PTEL=0
+         N2EL=0
+         SEGINI MELVAL
+         IELVAL(ICOMP)=MELVAL
+       
+c    +++ les composantes +++
+         ICOMP1=KCOMP1(ICOMP)
+         ICOMP2=KCOMP2(ICOMP)
+         
+c    +++ on met dans le resultat le produit des composantes +++
+         MELVA1= MCHAM3.IELVAL(ICOMP1)
+         MELVA2= MCHAM4.IELVAL(ICOMP2)
+         segact melva1,melva2
+         IB1MAX = MELVA1.VELCHE(/1)
+         IE1MAX = MELVA1.VELCHE(/2)
+         IB2MAX = MELVA2.VELCHE(/1)
+         IE2MAX = MELVA2.VELCHE(/2)
+         DO  IE= 1,N1EL
+         DO  IB= 1,N1PTEL
+           IB1 = min(IB,IB1MAX)
+           IB2 = min(IB,IB2MAX)
+           IE1 = min(IE,IE1MAX)
+           IE2 = min(IE,IE2MAX)
+           VELCHE(IB,IE)=MELVA1.VELCHE(IB1,IE1)*MELVA2.VELCHE(IB2,IE2)
+         ENDDO
+         ENDDO
+cbp,2020       segdes melva1,melva2
+
+c    +++ on soustrait le produit des composantes inversees +++
+         MELVA1= MCHAM3.IELVAL(ICOMP2)
+         MELVA2= MCHAM4.IELVAL(ICOMP1)
+         segact melva1,melva2
+         IB1MAX = MELVA1.VELCHE(/1)
+         IE1MAX = MELVA1.VELCHE(/2)
+         IB2MAX = MELVA2.VELCHE(/1)
+         IE2MAX = MELVA2.VELCHE(/2)
+         DO  IE= 1,N1EL
+         DO  IB= 1,N1PTEL
+           IB1 = min(IB,IB1MAX)
+           IB2 = min(IB,IB2MAX)
+           IE1 = min(IE,IE1MAX)
+           IE2 = min(IE,IE2MAX)
+           VELCHE(IB,IE)=VELCHE(IB,IE) 
+     &     - MELVA1.VELCHE(IB1,IE1)*MELVA2.VELCHE(IB2,IE2)
+         ENDDO
+         ENDDO
+cbp,2020         segdes,MELVAL
+
+110    CONTINUE
+c----- FIN DE BOUCLE SUR LES COMPOSANTES RESULTATS ---------------      
+C
+C      segsup MCHAM3,MCHAM4 --> dtcham
+cbp,2020      segdes,MCHAML
+
+500   CONTINUE
+C____________________________________________________________________
+C
+C     FIN DE BOUCLE SUR LES ZONES 
+C____________________________________________________________________
+
+      call dtcham(mchel3)
+      call dtcham(mchel4)
+      segdes mchel1
+cbp,2020      segdes,mchelm
+      
+      RETURN
+      END
+
+
+ 
+ 

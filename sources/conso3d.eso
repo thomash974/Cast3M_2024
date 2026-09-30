@@ -1,0 +1,82 @@
+C CONSO3D   SOURCE    FD218221  24/02/07    21:15:07     11834          
+      subroutine conso3d(xxk,epsmk,epser,epsm6,epse_tild6,cc3,
+     # vp33,CMp,CTp,CTv,CWp)
+      
+c     calcul des coeff de consolidation dans les direction de vp33
+C     cf. Alain Sellier, Stéphane Multon, Laurie Buffo-Lacarrière, Thierry Vidal, Xavier Bourbon, Guillaume Camps,
+C     Concrete creep modelling for structural applications: non-linearity, multi-axiality, hydration, temperature and drying effects,
+C     Cement and Concrete Research, Volume 79, 2016,Pages 301-315,ISSN 0008-8846,
+C     https://doi.org/10.1016/j.cemconres.2015.10.001.
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 epsmk,ccmin,gama,epser,dfmx
+      real*8 CWp,CMp,CTp,CTv
+      real*8 epsm6(6),epse6(6),cc3(3),epse_tild6(6)
+      real*8 vp33(3,3)
+      
+c     deformation minimale prise en compte pour le calcul de potentiel
+c     de fluage      
+      real*8 epse_min,xx1,xxk_min
+      parameter (epse_min=1.0d-6,xxk_min=1.0d-6)     
+      real*8 epsm33(3,3),epsm3(3)
+      real*8 epse16(6)
+      integer i
+      
+c     deformation equivalente de Maxwell      
+      real*8 epsmeq6(6),epsmeq16(6)
+           
+c     passage du tenseur des deformations de fluage dans la base vp33
+      do i=1,6
+         epsmeq6(i)=epsm6(i)
+      end do
+      call chrep6(epsmeq6,vp33,.false.,epsmeq16)   
+             
+c     passage des deformations elastiques dans la base vp33
+      call chrep6(epse_tild6,vp33,.false.,epse16)        
+      
+c     calcul des coefficients de consolidation 
+      xxk=max((epsmk/epser)*CMp*CTp*CWp,xxk_min)
+c     pas d activation thermique visqueuse  sur k "*CTv" 
+c     car deja compté dans le temps caracteristique)
+      
+c     potentiel dans les directions principales du tenseur vp33
+      do i=1,3
+c       deformation elastique normale 
+        xx1=max(abs(epse16(i)),epse_min)         
+        xx2=xxk*xx1  
+c       coeff de consolidation
+        if(epse16(i)*epsmeq16(i).ge.0.d0) then
+c            le fluage et la def elastique sont de meme sens        
+             cc3(i)=(exp(min(abs(epsmeq16(i))/xx2,25.d0)))/xxk
+        else
+c            le fluage et la def elastique sont de sens opposes         
+             cc3(i)=1.d0/xxk         
+c             print*,'dans conso cc(',i,')=',cc3(i),xx1,epser,xx2
+c             print*,'epse16(i),epsmeq16(i)',epse16(i),epsmeq16(i)
+c             print*,'xxk',xxk  
+              cc3(i)=(exp(min(abs(epsmeq16(i))/xx2,25.d0)))/xxk
+        end if 
+C         IF(CC3(I).GT.1.0E6) THEN
+C           PRINT*,'DANS CONSO3D CC3 EST TRES GRAND'
+C           WRITE(*,'(A5,I2,A2,E10.3,/,A5,I2,A2,E10.3,/,A5,E10.3,/,                  
+C      #              A4,I2,A2,E10.3)') 
+C      #    'EPSM(',I,')=',EPSMEQ16(I),'ESPE(',I,')=',EPSE16(I), 
+C      #    'KEFF=',XXK,'CC3(',I,')=',CC3(I)  
+C            READ*
+C         END IF           
+c       print*,'epsmk,epser,CWp,CMp,CTd,CTv',epsmk,epser,CWp,CMp,CTd,CTv
+201     FORMAT('cc(',I1,')=',4E10.3)
+c        write(*,201) i,cc3(i),epse16(i),epsmeq16(i),xx2       
+      end do
+c      print*,'---------------------------------------------------------'
+c      read*      
+      return
+      end
+      
+        
+      
+      
+ 
+ 

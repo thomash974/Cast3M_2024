@@ -1,0 +1,87 @@
+C ECMELX    SOURCE    GOUNAND   21/04/02    21:15:01     10937          
+      SUBROUTINE ECMELX (IELEME,jentet)
+************************************************************************
+*
+*                             E C M E L X
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     IMPRESSION D'UN MAILLAGE A UN SEUL TYPE D'ELEMENT (repris de
+*     ECMAI1 et adapte pour les segments MELEMX)
+*
+* MODULES UTILISES:
+* -----------------
+*
+      IMPLICIT INTEGER(I-N)
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC TMATOP1      
+*-INC SMELEMX
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE   (+ = CONTENU DANS UN COMMUN)
+* -----------
+*
+*     IELEME  (E)  POINTEUR D'UN SEGMENT "MELEME".
+*                  ON NE VERIFIE PAS QU'IL CORRESPOND A UN MAILLAGE A
+*                  UN SEUL TYPE D'ELEMENT.
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     REPRISE: PASCAL MANIGOT     11 SEPTEMBRE 1987
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE + FORTRAN77
+*
+************************************************************************
+*
+      MELEMX = IELEME
+*      SEGACT MELEMX
+      NBNN=NNCOU
+      NBELEM=NLCOU
+      INTERR(1)=MELEMX
+      INTERR(2)=NBELEM
+      IF (ITYPEX.LE.0) THEN
+        MOTERR(1:4)='    '
+      ELSE
+        MOTERR(1:4)=NOMS(ITYPEX)
+      ENDIF
+      CALL ERREUR(-19)
+*
+      NBELEM=NLCOU
+      NBE=NBELEM
+      if(jentet.eq.1) then
+        NBE=MIN(10,NBELEM)
+      endif
+      DO 146 L=1,NBE,10
+         if (ierr.ne.0) return
+         LH = MIN(L+9,NBELEM)
+         CALL ERREUR(-20)
+         WRITE (IOIMP,147) (M,M=L,LH)
+ 147     FORMAT(5X,10I8)
+*         WRITE (IOIMP,138) (NCOUL(ICOLOR(M)),M=L,LH)
+* 138     FORMAT(5X,10A8)
+         WRITE (IOIMP,'(1X)')
+         DO 148 J=1,NBNN
+            WRITE(IOIMP,149) (NUMX(J,K),K=L,LH)
+ 149        FORMAT (5X,10I8)
+ 148     CONTINUE
+*        END DO
+ 146  CONTINUE
+*     END DO
+*
+*      SEGDES,MELEMX
+*
+      RETURN
+      END
+
+
+ 
+ 
+ 

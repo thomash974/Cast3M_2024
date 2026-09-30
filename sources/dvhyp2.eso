@@ -1,0 +1,55 @@
+C DVHYP2    SOURCE    KICH      19/10/25    21:15:08     10351          
+      subroutine dvhyp2(nbrobl,nombre,s,n,liste,iok2,r2,centre)
+c
+c     *************************************************
+c     trouver la plus petite hypersphere circonscrite
+c     aux points de la liste
+c     *************************************************
+c
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      real*8 s(nbrobl-1,nombre)
+      integer liste(6)
+      real*8 tns(5,5),vc(5),res(5),u(5),v(5),centre(5)
+
+      iok2 = 0
+      do mm=1,5
+       u(mm) = 0.d0
+       v(mm) = 0.d0
+       vc(mm) = 0.d0
+      enddo
+      n    = n-1
+      do k=1,n
+         do l=k,n
+            do ict=1,nbrobl-1
+              u(ict) = s(ict,liste(l+1))-s(ict,liste(1))
+              v(ict) = s(ict,liste(k+1))-s(ict,liste(1))
+            enddo
+            tns(k,l) = u(1)*v(1) + u(2)*v(2) + 2.d0*(u(3)*v(3)
+     & + u(4)*v(4) + u(5)*v(5))
+            tns(l,k)=tns(k,l)
+         enddo
+         do ict=1,nbrobl-1
+            u(ict) = s(ict,liste(k+1))-s(ict,liste(1))
+         enddo
+         vc(k) = (u(1)**2+u(2)**2+2.*(u(3)**2+u(4)**2+u(5)**2))/2.d0
+      enddo
+      call dvinve(n,tns,vc,res,iok3)
+      if(iok3.eq.1) go to 525
+      iok2 = 0
+      go to 600
+ 525  continue
+      do k=1,nbrobl-1
+        centre(k)=s(k,liste(1))
+        do l=1,n
+          centre(k)=centre(k)+res(l)*(s(k,liste(l+1))-s(k,liste(1)))
+        enddo
+        vc(k)=s(k,liste(1))-centre(k)
+      enddo
+      r2 = (vc(1)**2+vc(2)**2+2.*(vc(3)**2+vc(4)**2+vc(5)**2))
+ 600  continue
+      return
+      end
+
+ 
+ 

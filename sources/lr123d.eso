@@ -1,0 +1,108 @@
+C LR123D    SOURCE    PV090527  23/02/13    21:15:10     11592          
+      SUBROUTINE LR12LDP3D(K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,R2,f3,
+     # lr1,lr2,ldp,precision3d,log_err)
+c      Multiplicateur plastique Rankine 1 et 2 et Drucker Prager en 3 couples
+c     (A.Sellier 2021/04/22)
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+
+      real*8 K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,R2,f3,lr1,lr2,ldp
+      real*8 precision3d
+      real*8 DD(3,3),denom
+      logical log_err
+      
+      log_err=.false.
+
+      t2 = -0.4D1 / 0.3D1 * G - K
+      t4 = -K + 0.2D1 / 0.3D1 * G
+      t5 = R1 ** 2
+      t9 = R2 ** 2
+      t13 = s3 ** 2
+      t14 = 0.3D1 * t13
+      t16 = (0.3D1 * t5 + 0.3D1 * R1 * (-R2 - s3) + 0.3D1 * t9 - 0.3D1
+     # * R2 * s3 + t14)
+      if(t16.gt.0.d0) then
+        t16=sqrt(t16)
+      else
+c        print*,'Pb dans lr12ldp3d t16<0'
+        log_err=.true.
+        goto 10
+      end if
+      t17 = 0.1D1 / t16
+      t18 = b * K
+      t19 = t16 * t18
+      t29 = 0.2D1 * R2
+      t36 = s1 ** 2
+      t40 = s2 ** 2
+      t45 = (0.3D1 * t36 + 0.3D1 * (-s2 - s3) * s1 + 0.3D1 * t40 - 0.3D1
+     # * s2 * s3 + t14)
+      if(t45.gt.0.d0) then
+        t45=sqrt(t45)
+      else
+c        print*,'Pb dans lr12ldp3d t45<0'
+        log_err=.true. 
+        goto 10        
+      end if     
+      t46 = t45 * d * K
+      t51 = 0.1D1 / t45
+      DD(1,1) = t2
+      DD(1,2) = t4
+      DD(1,3) = -0.4D1 / 0.3D1 * (0.3D1 / 0.4D1 * t19 + 0.3D1 / 0.2D1 * 
+     #(R1 - R2 / 0.2D1 - s3 / 0.2D1) * G) * t17
+      DD(2,1) = t4
+      DD(2,2) = t2
+      DD(2,3) = (-t19 + (R1 - t29 + s3) * G) * t17
+      DD(3,1) = t51 * (-t46 + (-0.2D1 * s1 + s2 + s3) * G)
+      DD(3,2) = t51 * (-t46 + G * (s1 - 0.2D1 * s2 + s3))
+      DD(3,3) = 0.3D1 / 0.2D1 * t17 * t51 * (0.2D1 / 0.3D1 * t16 * t45 *
+     # (-d * t18 - Hdp) + (-0.2D1 * t13 + (s2 + R1 + R2 + s1) * s3 + (
+     #-0.2D1 * R1 + R2) * s1 + (R1 - t29) * s2) * G)              
+      d11=dd(1,1)
+      d12=dd(1,2)
+      d13=dd(1,3)
+      d21=dd(2,1)
+      d22=dd(2,2)
+      d23=dd(2,3)
+      d31=dd(3,1)
+      d32=dd(3,2)
+      d33=dd(3,3)      
+       denom=(d11 * d22 * d33 -
+     # d11 * d23 * d32 - d12 * d21 * d33 + d12 * d23 * d31 + d13 * d21 *
+     # d32 - d13 * d22 * d31)     
+    
+      if(abs(denom).lt.precision3d) then
+          log_err=.true.
+          goto 10
+      else
+         lr1 = -(d12 * d23 * f3 - d12 * d33 * f2 - d13 * d22 * f3 + d13 
+     #    * d32 * f2 + d22 * d33 * f1 - d23 * d32 * f1) /denom 
+         lr2 = (d11 * d23 * f3 - d11 * d33 * f2 - d13 * d21 * f3 + d13 *
+     #   d31 * f2 + d21 * d33 * f1 - d23 * d31 * f1) / denom
+         ldp = -(d11 * d22 * f3 - d11 * d32 * f2 - d12 * d21 * f3 + d12 
+     #   * d31 * f2 + d21 * d32 * f1 - d22 * d31 * f1) / denom 
+      end if
+10    if(log_err.or.lr1.ne.lr1.or.lr2.ne.lr2.or.isnanldp.ne.ldp) then
+c          print*,'Pb de resolution dans lr12ldp3d'
+c          print*,'t16',t16
+c          print*,'t45',t45
+c          print*,'denom=',denom
+c          print*,'K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,R2,f3,lr1,lr2,ldp,prec'
+c          print*,K,G,b,d,s1,s2,s3,Hdp,f1,R1,f2,R2,f3,
+c     #    lr1,lr2,ldp,precision3d
+          log_err=.true.
+          lr1=0.d0
+          lr2=0.d0
+          ldp=0.d0
+      end if
+c      print*,'denom',denom
+c      print*,'f',f1,f2,f3
+c      print*,lr1,lr2,ldp     
+     
+c     attention: mettre s1=R1, s2=R2 dans le gradient (Vdep)     
+     
+      return
+      end
+      
+     
+ 
+ 

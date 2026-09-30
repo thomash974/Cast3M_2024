@@ -1,0 +1,102 @@
+C WDTT3D    SOURCE    PV090527  23/02/07    06:18:20     11589          
+       subroutine wdtt3d(wcsh0,wcshf,tdtt,mdtt,wdtt,pdtt,CTHv,
+     # teta1,teta2,pw,dt,CDTT,pwcsh0,pwcshf,thetaref,err1)
+     
+c     calcul du volume d eau dans les CSH et du coeff de DTT
+c     cf. thèse Florent Manzoni      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables externes
+      real*8 wcsh0,wcshf,tdtt,mdtt,wdtt,CTHv,CDTT,teta1,teta2,pw,dt
+      real*8 pdtt,pwcsh0,pwcshf
+      integer err1
+      
+c     variables locales
+      real*8 T,T0,T1,T2,T3,T4,rhow_ref,rhow
+      real*8 a1,a2,a3,a4,a5
+      parameter (T0=273.15d0,T1=269.017d0,T2=574.797d0,T3=722.86d0,
+     # T4=342.349,rhow_ref=999.975d0,
+     # a1=-3.983035d0,a2=301.797d0,a3=522528.9d0,a4=69.34881d0,
+     # a5=999.974950d0)
+      real*8 Tini,Tfin,rhow0,rhowf,mn0,mnf,mn00,xt,pwcsh,Tmoy,thetaref
+      real*8 TREF,mnm,rhowm,wcshm     
+
+c     wcsh0,wcshf : volume d eau
+c     tdtt : temps caracteristique à la temperature de ref
+c     mdtt : module de biot inter CSH
+c     wdtt : volume d eau de reference
+c     CTHv : coeff d activation de la cinetique de transfert par la viscosite de l eau
+c     le même que pour le fluage propre
+c     CDTT : coeff hydrique pour la DTT se substituant à CW pour la partie DTT
+c     teta1,teta2: temperatures (celcius)
+c     pw : pression capillaire fin de pas
+c     dt : pas de temps  
+
+c     passage des temperatures en Kelvin
+      Tini=teta1+T0
+      Tfin=teta2+T0
+      Tmoy=0.5d0*(Tini+Tfin)
+      Tref=thetaref+T0
+c     calcul de la masse volumique de l'eau en fonction de la temparature
+c      rhow0=rhow_ref*(1.d0-((Tini-T2)*(Tini-T1)**2)/((T3**2)*(Tini-T4)))
+c      rhowf=rhow_ref*(1.d0-((Tfin-T2)*(Tfin-T1)**2)/((T3**2)*(Tfin-T4)))
+      rhow0=a5*(1.d0-((teta1+a2)*(teta1+a1)**2)/(a3*(teta1+a4)))
+      rhowf=a5*(1.d0-((teta2+a2)*(teta2+a1)**2)/(a3*(teta2+a4)))
+      rhowm=0.5d0*(rhow0+rhowf)
+c      print*,'wdtt3d 1:',tini,tfin,rhow0,rhowf
+      
+c     masse d eau initiale
+      mn0=wcsh0*rhow0
+c     masse d eau fin de pas
+      if((tdtt.gt.0.).and.(mdtt.gt.0.)) then
+c        masse d eau a l infini
+         mn00=rhowf*(wdtt+pw/mdtt)
+c        fonction du temps         
+         xt=exp(-dt*CTHv/tdtt)
+c         
+c         print*,'wdtt3d 2:',dt,CTHv,tdtt
+c        masse d eau fin de pas         
+         mnf=mn0*xt+(1.d0-xt)*mn00
+c        masse moyenne
+         if(dt.gt.0.) then
+             mnm=mn00+(tdtt/dt/CTHv)*(mn0-mn00)*(1.0d0-xt)
+         else
+             mnm=mn0
+         end if
+c        volume d eau fin de pas 
+         wcshf=mnf/rhowf
+c        moyenne
+         wcshm=mnm/rhowm         
+c        pression dans les csh en fin de pas
+         pwcshf=mdtt*(wcshf-wdtt)
+c        pression moyenne pendant le pas
+         pwcsh=mdtt*(wcshm-wdtt)      
+c        coeff hydrique pour la deformation thermique transitoire
+         if(pwcsh.lt.pw) then
+             CDTT=0.d0
+         else
+             if(pdtt.ne.0.) then
+                CDTT=(pwcsh-pw)/pdtt
+             else
+                print*,'Il faut aussi donner PDTT dpour wdttt3d'
+                CDTT=0.d0
+                err1=1
+             end if
+         end if
+      else
+c         pas de surpression dans les CSH
+          wcshf=wdtt
+          CDTT=0.d0
+c         interfeuillet a pression capillaire          
+          pwcsh=pw
+*  ajout pv
+          pwcshf=pw
+      end if
+c      print*,'WDTT3D CDTT=',CDTT
+      return
+      end
+      
+    
+ 
+ 

@@ -1,0 +1,132 @@
+C MENAG4    SOURCE    PV090527  23/03/23    21:15:09     11642          
+C  SUPPRIMER LES SEGMENTS INDESIRABLES
+C
+      SUBROUTINE MENAG4(ISLIS)
+      IMPLICIT INTEGER(I-N)
+      
+      LOGICAL OOOVP1
+
+-INC CCPRECO
+
+C==DEB= FORMULATION HHO == Includes specifiques ========================
+-INC CCHHOPA
+-INC CCHHOPR
+C==FIN= FORMULATION HHO ================================================
+
+      SEGMENT ISLIS(NP)
+      SEGMENT ISEG(0)
+            
+      IPREC=0
+      DO 10 I=1,ISLIS(/1)
+        ISEG=ISLIS(I)
+        IF (ISEG.EQ.ISLIS) GOTO 10
+        IF (ISEG.EQ.IPREC) GOTO 10
+        IPREC=ISEG
+        SEGSUP,ISEG
+  10  CONTINUE
+      SEGSUP,ISLIS
+  
+C     Vidange des queue de DESACTIVATION et SUPPRESSION (action faite par lots en temps normal)
+C     ATTENTION : On n'est pas protege par le GLOBAL LOCK, seulement par le LOCK du menage
+      call ooodeq(0)
+      call ooosuq(0)
+
+C     Verification dans le CCPRECO pour le REDU : On retire les OBJETS que le menage a supprime
+      DO 144 ITH1 = 1, NBASMA+1
+        ITAILL = NBPRRE(ith1)
+        IF (ITAILL .EQ. 0) GOTO 144
+        ICOUR = 0
+        DO 145 IPRECO = 1, ITAILL
+          IMO  = PRECMO(IPRECO,ITH1)
+          IF (IMO .EQ. 0) GOTO 145
+          ICH1 = PRECM1(IPRECO,ITH1)
+          ICH2 = PRECM2(IPRECO,ITH1)
+
+C         Verification VALIDITE POINTEUR
+          IF(.NOT. (OOOVP1(IMO).AND.OOOVP1(ICH1).AND.OOOVP1(ICH2)))THEN
+            PRECMO(IPRECO,ith1) = 0
+            PRECM1(IPRECO,ith1) = 0
+            PRECM2(IPRECO,ith1) = 0
+            PRECM3(IPRECO,ith1) = 0
+            PRECM4(IPRECO,ith1) = 0
+            PRECM5(IPRECO,ith1) = 0
+
+          ELSE
+C           Le CCPRECO pour le REDU est retasse
+            ICOUR = ICOUR + 1
+            PRECMO(ICOUR,ith1) = PRECMO(IPRECO,ith1)
+            PRECM1(ICOUR,ith1) = PRECM1(IPRECO,ith1)
+            PRECM2(ICOUR,ith1) = PRECM2(IPRECO,ith1)
+            PRECM3(ICOUR,ith1) = PRECM3(IPRECO,ith1)
+            PRECM4(ICOUR,ith1) = PRECM4(IPRECO,ith1)
+            PRECM5(ICOUR,ith1) = PRECM5(IPRECO,ith1)
+          ENDIF
+ 145    CONTINUE
+        NBPRRE(ith1) = ICOUR
+ 144  CONTINUE
+
+C     Verification dans le CCPRECO pour les MMODEL etendus (modete) : On supprime ceux que le menage veut supprimer
+      DO 151 ITH1 = 1, NBASMA+1
+        ITAILL = NBMOMO(ith1)
+        IF (ITAILL .EQ. 0) GOTO 151
+        ICOUR = 0
+        DO 152 IPRECO = 1, ITAILL
+          IMO1 = PMOMO1(IPRECO,ITH1)
+          IMO2 = PMOMO2(IPRECO,ITH1)
+          IF (IMO1 .EQ. 0) GOTO 152
+
+C         Verification VALIDITE POINTEUR
+          IF(.NOT. (OOOVP1(IMO1).AND.OOOVP1(IMO2)))THEN
+            PMOMO1(IPRECO,ith1) = 0
+            PMOMO2(IPRECO,ith1) = 0
+
+          ELSE
+C           Le CCPRECO pour le REDU est retasse
+            ICOUR = ICOUR + 1
+            PMOMO1(ICOUR,ith1) = PMOMO1(IPRECO,ith1)
+            PMOMO2(ICOUR,ith1) = PMOMO2(IPRECO,ith1)
+          ENDIF
+ 152    CONTINUE
+        NBMOMO(ith1) = ICOUR
+ 151  CONTINUE
+
+C Rebelote pour le preconditionnement de chame1
+      do 170 ith=0,nbasma
+       do 171 iprec=nprcha,1,-1
+         ich=iprchl(iprec,ith)
+         if (.not.ooovp1(ich)) then
+         do 172 ipr=iprec,nprcha-1
+           iprma(ipr,ith) =iprma(ipr+1,ith)
+           iprhoa(ipr,ith)=iprhoa(ipr+1,ith)
+           iprmo(ipr,ith) =iprmo(ipr+1,ith)
+           iprhom(ipr,ith)=iprhom(ipr+1,ith)
+           iprchp(ipr,ith)=iprchp(ipr+1,ith)
+           iprhoc(ipr,ith)=iprhoc(ipr+1,ith)
+           iprsu(ipr,ith) =iprsu(ipr+1,ith)
+           iprcha(ipr,ith)=iprcha(ipr+1,ith)
+           iprchl(ipr,ith)=iprchl(ipr+1,ith)
+ 172     continue
+           iprchp(nprcha,ith) =0
+         endif
+ 171   continue
+ 170  continue
+
+C==DEB= FORMULATION HHO == Traitements specifiques ====================
+C Verification si le menage veut supprimer les maillages HHO
+      IF (NUFHHO .GT. 0) THEN
+c-dbg      IF (MSQHHO .GT. 0) THEN
+        IF ( OOOVP1(MSQHHO) .AND. OOOVP1(MCEHHO) .AND.
+     &       OOOVP1(MPFHHO) .AND. OOOVP1(MPCHHO) ) THEN
+c-dbg          write(6,*) 'MENAG4 - HHO -> OK Pointeurs Maillages conserves'
+        ELSE
+          write(6,*) 'MENAG4 - HHO -> PB Pointeurs Maillages detruits'
+        END IF
+      END IF
+C==FIN= FORMULATION HHO ================================================
+
+
+      END
+ 
+ 
+ 
+ 

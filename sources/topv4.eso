@@ -1,0 +1,167 @@
+C TOPV4     SOURCE    GOUNAND   21/04/06    21:15:35     10940          
+*ijob      SUBROUTINE TOPV4(TRAVL,IJOB,XVMIN,XVTLOV,XVTOL,KPVIRT)
+      SUBROUTINE TOPV4(TRAVL,IALGO,XVMIN,XVTLOV,XVTOL,KPVIRT,impr)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TOPV4
+C DESCRIPTION :  Amélioration d'une topologie autour d'un élément : sélection des
+C      candidats de volume minimum mais non nul
+C
+C
+C     
+C               IJOB=0
+C               Minimise le volume d'une topologie de maillage
+C               en le maintenant supérieur à 0
+C               IJOB=1
+C               Minimise le volume, mais on a le droit d'ajouter des
+C               noeuds internes
+C               IJOB=2
+C               La topologie de maillage est supposée être un maillage
+C               On essaie de l'améliorer en conservant son volume
+C               mais en augmentant sa qualité grace a l'adjonction
+C               de noeuds internes
+C     
+C     
+C     
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C VERSION    : v1, 05/02/2013, version initiale
+C HISTORIQUE : v1, 05/05/2013, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMELEME
+      POINTEUR KELEM.MELEME
+      POINTEUR KEXTO.MELEME
+      POINTEUR IBTLOC.MELEME
+      POINTEUR IPBTL2.MELEME
+      POINTEUR KTBES.MELEME
+      POINTEUR KTBES2.MELEME
+*anc      POINTEUR IMCAND.MELEME
+-INC TMATOP1
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+      POINTEUR IPBTL.MELEMX
+-INC SMLENTI
+      POINTEUR KNNO.MLENTI
+      POINTEUR LIDXCA.MLENTI
+      POINTEUR LOKVOL.MLENTI
+*anc      POINTEUR LNQUAL.MLENTI
+-INC SMLREEL
+*anc      POINTEUR IQUAL.MLREEL
+*anc      POINTEUR LQUALS.MLREEL
+-INC SMCOORD
+      POINTEUR KCOORD.MCOORD
+*anc-INC STRAVJ
+*anc      POINTEUR TRAVK.TRAVJ
+*-INC STRAVL
+*     
+      LOGICAL LOK
+*anc      LOGICAL LTOIBO
+*anc      LOGICAL LTOIBA
+      INTEGER JCAND
+      LOGICAL LCHANG
+      LOGICAL LCHTOP
+* Liste de topologies de maillages candidates
+*      SEGMENT ITCAND(0)
+* Liste de topologies de maillages candidats de plus petit volume non nul
+*      SEGMENT ITVOL(JG)
+* Liste de topologies de maillages candidats de plus petit volume
+* et de meilleure qualité
+*      SEGMENT ILQUAL(JG)
+*      SEGMENT ILIND(JG)
+*      SEGMENT JLIND(JG)
+*     
+* Executable statements
+*     
+*      WRITE(IOIMP,*) 'coucou topv4'
+* Il vaudrait mieux la lire !!
+*      XVTOL=XZPREC*1.D2
+*anc      IDIMP1=IDIM+1
+*anc      KCOORD=TRAVK.COORD
+*anc      KEXTO=TRAVK.TOPO
+*
+      LMCANS=TRAVL.MCANS
+      LIDXCA=TRAVL.IDXCA
+      LOKVOL=TRAVL.OKVOL
+*anc      LQUALS=TRAVL.QUALS
+*anc      LNQUAL=TRAVL.NQUAL
+*      
+      TRAVL.NVOCOU=0
+      JCAND=TRAVL.NCCOU
+      DO ICAND=1,JCAND
+*         IMCAND=ITCAND(ICAND)
+*Erreur pour calculer le volume, il ne faut pas utiliser la métrique !
+*         CALL VOMSIM(IMCAND,IMET,KPVIRT,XVCAND)
+*         CALL VOMSIM(IMCAND,0,KPVIRT,YVCAND,YVCANV)
+*
+         IELDEB=LIDXCA.LECT(ICAND)
+         IELFIN=LIDXCA.LECT(ICAND+1)-1
+         CALL VOMSI3(LMCANS,IELDEB,IELFIN,0,KPVIRT,XVCAND,XVCANV)
+         IF (IERR.NE.0) RETURN
+         
+         if (impr.ge.4) then
+            WRITE(IOIMP,*) '  ICAND=',ICAND,' XVCAND=',XVCAND,
+     $           ' XVCANV=',XVCANV
+* àfaire            CALL ECMAI1(imcand,0)
+         endif
+
+*ijob         IF (IJOB.EQ.0.OR.IJOB.EQ.1) THEN
+         IF (IALGO.EQ.0) THEN
+            IF (XVCAND.GT.XVTOL.AND.XVCAND.LE.XVMIN+XVTOL) THEN
+               IF (ABS(XVMIN-XVCAND).LE.XVTOL) THEN
+*
+                  NVOCOU=NVOCOU+1
+                  LOKVOL.LECT(NVOCOU)=ICAND
+               ELSE
+                  XVMIN=XVCAND
+*
+                  NVOCOU=1
+                  LOKVOL.LECT(NVOCOU)=ICAND
+               ENDIF
+            ENDIF
+*ijob         ELSEIF (IJOB.EQ.2) THEN
+         ELSEIF (IALGO.EQ.1) THEN
+**** Test !!!!            
+****            IF (ABS(XVMIN-XVCAND).LE.XVTOL) THEN
+****  Test !!!!
+            IF (ABS(XVMIN-XVCAND).LE.XVTOL.AND.ABS(XVCANV
+     $           -XVTLOV).LE.XVTOL)THEN
+*
+               NVOCOU=NVOCOU+1
+               LOKVOL.LECT(NVOCOU)=ICAND
+            ENDIF
+         ELSE
+*ijob            WRITE(IOIMP,*) 'IJOB=',IJOB,' unknown'
+            WRITE(IOIMP,*) 'IALGO=',IALGO,' unknown'
+            GOTO 9999
+         ENDIF
+      ENDDO
+      if (impr.ge.4) then
+*anc         write(ioimp,*) 'Apres selection vol ncandidat=',ITVOL(/1)
+*anc         Write(ioimp,*) (itvol(iii),iii=1,itvol(/1))
+         write(ioimp,*) 'Apres selection vol ncandidat=',nvocou
+         Write(ioimp,*) (lokvol.lect(iii),iii=1,nvocou)
+      endif
+      RETURN
+*     
+*     
+*     
+ 9999 CONTINUE
+      MOTERR(1:8)='TOPV4   '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*     
+* End of subroutine TOPV4
+*     
+      END
+
+ 

@@ -1,0 +1,13 @@
+C AMNVAL    SOURCE    PV090527  23/01/27    21:15:05     11574          
+      subroutine amnval(f,nl,fmin)   
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+          dimension f(nl)
+          fmin=f(1)
+      do i=2,nl
+          if(f(i).LT.fmin) fmin=f(i)          
+          enddo
+      return
+      end
+      
+ 

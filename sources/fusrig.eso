@@ -1,0 +1,109 @@
+C FUSRIG    SOURCE    FANDEUR   22/01/19    21:15:07     11256          
+
+C=======================================================================
+C=                           F U S R I G                               =
+C=                           -----------                               =
+C=  Ce sousprogramme realise la fusion ('ET') de deux objets RIGIDITE. =
+C=======================================================================
+
+      SUBROUTINE FUSRIG (IP1,IP2,IRETOU)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMRIGID
+-INC SMELEME
+
+      PARAMETER (IVA=2)
+      DIMENSION ITTG(IVA)
+
+      IRETOU = 0
+      if (ierr.ne.0) return
+
+      RI1 = IP1
+      RI2 = IP2
+      SEGACT,RI1,RI2
+      NRIG1 = RI1.IRIGEL(/2)
+      NRIG2 = RI2.IRIGEL(/2)
+
+      ITTG(1)=IP1
+      ITTG(2)=IP2
+
+      NRIGEL = NRIG1 + NRIG2
+
+      SEGINI,MRIGID
+      ICHOLE = 0
+      IMGEO1 = 0
+
+      IC=0
+      DO i=1,IVA
+        RI4=ITTG(i)
+        JA=RI4.IRIGEL(/2)
+        JB=RI4.IRIGEL(/1)
+        DO k=1,JA
+          MELEME=RI4.IRIGEL(1,k)
+          SEGACT,MELEME
+          IF (NUM(/2).NE.0) THEN
+            IC=IC+1
+            COERIG(IC)=RI4.COERIG(k)
+            DO l=1,JB
+              IRIGEL(l,IC)=RI4.IRIGEL(l,k)
+            ENDDO
+          ENDIF
+        ENDDO
+      ENDDO
+
+      IF (NRIGEL.NE.IC) THEN
+        NRIGEL=IC
+        SEGADJ,MRIGID
+      ENDIF
+
+c*c  Les 2 matrices ne sont pas vides :
+c*      IF (NRIG1.NE.0 .AND. NRIG2.NE.0) THEN
+        IF (RI2.MTYMAT.NE.RI1.MTYMAT) THEN
+          IF (RI1.MTYMAT.EQ.'RIGIDITE'.OR.RI2.MTYMAT.EQ.'RIGIDITE') THEN
+            MTYMAT='RIGIDITE'
+          ELSE
+            MTYMAT='INDETERM'
+          ENDIF
+        ELSE
+          MTYMAT=RI1.MTYMAT
+        ENDIF
+        IF (RI2.IFORIG.NE.RI1.IFORIG) THEN
+          interr(1)=RI1.IFORIG
+          interr(2)=RI2.IFORIG
+          interr(3)=IFOUR
+c-dbg      write(ioimp,*) '1132 FUSRIG',ri1,ri2
+          call erreur(1132)
+          IFORIG = IFOUR
+        ELSE
+          IFORIG=RI1.IFORIG
+        ENDIF
+c  Au moins une matrice est vide, voire les 2
+c*      ELSE
+c*        IF (NRIG1.NE.0) THEN
+c*          MTYMAT=RI1.MTYMAT
+c*          IFORIG=RI1.IFORIG
+c*        ELSE IF (NRIG2.NE.0) THEN
+c*          MTYMAT=RI2.MTYMAT
+c*          IFORIG=RI2.IFORIG
+c*        ELSE
+c*          MTYMAT='INDETERM'
+c*          IFORIG=IFOUR
+c*        ENDIF
+c*      ENDIF
+
+*  pour le frottement, combinaison de deux raideurs portant sur le meme lx
+      call verlag(mrigid)
+
+      SEGDES,RI1,RI2
+
+      SEGDES,MRIGID
+      IRETOU=MRIGID
+
+      RETURN
+      END
+
+ 

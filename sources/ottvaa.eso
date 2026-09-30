@@ -1,0 +1,28 @@
+C OTTVAA    SOURCE    FD218221  21/06/10    21:15:44     11030          
+      SUBROUTINE OTTVAA(YOUN,XLCS,XX)
+*
+      IMPLICIT INTEGER (I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      PARAMETER (UN=1.D0,DEUX=2.D0,TROIS=3.D0,UNDEMI=0.5D0)
+      PARAMETER (XPI = 3.1415926535897931D0)
+      DIMENSION XX(*)
+*
+      XX(1)= 2.D-3 ;
+      XX(2)=5.D0*XX(1)
+      XX(3)=1.16D0*XLCS
+      XX(4)=(XX(3)-XLCS)/(2.*XX(3)-XLCS)
+      XX(5)=0.4D0
+      XX(6)=0.25
+      XX(7)=XLCS
+      XKC1=XX(1)*(1.-2.*XX(6))
+      XKC1=XKC1/(2. - 2.*XX(6))/(1.-XX(5))
+      XX(8)=XKC1 
+      FC0=0.3*XLCS
+      XXC=0.19
+      XLN2=LOG (2.)
+      XBC=2.*XLCS*XXC/(1.-XXC)/(FC0*XKC1+(XLCS-FC0)*XKC1*XLN2)
+      XX(9)=XBC
+      XX(10)=FC0
+      RETURN
+      END
+ 

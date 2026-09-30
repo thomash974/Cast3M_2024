@@ -1,0 +1,356 @@
+C CHAINE    SOURCE    PV        22/11/03    21:15:01     11493          
+      SUBROUTINE CHAINE
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C
+C     CET OPERATEUR crée une chaîne de caractères
+C
+C     En présence du modificateur
+C       *N : justifie l'entrée à droite jusqu'à la colonne N
+C       /N : justifie l'entrée à gauche à partie de la colonne N
+C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C
+C     Appelé par PILOT
+C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C
+C     Remarques
+C
+C       ITOT : longueur de la chaîne élémentaire
+C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C     Auteur : ?
+C
+C     Modifications :
+C       PM 17/01/2006
+C         - plus d'erreur si on impose une colonne d'écriture trop
+C           petite : on se contente de décaler vers la droite
+C         - ajout de commentaires
+C         - Ne tronque plus les chaînes en entrée de + de 72 caractères
+C           par passage de ITXTIN de 72 à LMAX caractères
+C         - ne conserve pas indûment le dernier alignement spécifié
+C           pour les entrées suivantes, ce qui corrige le bug survenant
+C           si on donne encore une entrée après une spécification d'alignement
+C           ex : 'CHAI' (bonjour*20 monde) ;
+C         - n'interprête plus les caractères * et / isolés comme des
+C           spécifications incomplètes de tabulation
+C
+C       CB215821 06/04/2020
+C         - Utilisation de LOCHAI dans PPARAM.INC.INC pour la longeur des
+C           chaines de caractere
+C
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+-INC SMTEXTE
+
+      EXTERNAL         LONG
+      LOGICAL          LPO,LPO1,DEJALU
+      REAL*8           XPO,XPO1
+      CHARACTER*(LOCHAI) ITIT1,CMOT
+      CHARACTER*(LOCHAI) ITXTIN,ITXTI1
+      CHARACTER*(72)     MFMT
+      CHARACTER*(8)      CTYP,CTYP1,CTAB,CFMT
+      CHARACTER*(4)      IMO(4)
+      CHARACTER*(4)      CC
+      CHARACTER*(10)     DIGIT
+      logical entry
+      character*(*)      lachaine
+
+      DATA             IMO/'*   ','/   ','<   ','>   '/
+      DATA             DIGIT/'1234567890'/
+
+      entry = .false.
+      goto 314
+
+      entry chain1(lachaine)
+      entry = .true.
+ 314  continue
+      ITIT1 = ' '
+      ILON  = 0
+      ITOT  = 0
+*     Format par défaut
+      MFMT  = '(1PE12.5)'
+      IRETF = 9
+      DEJALU= .FALSE.
+
+*     Boucle infinie sur tous les objets en entrée
+ 1    CONTINUE
+
+*     initialisation
+      IDECA = 0
+
+
+*     ===========================
+*     Lecture de l'objet en cours
+*     ===========================
+
+      IF (.NOT.DEJALU) THEN
+          CALL QUETYP(CTYP,0,IRETOU)
+          IF (IRETOU.EQ.0) GOTO 10
+          IF (CTYP.EQ.'ENTIER') THEN
+              CALL LIRENT(IPO,1,IRETOU)
+              IF(IERR.NE.0) GOTO 1010
+          ELSEIF (CTYP.EQ.'FLOTTANT') THEN
+              CALL LIRREE(XPO,1,IRETOU)
+              IF(IERR.NE.0) GOTO 1010
+          ELSEIF (CTYP.EQ.'LOGIQUE') THEN
+              CALL LIRLOG(LPO,1,IRETOU)
+              IF(IERR.NE.0) GOTO 1010
+          ELSEIF ((CTYP.EQ.'MOT').OR.(CTYP.EQ.'PROCEDUR')) THEN
+              CTYP='MOT'
+              CALL LIRCHA(ITXTIN,1,IRETOU)
+              IF(IERR.NE.0) GOTO 1010
+*             on lit la spécification éventuelle du format
+              IF(ITXTIN(1:7).EQ.'FORMAT ')THEN
+                  CALL LIRCHA(MFMT,1,IRETF)
+                  IF(IERR.NE.0) GOTO 1010
+                  GOTO 1
+              ENDIF
+          ENDIF
+
+      ELSE
+*         on gère ce cas dans toute sa généralité, même si en pratique,
+*         on ne peut avoir qu'un MOT, valant '*' ou '/' ou '<' ou '>'
+*         (de longueur 1)
+          DEJALU=.FALSE.
+          CTYP  = CTYP1
+          IF     (CTYP.EQ.'ENTIER  ')THEN
+              IPO=IPO1
+          ELSEIF (CTYP.EQ.'FLOTTANT') THEN
+              XPO=XPO1
+          ELSEIF (CTYP.EQ.'LOGIQUE ') THEN
+              LPO=LPO1
+          ELSEIF (CTYP.EQ.'MOT     ') THEN
+              ITXTIN=ITXTI1
+              IRETOU=IRETO1
+*             on lit la spécification éventuelle du format
+              IF(ITXTIN(1:7).EQ.'FORMAT ')THEN
+                  CALL LIRCHA(MFMT,1,IRETF)
+                  IF(IERR.NE.0) GOTO 1010
+                  GOTO 1
+              ENDIF
+          ENDIF
+      ENDIF
+
+
+*     Lecture d'un indicateur éventuel de tabulation ('*' ou '/' ou
+*     '<' ou '>')
+      CALL QUETYP(CTAB,0,IRETO)
+      IF (CTAB.EQ.'MOT') THEN
+          CALL LIRCHA(CMOT,1,LMOT)
+          IF (IERR.NE.0) RETURN
+
+          CALL PLACE(IMO,4,IRET,CMOT(1:1))
+
+          IF (IRET.NE.0) THEN
+*          => PRISE EN COMPTE DES INDICATEURS '<' ET '>' ECRITS
+*             "A LA VA-VITE" SANS QUOTES ET COLLES A L'ENTIER QUI SUIT
+*             EXEMPLE : CHAI 'TOTO'<12 ; QUE GIBIANE INTERPRETE COMME
+*                       LE MOT 'TOTO' SUIVI DU MOT '<12'
+*             REMARQUE : CELA NE CONCERNE PAS '/' ET '*' QUI SONT
+*                        CONSIDERES COMME DES SEPARATEURS NATIFS DE
+*                        GIBIANE
+              IF (LMOT.GE.2) THEN
+                  DO K=2,LMOT
+                      II = INDEX(DIGIT,CMOT(K:K))
+                      IF (II.EQ.0) GOTO 2
+                  ENDDO
+                  WRITE(CFMT,FMT='("(I",I1,")")') LMOT-1
+                  READ(CMOT(2:LMOT),FMT=CFMT) IPOS
+                  CALL ECRENT(IPOS)
+              ENDIF
+
+*             y a-t-il un entier derrière ? (converti ci-dessus depuis
+*             un mot, ou bien lu en tant que tel)
+              CALL QUETYP(CTYP1,0,IRETO)
+              IF (CTYP1.EQ.'ENTIER') THEN
+*                 si oui, on a affaire à une spécification de tabulation
+                  CALL LIRENT(IPOS,1,IRETO)
+                  IF (IERR.NE.0) GOTO 1010
+                  IDECA = IRET
+                  GOTO 3
+              ENDIF
+
+*             format de tabulation non reconnu
+*             => on traite le mot CMOT (qui debute par * ou / ou < ou >)
+*                comme un simple mot, sans signification particulière
+*                ...mais on l'a lu en avance (stocke dans ITXTI1)
+    2         CONTINUE
+              DEJALU=.TRUE.
+              CTYP1 = 'MOT     '
+              IPO1=IPO
+              XPO1=XPO
+              LPO1=LPO
+              ITXTI1(1:LMOT)=CMOT(1:LMOT)
+              IRETO1 = LMOT
+          ELSE
+              CALL REFUS
+          ENDIF
+      ENDIF
+
+    3 CONTINUE
+
+
+*     =================================================================
+*     Construction de la chaîne de caractère élémentaire en fonction du
+*     type d'objet
+*     =================================================================
+
+
+*     1) calcul de la longueur du morceau de chaine a ajouter
+*        ----------------------------------------------------
+
+      IF (CTYP.EQ.'ENTIER  ') THEN
+         IDEJ=0
+         IF(IPO.LT.0) IDEJ=1
+         IPO=ABS(IPO)
+*        nombre de chiffres à écrire, converti en chaîne
+         IF(IPO.EQ.0) THEN
+            idpl  = 1
+         ELSE
+            xnb   = log10 (real(ipo))
+            idpl  = (int(xnb)) + 1
+         ENDIF
+*        format d'écriture correspondant
+         IF (idpl.LT.10)   THEN
+            WRITE(cc,FMT='(I1)') idpl
+            CFMT  = '(I'//cc(1:1)//')'
+            IRETI = 4
+         ELSE
+*           ce cas n'est pas atteint lorsqu'un entier à plus de 10 chiffres est
+*           considéré comme un réel.
+            CFMT  = '(I10)'
+            IRETI = 5
+         ENDIF
+
+         ITOT=IDEJ+IDPL
+
+*        ajout du signe si négatif
+         IF (IDEJ.EQ.1) THEN
+            ITIT1(ILON+1:ILON+1)='-'
+            ILON=ILON+1
+         ENDIF
+
+      ELSEIF (CTYP.EQ.'FLOTTANT') THEN
+*        conversion en chaîne suivant le FORMAT
+         ITXTIN(1:LOCHAI)=' '
+         WRITE(ITXTIN,FMT=MFMT(1:IRETF),IOSTAT=ios1,ERR=1094) XPO
+         IF(ios1 .eq. 0)GOTO 1095
+ 1094      CALL ERREUR(1094)
+           RETURN
+ 1095    CONTINUE
+         ITOT=LONG(ITXTIN)
+
+      ELSEIF (CTYP.EQ.'LOGIQUE ') THEN
+         ITOT=4
+
+      ELSEIF (CTYP.EQ.'MOT     ') THEN
+         ITOT=IRETOU
+
+      ELSE
+*       Données incompatibles
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+
+
+*     2) gestion du decalage et de l'alignement
+*        --------------------------------------
+
+*     *N => on ecrit a gauche de la N-ieme colonne
+      IF     (IDECA.EQ.1) THEN
+c          IF (ILON+ITOT.GT.IPOS) IPOS=ILON+ITOT
+         ILON=IPOS-ITOT
+
+*     /N => on ecrit a droite de la N-ieme colonne
+      ELSEIF (IDECA.EQ.2) THEN
+c          IF (IPOS.LE.ILON) IPOS=ILON+1
+         ILON=IPOS-1
+
+*     -N => on ecrit a gauche de N colonnes plus loin
+      ELSEIF (IDECA.EQ.3) THEN
+c          IF(ILON+IPOS.LE.ILON) IPOS=ILON+ITOT
+         ILON=ILON+IPOS-ITOT
+
+*     +N => on ecrit a droite de N colonnes plus loin
+      ELSEIF (IDECA.EQ.4) THEN
+c          IF(IPOS.LE.ILON) IPOS=ILON+1
+         ILON=ILON+IPOS-1
+
+      ENDIF
+
+*     erreur si chaîne totale trop grande
+      IF(ILON+ITOT.GT.LOCHAI) THEN
+        CALL ERREUR(1110)
+        RETURN
+      ENDIF
+
+
+*     3) mise a jour de la chaine
+*        ------------------------
+
+      IF     (CTYP.EQ.'ENTIER  ')THEN
+*        write (6,*) ' format: ',ireti,cfmt(1:ireti)
+         WRITE(ITIT1(ILON+1:ILON+IDPL),FMT=CFMT(1:IRETI)) IPO
+         ILON=ILON+IDPL
+
+      ELSEIF (CTYP.EQ.'FLOTTANT') THEN
+         ITIT1(ILON+1:ILON+ITOT)=ITXTIN(1:ITOT)
+         ILON=ILON+ITOT
+
+      ELSEIF (CTYP.EQ.'LOGIQUE ') THEN
+         IF (LPO) THEN
+            ITIT1(ILON+1:ILON+ITOT)='VRAI'
+         ELSE
+            ITIT1(ILON+1:ILON+ITOT)='FAUX'
+         ENDIF
+         ILON=ILON+ITOT
+
+      ELSEIF (CTYP.EQ.'MOT     ') THEN
+         ITIT1(ILON+1:ILON+ITOT)=ITXTIN(1:ITOT)
+         ILON=ILON+ITOT
+      ENDIF
+
+
+*     Lecture de l'objet suivant
+      GOTO 1
+
+
+
+*     ==========================================
+*     Fin de la subroutine : avec ou sans erreur
+*     ==========================================
+
+
+*     On a tout lu sans erreur
+*     On écrit la chaîne en sortie si elle n'est pas vide
+ 10   CONTINUE
+      IF (ILON.EQ.0) THEN
+          ILON=1
+          ITIT1=' '
+      ENDIF
+
+***   IF(ILON.EQ.0) return
+      if (entry) then
+        lachaine=itit1(1:ilon)
+      else
+        CALL ECRCHA(ITIT1(1:ILON))
+      endif
+      RETURN
+
+
+
+*     DECLENCHEMENT D'UNE ERREUR
+*     **************************
+
+ 1010 CONTINUE
+      CALL ERREUR(21)
+      RETURN
+      END
+
+ 
+ 

@@ -1,0 +1,21 @@
+C MOEULR    SOURCE    JK148537  23/02/21    21:15:03     11603          
+      SUBROUTINE MOEULR(MOMODL,NMOD)
+*----------------------------------------------------------------------
+*     -  CAS DE LA FORMULATION 'NAVIER_STOKES'
+*    DEFINITION DES NOMS DES MATERIAUX
+*----------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC CCOPTIO
+*
+      CHARACTER*16 MOMODL(*)
+*
+*     Noms des materiaux
+*
+      NMOD=1
+      MOMODL(1)='NEWTONIEN'
+      RETURN
+      END
+
+ 

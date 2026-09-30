@@ -1,0 +1,680 @@
+C PROPHA    SOURCE    CB215821  20/11/25    13:37:29     10792          
+
+      SUBROUTINE PROPHA
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+*  Calcule la nouvelle proportion de phase
+* en entree
+*           : son chamelem de materiau associé
+*           : un champ de temperature proposée avec les mult de
+*             lagrange
+*  en sortie MCHAML de proportion de phase mis a jour
+*
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+
+-INC SMMODEL
+-INC SMCHAML
+      POINTEUR mchelp.mchelm
+      POINTEUR mchamp.mchaml
+      POINTEUR melvap.melval
+-INC SMCHPOI
+-INC SMELEME
+-INC SMCOORD
+
+      SEGMENT SCPR
+        INTEGER            ICPR1(NODE)
+        INTEGER            ICPR2(NODE)
+      ENDSEGMENT
+
+      SEGMENT              ICPR3(NODE,N_CON)
+      SEGMENT              ICPR4(NODE,N_CON)
+
+      SEGMENT S_CONS
+        CHARACTER*(LCONMO) CHACON(N_CON)
+        INTEGER            LIS_LX(N_CON)
+        INTEGER            NB_MOD(N_CON)
+        INTEGER            LISMOD(N_CON,N_CON)
+C       N_CON : Dimensionnement au plus grand du SEGMENT
+C       CHACON: Nom des constituants
+C       LIS_LX: Liste de  pointeurs S_LX
+C       NB_MOD: Nombre de IMODEL partageant le meme CONSTITUANT
+C       LISMOD: Liste des IMODEL partageant le meme CONSTITUANT
+      ENDSEGMENT
+
+      SEGMENT S_LX
+        INTEGER NB_LX
+        INTEGER LISELE(N_LX)
+        INTEGER LISNOL(N_LX)
+        INTEGER LISNOI(N_LX)
+        REAL*8  Q_REA (N_LX)
+        REAL*8  Q_MAX (N_LX)
+C       N_LX  : Dimensionnement au plus grand du SEGMENT
+C       NB_LX : Nombre de noeuds 'LX' du CHAMP qui concerne ce constituant
+C       LISELE: Liste de Pointeur S_ELEM
+C       LISNOL: Numeros des noeuds 'LX'
+C       LISNOI: Numeros des noeuds 'INCO' relies aux 'LX'
+C       Q_REA : Chaleur de la reaction a distribuer   sur les noeuds
+C       Q_MAX : Chaleur maximale         distribuable sur les noeuds
+      ENDSEGMENT
+
+      SEGMENT S_ELEM
+        INTEGER NB_EL
+        INTEGER MELPRO(N_EL)
+        INTEGER LISNEL(N_EL)
+        INTEGER LISNNO(N_EL)
+        REAL*8  QTOTNO(N_EL)
+        REAL*8  QDEJNO(N_EL)
+        REAL*8  QRESNO(N_EL)
+        REAL*8  QTOTEL(N_EL)
+        REAL*8  QDEJEL(N_EL)
+        REAL*8  QRESEL(N_EL)
+C       NB_EL : Nombre d'elements de ce type touchant le noeud 'INCO'
+C       N_EL  : Dimensionnement au plus grand du SEGMENT
+C       MELPRO: Liste des pointeurs MELVAL associes a la proportion de phase
+C       LISNEL: Liste des numeros d'elements dans le MELEME SIMPLE
+C       LISNNO: Liste des numeros de noeud dans l'element trouve
+C       QTOTNO: Chaleur totale         integree au noeud 'INCO'
+C       QDEJNO: Chaleur deja accumulee integree au noeud 'INCO'
+C       QRESNO: Chaleur restante       integree au noeud 'INCO'
+C       QTOTEL: Chaleur totale         sommee dans l'element
+C       QDEJEL: Chaleur deja accumulee sommee dans l'element
+C       QRESEL: Chaleur restante       sommee dans l'element
+      ENDSEGMENT
+
+      SEGMENT ITRAV
+        INTEGER IPERM1(NNN)
+        INTEGER IPERM2(NNN)
+        INTEGER IT1(NNN)
+        REAL*8  TT1(NNN)
+        REAL*8  TT2(NNN)
+      ENDSEGMENT
+
+      SEGMENT ISEGSU(0)
+      SEGMENT ISEG(0)
+
+      CHARACTER*(LOCOMP) MOCOMP
+      LOGICAL     LOG1
+
+C Un peu de marge sur la precision des calculs (pb aix)
+      XZPREL=XZPREC*1.D3
+* +--------------------------------------------------------------------+
+* |    LECTURE DES ARGUMENTS GIBIANE                                   |
+* +--------------------------------------------------------------------+
+      ipmodl = 0
+      NNN    = 0
+
+C     Lecture du modele
+      call LIROBJ('MMODEL  ',mmodel,1,iretou)
+      CALL ACTOBJ('MMODEL  ',mmodel,1)
+      if(ierr.ne.0) return
+
+*     Lecture du mchaml de proportions de phase (aux NOEUDS)
+      call LIROBJ('MCHAML  ',IPIN,1,iretou)
+      call ACTOBJ('MCHAML  ',IPIN,1)
+      IF(IERR .NE. 0) RETURN
+
+      CALL REDUAF(IPIN,mmodel,mchel1,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+
+      call quesup(ipmodl,mchel1,0,0,isupp,iret)
+      if (isupp.gt.1) then
+        call erreur(609)
+        return
+      endif
+
+*     Lecture du mchaml de chaleur latente integree (aux NOEUDS)
+      call LIROBJ('MCHAML  ',IPIN,1,iretou)
+      call ACTOBJ('MCHAML  ',IPIN,1)
+      IF(IERR .NE. 0) RETURN
+      CALL REDUAF(IPIN,mmodel,MCHEL2,0,IR,KER)
+      IF(IR   .NE. 1) CALL ERREUR(KER)
+      IF(IERR .NE. 0) RETURN
+      call quesup(ipmodl,MCHEL2,0,0,isupq,iret)
+      if (isupq.gt.1) then
+        call erreur(609)
+        return
+      endif
+
+C     Lecture du CHPOINT des temperatures proposees
+      CALL LIROBJ('CHPOINT ',mchpoi,1,IRETOU)
+      CALL ACTOBJ('CHPOINT ',mchpoi,1)
+      IF(IERR.NE.0) RETURN
+
+C     Initialisation du chapeau du resultat
+      SEGINI,MCHELP=MCHEL1
+
+      XUN = 1.D0
+
+* +--------------------------------------------------------------------+
+* |    Reperage du MSOUPO des 'LX' dans mchpoi                         |
+* +--------------------------------------------------------------------+
+      NSOUPO=mchpoi.ipchp(/1)
+      DO iii=1,NSOUPO
+        MSOUPO=mchpoi.ipchp(iii)
+        NC    =MSOUPO.NOCOMP(/2)
+        DO ICOMP=1,NC
+          IF(MSOUPO.NOCOMP(ICOMP) .EQ. 'LX  ') THEN
+            MPOVAL = IPOVAL
+            MELEME = IGEOC
+            N      = MPOVAL.VPOCHA(/1)
+            GOTO 10
+          ENDIF
+        ENDDO
+      ENDDO
+
+C     Pas de 'LX' trouve on sort
+      CALL ACTOBJ('MCHAML  ',MCHELP,1)
+      CALL ECROBJ('MCHAML  ',MCHELP)
+      RETURN
+
+ 10   CONTINUE
+
+C     Si 'LX' trouve, il est la seule composante de son MSOUPO
+      IF (ICOMP .NE. 1) CALL ERREUR(5)
+
+* +----------------------------------------------------------------------------+
+* |    Liste des CONSTITUANTS et 'LX' pour les modeles 'CHANGEMENT_PHASE'      |
+* +----------------------------------------------------------------------------+
+      NODE  = nbpts
+      SEGINI,ISEGSU
+      SEGINI,SCPR
+      ISEGSU(**)= SCPR
+      N1        = MMODEL.KMODEL(/1)
+      N_CON     = N1
+      SEGINI,S_CONS
+      ISEGSU(**)=S_CONS
+      SEGINI,ICPR3
+      ISEGSU(**)=ICPR3
+
+      NB_CON = 0
+      DO 1 I_MODE=1,N1
+C       Boucle sur les SOUS-MODELES 'CHANGEMENT_PHASE'
+        IMODEL=MMODEL.KMODEL(I_MODE)
+        NFOR  =IMODEL.FORMOD(/2)
+        CALL PLACE(IMODEL.FORMOD,NFOR,IPLAC,'CHANGEMENT_PHASE')
+        IF  (IPLAC .EQ. 0) GOTO 1
+
+C       Recherche du noeud 'LX' dans le MAILLAGE de BLOCAGE
+        IF(TYMODE(2) .NE. 'MAILLAGE')THEN
+          CALL ERREUR(5)
+          RETURN
+        ENDIF
+
+        IPT1  = IMODEL.IVAMOD(2)
+        NB_EL1= IPT1.NUM(/2)
+C       Listes des CONSTITUANTS
+        DO 2 I_CONS=1,NB_CON
+          IF(S_CONS.CHACON(I_CONS) .EQ. IMODEL.CONMOD)THEN
+C           Constituant existant
+            nbmode=S_CONS.NB_MOD(I_CONS)+1
+            S_CONS.NB_MOD(I_CONS)=nbmode
+            S_CONS.LISMOD(nbmode,I_CONS)=IMODEL
+            S_LX = S_CONS.LIS_LX(I_CONS)
+            N_LX = S_LX.LISELE(/1) + NB_EL1
+            SEGADJ,S_LX
+            GOTO 3
+          ENDIF
+ 2      CONTINUE
+C       Nouvelle Zone trouvee
+        NB_CON = NB_CON + 1
+        I_CONS = NB_CON
+        N_LX   = NB_EL1
+        SEGINI,S_LX
+        ISEGSU(**)=S_LX
+        S_LX.NB_LX = 0
+        S_CONS.LIS_LX(I_CONS)  = S_LX
+        S_CONS.CHACON(I_CONS)  = IMODEL.CONMOD
+        S_CONS.NB_MOD(I_CONS)  = 1
+        S_CONS.LISMOD(1,I_CONS)= IMODEL
+ 3      CONTINUE
+
+        DO 4 I_EL1=1,NB_EL1
+C         Noeud 1 : 'LX'
+C         Noeud 2 : 'Inconnues classiques'
+          I_LX   = IPT1.NUM(1,I_EL1)
+          I_INCO = IPT1.NUM(2,I_EL1)
+          IF(ICPR3(I_INCO,I_CONS) .EQ. 0)THEN
+            ICPR3(I_INCO,I_CONS) = I_LX
+          ENDIF
+          SCPR.ICPR1(I_LX) = I_INCO
+          SCPR.ICPR2(I_LX) = I_CONS
+ 4      CONTINUE
+ 1    CONTINUE
+
+      IF (NB_CON .EQ. 0) THEN
+C       Cas ou aucune SOUS-ZONE ne correspond aux modeles 'CHANGEMENT_PHASE'
+        CALL ACTOBJ('MCHAML  ',MCHELP,1)
+        CALL ECROBJ('MCHAML  ',MCHELP)
+        RETURN
+      ENDIF
+
+* +--------------------------------------------------------------------+
+* |    Creation du resultat (extension du MELVAL obligatoire)          |
+* +--------------------------------------------------------------------+
+      N1=MCHELP.ICHAML(/1)
+      DO iN1=1,N1
+        MCHAML=MCHELP.ICHAML(iN1)
+        IPT2  =MCHELP.IMACHE(iN1)
+        N2    =1
+        SEGINI,MCHAMP
+        MCHELP.ICHAML(iN1)= MCHAMP
+        MCHAMP.NOMCHE(1)  ='PPHA'
+        MCHAMP.TYPCHE(1)  ='REAL*8'
+
+        N1PTEL=IPT2.NUM(/1)
+        N1EL  =IPT2.NUM(/2)
+        N2PTEL=0
+        N2EL  =0
+        SEGINI,MELVAP
+        MCHAMP.IELVAL(1)=MELVAP
+
+        MELVA1=MCHAML.IELVAL(1)
+        MAXP1=MELVA1.VELCHE(/1)
+        MAXE1=MELVA1.VELCHE(/2)
+        DO IE=1,N1EL
+          DO IP=1,N1PTEL
+            MELVAP.VELCHE(IP,IE)=MELVA1.VELCHE(MIN(IP,MAXP1),
+     &                                         MIN(IE,MAXE1))
+          ENDDO
+        ENDDO
+      ENDDO
+
+* +--------------------------------------------------------------------+
+* |    Reperage des Elements qui touchent un noeud 'INCO'              |
+* +--------------------------------------------------------------------+
+      SEGINI,ICPR4
+      ISEGSU(**)=ICPR4
+      DO I_CONS=1,NB_CON
+        nbmode=S_CONS.NB_MOD(I_CONS)
+        DO I_MODE=1,nbmode
+          IMODEL= S_CONS.LISMOD(I_MODE,I_CONS)
+          IPT1  = IMODEL.IMAMOD
+          DO I_EL1=1,IPT1.NUM(/2)
+            DO I_NO1=1,IPT1.NUM(/1)
+              NU_INC=IPT1.NUM(I_NO1,I_EL1)
+              ICPR4(NU_INC,I_CONS)=ICPR4(NU_INC,I_CONS) + 1
+            ENDDO
+          ENDDO
+
+          IPT2  = IMODEL.IVAMOD(2)
+          DO I_EL2=1,IPT2.NUM(/2)
+
+          ENDDO
+        ENDDO
+
+C       Creation des SEGMENTS S_ELEM et placement dans ICPR4
+        DO 20 iii=1,NODE
+          N_EL=ICPR4(iii,I_CONS)
+          IF(N_EL .EQ. 0) GOTO 20
+          NNN =MAX(NNN,N_EL)
+          SEGINI,S_ELEM
+          ISEGSU(**)=S_ELEM
+          ICPR4(iii,I_CONS)=S_ELEM
+          S_ELEM.NB_EL = 0
+ 20     CONTINUE
+
+        DO I_MODE=1,nbmode
+          IMODEL = S_CONS.LISMOD(I_MODE,I_CONS)
+          IPT1   = IMODEL.IMAMOD
+          NB_NO1 = IPT1.NUM(/1)
+          NB_EL1 = IPT1.NUM(/2)
+
+C         Recuperation des MELVAL de 'PPHA' et inconnue duale 'Q' de cette SOUS-ZONE
+          NOMID  = IMODEL.LNOMID(2)
+          MOCOMP  = NOMID.LESOBL(1)
+
+*         +--------------------------------------------------------+
+*         |    Recherche du MELVAL correspondant a 'PPHA'          |
+*         +--------------------------------------------------------+
+          DO 41 I_MCH=1,MCHELP.ICHAML(/1)
+            IF(MCHELP.CONCHE(I_MCH) .NE. IMODEL.CONMOD) GOTO 41
+            IF(MCHELP.IMACHE(I_MCH) .EQ. IPT1  ) THEN
+              MCHAM1=MCHELP.ICHAML(I_MCH)
+              GOTO 42
+            ENDIF
+   41     CONTINUE
+          CALL ERREUR(472)
+          RETURN
+   42     CONTINUE
+
+          DO 46 I_COMP=1,MCHAM1.NOMCHE(/2)
+            IF(MCHAM1.NOMCHE(I_COMP).EQ.'PPHA') THEN
+              IF (MCHAM1.TYPCHE(I_COMP).NE.'REAL*8') THEN
+                MOTERR(1:16)  = MCHAM1.TYPCHE(I_COMP)
+                MOTERR(17:20) ='PPHA'
+                MOTERR(21:36) = MCHELP.TITCHE
+                CALL ERREUR(552)
+                RETURN
+              ENDIF
+              MELVA1=MCHAM1.IELVAL(I_COMP)
+              NPT1=MELVA1.VELCHE(/1)
+              NEL1=MELVA1.VELCHE(/2)
+              GOTO 47
+            ENDIF
+   46     CONTINUE
+          MOTERR = 'PPHA'
+          CALL ERREUR(677)
+          RETURN
+   47     CONTINUE
+
+*         +-------------------------------------------------------------+
+*         |    Recherche du MELVAL correspondant aux quantites integrees|
+*         +-------------------------------------------------------------+
+          DO 411 I_MCH=1,MCHEL2.ICHAML(/1)
+            IF(MCHEL2.CONCHE(I_MCH) .NE. IMODEL.CONMOD) GOTO 411
+            IF(MCHEL2.IMACHE(I_MCH) .EQ. IPT1  ) THEN
+              MCHAM2=MCHEL2.ICHAML(I_MCH)
+              GOTO 421
+            ENDIF
+  411     CONTINUE
+          CALL ERREUR(472)
+          RETURN
+  421     CONTINUE
+
+          DO 461 I_COMP=1,MCHAM2.NOMCHE(/2)
+            IF(MCHAM2.NOMCHE(I_COMP).EQ. MOCOMP) THEN
+              IF (MCHAM2.TYPCHE(I_COMP).NE.'REAL*8') THEN
+                MOTERR(1:16)  = MCHAM2.TYPCHE(I_COMP)
+                MOTERR(17:20) = MOCOMP
+                MOTERR(21:36) = MCHEL2.TITCHE
+                CALL ERREUR(552)
+                RETURN
+              ENDIF
+              MELVA2= MCHAM2.IELVAL(I_COMP)
+              NPT2  = MELVA2.VELCHE(/1)
+              NEL2  = MELVA2.VELCHE(/2)
+              GOTO 471
+            ENDIF
+  461     CONTINUE
+          MOTERR = MOCOMP
+          CALL ERREUR(677)
+          RETURN
+  471     CONTINUE
+
+          DO I_EL1=1,NB_EL1
+            q_totE = XZERO
+            q_dejE = XZERO
+C           1ere boucle pour connaitre le cumul dans l'element
+            DO I_NO1=1,NB_NO1
+              x_prop = MELVA1.VELCHE(MIN(I_NO1,NPT1),MIN(I_EL1,NEL1))
+              x_qtot = MELVA2.VELCHE(MIN(I_NO1,NPT2),MIN(I_EL1,NEL2))
+              q_totE = q_totE + x_qtot
+              q_dejE = q_dejE + x_qtot*x_prop
+            ENDDO
+
+            DO I_NO1=1,NB_NO1
+              NU_INC = IPT1.NUM(I_NO1,I_EL1)
+              S_ELEM = ICPR4(NU_INC,I_CONS)
+              NU_EL  = S_ELEM.NB_EL + 1
+              S_ELEM.NB_EL        = NU_EL
+              S_ELEM.MELPRO(NU_EL)= MELVA1
+              S_ELEM.LISNEL(NU_EL)= I_EL1
+              S_ELEM.LISNNO(NU_EL)= I_NO1
+
+              x_prop = MELVA1.VELCHE(MIN(I_NO1,NPT1),MIN(I_EL1,NEL1))
+              x_qtot = MELVA2.VELCHE(MIN(I_NO1,NPT2),MIN(I_EL1,NEL2))
+              x_deja = x_prop*x_qtot
+              S_ELEM.QTOTNO(NU_EL)= x_qtot
+              S_ELEM.QDEJNO(NU_EL)= x_deja
+              S_ELEM.QRESNO(NU_EL)= x_qtot - x_deja
+
+              S_ELEM.QTOTEL(NU_EL)= q_totE
+              S_ELEM.QDEJEL(NU_EL)= q_dejE
+              S_ELEM.QRESEL(NU_EL)= q_totE - q_dejE
+            ENDDO
+          ENDDO
+        ENDDO
+      ENDDO
+
+* +--------------------------------------------------------------------+
+* |    Remplissage du S_LX a partir des 'LX' du MCHPOI                 |
+* +--------------------------------------------------------------------+
+      DO 30 I_LX=1,N
+        NUM_LX = MELEME.NUM(1,I_LX)
+        NU_INC = SCPR.ICPR1(NUM_LX)
+        IF(NU_INC .EQ. 0)GOTO 30
+        I_CONS = SCPR.ICPR2(NUM_LX)
+
+        S_LX   = S_CONS.LIS_LX(I_CONS)
+        N_LX   = S_LX.NB_LX + 1
+        S_ELEM = ICPR4(NU_INC,I_CONS)
+        qmax=XZERO
+        DO I_EL=1,S_ELEM.NB_EL
+          qmax = qmax + S_ELEM.QTOTNO(I_EL)
+        ENDDO
+        S_LX.NB_LX       = N_LX
+        S_LX.LISELE(N_LX)= S_ELEM
+        S_LX.LISNOL(N_LX)= NUM_LX
+        S_LX.LISNOI(N_LX)= NU_INC
+        S_LX.Q_REA(N_LX) = MPOVAL.VPOCHA(I_LX,1)
+        S_LX.Q_MAX(N_LX) = qmax
+ 30   CONTINUE
+
+* +--------------------------------------------------------------------+
+* |    Boucle pour repartir la chaleur sur les noeuds des elements     |
+* +--------------------------------------------------------------------+
+      SEGINI,ITRAV
+      ISEGSU(**)=ITRAV
+      DO 60 I_CONS=1,NB_CON
+        S_LX=S_CONS.LIS_LX(I_CONS)
+        DO 70 I_LX=1,S_LX.NB_LX
+          S_ELEM = S_LX.LISELE(I_LX)
+          NUM_LX = S_LX.LISNOL(I_LX)
+          NU_INC = S_LX.LISNOI(I_LX)
+          N_EL   = S_ELEM.NB_EL
+          qrea   = S_LX.Q_REA(I_LX)
+          qmax   = S_LX.Q_MAX(I_LX)
+          qprec  = MAX(ABS(qmax)*XZPREL, XPETIT/XZPREC)
+
+          IF(qrea .GT. XZERO)THEN
+C           AU CHAUFFAGE
+C           Premier Trie selon QDEJEL pour connaitre les elements qui ont commence la transformation
+            DO I_EL=1,N_EL
+              ITRAV.IPERM1(I_EL)=I_EL
+              ITRAV.TT2(I_EL)   =-S_ELEM.QDEJEL(I_EL)
+            ENDDO
+            CALL TRIFLO(ITRAV.TT2,ITRAV.TT1,
+     &                  ITRAV.IPERM1,ITRAV.IT1,N_EL)
+
+C           On compte combien ont commence
+            NB_COM=0
+            DO I_EL=1,N_EL
+              iperm = ITRAV.IPERM1(I_EL)
+              q_totE= S_ELEM.QTOTEL(iperm)
+              q_dejE= S_ELEM.QDEJEL(iperm)
+              IF (q_dejE .GT. (XZPREL*q_totE)) THEN
+                NB_COM=NB_COM + 1
+                ITRAV.TT2(NB_COM)=S_ELEM.QRESNO(iperm)
+              ENDIF
+            ENDDO
+            NB_NUL=N_EL-NB_COM
+
+            IF(NB_COM .GT. 1)THEN
+C             Deuxieme Trie : Les elements qui ont commences sont tries selon QRESNO
+              CALL TRIFLO(ITRAV.TT2,ITRAV.TT1,
+     &                    ITRAV.IPERM1,ITRAV.IT1,NB_COM)
+            ENDIF
+
+            IF(NB_NUL .GT. 1)THEN
+C             Troisieme Trie : Les elements qui n'ont pas commences sont tries selon QTOTNO
+              DO I_EL=1,NB_NUL
+                iperm          = ITRAV.IPERM1(NB_COM+I_EL)
+                ITRAV.TT2(I_EL)= S_ELEM.QTOTNO(iperm)
+              ENDDO
+              CALL TRIFLO(ITRAV.TT2,ITRAV.TT1,
+     &                    ITRAV.IPERM1(NB_COM+1),ITRAV.IT1,NB_NUL)
+            ENDIF
+
+C           Il ne reste qu'a repartir le plus equitablement possible aux noeuds
+C           PRINT * ,'Hausse ELEMENT',N_EL,NB_COM,NB_NUL,qrea,S_ELEM
+            DO 80 I_EL=1,N_EL
+              iperm =ITRAV.IPERM1(I_EL)
+              melvap=S_ELEM.MELPRO(iperm)
+              q_tot =S_ELEM.QTOTNO(iperm)
+              q_dej =S_ELEM.QDEJNO(iperm)
+              q_res =S_ELEM.QRESNO(iperm)
+              IP    =S_ELEM.LISNNO(iperm)
+              IE    =S_ELEM.LISNEL(iperm)
+
+              IF(NB_COM .GE. 1)THEN
+                q_part = qrea / NB_COM
+              ELSE
+                q_part = qrea / NB_NUL
+              ENDIF
+
+              IF(q_tot.EQ.XZERO .OR. (q_res-q_part) .LE. XZERO)THEN
+C               Ce noeud termine sa transformation vers le haut
+                MELVAP.VELCHE(IP,IE)=XUN
+                qrea  = qrea - q_res
+C               PRINT *,'Hausse-a',qrea,q_tot,q_dej,q_res,q_part
+                q_res = XZERO
+                q_dej = q_tot
+
+              ELSE
+C               Ce noeud consomme exactement q_part
+                pp    = MAX(MIN((q_dej+q_part)/q_tot,XUN),XZERO)
+                MELVAP.VELCHE(IP,IE)=pp
+                qrea  = qrea  - q_part
+C               PRINT *,'Hausse-b',qrea,q_tot,q_dej,q_res,q_part
+                q_res = q_res - q_part
+                q_dej = q_tot - q_res
+              ENDIF
+
+              NB_COM = NB_COM - 1
+              IF(NB_COM.LT.0)THEN
+                NB_NUL = NB_NUL - 1
+              ENDIF
+
+              S_ELEM.QRESNO(iperm)=q_res
+              S_ELEM.QDEJNO(iperm)=q_dej
+ 80         CONTINUE
+            IF(ABS(qrea).GT.qprec) CALL soucis(1)
+
+          ELSEIF(qrea .LT. XZERO)THEN
+C           AU REFROIDISSEMENT
+C           Premier Trie selon QRESEL pour connaitre les elements qui ont commence la transformation inverse
+            DO I_EL=1,N_EL
+              ITRAV.IPERM1(I_EL)= I_EL
+              ITRAV.TT2(I_EL)   =-S_ELEM.QRESEL(I_EL)
+            ENDDO
+            CALL TRIFLO(ITRAV.TT2,ITRAV.TT1,
+     &                  ITRAV.IPERM1,ITRAV.IT1,N_EL)
+
+C           On compte combien d'elements ont commence la transformation inverse
+            NB_COM=0
+            DO I_EL=1,N_EL
+              iperm = ITRAV.IPERM1(I_EL)
+              q_totE= S_ELEM.QTOTEL(iperm)
+              q_resE= S_ELEM.QRESEL(iperm)
+              IF (q_resE .GT. (XZPREL*q_totE)) THEN
+                NB_COM=NB_COM + 1
+                ITRAV.TT2(NB_COM)=S_ELEM.QDEJNO(iperm)
+              ENDIF
+            ENDDO
+            NB_NUL=N_EL-NB_COM
+
+            IF(NB_COM .GT. 1)THEN
+C             Deuxieme Trie : Les elements qui ont commences sont tries selon QDEJNO
+              CALL TRIFLO(ITRAV.TT2,ITRAV.TT1,
+     &                    ITRAV.IPERM1,ITRAV.IT1,NB_COM)
+            ENDIF
+
+            IF(NB_NUL .GT. 1)THEN
+C             Troisieme Trie : Les elements qui n'ont pas commences sont tries selon QTOTNO
+              DO I_EL=1,NB_NUL
+                iperm          = ITRAV.IPERM1(NB_COM+I_EL)
+                ITRAV.TT2(I_EL)= S_ELEM.QTOTNO(iperm)
+              ENDDO
+              CALL TRIFLO(ITRAV.TT2,ITRAV.TT1,
+     &                    ITRAV.IPERM1(NB_COM+1),ITRAV.IT1,NB_NUL)
+            ENDIF
+
+C           Il ne reste qu'a repartir le plus equitablement possible aux noeuds
+C           PRINT * ,'Baisse ELEMENT',N_EL,NB_COM,NB_NUL,qrea
+            DO 90 I_EL=1,N_EL
+              iperm =ITRAV.IPERM1(I_EL)
+              melvap=S_ELEM.MELPRO(iperm)
+              q_tot =S_ELEM.QTOTNO(iperm)
+              q_dej =S_ELEM.QDEJNO(iperm)
+              q_res =S_ELEM.QRESNO(iperm)
+              IP    =S_ELEM.LISNNO(iperm)
+              IE    =S_ELEM.LISNEL(iperm)
+
+              IF(NB_COM .GE. 1)THEN
+                q_part = qrea / NB_COM
+              ELSE
+                q_part = qrea / NB_NUL
+              ENDIF
+
+              IF(q_tot.EQ.XZERO .OR. (q_dej+q_part) .LE. XZERO)THEN
+C               Ce noeud termine sa transformation vers le bas
+                MELVAP.VELCHE(IP,IE)=XZERO
+                qrea  = qrea + q_dej
+C               PRINT *,'Baisse-a',qrea,q_tot,q_dej,q_res,q_part
+                q_res = q_tot
+                q_dej = XZERO
+
+              ELSE
+C               Ce noeud consomme exactement q_part
+                pp    = MAX(MIN((q_dej+q_part)/q_tot,XUN),XZERO)
+                MELVAP.VELCHE(IP,IE)=pp
+                qrea  = qrea  - q_part
+C               PRINT *,'Baisse-b',qrea,q_tot,q_dej,q_res,q_part
+                q_res = q_res - q_part
+                q_dej = q_tot - q_res
+              ENDIF
+
+              NB_COM = NB_COM - 1
+              IF(NB_COM.LT.0)THEN
+                NB_NUL = NB_NUL - 1
+              ENDIF
+
+              S_ELEM.QRESNO(iperm)=q_res
+              S_ELEM.QDEJNO(iperm)=q_dej
+ 90         CONTINUE
+            IF(ABS(qrea).GT.qprec) CALL soucis(1)
+
+          ELSE
+C           Cas (qrea .EQ. XZERO) : survient si chaleur latente nulle
+C           On fait donc une bascule des proportions de phase
+C           Si pp>0 ==> pp=1
+C           Si pp<1 ==> pp=0
+            DO 100 I_EL=1,N_EL
+              MELVAP=S_ELEM.MELPRO(I_EL)
+              IP    =S_ELEM.LISNNO(I_EL)
+              IE    =S_ELEM.LISNEL(I_EL)
+              pp    =MELVAP.VELCHE(IP,IE)
+              IF    (pp .LT. XUN  )THEN
+                pp = XUN
+              ELSEIF(pp .GT. XZERO)THEN
+                pp = XZERO
+              ELSE
+                CALL ERREUR(5)
+              ENDIF
+              MELVAP.VELCHE(IP,IE)=pp
+ 100        CONTINUE
+          ENDIF
+ 70     CONTINUE
+ 60   CONTINUE
+
+C     On supprime les SEGMENTS de travail
+      ISEGSU(**)=ISEGSU
+      DO ii=1,ISEGSU(/1)
+        ISEG=ISEGSU(ii)
+        SEGSUP,ISEG
+      ENDDO
+
+      CALL ACTOBJ('MCHAML',MCHELP,1)
+      CALL ECROBJ('MCHAML',MCHELP)
+      END
+ 
+ 
+ 
+ 

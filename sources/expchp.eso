@@ -1,0 +1,305 @@
+C EXPCHP    SOURCE    CB215821  20/11/25    13:28:37     10792          
+       SUBROUTINE EXPCHP(IPCHPO,IMM,IAB,IAV,IPLIS,VALREF,VALRE2,IPMAIL)
+*
+*   EXTRAIRE LE OU LES POINTS SUPPORTS DU MAXI OU DU MINI DES VALEURS DE
+*   COMPOSANTES D'UN CHAMP/POINT
+*
+************************************************************************
+*   ENTREES :
+*
+*     IPCHPO =POINTEUR SUR UN CHPOINT
+*     IMM    = 1  MAXI , 2 MINI , 3 A 8  AUTRES
+*     IAB   = 0 VALEURS ALGEBRIQUES  ,1 VALEURS ABSOLUES
+*     IAV    = 1 LES NOMS DE LA LISEMOTS SONT CONSIDERES ,2 ILS SONT EXC
+*     IPLIS  = POINTEUR SUR UN LISTMOTS
+*     VALREF = VALEUR DE REFERENCE
+*     VALRE2 = IDEM POUR OPTION COMPRIS
+*
+*    SORTIES :
+*
+*    IPMAIL  = POINTEUR  SUR OBJET MAILLAGE CONTENANT LE OU LES POINTS
+*              SUPPORTS DU MAXI OU DU MINI OU AUTRES
+*
+*  P DOWLATYARI OCT 91
+************************************************************************
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC SMCHPOI
+-INC SMELEME
+-INC SMCOORD
+-INC SMLMOTS
+*
+      SEGMENT QUELCO
+        INTEGER ICO(NSOUS,NCOMX),NNCO(NSOUS)
+      ENDSEGMENT
+      CHARACTER*(LOCOMP) MOCOMP
+      DIMENSION  XE(3,1)
+*
+*       INITIALISATIONS
+*
+      IF(IAB.EQ.0)THEN
+        IF    (IMM.EQ.1)THEN
+          VALRE1=-XGRAND
+        ELSEIF(IMM.EQ.2)THEN
+          VALRE1= XGRAND
+        ELSE
+          VALRE1=VALREF
+        ENDIF
+
+      ELSE
+        IF    (IMM.EQ.1)THEN
+          VALRE1=0.D0
+        ELSEIF(IMM.EQ.2)THEN
+          VALRE1= XGRAND
+        ELSE
+          VALRE1=VALREF
+        ENDIF
+      ENDIF
+*
+      IF(IPLIS.NE.0)THEN
+         MLMOTS=IPLIS
+         SEGACT MLMOTS
+         NC=MOTS(/2)
+      ENDIF
+*
+*         ON RECUPERE LE CHPOINT
+*
+      MCHPOI=IPCHPO
+      NSOUS = IPCHP(/1)
+
+*
+*  ON CHERCHE LE NOMBRE MAXIMAL DE COMPOSANTES
+*
+      NCOMX = 0
+      DO 10 ISOUS=1,NSOUS
+       MSOUPO=IPCHP(ISOUS)
+       NCOMX=MAX(NCOMX,NOCOMP(/2))
+  10  CONTINUE
+*
+      IF(IPLIS.NE.0)SEGINI QUELCO
+
+*
+*   BOUCLE SUR LES SOUS-ZONES POUR TROUVER LE MAXI OU LE MINI
+*                             SI IMM = 1 OU 2
+*
+      DO  500 ISOUS=1,NSOUS
+*
+      MSOUPO=IPCHP(ISOUS)
+      NCOMP=NOCOMP(/2)
+      IF(IPLIS.NE.0)THEN
+       NCO=0
+       DO 20 ICOMP=1,NCOMP
+       MOCOMP=NOCOMP(ICOMP)
+       CALL PLACE(MOTS,NC,IX,MOCOMP)
+       IF(IAV.EQ.1)THEN
+         IF(IX.NE.0)THEN
+            ICO(ISOUS,ICOMP)=1
+            NCO=NCO+1
+         ELSE
+            ICO(ISOUS,ICOMP)=0
+         ENDIF
+       ELSE
+         IF(IX.EQ.0)THEN
+            ICO(ISOUS,ICOMP)=1
+            NCO=NCO+1
+         ELSE
+            ICO(ISOUS,ICOMP)=0
+         ENDIF
+       ENDIF
+ 20    CONTINUE
+       NNCO(ISOUS)=NCO
+      ENDIF
+*
+      IF(IMM.LE.2) THEN
+        XMAXI = -XGRAND
+        XMINI =  XGRAND
+        IF(IPLIS.EQ.0)THEN
+          MPOVAL=IPOVAL
+          N=VPOCHA(/1)
+          DO 100 ICOMP=1,NCOMP
+            DO 101 IB=1,N
+              XX=VPOCHA(IB,ICOMP)
+              IF(IAB.EQ.1)XX=ABS(XX)
+              XMAXI=MAX(XX,XMAXI)
+              XMINI=MIN(XX,XMINI)
+ 101        CONTINUE
+ 100      CONTINUE
+ 
+        ELSEIF(NCO.NE.0)THEN
+          MPOVAL=IPOVAL
+          N=VPOCHA(/1)
+          DO 110 ICOMP=1,NCOMP
+            IF(ICO(ISOUS,ICOMP).EQ.0)GOTO 110
+            DO 111 IB=1,N
+              XX=VPOCHA(IB,ICOMP)
+              XMAXI=MAX(XX,XMAXI)
+              XMINI=MIN(XX,XMINI)
+ 111        CONTINUE
+ 110      CONTINUE
+        ENDIF
+
+        IF(IMM.EQ.1)THEN
+          VALRE1=XMAXI
+        ELSE
+          VALRE1=XMINI
+        ENDIF
+      ENDIF
+*
+ 500  CONTINUE
+      IF(IPLIS.NE.0)THEN
+          NZERO=0
+          DO 510 ISOUS=1,NSOUS
+          IF(NNCO(ISOUS).EQ.0)NZERO=NZERO+1
+  510     CONTINUE
+       IF(NZERO.EQ.NSOUS)THEN
+          CALL ERREUR(280)
+          SEGSUP QUELCO
+          IPMAIL=0
+          RETURN
+        ENDIF
+      ENDIF
+*
+*   CREATION DE L'OBJET MAILLAGE CONTENANT LES POINTS SUPPORTS
+*
+      NBNN=1
+      NBELEM=nbpts
+      NBSOUS=0
+      NBREF=0
+      SEGINI MELEME
+      IPMAIL=MELEME
+      ITYPEL=1
+      NBELEM=0
+*
+*    DEUXIEME BOUCLE SUR LES SOUS-ZONES POUR TROUVER LES POINTS SUPPORTS
+*
+      DO 600 ISOUS=1,NSOUS
+*
+      MSOUPO=IPCHP(ISOUS)
+      NCOMP=NOCOMP(/2)
+      IPT1=IGEOC
+      IF(IPLIS.EQ.0)THEN
+        MPOVAL=IPOVAL
+        N=VPOCHA(/1)
+        DO 300 ICOMP=1,NCOMP
+          DO 301 IB=1,N
+            XX=VPOCHA(IB,ICOMP)
+            IF(IAB.EQ.1)XX=ABS(XX)
+            XPREC=ABS(VALRE1)*XZPREC
+            XDIFF=XX - VALRE1
+*           
+*           TRI SELON LA VALEUR DE IMM
+*
+            GOTO (21,21,23,24,21,26,27,28,29),IMM
+*
+            CALL ERREUR(280)
+            SEGSUP QUELCO
+            IPMAIL=0
+            RETURN
+*
+*  MAXI OU MINI OU EGAL
+  21        IF(A_EGALE_B(XX,VALRE1)) GOTO 303
+            GOTO 301
+*           
+* SUPE      
+  23        IF(XDIFF.GT.XPREC) GOTO 303
+            GOTO 301
+*           
+* EGSUPE    
+  24        IF(XDIFF.GE.-XPREC) GOTO 303
+            GOTO 301
+*           
+* EGINFE    
+  26        IF(XDIFF.LE.XPREC) GOTO 303
+            GOTO 301
+*           
+* INFE      
+  27        IF(XDIFF.LT.-XPREC) GOTO 303
+            GOTO 301
+*           
+* DIFF      
+  28        IF(ABS(XDIFF).GT.XPREC) GOTO 303
+            GOTO 301
+*           
+* COMP      
+  29        CONTINUE
+            XDIFF2=XX-VALRE2
+            IF((XDIFF.GE.-XPREC).AND.(XDIFF2.LE.XPREC)) GOTO 303
+            GOTO 301
+*
+ 303        CONTINUE
+            NBELEM=NBELEM+1
+*           SEGADJ MELEME
+            NUM(1,NBELEM)=IPT1.NUM(1,IB)
+ 301      CONTINUE
+ 300    CONTINUE
+*
+      ELSEIF(NNCO(ISOUS).NE.0)THEN
+        MPOVAL=IPOVAL
+        N=VPOCHA(/1)
+        DO 310 ICOMP=1,NCOMP
+          IF(ICO(ISOUS,ICOMP).EQ.0)GOTO 310
+          DO 410 IB=1,N
+            XX=VPOCHA(IB,ICOMP)
+            IF(IAB.EQ.1)XX=ABS(XX)
+            XPREC=ABS(VALRE1)*XZPREC
+            XDIFF=XX-VALRE1
+*
+*
+*           TRI SELON LA VALEUR DE IMM
+*
+            GOTO (31,31,33,34,31,36,37,38,39),IMM
+*
+            CALL ERREUR(280)
+            SEGSUP QUELCO
+            IPMAIL=0
+            RETURN
+*
+*  MAXI OU MINI OU EGAL
+  31        IF(A_EGALE_B(XX,VALRE1)) GOTO 413
+            GOTO 410
+*
+* SUPE
+  33        IF(XDIFF.GT.XPREC) GOTO 413
+            GOTO 410
+*
+* EGSUPE
+  34        IF(XDIFF.GE.-XPREC) GOTO 413
+            GOTO 410
+*
+* EGINFE
+  36        IF(XDIFF.LE.XPREC) GOTO 413
+            GOTO 410
+*
+* INFE
+  37        IF(XDIFF.LT.-XPREC) GOTO 413
+            GOTO 410
+*
+* DIFF
+  38        IF(ABS(XDIFF).GT.XPREC) GOTO 413
+            GOTO 410
+*
+* COMP
+  39        CONTINUE
+            XDIFF2=XX-VALRE2
+            IF((XDIFF.GE.-XPREC).AND.(XDIFF2.LE.XPREC)) GOTO 413
+            GOTO 410
+*
+ 413        CONTINUE
+            NBELEM=NBELEM+1
+*           SEGADJ MELEME
+            NUM(1,NBELEM)=IPT1.NUM(1,IB)
+ 410      CONTINUE
+ 310    CONTINUE
+      ENDIF
+*
+ 600  CONTINUE
+      SEGADJ MELEME
+      IF(IPLIS.NE.0)SEGSUP QUELCO
+      END
+ 
+ 

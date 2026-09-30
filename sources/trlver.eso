@@ -1,0 +1,166 @@
+C TRLVER    SOURCE    GOUNAND   21/04/06    21:15:41     10940          
+      SUBROUTINE TRLVER(TRAVL,MMOT)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      IMPLICIT INTEGER (I-N)
+C***********************************************************************
+C NOM         : TRLVER
+C DESCRIPTION : Vérifie la consistance du segment TRAVL    
+C      
+C
+C LANGAGE     : ESOPE
+C AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+C               mél : gounand@semt2.smts.cea.fr
+C***********************************************************************
+C***********************************************************************
+C SYNTAXE GIBIANE    : 
+C ENTREES            : MELEME (Activé), NEL
+C ENTREES/SORTIES    : TOPINV (Activé *MOD)
+C SORTIES            :
+C CODE RETOUR (IRET) : = 0 si tout s'est bien passé
+C***********************************************************************
+C VERSION    : v1, 30/10/2017, version initiale
+C HISTORIQUE : v1, 30/10/2017, création
+C HISTORIQUE :
+C HISTORIQUE :
+C***********************************************************************
+-INC PPARAM
+-INC CCOPTIO
+-INC TMATOP1      
+*-INC SMELEMX
+      POINTEUR LMCANS.MELEMX
+-INC SMLENTI
+      POINTEUR LIDXCA.MLENTI
+      POINTEUR LOKVOL.MLENTI
+      POINTEUR LNQUAL.MLENTI
+      POINTEUR LINDI.MLENTI
+      POINTEUR LINDJ.MLENTI
+-INC SMLREEL
+      POINTEUR LQUALS.MLREEL
+-INC TMATOP2
+*-INC STRAVL
+      CHARACTER*(*) MMOT
+*
+*     
+* Executable statements
+*
+      if (impr.ge.5) WRITE(IOIMP,*) 'Entrée dans trlver.eso'
+      IDIMP=IDIM+1
+      lmcans=travl.mcans
+      lidxca=travl.idxca
+      lokvol=travl.okvol
+      lquals=travl.quals
+      lnqual=travl.nqual
+      lindi=travl.indi
+      lindj=travl.indj
+*
+*     Petite vérification de consistance de dimension des objets
+*     (NCMAX,NLMAX)
+*
+      if (lmcans.ne.0) then
+         call vemelx(lmcans,'trlver')
+         if (ierr.ne.0) then
+            write(ioimp,*) mmot
+            return
+         endif
+      endif
+*     
+      if (lidxca.ne.0) then
+         jg=lidxca.lect(/1)
+         if (jg.ne.ncmax+1) then
+            write(ioimp,185) 'lidxca : jg,ncmax=',jg,ncmax
+            goto 9999
+         endif
+      endif
+*     
+      if (lokvol.ne.0) then
+         jg=lokvol.lect(/1)
+         if (jg.ne.ncmax) then
+            write(ioimp,185) 'lokvol : jg,ncmax=',jg,ncmax
+            goto 9999
+         endif
+      endif
+*     
+      if (lquals.ne.0) then
+         if (lmcans.eq.0) then
+            write(ioimp,*) 'lquals existe mais pas lmcans'
+            goto 9999
+         endif
+         jg=lquals.prog(/1)
+         nlmax=lmcans.numx(/2)
+         if (jg.ne.nlmax) then
+            write(ioimp,185) 'lquals : jg,nlmax=',jg,nlmax
+            goto 9999
+         endif
+      endif
+*     
+      if (lnqual.ne.0) then
+         jg=lnqual.lect(/1)
+         if (jg.ne.ncmax) then
+            write(ioimp,185) 'lnqual : jg,ncmax=',jg,ncmax
+            goto 9999
+         endif
+      endif
+*     
+      if (lindi.ne.0) then
+         jg=lindi.lect(/1)
+         if (jg.ne.ncmax) then
+            write(ioimp,185) 'lindi : jg,ncmax=',jg,ncmax
+            goto 9999
+         endif
+      endif
+*     
+      if (lindj.ne.0) then
+         jg=lindj.lect(/1)
+         if (jg.ne.ncmax) then
+            write(ioimp,185) 'lindj : jg,ncmax=',jg,ncmax
+            goto 9999
+         endif
+      endif
+*
+* Consistance des index
+*
+      if (lidxca.ne.0) then
+         if (lmcans.eq.0) then
+            write(ioimp,*) 'lidxca existe mais pas lmcans'
+            goto 9999
+         endif
+*
+         nlc=LMCANS.NLCOU
+         ncc=TRAVL.NCCOU
+         idxp=lidxca.lect(ncc+1)
+         if (idxp.ne.nlc+1) then
+            write(ioimp,185) 'pb idx lmcans : idxp,nlcou=',idxp,nlc
+            goto 9999
+         endif
+      endif
+      
+      
+      
+*
+* Normal termination
+*
+      RETURN
+*
+* Format handling
+*
+ 185  FORMAT (5X,A32,6I8)
+ 187  FORMAT (5X,10I8)
+ 188  FORMAT ('Apres point IELEM(',I2,',1)=',I6,' ; NBL=')
+ 189  FORMAT ('Le noeud ',I2,'/',I2,' de IELEM de numero',I6
+     $     ,' a le plus petit nb de voisins :',I3)
+*     
+* Error handling     
+*     
+ 9999 CONTINUE
+      write(ioimp,*) MMOT
+      MOTERR(1:8)='TRLVER  '
+* 349 2
+*Problème non prévu dans le s.p. %m1:8 contactez votre assistance
+      CALL ERREUR(349)
+      RETURN
+*
+* End of subroutine TRLVER
+*
+      END
+
+ 

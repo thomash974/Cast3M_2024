@@ -1,0 +1,36 @@
+C HBMDVEC   SOURCE    BP208322  20/09/18    21:16:41     10718          
+
+        SUBROUTINE HBMDVEC(NT,NHBM,NDDL,Q1,OMEG,V1)
+        
+c-----------------------------------------------------------------------        
+c       Derivation dans le domaine frequentiel
+c                         V1 = w*kron(L,In)*Q1 
+c       e  NT,NHBM,NDDL : nombre de coefficients, harmoniques, ddl
+c       e  Q1           : vecteur de coefficients à deriver
+c       e  OMEG         : pulsation du cycle
+c       s  V1           : derivee du vecteur Q1 en frequentiel 
+c-----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+        INTEGER NDDL,NT,NHBM,I,J
+        REAL*8 Q1(NT),V1(NT),OMEG
+        
+c       Composante statique nulle 
+        DO I=1,NDDL
+          V1(I) = 0.D0
+        ENDDO
+        
+c       Boucle sur les harmoniques > 0
+        DO J=2,2*NHBM,2
+          DO I=1,NDDL
+            V1((J-1)*NDDL+I) = OMEG*(J/2)*Q1(J*NDDL+I)
+            V1(J*NDDL+I)     = -(J/2)*OMEG*Q1((J-1)*NDDL+I)
+          ENDDO          
+        ENDDO 
+        
+        END
+        
+ 
+ 

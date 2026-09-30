@@ -1,0 +1,368 @@
+C SEFMOD    SOURCE    CB215821  23/03/14    21:15:11     11628          
+      SUBROUTINE SEFMOD(ityp1,nbnn,itef,ifrtt,ifroca,lesfor,lestef,
+     &                  nepapa,iconv,iraye,mele,nefmod)
+C +--------------------------------------------------------------------+
+C | Determination de la valeur de NEFMOD pour IMODEL                   |
+C +--------------------------------------------------------------------+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+-INC CCGEOME
+      CHARACTER*16 LESFOR(2)
+      CHARACTER*4 LESTEF(*),LBTEF
+      logical lobbar
+      
+      lobbar = .false.
+C  Affectation du type d'ELEMENTS FINIS si donnes par utilisateur
+
+C       cas des SURE (relation de conformite) :
+C       NEPAPA = si EF specifique demande -> on utilise ses inconnues
+        NEPAPA=0
+        IF(ITYP1.eq.48) then
+
+          NEFMOD=259
+          IF (ITEF.GT.0) THEN
+            DO i=1,ITEF
+              CALL PLACE(NOMTP,LNOMTP,MELE,LESTEF(i))
+              IF (MELE.NE.0) NEPAPA = MELE
+            ENDDO
+          ENDIF
+          IF(NEPAPA.EQ.0) THEN
+c         2D -> on choisit les inconnues du QUA4  pour toute formulation
+            IF(IDIM.EQ.2) THEN
+              NEPAPA=8
+c         3D -> on choisit les inconnues du CUB8  pour toute formulation
+            ELSEIF(IDIM.EQ.3) THEN
+              NEPAPA=14
+            ELSE
+              CALL ERREUR(610)
+            ENDIF
+          ENDIF
+**          GOTO 11
+          RETURN
+        ENDIF
+        IF (ITEF.GT.0) THEN
+C  Cas de la FORMULATION 'NAVIER_STOKES'
+          IF (LESFOR(1).EQ.'NAVIER_STOKES') THEN
+            IF (LESTEF(1).EQ.'LINE')THEN
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=129
+              IF (ITYP1.EQ. 7) NEFMOD=130
+              IF (ITYP1.EQ.11) NEFMOD=131
+              IF (ITYP1.EQ.33) NEFMOD=132
+              IF (ITYP1.EQ.34) NEFMOD=133
+              IF (ITYP1.EQ.35) NEFMOD=134
+              IF (ITYP1.EQ.36) NEFMOD=135
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSE IF(LESTEF(1).EQ.'MACR')THEN
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=136
+              IF (ITYP1.EQ. 7) NEFMOD=137
+              IF (ITYP1.EQ.11) NEFMOD=138
+              IF (ITYP1.EQ.33) NEFMOD=139
+              IF (ITYP1.EQ.34) NEFMOD=140
+              IF (ITYP1.EQ.35) NEFMOD=141
+              IF (ITYP1.EQ.36) NEFMOD=142
+C  Il nous manque la pyramide
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSE IF (LESTEF(1).EQ.'QUAF') THEN
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=143
+              IF (ITYP1.EQ. 7) NEFMOD=144
+              IF (ITYP1.EQ.11) NEFMOD=145
+              IF (ITYP1.EQ.33) NEFMOD=146
+              IF (ITYP1.EQ.34) NEFMOD=147
+              IF (ITYP1.EQ.35) NEFMOD=148
+              IF (ITYP1.EQ.36) NEFMOD=149
+C Il nous manque la pyramide
+              IF (NEFMOD.EQ.0) GO TO 99
+            ELSE IF (LESTEF(1).EQ.'LINB') THEN
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=158
+              IF (ITYP1.EQ. 7) NEFMOD=159
+              IF (ITYP1.EQ.11) NEFMOD=160
+              IF (ITYP1.EQ.33) NEFMOD=161
+              IF (ITYP1.EQ.34) NEFMOD=162
+C             IF (ITYP1.EQ.35) NEFMOD=163
+C             IF (ITYP1.EQ.36) NEFMOD=164
+C Il nous manque la pyramide et le tetrahedre
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSE
+              DO i=1,ITEF
+                CALL PLACE(NOMTP,LNOMTP,MELE,LESTEF(i))
+                IF (MELE.EQ.0) GOTO 99
+                MEGE=NUMGEO(MELE)
+                IF (MEGE.EQ.0) GOTO 99
+                IF (MEGE.EQ.ITYP1) GOTO 610
+              ENDDO
+              GO TO 99
+ 610          NEFMOD=MELE
+            ENDIF
+C  Cas de la FORMULATION 'EULER'
+          ELSE IF (LESFOR(1).EQ.'EULER') THEN
+            NEFMOD=0
+            IF (ITYP1.EQ. 2) NEFMOD=ITYP1
+            IF (ITYP1.EQ. 4) NEFMOD=ITYP1
+            IF (ITYP1.EQ. 8) NEFMOD=ITYP1
+            IF (ITYP1.EQ.14) NEFMOD=ITYP1
+            IF (ITYP1.EQ.16) NEFMOD=ITYP1
+            IF (ITYP1.EQ.23) NEFMOD=ITYP1
+            IF (ITYP1.EQ.25) NEFMOD=ITYP1
+            IF (NEFMOD.EQ.0) GOTO 99
+C  Cas des autres FORMULATIONs
+          ELSE
+            DO i=1,ITEF
+              LBTEF = LESTEF(i)
+              if(lestef(i)(1:4).eq.'BBAR') lobbar = .true.
+              if (lobbar) CALL MODE20(ITYP1,LBTEF)
+              CALL PLACE(NOMTP,LNOMTP,MELE,LBTEF)
+              IF (MELE.EQ.0) GOTO 99
+              MEGE=NUMGEO(MELE)
+              IF (MEGE.EQ.0) GOTO 99
+              IF (MEGE.EQ.ITYP1) GOTO 6
+c kich cas du POI1
+              if (ityp1.eq.1) goto 6
+            ENDDO
+            GOTO 99
+C  Cas particulier pour les elements polygonaux
+ 6          IF (ITYP1.EQ.32) THEN
+              MELE=MELE+NBNN-3
+              IF (NBNN.GT.14) GOTO 99
+            ENDIF
+            NEFMOD=MELE
+          ENDIF
+C  Affectation des elements finis de maniere automatique
+        ELSE
+C  Cas des milieux POREUX
+          IF (LESFOR(1).EQ.'POREUX') THEN
+            NEFMOD=0
+            IF (ITYP1.EQ. 6) NEFMOD=79
+            IF (ITYP1.EQ.10) NEFMOD=80
+            IF (ITYP1.EQ.15) NEFMOD=81
+            IF (ITYP1.EQ.24) NEFMOD=82
+            IF (ITYP1.EQ.17) NEFMOD=83
+            IF (ITYP1.EQ.29) NEFMOD=108
+            IF (ITYP1.EQ.30) NEFMOD=109
+            IF (ITYP1.EQ.31) NEFMOD=110
+            IF (NEFMOD.EQ.0) GOTO 99
+C  Cas des elements de frottement (formulation FROTTEMENT)
+          ELSE IF (LESFOR(1).EQ.'CONTACT') THEN
+C *          NEFMOD=22   pv est passe par la
+            NEFMOD=0
+            if(ifrtt.eq.1) then
+            IF (ITYP1.EQ.22.AND.IDIM.EQ.2) NEFMOD=107
+            IF (ITYP1.EQ.22.AND.IDIM.EQ.3) NEFMOD=165
+            elseif(ifroca.ne.0) then
+            IF (ITYP1.EQ.22.AND.IDIM.EQ.2)  NEFMOD=261
+            IF (ITYP1.EQ.22.AND.IDIM.EQ.3)  NEFMOD=262
+            endif
+C             IF (NEFMOD.EQ.0) GOTO 99
+C  Cas des elements hybrides (imposes en DARCY)
+          ELSE IF (LESFOR(1).EQ.'DARCY') THEN
+            NEFMOD=0
+            IF (ITYP1.EQ. 3) NEFMOD=143
+C           IF (ITYP1.EQ. 4) NEFMOD=99
+C           IF (ITYP1.EQ. 8) NEFMOD=100
+C           IF (ITYP1.EQ.23) NEFMOD=101
+C           IF (ITYP1.EQ.16) NEFMOD=102
+C           IF (ITYP1.EQ.14) NEFMOD=103
+            IF (ITYP1.EQ. 7) NEFMOD=99
+            IF (ITYP1.EQ.11) NEFMOD=100
+            IF (ITYP1.EQ.35) NEFMOD=101
+            IF (ITYP1.EQ.34) NEFMOD=102
+            IF (ITYP1.EQ.33) NEFMOD=103
+            IF (NEFMOD.EQ.0) GOTO 99
+C  Cas de la formulation MAGNETODYNAMIQUE
+          ELSE IF (LESFOR(1).EQ.'MAGNETODYNAMIQUE') THEN
+            NEFMOD=0
+            IF (ITYP1.EQ. 4) NEFMOD=128
+            IF (NEFMOD.EQ.0) GOTO 99
+C  Cas de la formulation 'NAVIER_STOKES'
+          ELSE IF (LESFOR(1).EQ.'NAVIER_STOKES') THEN
+            IF (ILNAVI.EQ.0) THEN
+* par defaut option 'LINE'
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=129
+              IF (ITYP1.EQ. 7) NEFMOD=130
+              IF (ITYP1.EQ.11) NEFMOD=131
+              IF (ITYP1.EQ.33) NEFMOD=132
+              IF (ITYP1.EQ.34) NEFMOD=133
+              IF (ITYP1.EQ.35) NEFMOD=134
+              IF (ITYP1.EQ.36) NEFMOD=135
+              IF (NEFMOD.EQ.0) GOTO 99
+              CALL MESLIR(-341)
+**              GOTO 990
+            ELSEIF (ILNAVI.EQ.1) THEN
+C         LICE
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=195
+              IF (ITYP1.EQ. 7) NEFMOD=196
+              IF (ITYP1.EQ.11) NEFMOD=197
+              IF (ITYP1.EQ.33) NEFMOD=198
+              IF (ITYP1.EQ.34) NEFMOD=199
+              IF (ITYP1.EQ.35) NEFMOD=200
+              IF (ITYP1.EQ.36) NEFMOD=201
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.2) THEN
+C         LIMS
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=202
+              IF (ITYP1.EQ. 7) NEFMOD=203
+              IF (ITYP1.EQ.11) NEFMOD=204
+              IF (ITYP1.EQ.33) NEFMOD=205
+              IF (ITYP1.EQ.34) NEFMOD=206
+              IF (ITYP1.EQ.35) NEFMOD=207
+              IF (ITYP1.EQ.36) NEFMOD=208
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.3) THEN
+C         LBMS
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=209
+              IF (ITYP1.EQ. 7) NEFMOD=210
+              IF (ITYP1.EQ.11) NEFMOD=211
+              IF (ITYP1.EQ.33) NEFMOD=212
+              IF (ITYP1.EQ.34) NEFMOD=213
+              IF (ITYP1.EQ.35) NEFMOD=214
+              IF (ITYP1.EQ.36) NEFMOD=215
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.4) THEN
+C         MCCE
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=216
+              IF (ITYP1.EQ. 7) NEFMOD=217
+              IF (ITYP1.EQ.11) NEFMOD=218
+              IF (ITYP1.EQ.33) NEFMOD=219
+              IF (ITYP1.EQ.34) NEFMOD=220
+              IF (ITYP1.EQ.35) NEFMOD=221
+              IF (ITYP1.EQ.36) NEFMOD=222
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.5) THEN
+C         MCP1
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=223
+              IF (ITYP1.EQ. 7) NEFMOD=224
+              IF (ITYP1.EQ.11) NEFMOD=225
+              IF (ITYP1.EQ.33) NEFMOD=226
+              IF (ITYP1.EQ.34) NEFMOD=227
+              IF (ITYP1.EQ.35) NEFMOD=228
+              IF (ITYP1.EQ.36) NEFMOD=229
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.6) THEN
+C         MCMS
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=230
+              IF (ITYP1.EQ. 7) NEFMOD=231
+              IF (ITYP1.EQ.11) NEFMOD=232
+              IF (ITYP1.EQ.33) NEFMOD=233
+              IF (ITYP1.EQ.34) NEFMOD=234
+              IF (ITYP1.EQ.35) NEFMOD=235
+              IF (ITYP1.EQ.36) NEFMOD=236
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.7) THEN
+C         QFCE
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=237
+              IF (ITYP1.EQ. 7) NEFMOD=238
+              IF (ITYP1.EQ.11) NEFMOD=239
+              IF (ITYP1.EQ.33) NEFMOD=240
+              IF (ITYP1.EQ.34) NEFMOD=241
+              IF (ITYP1.EQ.35) NEFMOD=242
+              IF (ITYP1.EQ.36) NEFMOD=243
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.8) THEN
+C         QFP1
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=244
+              IF (ITYP1.EQ. 7) NEFMOD=245
+              IF (ITYP1.EQ.11) NEFMOD=246
+              IF (ITYP1.EQ.33) NEFMOD=247
+              IF (ITYP1.EQ.34) NEFMOD=248
+              IF (ITYP1.EQ.35) NEFMOD=249
+              IF (ITYP1.EQ.36) NEFMOD=250
+              IF (NEFMOD.EQ.0) GOTO 99
+            ELSEIF (ILNAVI.EQ.9) THEN
+C         QFMS
+              NEFMOD=0
+              IF (ITYP1.EQ. 3) NEFMOD=251
+              IF (ITYP1.EQ. 7) NEFMOD=252
+              IF (ITYP1.EQ.11) NEFMOD=253
+              IF (ITYP1.EQ.33) NEFMOD=254
+              IF (ITYP1.EQ.34) NEFMOD=255
+              IF (ITYP1.EQ.35) NEFMOD=256
+              IF (ITYP1.EQ.36) NEFMOD=257
+              IF (NEFMOD.EQ.0) GOTO 99
+            ENDIF
+C  Cas de la formulation 'EULER'
+          ELSE IF (LESFOR(1).EQ.'EULER') THEN
+            NEFMOD=0
+            IF (ITYP1.EQ. 2) NEFMOD=ITYP1
+            IF (ITYP1.EQ. 4) NEFMOD=ITYP1
+            IF (ITYP1.EQ. 8) NEFMOD=ITYP1
+            IF (ITYP1.EQ.14) NEFMOD=ITYP1
+            IF (ITYP1.EQ.16) NEFMOD=ITYP1
+            IF (ITYP1.EQ.23) NEFMOD=ITYP1
+            IF (ITYP1.EQ.25) NEFMOD=ITYP1
+            IF (NEFMOD.EQ.0) GOTO 99
+
+C  Cas des autres formulations
+          ELSE
+            NEFMOD=ITYP1
+c kich cas du POI1
+            if (ityp1.eq.1) nefmod = 45
+C  Cas particuliers des elements polygonaux
+            IF (NEFMOD.EQ.32) NEFMOD=111+NBNN -3
+c gounand cas des 'CU27','PR21','TE15','PY19'
+            if (NEFMOD.GE.33.AND.NEFMOD.LE.36) then
+               nefmod = nefmod-33 +275
+            endif
+C  Cas particuliers des elements finis pour IDIM=1
+            IF (IDIM.EQ.1) THEN
+              NEFMOD=0
+              IF (LESFOR(1).EQ.'THERMIQUE') THEN
+                IF (ICONV.NE.0 .OR. iraye.NE.0) THEN
+                  IF (ITYP1.EQ.1) NEFMOD=45
+                  IF (ITYP1.EQ.2) NEFMOD=ITYP1
+                ELSE
+                  IF (ITYP1.EQ.2) NEFMOD=191
+                  IF (ITYP1.EQ.3) NEFMOD=192
+                ENDIF
+              ELSE IF (LESFOR(1).EQ.'MECANIQUE') THEN
+                IF (ITYP1.EQ.2) NEFMOD=193
+                IF (ITYP1.EQ.3) NEFMOD=194
+              ELSE IF (LESFOR(1).EQ.'FISSURE') THEN
+                IF (ITYP1.EQ.2) NEFMOD=ITYP1
+              ELSE IF (LESFOR(1).EQ.'ELECTROSTATIQUE') THEN
+                IF (ITYP1.EQ.2) NEFMOD=193
+                IF (ITYP1.EQ.3) NEFMOD=194
+              ELSE IF (LESFOR(1).EQ.'DIFFUSION') THEN
+* En attendant le retour a la normale pour la diffusion, on ajoute une
+* enieme rustine en mettant les memes elements qu'en thermique.
+**                IF (ITYP1.EQ.2) NEFMOD=193
+**                IF (ITYP1.EQ.3) NEFMOD=194
+                IF (ITYP1.EQ.2) NEFMOD=191
+                IF (ITYP1.EQ.3) NEFMOD=192
+              ENDIF
+            ENDIF
+            IF (NEFMOD.EQ.0) GOTO 99
+            MELE=NEFMOD
+          ENDIF
+        ENDIF
+C +--------------------------------------------------------------------+
+C | Fin de la valeur de NEFMOD pour IMODEL                             |
+C +--------------------------------------------------------------------+
+      RETURN
+      
+ 99   CONTINUE
+C     write(6,*) 'allo houston', nefmod
+      CALL ERREUR(21)
+      RETURN
+      
+      END
+ 
+ 
+ 
+ 
+ 

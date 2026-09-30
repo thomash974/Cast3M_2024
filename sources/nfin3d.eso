@@ -1,0 +1,152 @@
+C NFIN3D    SOURCE    FD218221  24/02/07    21:15:21     11834          
+c***********************************************************************
+c          calcul du nombre de fissures en fonction de la direction
+c      A.Sellier sept.2022
+       subroutine nfin3d(ppas,lcr,nc33,NRENF00,vecr,NB_RENF,longr,lsr,
+     # lfr,deqr,syr,taur,rhor,rt00,XE3D,NBNMAX3D,NBNB3D,IDIMB3D,
+     # NB_HELM,TAILH,log_H_RENF,Num_H_RENF,err1)
+      
+c     tables de dimension fixe pour resolution des sytemes lineaires 
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables non locales      
+      integer NB_HELM,err1
+      real*8 TAILH(NB_HELM,3,3)
+c     nombre reel de renforts      
+      integer NRENF00
+      integer NBNMAX3D,NBNB3D,idimb3d
+      real*8 xe3d(3,NBNMAX3D)
+c     declaration supplementaires pour le traitement non local des renforts
+      logical log_H_RENF(NB_RENF)
+      integer Num_H_RENF(NB_RENF)
+      
+c     nombre maxi renfort
+      integer NB_RENF
+      logical ppas
+      real*8 nc33(3,3),rt00
+      real*8 vecr(NB_RENF,3),longr(NB_RENF),deqr(NB_RENF)
+      real*8 rhor(NB_RENF),lsr(NB_RENF),lfr(NB_RENF),syr(NB_RENF)
+      real*8 taur(NB_RENF)
+      real*8 lcr(NB_RENF)
+
+c     variables locales
+      real*8 dir3(3),nfis0,nfis1,dnfis,nc3(3) 
+      integer nl,nd1,id1
+
+c     initialisation des matrice pour le cas sans renforts
+      err1=0
+      do i=1,3
+        do j=1,3
+            if(i.eq.j) then
+                nc33(i,j)=1.d0
+            else
+                nc33(i,j)=0.d0
+            end if
+        end do
+      end do
+      
+c     evaluation du nombre de fissures par direction et construction
+c     d une approximation ellipsoidale du nombre de fissure en fonction
+c     de la direction      
+c     w contient alors le cumul des ouvertures sur la longueur consideree
+      if(NRENF00.gt.0) then
+c        print*,'dans nfin3d'
+c       boucle sur le nombre de renforts       
+        do i=1,NRENF00
+c           taille a considerer dans la direction du renfort
+c           recup direction du renfort
+            do j=1,3
+                 dir3(j)=vecr(i,j)
+            end do
+            if(ppas) then        
+c             calcul de la taille de l element ds la direction du renfort
+c             toujours calculé avec la vrai taille de l element
+              call tail1d(longr(i),dir3,.true.,XE3D,NBNMAX3D,NBNB3D,
+     #        IDIMB3D,.false.,1.d0,err1)
+              if(err1.eq.1) then
+                 print*,'Pb lors du calcul de la taille dans nfin3d'
+                 return
+              end if
+c             on sauve la taille    
+c             print*,'renfort',i,longr(i) 
+              lcr(i)=longr(i)
+            else
+c             la taille dans la direction du renfort est chargée            
+              longr(i)=lcr(i)
+            end if
+c           longueur d ancrage droit
+            if(( deqr(i).ne.0.).and.( rhor(i).ne.0.)) then 
+c                 print*,'rhor',i,'=',rhor(i)
+c                longueur d ancrage            
+                 lsr(i)=0.5d0*deqr(i)*syr(i)/taur(i)
+c                inter espace max des fissures en regime elastique
+                 lfr(i)=0.5d0*deqr(i)*((1.d0-rhor(i))/rhor(i))*
+     #           (rt00/taur(i))
+c                 print*, lfr(i)
+c                 print*, '------------'
+            else
+                lsr(i)=longr(i)
+                lfr(i)=longr(i)
+            end if
+c            print*,'lsr(',i,')=',lsr(i)
+c            print*,'lfr(',i,')=',lfr(i)
+c            print*,'-------------------'
+c           energie de fissuration et nombre de fissures localisees
+c           en regime etabli
+c           projection de la matrice du nombre de fissures dans la direction ei
+            do j=1,3
+c               vecteur nbre de fissure            
+                nc3(j)=0.d0
+                do k=1,3
+                  nc3(j)=nc3(j)+nc33(j,k)*dir3(k)
+                end do
+            end do
+c           scalaire nbre de fissure (par projection du vecteur) 
+            nfis0=0.d0               
+            do j=1,3
+                nfis0=nfis0+nc3(j)*dir3(j)
+            end do
+c           evaluation nbre maxi de fissures dans cette direction
+            if(rhor(i).eq.0.) then            
+              nfis1=1.d0
+            else
+              if((lsr(i).ne.0.).and.(lfr(i).ne.0.)) then
+                 nfis1=max(1.d0,longr(i)/lsr(i),longr(i)/lfr(i))
+              else
+c                 print*,'Distance entre fissures non calculable nfin3d'
+c                 print*,'Ancrage lsr(',i,')=',lsr(i)
+c                 print*,'Regime Elastique lfr(',i,')=',lfr(i)
+c                 print*,'On adopte 1 fissure par element'
+                 nfis1=1.d0
+              end if
+            end if             
+c           actualisation du tenseur des nombres de fissure si necessaire
+            if(nfis1.gt.nfis0) then
+                dnfis=nfis1-nfis0
+                do j=1,3
+                     do k=1,3
+                        nc33(j,k)=nc33(j,k)+dnfis*dir3(j)*dir3(k)
+                     end do
+                end do                     
+            end if 
+c           controle longueur des elements            
+            if(longr(i).eq.0.) then 
+               if(rhor(i).ne.0.) then            
+                 print*,'nfin3d : reinf nb:',i
+                 print*,'long r:',longr(i),'ls r:',lsr(i),'lf r:',lfr(i)
+                 print*,'lcr(',i,')=',lcr(i),'ppas',ppas
+                 err1=1
+               end if                  
+            end if            
+        end do
+      end if
+c      print*,'dans nfin3d matrice des nbr de fiss '
+c      print*,'nbre fiss nc33'
+c      call afic33(nc33)
+
+      return
+      end
+      
+ 
+ 

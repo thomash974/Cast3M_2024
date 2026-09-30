@@ -1,0 +1,48 @@
+C TRSPOR    SOURCE    PV        22/04/22    21:15:14     11344          
+      SUBROUTINE TRSPOR (RMAT,L1,L2,  RMATT)
+************************************************************************
+*
+*                             T R S P O S
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     TRANSPOSITION D'UNE MATRICE RECTANGULAIRE.
+*
+*     PROCEDURE           FONCTIONNANT POUR LES TYPES "INTEGER"
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE   (+ = CONTENU DANS UN COMMUN)
+* -----------
+*
+*     MAT     (E)  MATRICE A TRANSPOSER.
+*     L1      (E)  NOMBRE DE LIGNES DE LA MATRICE.
+*     L2      (E)  NOMBRE DE COLONNES DE LA MATRICE.
+*     MATT    (S)  MATRICE TRANSPOSEE.
+*
+      IMPLICIT INTEGER(I-N)
+      REAL*8 RMAT(L1,L2),RMATT(L2,L1)
+      INTEGER L1,L2
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     PASCAL MANIGOT     24 FEVRIER 1986
+*
+* LANGAGE:
+* --------
+*
+*     FORTRAN77
+*
+************************************************************************
+*
+      DO 100 I=1,L1
+         DO 100 J=1,L2
+            RMATT(J,I) = RMAT(I,J)
+  100       CONTINUE
+*        END DO
+*     END DO
+*
+      END
+
+ 

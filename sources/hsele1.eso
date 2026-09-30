@@ -1,0 +1,205 @@
+C HSELE1    SOURCE    KICH      22/11/21    21:15:03     11505          
+      subroutine hsele1(ith,ideb,ifin,imfopa,ihg1,ihg2
+     +           ,iwrk3,ishg,ihug,ihgsel,ihg,ipmodl,icle
+     +           ,imcord,ihgt,ixlong)
+C
+C
+C     entree :
+C     ith numero du thread
+C     ideb ifin zone a traiter par la routine
+C     mfopa contient le rang du premier elem d'une division apres le classement
+C     ihg1 ihg2 coordonnees des barycentre si sym hg2 contient coord sym
+C     iwrk3 adresse des vecteurs a passer a doxe
+C     ishg nsym donne l'adresse des elements conservees dans la liste complete
+C     ihug contient les adresse des ivecti
+C     ihgsel contient information utile
+C     ihg
+C     ipmodl modele 
+C     icle 1 normal 2 translation 3 symetrie centrale 4 sym // droite 5 sym // plan
+C     imcord contient coordonnees symetrique des noeuds (icle = 3 4 5)
+C     ixlong pointeur vers chamelem de longueur de recherche
+C
+C     sorties :
+C        ivecti contient numero des elts connectes
+C        nhug longueur remplie dans ivecti.lhug
+C        inoa nombre d elements connectes par zone (nsous+1) nombre total pour un elt
+C
+
+
+      implicit integer(i-n)
+      implicit real*8(a-h,o-p)
+-INC CCREEL
+-INC PPARAM
+-INC CCOPTIO
+-INC SMMODEL
+-INC SMELEME
+-INC SMCOORD
+
+
+      segment hgsele
+         real*8 xmult,ymult,zmult
+         real*8 hmaxt,xlong2,tmax,tmin,xlong2m
+         integer nels,nbpb,ipass
+         integer nbzt,indt,khug
+      endsegment
+      SEGMENT HG
+        INTEGER IELH(nbpb,2) 
+C IELH(i,1)=numero de l'element dans la sous zone
+C IELH(i,2)=numero de la sous zone
+C Tableau qui contient le max d(noeuds, barycentre)
+        REAL*8 HMax(nbpb)
+C si ixlong different de zero contient le max de ixlong dans l'element
+        REAL*8 XLL(nbpb)
+C Tableau qui contient nombre d'ele en connex par sous zone        
+        INTEGER INOA(nbpb,NSOUS+1)
+      ENDSEGMENT
+C hgt contient les tableaux utile pour le tri
+      SEGMENT HGT
+C       integer ka(nels),kb(nels)
+C Tableau contenant proj ortho sur la droite apres tri
+        REAL*8 Xp(nels)
+C Tableau auxiliaire  pour triflot
+        REAL*8 Xw(nels)
+C Tableau auxiliaire pour triflot 
+        INTEGER Ke(nels)
+C Tableau donne la correspondance entre le tableau trie et la numerotation de la zone 2 
+        INTEGER ICO(nels)
+      ENDSEGMENT
+
+      SEGMENT,WRK1
+        REAL*8 XE(3,nbno1)
+C coord des noeuds
+      ENDSEGMENT
+      
+      SEGMENT,WRK2
+        REAL*8 XEJ(3,nbno1)
+      ENDSEGMENT
+
+      SEGMENT,WRK3
+         INTEGER IWRK1(NSOUS,nbthr), IWRK2(NSOUS,nbthr),imptv(nsous)
+C iwrk1 pointe vers les wrk1 et iwrk2 pointe sur les wrk2         
+      ENDSEGMENT
+
+      SEGMENT iVECTI
+        INTEGER Lhug(JG)
+      ENDSEGMENT
+
+      segment mlhug
+         integer ilhug(nbthr)
+         integer nhug(nbthr)
+      endsegment
+
+      SEGMENT HG1      
+        REAL*8 HCOOR(3*nbpb)
+      ENDSEGMENT 
+      pointeur hg2.hg1
+      SEGMENT mfopa
+C Premier element dans un segment de la droite      
+        INTEGER ind(indt)     
+      ENDSEGMENT 
+      SEGMENT SHG
+        INTEGER NSYM(NELS)
+      ENDSEGMENT
+      pointeur ipmail.MELEME
+      pointeur mcord2.mcoord
+
+       hgt    = ihgt
+       mcord2 = imcord
+       mmodel = ipmodl
+       mfopa  = imfopa
+       hg1    = ihg1
+       hg2    = ihg2
+       wrk3   = iwrk3
+       shg    = ishg
+       mlhug = ihug
+       
+C       write(6,*) 'hsele1 ihug=',ihug
+       hg     = ihg
+       nsous = iwrk1(/1)
+       hgsele = ihgsel
+       if (ipass.eq.2) then
+          ivecti = ilhug(ith)
+       endif
+       khug1 = khug
+       nhug1 = 0
+       DO iiel1 = ideb, ifin
+          iel1=iiel1
+          if(icle.eq.5) iel1=nsym(iiel1)
+          if(icle.eq.4) iel1=nsym(iiel1)
+          if(icle.eq.3) iel1=nsym(iiel1)
+
+          tc = hg1.HCOOR((iiel1-1)*3+1) * xmult
+     +       + hg1.HCOOR((iiel1-1)*3+2) * ymult
+     +       + hg1.HCOOR((iiel1-1)*3+3) * zmult
+          izo1   = IELH(iel1,2)
+          inu1   = ielh(iel1,1)
+          wrk1   = iwrk1(izo1,ith)       
+          IMODEL = KMODEL(izo1)
+          IPMAIL = IMAMOD
+          nbn1   = IPMAIL.num(/1)
+          MELEME = IPMAIL
+          CALL DOXE(XCOOR,IDIM,nbn1,NUM,inu1,XE)
+          xkmax = hmax(iel1) + hmaxt  
+          if (ixlong.ne.0) xlong2 = xll(iel1)
+          izg   = nbzt*((tc-(xlong2+xkmax))-tmin)/(tmax-tmin)+1
+          izg   = max(izg,1)
+          izg   = min(izg,indt)     
+          indb  = ind(izg)
+          DO  iiel2  = indb, nels                         
+              iiel2t = ico(iiel2)
+              iel2   = iiel2t
+              if(icle.eq.5) iel2 = nsym(ico(iiel2))
+              if(icle.eq.4) iel2 = nsym(ico(iiel2))
+              if(icle.eq.3) iel2 = nsym(ico(iiel2))
+              izo2 = IELH(iel2,2) 
+              inu2 = ielh(iel2,1)
+              if (Xp(iiel2).gt.(tc+xlong2+xkmax)) GOTO  7
+                 wrk2  = iwrk2(izo2,ith)
+                IMODEL = KMODEL(izo2)
+                IPMAIL = IMAMOD
+                nbn2   = IPMAIL.num(/1)
+                MELEME = IMAMOD
+                CALL DOXE(mcord2.XCOOR,IDIM,nbn2,num,inu2,XEJ)                
+                xd = sqrt(( hg1.hcoor((iiel1  -1)*3+1)
+     +                     -hg2.hcoor((iiel2t  -1)*3+1))**2
+     +                   +( hg1.hcoor((iiel1  -1)*3+2)
+     +                     -hg2.hcoor((iiel2t  -1)*3+2))**2
+     +                   +( hg1.hcoor((iiel1  -1)*3+3)
+     +                     -hg2.hcoor((iiel2t  -1)*3+3))**2) 
+                xxd=xd-xkmax
+                IF (xxd.le.xlong2) then
+                   if (ipass.eq.1) goto 11
+                   DO ino1 = 1, nbn1                   
+                      DO ino2 = 1, nbn2
+                         XXLON2=0.D0     
+                         DO IE3 = 1, IDIM
+                            XXLON2=XXLON2+(XE(IE3,Ino1)-
+     +                      XEJ(IE3,Ino2))**2 
+                         ENDDO   
+                         IF(XXLON2.Lt.(XLONg2**2)) then
+                           GOTO 6
+                         endif
+                      ENDDO                    
+                   ENDDO
+                   GOTO 9
+                else
+                   goto 9
+                ENDIF    
+ 6              continue 
+                inoa(iel1,izo2)=inoa(iel1,izo2)+1
+                INOA(IEL1,NSOUS+1)=INOA(IEL1,NSOUS+1)+1
+ 11             continue
+                nhug1 = nhug1 + 1
+                if (ipass.eq.2) then
+                   lhug(nhug1)=iel2
+                endif
+ 9              Continue          
+          ENDDO
+ 7        Continue       
+       ENDDO   
+       nhug(ith) = nhug1
+C
+      return
+      end
+ 
+ 

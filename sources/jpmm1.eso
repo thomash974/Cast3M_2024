@@ -1,0 +1,142 @@
+C JPMM1     SOURCE    PV090527  23/03/08    21:15:05     11619          
+      SUBROUTINE JPMM1(ILREE,ICHAMJ,ILREE2,IMOD5,MINTE1,NBELEM)
+
+* ---------------------------------------------------------------------
+* 
+*                               ROUTINE JPMAG1
+* 
+* ---------------------------------------------------------------------
+* Auteur : Nikola JERANCE
+* 
+* Historique : 
+* 
+*       20/09/2022 - Première écriture (N. Jerance)
+*     
+* 
+* Descriptif :
+* 
+*  Le potentiel magnétique vecteur est calculé à partir de J(x,y)
+*  et la matrice obtenue par MPMAGV. Le potentiel est en 3D.
+* 
+*  
+*  
+* Arguments :
+* 
+*       (E)     ILREE = Pointeur sur la liste de réels d'entrée
+*       (E)     ICHAMJ = J(x,y) en tant que MCHAML
+*       (S)     ILREE2 = Pointeur sur la liste de réels de sortie
+*       (E)     IMOD5 = pointeur sur le modèle
+*       (E)     MINTE1 = pointeur sur MINTE
+*       (E)     NBELEM = nb d'éléments
+* 
+* ---------------------------------------------------------------------
+
+* ----------------------------------------------------------------------
+* 
+*                         0 - DECLARATIONS ET IMPORTS
+* 
+* ----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+-INC SMLREEL
+-INC SMCHAML
+-INC SMMODEL
+-INC SMINTE
+
+
+     
+      INTEGER NBEL1,NBEL2
+      POINTEUR IA.MCHELM
+      POINTEUR ILREE1.MLREEL
+      POINTEUR ILREE2.MLREEL
+      POINTEUR IJ.MCHELM
+      POINTEUR IJX.MELVAL
+      POINTEUR IJY.MELVAL
+      POINTEUR IMOD1.IMODEL
+      POINTEUR IJ1.MCHAML
+        
+C      WRITE(IOIMP,*) '    ***  CALCUL DE A  *** '
+      
+      IJ = ICHAMJ
+      SEGACT,IJ
+      
+      NB1 = IJ.ICHAML(/1)
+      
+      IJ1 = IJ.ICHAML(1)
+      SEGACT,IJ1
+      
+      IMOD1 = IMOD5
+             
+
+
+      ILREE1 = ILREE
+      SEGACT,ILREE1
+      JG = NBELEM*NBELEM
+      SEGINI,ILREE2
+
+      NCOMPO = IJ1.IELVAL(/1)
+
+*      DO ICOMPO = 1,NCOMPO
+        ICOMPO = 1
+         IJX = IJ1.IELVAL(ICOMPO)
+         SEGACT,IJX
+
+          NBEL1 = IJX.VELCHE(/2)
+          NBEL2 = IJX.VELCHE(/1)
+         IF (NBEL1.EQ.1) THEN
+           V = 0.0
+             DO I1 = 1,NBEL2
+              VX = IJX.VELCHE(I1,1)
+              V = V + VX/NBEL2
+             END DO
+
+          K=0
+          DO I = 1, NBELEM
+         
+        
+           DO J1=1,NBELEM
+             K = K + 1
+               ILREE2.PROG(K) = ILREE1.PROG(K)*V
+           END DO
+         
+          END DO
+        
+         
+         ELSE
+          K=0
+          DO I = 1, NBELEM
+           V = 0.0
+             DO I1 = 1,NBEL2
+              VX = IJX.VELCHE(I1,I)
+              V = V + VX/NBEL2
+             END DO
+           DO J=1,NBELEM
+             K = K + 1
+             ILREE2.PROG(K) =  ILREE1.PROG(K)*V
+           END DO
+
+         END DO   
+        
+        END IF
+        
+
+
+      ICHAMA = IA
+
+      SEGDES,ILREE1
+      SEGDES,ILREE2
+      SEGDES,IJ
+      SEGDES,IJX
+
+
+
+      RETURN
+      END 

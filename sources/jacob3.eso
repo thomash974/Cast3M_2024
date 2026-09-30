@@ -1,0 +1,88 @@
+C JACOB3    SOURCE    PV090527  23/02/15    21:15:04     11592          
+      subroutine jacob3(a,idim,d,x)
+C======================================================================
+C     OBJET
+C     -----
+C     DIAGONALISATION D UNE MATRICE 3*3 SYMETRIQUE
+C
+C     ENTREES
+C     -------
+C     A(3,3) = MATRICE SYMETRIQUE
+C     IDIM   = 2 OU 3  SI 2 ON NE S OCCUPE QUE DE A(2,2)
+C                      SI 3                    DE A(3,3)
+C     SORTIES
+C     -------
+C     D(3)   = VALEURS PROPRES ORDONNEES D(1)>D(2)>D(3)
+C
+C     S(3,3) = VECTEURS PROPRES ( S(IP,2) EST LE VECTEUR
+C                                 ASSOCIE A D(2) )
+C
+C===============================================================
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      dimension a(3,3),d(3),x(3,3)
+
+      if (idim.ne.3) then
+        call jacob2(a,d,x)
+        return
+      endif
+
+      c2=-a(1,1)-a(2,2)-a(3,3)
+      c1= (a(1,1)*a(2,2)+a(2,2)*a(3,3)+a(3,3)*a(1,1))
+     &   - a(1,3)**2 - a(1,2)**2 - a(2,3)**2
+      c0=-2.*a(1,2)*a(1,3)*a(2,3) + a(1,1)*a(2,3)**2
+     &   + a(2,2)*a(1,3)**2 + a(3,3)*a(1,2)**2
+     &   - a(1,1)*a(2,2)*a(3,3)
+      call degre3(c0,c1,c2,d1,XI1,d2,XI2,d3,XI3)
+      if (d1.lt.d2) then
+           dd=d1
+           d1=d2
+           d2=dd
+      endif
+      if (d1.lt.d3) then
+           dd=d1
+           d1=d3
+           d3=dd
+      endif
+      if (d2.lt.d3) then
+           dd=d2
+           d2=d3
+           d3=dd
+      endif
+      d(1)=d1                      
+      d(2)=d2                      
+      d(3)=d3                      
+c CLB dans le cas ou toutes les VP sont negatives,
+c     il faut prendre la valeur absolue
+      deps=abs (d(1))*1.e-6
+C CLB si l'ordre a ete inverse par le calcul (cf comm precedent) 
+c     on prend la valeur absolue
+      if (abs(d(1)-d(2)).le.deps) then
+*      valeur propre double
+       if (abs(d(2)-d(3)).le.deps) then
+*       valeur propre triple
+        call vectp(a,d(1),x(1,1),3)
+       else
+        call vectp(a,d(1),x(1,1),2)
+        call vectp(a,d(3),x(1,3),1)
+       endif
+      else
+       deps=d(2)*1.e-6
+       if (abs(d(2)-d(3)).le.deps) then
+*       valeur propre double
+        call vectp(a,d(1),x(1,1),1)
+        call vectp(a,d(2),x(1,2),2)
+       else
+*       cas normal
+        call vectp(a,d(1),x(1,1),1)
+        call vectp(a,d(2),x(1,2),1)
+        call vectp(a,d(3),x(1,3),1)
+       endif
+      endif
+
+      return
+      end
+
+
+ 
+ 

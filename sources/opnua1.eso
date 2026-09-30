@@ -1,0 +1,417 @@
+C OPNUA1    SOURCE    PASCAL    22/11/21    21:15:06     11502          
+      SUBROUTINE OPNUA1(IPO1,IOPERA,IARGU,COMP,I1,X1,IPO2,IRET)
+C=======================================================================
+C
+C  ENTREES
+C     IPO1  = POINTEUR SUR LE NUAGE
+C     I1    = ENTIER
+C     X1    = FLOTTANT
+C
+C
+C /!\ **** OPERATIONS PAS DISPONIBLES POUR TOUS LES TYPES DE COMPOSANTES
+C /!\ **** VOIR NOTICES
+C
+C Operations elementaires entre un NUAGE et un ENTIER ou FLOTTANT
+C     IOPERA= 1  PUISSANCE
+C           = 2  PRODUIT
+C           = 3  ADDITION
+C           = 4  SOUSTRACTION
+C           = 5  DIVISION
+C
+C Fonctions sur un NUAGE
+C     IOPERA= 6  COSINUS
+C           = 7  SINUS
+C           = 8  TANGENTE
+C           = 9  ARCOSINUS
+C           = 10 ARCSINUS
+C           = 11 ARCTANGENTE (ATAN A UN ARGUMENT)
+C           = 12 EXPONENTIELLE
+C           = 13 LOGARITHME
+C           = 14 VALEUR ABSOLUE
+C           = 15 COSINUS  HYPERBOLIQUE
+C           = 16 SINUS    HYPERBOLIQUE
+C           = 17 TANGENTE HYPERBOLIQUE
+C           = 18 ERF  FONCTION D''ERRREUR DE GAUSS
+C           = 19 ERFC FONCTION D''ERRREUR complementaire DE GAUSS (1-ERF(X))
+C           = 20 ARGCH (FONCTION RECIPROQUE DE COSH)
+C           = 21 ARGSH (FONCTION RECIPROQUE DE SINH)
+C           = 22 ARGTH (FONCTION RECIPROQUE DE TANH)
+C           = 23 SIGN  (renvoie -1 ou +1, resultat du meme type)
+C
+C     IARGU = 0  ==> ARGUMENT I1I ET X1I INUTILISES
+C     IARGU = 1  ==> ARGUMENT I1I UTILISE
+C     IARGU = 11 ==> ARGUMENT I1I UTILISE MAIS COMMUTE AVEC LE TABLEAU (SOUSTRACTION, DIVISION : POSITIONNEL)
+C     IARGU = 2  ==> ARGUMENT X1I UTILISE
+C     IARGU = 21 ==> ARGUMENT X1I UTILISE MAIS COMMUTE AVEC LE TABLEAU (SOUSTRACTION, DIVISION : POSITIONNEL)
+C
+C     COMP  = NOM DE LA COMPOSANTE SUR LAQUELLE ON EFFECTUE L'OPERATION
+C
+C  SORTIES
+C     IPO2  = NUAGE SOLUTION
+C     IRET  = 1 SI L OPERATION EST POSSIBLE
+C           = 0 SI L OPERATION EST IMPOSSIBLE
+C
+C HISTORIQUE :
+C   - SP204843             18/11/2022  --> Creation
+C
+C=======================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMNUAGE
+-INC SMEVOLL
+-INC SMLREEL
+-INC SMLENTI
+-INC SMLMOTS
+-INC CCREEL
+
+      PARAMETER (NTYP=7,NCLEVO=2)
+      CHARACTER*8 CTYP,COMP,MTYP(NTYP)
+      CHARACTER*4 CLEVO(NCLEVO)
+
+C     DATA DES TYPES DE DONNEES COMPATIBLES AVEC OPERATION
+      DATA MTYP/'ENTIER  ','FLOTTANT','LISTENTI','LISTREEL','EVOLUTIO',
+     &          'CHPOINT ','MCHAML  '/
+
+C     MOTS-CLE POUR OPERATION CUR COMPOSANTES TYPE EVOLUTION
+      DATA CLEVO/'ABSC','ORDO'/
+
+
+C     Segment quelconque pour la desactivation des segements
+      SEGMENT ISEG(0)
+
+C     Code retour
+      IRET = 0
+
+C======================================================================C
+C     Activation des SEGMENTS 
+C======================================================================C
+      MNUAG1=IPO1
+
+      SEGINI,MNUAGE=MNUAG1
+      IPO2 = MNUAGE
+
+      N=MNUAG1.NUANOM(/2)
+      IF (N .EQ. 0)THEN
+C       Cas de le NUAGE vide
+        IRET = 1
+        RETURN
+      ENDIF
+
+C==== VERIFICATIONS SUR LA COMPOSANTE
+C
+C     EST-ELLE BIEN DANS LE NUAGE ?
+      ICP1 = 0
+      DO 10 IA1=1,N
+        IF (MNUAG1.NUANOM(IA1).EQ.COMP) THEN
+          ICP1 = IA1
+          GOTO 11
+        ENDIF
+ 10   CONTINUE
+      MOTERR(1:8) = COMP
+      INTERR(1) = MNUAG1
+      CALL ERREUR(644)
+      RETURN
+
+ 11   CONTINUE
+C     SON TYPE EST-IL COMPATIBLE AVEC OPERATION
+      CTYP = MNUAG1.NUATYP(ICP1)
+      CALL PLACE(MTYP,NTYP,IPLA,CTYP)
+      IF (IPLA.EQ.0) THEN
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+
+C     QUELQUES VERIFICATIONS SUPLLEMENTAIRES SUR LES TYPES
+C     NUAGE D'ENTIERS (ou LISTENTI) OPER FLOTTANT => ERREUR
+      IF ((IPLA.EQ.1.OR.IPLA.EQ.3).AND.(IARGU.EQ.2.OR.IARGU.EQ.21)) THEN
+        CALL ERREUR(8)
+        RETURN
+      ENDIF
+
+C     BRANCHEMENT DE L'OPERATION EN FONCTION DU TYPE DE LA COMPOSANTE
+      GOTO (100,200,300,400,500,600,700),IPLA
+      CALL ERREUR(5)
+      RETURN
+
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE ENTIER   
+C----------------------------------------------------------------------C
+ 100  CONTINUE
+      NUAVI1 = MNUAG1.NUAPOI(ICP1)
+      NBCOUP = NUAVI1.NUAINT(/1)
+      SEGINI,NUAVIN
+      I2 = I1
+      IF (IOPERA.EQ.4.AND.IARGU.EQ.1) I2 = -1*I2
+
+C---------- NUA1 +/- ENT1 :
+
+      IF (IOPERA.EQ.3.OR.(IOPERA.EQ.4.AND.IARGU.EQ.1)) THEN
+        DO 101 IA1=1,NBCOUP
+          NUAVIN.NUAINT(IA1) = NUAVI1.NUAINT(IA1)+I2
+ 101    CONTINUE
+
+C---------- ENT1 - NUA1 :
+
+      ELSEIF (IOPERA.EQ.4.AND.IARGU.EQ.11) THEN
+        DO 102 IA1=1,NBCOUP
+          NUAVIN.NUAINT(IA1) = I2-NUAVI1.NUAINT(IA1)
+ 102    CONTINUE
+
+C---------- ENT1 * NUA1 :
+
+      ELSEIF (IOPERA.EQ.2) THEN
+        DO 103 IA1=1,NBCOUP
+          NUAVIN.NUAINT(IA1) = I2*NUAVI1.NUAINT(IA1)
+ 103    CONTINUE
+
+C---------- NUA1 / ENT1  :
+
+      ELSEIF (IOPERA.EQ.5.AND.IARGU.EQ.1) THEN
+        DO 104 IA1=1,NBCOUP
+          NUAVIN.NUAINT(IA1) = NUAVI1.NUAINT(IA1)/I2
+ 104    CONTINUE
+
+C---------- ENT1 / NUA1 :
+
+      ELSEIF (IOPERA.EQ.5.AND.IARGU.EQ.11) THEN
+        DO 105 IA1=1,NBCOUP
+          IF (NUAVI1.NUAINT(IA1).EQ.0) GOTO 190
+          NUAVIN.NUAINT(IA1) = I2/NUAVI1.NUAINT(IA1)
+ 105    CONTINUE
+
+C---------- NUA1 ** ENT1 :
+
+      ELSEIF (IOPERA.EQ.1.AND.IARGU.EQ.1) THEN
+        DO 106 IA1=1,NBCOUP
+          IF (I2.EQ.0)  THEN
+            NUAVIN.NUAINT(IA1) = 1
+          ELSE
+            IF ((NUAVI1.NUAINT(IA1).EQ.0).AND.I2.LT.0) GOTO 190
+            NUAVIN.NUAINT(IA1) = NUAVI1.NUAINT(IA1)**I2
+          ENDIF
+ 106    CONTINUE
+
+C---------- ENT1 ** NUA1 :
+
+      ELSEIF (IOPERA.EQ.1.AND.IARGU.EQ.11) THEN
+        DO 107 IA1=1,NBCOUP
+          IF (NUAVI1.NUAINT(IA1).EQ.0)  THEN
+            NUAVIN.NUAINT(IA1) = 1
+          ELSE
+            IF (I2.EQ.0.AND.(NUAVI1.NUAINT(IA1).LT.0)) GOTO 190
+            NUAVIN.NUAINT(IA1) = I2**NUAVI1.NUAINT(IA1)
+          ENDIF
+ 107    CONTINUE
+
+C---------- Operations non encore traitees :
+      ELSE
+        CALL ERREUR(251)
+        RETURN
+
+      ENDIF
+      MNUAGE.NUAPOI(ICP1) = NUAVIN
+      IRET = 1
+      RETURN
+
+C     DIVISION PAR 0 
+ 190  CONTINUE
+      CALL ERREUR(835)
+      RETURN
+
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE FLOTTANT
+C----------------------------------------------------------------------C
+ 200  CONTINUE
+      NUAVF1 = MNUAG1.NUAPOI(ICP1)
+      NBCOUP = NUAVF1.NUAFLO(/1)
+      SEGINI,NUAVFL
+
+C     SI OPERATION AVEC NUAGE REELS ET ENTIER, ON CONVERTIT L'ENTIER
+C     SAUF SI EXPOSANT OPERATION PUISSANCE
+      IF (IARGU.EQ.1.AND.IOPERA.NE.1) THEN
+        X1 = REAL(I1)
+        IARGU = 2
+      ENDIF
+      IF (IARGU.EQ.11) THEN
+        X1 = REAL(I1)
+        IARGU = 21
+      ENDIF
+      X2 = X1
+      IF (IOPERA.EQ.4.AND.IARGU.EQ.2) X2 = -1*X2
+
+C---------- NUA1 +/- FLOT1 :
+
+      IF (IOPERA.EQ.3.OR.(IOPERA.EQ.4.AND.IARGU.EQ.2)) THEN
+        DO 201 IA1=1,NBCOUP
+          NUAVFL.NUAFLO(IA1) = NUAVF1.NUAFLO(IA1)+X2
+ 201    CONTINUE
+
+C---------- FLOT1 - NUA1 :
+
+      ELSEIF (IOPERA.EQ.4.AND.IARGU.EQ.21) THEN
+        DO 202 IA1=1,NBCOUP
+          NUAVFL.NUAFLO(IA1) = X2-NUAVF1.NUAFLO(IA1)
+ 202    CONTINUE
+
+C---------- FLOT1 * NUA1 :
+
+      ELSEIF (IOPERA.EQ.2) THEN
+        DO 203 IA1=1,NBCOUP
+          NUAVFL.NUAFLO(IA1) = X2*NUAVF1.NUAFLO(IA1)
+ 203    CONTINUE
+
+C---------- NUA1 / FLOT1  :
+
+      ELSEIF (IOPERA.EQ.5.AND.IARGU.EQ.2) THEN
+        DO 204 IA1=1,NBCOUP
+          NUAVFL.NUAFLO(IA1) = NUAVF1.NUAFLO(IA1)/X2
+ 204    CONTINUE
+
+C---------- FLOT1 / NUA1  :
+
+      ELSEIF (IOPERA.EQ.5.AND.IARGU.EQ.21) THEN
+        DO 205 IA1=1,NBCOUP
+          XVNUA1 = NUAVF1.NUAFLO(IA1)
+          IF (ABS(XVNUA1).LT.XPETIT) GOTO 290
+          NUAVFL.NUAFLO(IA1) = X2/XVNUA1
+ 205    CONTINUE
+
+C---------- NUA1 ** ENT1  :
+
+      ELSEIF (IOPERA.EQ.1.AND.IARGU.EQ.1) THEN
+        DO 206 IA1=1,NBCOUP
+          NUAVFL.NUAFLO(IA1) = NUAVF1.NUAFLO(IA1)**I1
+ 206    CONTINUE
+
+C---------- NUA1 ** FLOT1 :
+
+      ELSEIF (IOPERA.EQ.1.AND.IARGU.EQ.2) THEN
+C       Le calcul de la puissance est repris de operpu, FLOT1**FLOT2
+        DO 207 IA1=1,NBCOUP
+          XVNUA1 = NUAVF1.NUAFLO(IA1)
+          IF (ABS(XVNUA1).LT.XPETIT.AND.X2.LT.REAL(0.D0)) THEN
+            REAERR(1)=XVNUA1
+            REAERR(2)=X2
+            MOTERR(1:4)=' ** '
+            CALL ERREUR(1062)
+            RETURN
+          ELSE
+            I2    = NINT(X2)
+            XFLOT = ABS(X2 - REAL(I2))
+            IF (XFLOT.LE.(XZPREC*ABS(X2)*REAL(2.D0))) THEN
+              NUAVFL.NUAFLO(IA1) = XVNUA1**I2
+            ELSEIF (XVNUA1.LT.REAL(0.D0)) THEN
+              REAERR(1)=XVNUA1
+              REAERR(2)=X2
+              MOTERR(1:4)=' ** '
+              CALL ERREUR(1062)
+              RETURN
+            ELSE
+              NUAVFL.NUAFLO(IA1) = XVNUA1**X2
+            ENDIF
+          ENDIF
+ 207    CONTINUE
+
+C---------- FLOT1 ** NUA1 :
+
+      ELSEIF (IOPERA.EQ.1.AND.IARGU.EQ.21) THEN
+C       Le calcul de la puissance est repris de operpu, FLOT1**FLOT2
+        DO 208 IA1=1,NBCOUP
+          XVNUA1 = NUAVF1.NUAFLO(IA1)
+          IF (ABS(X2).LT.XPETIT.AND.XVNUA1.LT.REAL(0.D0)) THEN
+            REAERR(1)=X2
+            REAERR(2)=XVNUA1
+            MOTERR(1:4)=' ** '
+            CALL ERREUR(1062)
+            RETURN
+          ELSE
+            I2    = NINT(XVNUA1)
+            XFLOT = ABS(XVNUA1 - REAL(I2))
+            IF (XFLOT.LE.(XZPREC*ABS(XVNUA1)*REAL(2.D0))) THEN
+              NUAVFL.NUAFLO(IA1) = X2**I2
+            ELSEIF (X2.LT.REAL(0.D0))THEN
+              REAERR(1)=X2
+              REAERR(2)=XVNUA1
+              MOTERR(1:4)=' ** '
+              CALL ERREUR(1062)
+              RETURN
+            ELSE
+              NUAVFL.NUAFLO(IA1) = X2**XVNUA1
+            ENDIF
+          ENDIF
+ 208    CONTINUE
+
+C---------- Operations non encore traitees :
+      ELSE
+        CALL ERREUR(251)
+        RETURN
+
+      ENDIF
+      MNUAGE.NUAPOI(ICP1) = NUAVFL
+      IRET = 1
+      RETURN
+
+C     ERREUR DIVISION PAR 0.
+ 290  CONTINUE
+      CALL ERREUR(835)
+      RETURN
+
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE LISTENTI
+C----------------------------------------------------------------------C
+ 300  CONTINUE
+      CALL ERREUR(251)
+      RETURN
+     
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE LISTREEL
+C----------------------------------------------------------------------C
+ 400  CONTINUE
+      CALL ERREUR(251)
+      RETURN
+     
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE EVOLUTION
+C----------------------------------------------------------------------C
+ 500  CONTINUE
+      NUAVI1 = MNUAG1.NUAPOI(ICP1)
+      NBCOUP = NUAVI1.NUAINT(/1)
+      SEGINI,NUAVIN
+C     Lecture du mot ABSC ou ORDO
+      ICLE = 0
+      CALL LIRMOT(CLEVO,NCLEVO,ICLE,0)
+      IF (ICLE.EQ.0) ICLE = 2
+      DO 501 IA1=1,NBCOUP
+          ICH = NUAVI1.NUAINT(IA1)
+          CALL OPEVO1(ICH,IOPERA,IARGU,ICLE,I1,X1,ICHR,IRET)
+          IF (IRET.EQ.0) GOTO 590
+          NUAVIN.NUAINT(IA1) = ICHR
+ 501  CONTINUE
+      MNUAGE.NUAPOI(ICP1) = NUAVIN
+      IRET = 1
+      RETURN
+
+ 590  CONTINUE
+      CALL ERREUR(26)
+      RETURN
+     
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE CHPOINT
+C----------------------------------------------------------------------C
+ 600  CONTINUE
+      CALL ERREUR(251)
+      RETURN
+     
+C----------------------------------------------------------------------C
+C     COMPOSANTE DE TYPE MCHALM
+C----------------------------------------------------------------------C
+ 700  CONTINUE
+      CALL ERREUR(251)
+      RETURN
+
+      END
+ 

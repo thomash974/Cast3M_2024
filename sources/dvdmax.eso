@@ -1,0 +1,36 @@
+C DVDMAX    SOURCE    KICH      19/10/25    21:15:07     10351          
+      SUBROUTINE DVDMAX(s,centre,ray2,llis,nbrobl,nombre,indx)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+c     ***********************************************************
+c     plus loin du centre 
+c     ***********************************************************
+      integer llis(nbrobl)
+      real*8 centre(nbrobl-1),v(nbrobl-1)
+      real*8 s(nbrobl-1,nombre)
+*         write(6,*) 'dd',(llis(ju),ju=1,nbrobl)
+      indx = 0
+      dmax = ray2
+      do ju = 1,nombre
+        do jli= 1,nbrobl
+          if(ju.eq.llis(jli)) goto 20
+        enddo
+        do ic = 1,nbrobl-1
+          v(ic) = s(ic,ju) - centre(ic)
+        enddo
+        dd = v(1)*v(1) + v(2)*v(2) + 2.D0*v(3)*v(3)
+        if(nbrobl.gt.4) then
+          dd = dd + 2.D0*(v(4)*v(4) + v(5)*v(5))
+        endif 
+*       write(6,*)'dmax',ju,(dd.gt.dmax),dd,dmax
+        if(dd.gt.dmax) then
+          dmax = dd
+          indx = ju
+        endif
+ 20     continue
+      enddo
+
+      RETURN
+      END
+ 
+ 

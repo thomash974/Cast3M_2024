@@ -1,0 +1,239 @@
+C DEFO      SOURCE    CB215821  23/01/25    21:15:11     11573          
+
+************************************************************************
+C  CONSTRUCTION D'UN OBJET DE TYPE DEFORME A PARTIR D'UNE GEOMETRIE
+C  D'UN CHPOIN UX UY UZ ET D'UN COEFFICIENT D'AMPLIFICATION
+C  1995 Changement de defaut de couleur P.PEGON JRC-ISPRA
+************************************************************************
+
+      SUBROUTINE DEFO
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCREEL
+
+-INC SMCOORD
+-INC SMCHPOI
+-INC SMDEFOR
+-INC SMELEME
+-INC SMLMOTS
+
+      CHARACTER*(LOCHPO) NOC
+      DIMENSION UMAX(3)
+
+************************************************************************
+*     LECTURE DES ARGUMENTS
+************************************************************************
+
+C     MAILLAGE ET CHPOINT SONT OBLIGATOIRES
+      CALL LIROBJ('MAILLAGE',MELEME,1,iretou)
+      CALL LIROBJ('CHPOINT ',MCHPOI,1,iretou)
+      IF (IERR.NE.0) RETURN
+
+C     AMPLIFICATION 1 PAR DEFAUT
+      AMP=1.D0
+      CALL LIRREE(AMP,0,IRETOA)
+      IF (IERR.NE.0) RETURN
+
+C     VECTEUR
+      MTVE=0
+      CALL LIROBJ('VECTEUR ',MTVE,0,iretou)
+      IF (IERR.NE.0) RETURN
+
+C     COULEUR
+      ICOUL=0
+      CALL LIRMOT(NCOUL,NBCOUL,ICOUL,0)
+      IF (IERR.NE.0) RETURN
+      IF (ICOUL.EQ.0) ICOUL=IDCOUL+1
+      ICOUL=ICOUL-1
+
+      IDIMP1 = IDIM+1
+************************************************************************
+*     COMPOSANTES DU DEPLACEMENT SELON MODE DE CALCUL
+************************************************************************
+      JGN = LOCHPO
+      JGM = IDIM
+      SEGINI,MLMOTS
+      IF      (IFOMOD.EQ.2.OR.IFOMOD.EQ.6) THEN
+        MLMOTS.MOTS(1) = 'UX        '
+        MLMOTS.MOTS(2) = 'UY        '
+        MLMOTS.MOTS(3) = 'UZ        '
+      ELSE IF (IFOMOD.EQ.-1) THEN
+        MLMOTS.MOTS(1) = 'UX        '
+        MLMOTS.MOTS(2) = 'UY        '
+      ELSE IF (IFOMOD.EQ.0 .OR. IFOMOD.EQ.1) THEN
+        MLMOTS.MOTS(1) = 'UR        '
+        MLMOTS.MOTS(2) = 'UZ        '
+      ELSE IF (IFOMOD.EQ.3) THEN
+        MLMOTS.MOTS(1) = 'UX        '
+      ELSE IF (IFOMOD.EQ.4.OR.IFOMOD.EQ.5) THEN
+        MLMOTS.MOTS(1) = 'UR        '
+      ELSE
+        CALL ERREUR(5)
+        RETURN
+      ENDIF
+      IPLDEP = MLMOTS
+
+************************************************************************
+*     TRAVAIL SUR LE CHPOINT
+************************************************************************
+      CALL REDUIR(MCHPOI,MELEME,IPCHP1)
+      IF (IERR.NE.0) RETURN
+C  VERIFICATION QU'IL Y A BIEN LES DEPLACEMENTS DANS LE CHPOINT
+      CALL ECROBJ('CHPOINT ',IPCHP1)
+      CALL ECRCHA('NOID')
+      CALL ECROBJ('LISTMOTS',IPLDEP)
+      CALL ECROBJ('LISTMOTS',IPLDEP)
+      IF (IERR.NE.0) RETURN
+      CALL EXCOMP
+      IF (IERR.NE.0) RETURN
+      CALL LIROBJ('CHPOINT ',MCHPOI,1,iretou)
+
+************************************************************************
+*     TRAVAIL SUR L'AMPLIFICATION
+************************************************************************
+      IF (IRETOA.EQ.0) THEN
+
+        CALL ACTOBJ('MAILLAGE',MELEME,1)
+        IF (IERR.NE.0) RETURN
+
+****    CALCUL D'UNE LONGUEUR CARACTERISTIQUE : CLONG    ****
+c       rem : pas besoin de CCREEL car ces valeurs seront tres vite ecrasees
+        XMAX=-XSGRAN
+        XMIN= XSGRAN
+        YMAX=-XSGRAN
+        YMIN= XSGRAN
+        ZMAX=-XSGRAN
+        ZMIN= XSGRAN
+*       CALCUL DU CADRE
+        NBSOUS=LISOUS(/1)
+        IPT1=MELEME
+        
+        SEGACT,MCOORD
+        DO ISOUS=1,MAX(1,NBSOUS)
+          IF (NBSOUS.NE.0) IPT1=LISOUS(ISOUS)
+          DO J = 1, IPT1.NUM(/2)
+            DO I = 1, IPT1.NUM(/1)
+              IREF=IDIMP1*(IPT1.NUM(I,J)-1)
+              XPT=XCOOR(IREF+1)
+              XMAX=MAX(XPT,XMAX)
+              XMIN=MIN(XPT,XMIN)
+              YPT=XCOOR(IREF+2)
+              YMAX=MAX(YPT,YMAX)
+              YMIN=MIN(YPT,YMIN)
+              IF (IDIM.EQ.3) THEN
+                ZPT=XCOOR(IREF+3)
+                ZMAX=MAX(ZPT,ZMAX)
+                ZMIN=MIN(ZPT,ZMIN)
+              ENDIF
+            ENDDO
+          ENDDO
+        ENDDO
+        SEGDES,MCOORD
+        if (idim.le.2) then
+          ZMAX=0.D0
+          ZMIN=0.D0
+          if (idim.le.1) then
+            YMAX=0.D0
+            YMIN=0.D0
+          endif
+        endif
+c        CLONG=MAX(XMAX-XMIN,YMAX-YMIN,ZMAX-ZMIN)
+*bp,2021 : une norme 2 semble + adaptee
+        CLONG=SQRT((XMAX-XMIN)**2+(YMAX-YMIN)**2+(ZMAX-ZMIN)**2)
+
+****    CALCUL DU DEPLACEMENT MAX : UMAX    ****
+        UMAX(1)=0.D0
+        UMAX(2)=0.D0
+        UMAX(3)=0.D0
+        NSOUPO=IPCHP(/1)
+c  "Impossible de calculer le coefficient d'amplification"
+        IF (NSOUPO.EQ.0) THEN
+          CALL ERREUR(475)
+          RETURN
+        ENDIF
+        DO ISOUPO = 1, NSOUPO
+          MSOUPO=IPCHP(ISOUPO)
+          MPOVAL=IPOVAL
+          NC=NOCOMP(/2)
+          DO I = 1, NC
+            NOC = NOCOMP(I)
+            DO J = 1, IDIM
+              IF (NOC.EQ.MLMOTS.MOTS(J)) THEN
+c         Jeme composante trouvee
+                DO K = 1, VPOCHA(/1)
+                  UMAX(J)=MAX(UMAX(J),ABS(VPOCHA(K,I)))
+                ENDDO
+              ENDIF
+            ENDDO
+          ENDDO
+        ENDDO
+        COMPMA=SQRT(UMAX(1)**2+UMAX(2)**2+UMAX(3)**2)
+
+*       ON PREND CLONG/(10*UMAX) COMME AMPLIFICATION
+        IF (COMPMA.GE.XSPETI) AMP=CLONG/(10.D0*COMPMA)
+c       (sinon, AMP reste = 1.d0)
+
+      ENDIF
+
+
+************************************************************************
+*     ISOVALEUR via CHPOINT ou MCHAML
+************************************************************************
+      IPCHP1=0
+      IPCHEL=0
+      IPMODL=0
+      IPCHAM=0
+*     lecture eventuelle d'un 2nd champoint ou d'un chamelem + model
+      CALL LIROBJ('CHPOINT ',IPCHP1,0,iretou)
+      IF (IERR.NE.0) RETURN
+      if (iretou.eq.1) then
+        CALL ACTOBJ('CHPOINT ',IPCHP1,1)
+      else
+        CALL LIROBJ('MCHAML  ',IPCHEL,0,iretou)
+        if (ierr.ne.0) return
+        if (iretou.ne.0) then
+          CALL LIROBJ('MMODEL  ',IPMODL,1,iretou)
+          if (ierr.ne.0) return
+          CALL ACTOBJ('MCHAML  ',IPCHEL,1)
+          CALL ACTOBJ('MMODEL  ',IPMODL,1)
+          if (ierr.ne.0) return
+*    PASSER LES CHAMELEM AUX noeuds
+          CALL CHASUP(IPMODL,IPCHEL,IPCHAM,IRET,1)
+          IF (IRET.NE.0) THEN
+            CALL ERREUR(IRET)
+            RETURN
+          ENDIF
+        endif
+      endif
+* rem : on pourrait verifier ici que ces champs n'ont qu'une seule
+*       composante car TRAC ne sait pas faire autrement a ce jour
+
+************************************************************************
+*     CREATION ET ECRITURE DE LA DEFORMEE
+************************************************************************
+      NDEF=1
+      SEGINI,MDEFOR
+      AMPL(1)  = AMP
+      MTVECT(1)= MTVE
+      IELDEF(1)= MELEME
+      ICHDEF(1)= MCHPOI
+      JCOUL(1) = ICOUL
+      MDCHP(1) = IPCHP1
+      MDMODE(1)= IPMODL
+      MDCHEL(1)= IPCHAM
+
+      CALL ECROBJ('DEFORME ',MDEFOR)
+
+      SEGSUP,MLMOTS
+
+c      return
+      END
+
+ 
+ 
+ 

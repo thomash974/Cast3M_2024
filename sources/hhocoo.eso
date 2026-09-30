@@ -1,0 +1,48 @@
+C HHOCOO    SOURCE    OF166741  24/05/06    21:15:08     11082          
+C HHOCOO    SOURCE    FANDEUR                                           
+
+C---------------------------------------------------------------------*
+C Coordonnees des noeuds d'un element HHO
+C---------------------------------------------------------------------*
+
+      SUBROUTINE HHOCOO (NUMMEL,NBNOE,COORD,NUMELT, TABCOO, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+      DIMENSION NUMMEL(NBNOE,*),COORD(*), TABCOO(*)
+
+      iret = 0
+
+      idimp1 = IDIM+1
+
+      IELT = NUMELT
+C- Recuperation des coordonnees des noeuds de l element IELT
+      IF (IDIM.EQ.1) THEN
+        DO ic = 1, NBNOE
+          jc = idimp1 * (NUMMEL(ic,IELT) - 1)
+          TABCOO(ic) = COORD(jc+1)
+        END DO
+      ELSE IF (IDIM.EQ.2) THEN
+        DO ic = 1, NBNOE
+          jc = idimp1 * (NUMMEL(ic,IELT) - 1)
+          TABCOO(ic)       = COORD(jc+1)
+          TABCOO(ic+NBNOE) = COORD(jc+2)
+        END DO
+      ELSE IF (IDIM.EQ.3) THEN
+        NBNO2 = 2*NBNOE
+        DO ic = 1, NBNOE
+          jc = idimp1 * (NUMMEL(ic,IELT) - 1)
+          TABCOO(ic)       = COORD(jc+1)
+          TABCOO(ic+NBNOE) = COORD(jc+2)
+          TABCOO(ic+NBNO2) = COORD(jc+3)
+        END DO
+      END IF
+
+c*      RETURN
+      END
+ 
+ 

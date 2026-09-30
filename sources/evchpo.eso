@@ -1,0 +1,246 @@
+C EVCHPO    SOURCE    CB215821  21/02/09    21:15:01     10867          
+      SUBROUTINE EVCHPO(ICOUL,IBOPOI,IPOI,MEVOLL,CMOT,NCHPT,NMAIL)
+C======================================================================
+C                OPTION CHPO DE L'OPERATEUR EVOL                      C
+C                                                                     C
+C       LA SYNTHAXE DE CETTE OPTION D'EVOL EST LA SUIVANTE :          C
+C                                                                     C
+C                                                                     C
+C    EV1 = EVOL (COUL) CHPO CHPT COMP LIGN;                           C
+C                                                                     C
+C                                                                     C
+C  + COUL   : COULEUR DE LA COURBE (FACULTATIVE)                      C
+C                                                                     C
+C  + CHPT   : CHAMP-POINT                                             C
+C                                                                     C
+C  + COMP   : COMPOSANTE DU CHAMP POINT                               C
+C                                                                     C
+C  + LIGN   : MAILLAGE D'UNE LIGNE (SEG2 ou SEG3)                     C
+C                                                                     C
+C                                                                     C
+C======================================================================
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC CCNOYAU
+-INC PPARAM
+-INC CCOPTIO
+-INC SMEVOLL
+-INC SMCHPOI
+-INC SMLREEL
+-INC SMELEME
+-INC SMCOORD
+-INC SMLMOTS
+-INC CCASSIS
+
+      EXTERNAL EVCHi
+      COMMON/EVCHC/NBTHR,ICPR1,MCHPOI,CMOT1
+
+
+      SEGMENT MVOL
+        REAL*8            POSNO(JG)
+        CHARACTER*(LONOM) NOMAB(JG)
+      ENDSEGMENT
+
+      SEGMENT TTRAV
+        INTEGER ILIS(IDIMM)
+      ENDSEGMENT
+
+      SEGMENT ICPR1
+        INTEGER           IBIN1(nbpts),IBIN2(nbpts)
+        REAL*8            XVAL1(nbpts)
+        CHARACTER*(LONOM) CNOM2(nbpts)
+      ENDSEGMENT
+
+      CHARACTER*(LOCOMP) CMOT1
+      CHARACTER*(LONOM)  CBLAN1
+      CHARACTER*8        TYP1
+      CHARACTER*(*)      CMOT,NCHPT,NMAIL
+      CHARACTER*11       UMOT1
+      CHARACTER*12       UMOT2
+      CHARACTER*5        UMOT3
+      CHARACTER*72       TITRE
+      REAL*8             PREC(3)
+      LOGICAL            NOMME,BCHP,BMAIL,BTHRD
+
+C=======================================================================
+
+      CBLAN1 =' '
+      TITRE  ='CREE PAR EVOL CHPO'
+      BCHP   = NCHPT .EQ. CBLAN1
+      BMAIL  = NMAIL .EQ. CBLAN1
+      
+      MCHPOI = IBOPOI
+      MELEME = IPOI
+      CALL LIGMAI(MELEME,TTRAV,1)
+      IF(IERR.NE.0) RETURN
+
+C     Nombre de composantes du CHPOINT
+      CALL NBCOMP(MCHPOI,'CHPOINT ',NBCO)
+      IF(IERR.NE.0)RETURN
+
+      IF    ( NBCO .EQ. 0)THEN
+        CMOT1 = ' '
+      ELSEIF(CMOT.EQ.' ')THEN
+        IF(NBCO .EQ. 1)THEN
+          MSOUPO = MCHPOI.IPCHP(1)
+          CMOT1  = MSOUPO.NOCOMP(1)
+        ELSE
+C         Dans le cas ou il y a plusieurs composantes il faut en specifier 1
+          CALL ERREUR(21)
+          RETURN
+        ENDIF
+      ELSE
+        CMOT1  = CMOT
+      ENDIF
+
+      JG  =TTRAV.ILIS(/1)
+      SEGINI,MLREEL,MLREE1,ICPR1,MVOL
+      NBTHR=NBTHRS
+
+      IF((NBTHR.EQ.1).OR.(NBTHRS.EQ.1).OR. (oothrd.GT.0)) THEN
+        NBTHR = 1
+        BTHRD =.FALSE.
+      ELSE
+        BTHRD =.TRUE.
+C       Initialisation des threads
+        CALL THREADII
+      ENDIF
+
+      SEGACT ITABOC*MOD,ITABOD*MOD,ITABOB*MOD
+      if(nbesc.ne.0) SEGACT,IPILOC
+      IF(BTHRD) THEN
+C       Lancement du travail en parallèle
+        DO ith=2,NBTHR
+          CALL THREADID(ith, EVCHi)
+        ENDDO
+C       Lancement du travail sur le maitre
+        CALL EVCHi(1)
+
+C       Attente de la fin du travail des threads
+        DO ith=2,NBTHR
+          CALL THREADIF(ith)
+        ENDDO
+
+C       Stop des threads
+        CALL THREADIS
+
+      ELSE
+C       Dans les ASSISTANTS ou en SEQUENTIEL on invoque directement la
+C       SUBROUTINE qui fait le travail avec ses arguments
+        ith=1
+        CALL EVCH1(NBTHR,ith,ICPR1,MCHPOI,CMOT1)
+      ENDIF
+      if(nbesc.ne.0) SEGDES,IPILOC
+
+
+C     BOUCLE SUR TOUS LES NOEUDS DE LA LIGNE
+C     IBOC : Nombre de POINTS nommes
+      IBOC =0
+      ZMABS=0.D0
+
+      SEGACT,MCOORD
+      DO INOLIG=1,JG
+        NN=TTRAV.ILIS(INOLIG)
+
+C       Calcul de l'agscisse curviligne
+        IF(INOLIG .EQ. 1) THEN
+          DO IT=1,IDIM
+            PREC(IT) = XCOOR((NN-1)*(IDIM+1) + IT)
+          ENDDO
+          ZMABS = 0.D0
+
+        ELSE
+          TOTAL = 0.D0
+          IDEB  =(NN-1)*(IDIM+1)
+          DO IT=1,IDIM
+            XCOO     = XCOOR(IDEB + IT)
+            TOTAL    = TOTAL + (XCOO - PREC(IT))**2
+            PREC(IT) = XCOO
+          ENDDO
+          ZMABS = ZMABS + (TOTAL**0.5D0)
+        ENDIF
+
+C       Le POINT est-il nomme
+        NOMME=(ICPR1.IBIN2(NN) .EQ. 1)
+        IF(NOMME)THEN
+          IBOC             =IBOC+1
+          MVOL.POSNO (IBOC)=ZMABS
+          MVOL.NOMAB (IBOC)=ICPR1.CNOM2(NN)
+        ENDIF
+
+        IF(ICPR1.IBIN1(NN) .EQ. 1)THEN
+C         Le POINT est dans le CHPOINT
+          MLREE1.PROG(INOLIG)= ICPR1.XVAL1(NN)
+        ELSE
+          MLREE1.PROG(INOLIG)= 0.D0
+        ENDIF
+        MLREEL.PROG(INOLIG) = ZMABS
+      ENDDO
+      SEGDES,MCOORD
+
+C     Construction du resultat
+      IF(IBOC.EQ.0) THEN
+        N=1
+      ELSE
+        N=2
+      ENDIF
+      SEGINI,MEVOLL
+C
+C   CREATION DU EVOL CONTENANT LES NOMS DES POINTS
+C
+      IF(IBOC.NE.0) THEN
+         SEGINI KEVOLL
+*MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM          IIIIIII
+*   DANS NOMAB ON A LES POINTS QUALIFIES        IIIIIII
+*   IBOC LE NOMBRE DE POINTS QUALIFIES            IIII
+*   DANS POSNO LA POSITION DES POINTS QUALIFIES   IIII
+*   MLREEL : ABSCISSE DES POINTS                  IIII
+*   MLREE1 : ORDONNEE DES POINTS                 IIIIII
+         JGN=LONOM
+         JGM=IBOC
+         SEGINI MLMOTS
+         JG=IBOC
+         SEGINI MLREE2
+         IPROGX=MLREE2
+         IPROGY=MLMOTS
+         TYPX  ='LISTREEL'
+         TYPY  ='LISTMOTS'
+         IEVOLL(2)=KEVOLL
+         NUMEVY='MARQ'
+         NUMEVX=ICOUL
+         NOMEVX='ABS'
+         NOMEVY=CMOT1
+         DO 9   I=1,IBOC
+            MOTS(I)       =MVOL.NOMAB(I)
+            MLREE2.PROG(I)=MVOL.POSNO(I)
+ 9       CONTINUE
+         KEVTEX='POINTS NOMMES APPARTENANT A LA LIGNE'
+      ENDIF
+
+
+      SEGINI KEVOLL
+      IEVOLL(1)= KEVOLL
+      ITYEVO='REEL'
+      TYPX  ='LISTREEL'
+      TYPY  ='LISTREEL'
+      IPROGX= MLREEL
+      IPROGY= MLREE1
+      IEVTEX= TITREE
+      NOMEVX= 'ABS'
+      NOMEVY= CMOT1
+      NUMEVX= ICOUL
+      NUMEVY= 'REEL'
+      KEVTEX=TITRE
+
+      IF (BCHP .AND. BMAIL) THEN
+        UMOT1= 'COMPOSANTE '
+        UMOT2= ' DU CHPOINT '
+        UMOT3= ' SUR '
+        TITRE=UMOT1//CMOT1//UMOT2//NCHPT//UMOT3//NMAIL
+        KEVTEX=TITRE
+      ENDIF
+      SEGSUP TTRAV,MVOL,ICPR1
+      END
+ 
+ 

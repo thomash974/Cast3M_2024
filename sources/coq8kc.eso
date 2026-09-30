@@ -1,0 +1,219 @@
+C COQ8KC    SOURCE    BP208322  20/03/11    21:15:09     10550          
+      SUBROUTINE COQ8KC(NBNO,RHOK,NBPGAU,ESP,EXCEN,WRK1,MINTE,MINTE2,
+     . VROT)
+C
+C       |--------------------------------------------------------------|
+C       | NOUVELLE PROCEDURE DE CALCUL DE LA MATRICE DE RIGIDITE       |
+C       |  CENTRIFUGE  AVEC UN ELEMENT DE COQUE A 6 OU 8 NOEUDS        |
+C       |                                                              |
+C       |                INSPIRE DU CALCUL DE LA MATRICE DE MASSE      |
+C       |--------------------------------------------------------------|
+C       |  ENTREES                                                     |
+C       |    NBPGAU :  NOMBRE DE POINTS DE GAUSS.                      |
+C       |    MINTE  :  FONCTIONS DE FORME AUX POINTS DE GAUSS          |
+C       |    MINTE2 :  FONCTIONS DE FORME AUX NOEUDS                   |
+C       |    RHOK   :  MASSE VOLUMIQUE.                                |
+C       |    ESP    :  EPAISSEUR.                                      |
+C       |    EXCEN  :  EXCENTREMENT.                                   |
+C       |    NBNO   :  NOMBRE DE NOEUDS                                |
+C       |    VROT   :  VECTEUR VITESSE ROTATION                        |
+C       |               Didier COMBESCURE mars 2003                    |
+C       |--------------------------------------------------------------|
+C
+C
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      
+-INC  SMINTE
+      SEGMENT WRK7
+c       REAL*8 XJI(3,3),TXR(3,3,NBNO),FINT(3,LRE),XJ(3,3),B(3,3)
+      REAL*8 TXR(3,3,NBNO),XN(3,LRE),XN2(3,LRE),B(3,3)
+      REAL*8 TH(NBNO),EXC(NBNO),H(NBNO)
+      ENDSEGMENT
+      SEGMENT/WRK1/(REL(LRE,LRE)*D,XE(3,NBNO)*D)
+cbp,2020      DIMENSION ROME(6,6),VROT(*)
+      DIMENSION ROME(3,3),VROT(*)
+      
+      SEGACT MINTE
+      SEGACT WRK1*MOD
+      LRE=6*NBNO
+      SEGINI WRK7
+      
+C     EXCENTRICITE ET EPAISSEUR CONSTANTES EN ENTREE !?!
+      DO 5 I = 1,NBNO
+      EXC(I)=EXCEN
+      TH(I) = ESP
+    5 CONTINUE
+C
+C     CALCUL DE LA MATRICE  ROME = [-OMEG X OMEG X]  
+c     ou x est le produit vectoriel et OMEG le vecteur rotation
+c       DO 9 IN=1,6
+c         DO 9 IM=1,6
+c    9  ROME(IN,IM) = 0.D0
+Cbp,2020 :  ci-dessus inutile
+      ROME(1,1) = (-1.)*((VROT(2)**2) + (VROT(3)**2))
+      ROME(2,2) = (-1.)*((VROT(1)**2) + (VROT(3)**2))
+      ROME(3,3) = (-1.)*((VROT(1)**2) + (VROT(2)**2))
+      ROME(1,2) = VROT(1)*VROT(2)
+      ROME(1,3) = VROT(1)*VROT(3)
+      ROME(2,3) = VROT(2)*VROT(3)
+      ROME(2,1) = ROME(1,2)
+      ROME(3,1) = ROME(1,3)
+      ROME(3,2) = ROME(2,3)
+C
+C     INITIALISATION DE LA MATRICE MASSE M=[0] (KCENT ici)
+      DO 10 I = 1,6*NBNO
+      DO 11 J = 1,6*NBNO
+      REL(I,J) = 0.D0
+   11 CONTINUE
+   10 CONTINUE
+*
+C     CALCUL DU REPERE LOCAL AUX NOEUDS : 
+c     TXR(i,j,k) = [V1,V2,V3] calcules aux NBNO noeuds (x_k)
+      SEGACT MINTE2
+      CALL CQ8LOC(XE,NBNO,MINTE2.SHPTOT,TXR,IRR)
+*      SEGDES MINTE2
+*
+* 
+*===> BOUCLE SUR LES POINTS DE GAUSS xGauss
+      DO 80 LX = 1,NBPGAU
+      
+c     coordonnees hors plan \dze, poids w et fonctiond forme Ni(xGauss)
+      E3 = DZEGAU(LX)
+      WT = POIGAU (LX)
+      DO 20 I=1,NBNO
+      H(I)=SHPTOT(1,I,LX)
+   20 CONTINUE
+   
+c     calcul du Jacobien |J|
+      CALL CQ8JCE(LX,NBNO,E3,XE,TH,EXC,TXR,SHPTOT,B,DET,IRR)
+      FACT = WT*DET*RHOK
+
+c                            UX UY UZ   RX  RY               RZ      
+c     remplissage de [N] = [ Ni 0  0  | 0  +Ni*ti*\dze*V3Z -Ni*ti*\dze*V3Y ] 
+c                          [ 0  Ni 0  | .   0              +Ni*ti*\dze*V3X ]
+c                          [ 0  0  Ni | antisym.            0.             ]
+      DO 30 I = 1,3
+      DO 31 J = 1,NBNO*6
+      XN(I,J) = 0.D0
+   31 CONTINUE
+   30 CONTINUE   
+      DO 60 J = 1,NBNO      
+c       DO 40 I = 1,3
+c       XJI(I,I) = 0.D0
+c    40 CONTINUE
+c       XJI(1,2) = TXR(1,1,J)*TXR(2,2,J) - TXR(2,1,J)*TXR(1,2,J)
+c       XJI(1,3) = TXR(1,1,J)*TXR(3,2,J) - TXR(1,2,J)*TXR(3,1,J)
+c       XJI(2,3) = TXR(2,1,J)*TXR(3,2,J) - TXR(2,2,J)*TXR(3,1,J)
+c       DO 50 IK = 1,3
+c       DO 51 JK = IK,3
+c       XJI(JK,IK) = -XJI(IK,JK)
+c    51 CONTINUE
+c    50 CONTINUE
+Cbp,2020 : on fait + simple car V3 deja calcule !
+      V3X=TXR(1,3,J)
+      V3Y=TXR(2,3,J)
+      V3Z=TXR(3,3,J)
+      J1 = (J-1)*6 + 1
+      J2 = J1 + 1
+      J3 = J2 + 1
+      J4 = J3 + 1
+      J5 = J4 + 1
+      J6 = J5 + 1
+      A1 = H(J)*(0.5*E3*ESP+EXCEN)
+      XN(1,J1) = H(J)
+cbp,2020       XN(1,J5) = A1*XJI(1,2)
+cbp,2020       XN(1,J6) = A1*XJI(1,3)
+      XN(1,J5) = A1*V3Z
+      XN(1,J6) = -1.*A1*V3Y
+      XN(2,J2) = XN(1,J1)
+      XN(2,J4) = -XN(1,J5)
+cbp,2020       XN(2,J6) = A1*XJI(2,3)
+      XN(2,J6) = A1*V3X
+      XN(3,J3) = XN(1,J1)
+      XN(3,J4) = -XN(1,J6)
+      XN(3,J5) = -XN(2,J6)
+   60 CONTINUE
+
+cbp,2020 : introduction de N2 (cf. + bas)   
+c     produit : [N2] = [-OMEG X OMEG X]*[N]
+      DO 65 I=1,3
+      DO 66 J=1,NBNO*6
+      XN2(I,J)=0.D0
+      DO 67 K=1,3
+        XN2(I,J)=XN2(I,J) + ROME(I,K)*XN(K,J)
+   67 CONTINUE
+   66 CONTINUE
+   65 CONTINUE      
+   
+c     calcul de M = \sum_ptdeGauss  N^T * N \rho |J| w
+cbp,2020 : on prefere :
+c     calcul de Kce = \sum_ptdeGauss  N^T * [-OMEG X OMEG X] N \rho |J| w
+      DO 70 I = 1,NBNO*6
+      DO 71 J = I,NBNO*6
+      DO 72 K = 1,3
+cbp,2020   REL(I,J) = REL(I,J) + XN(K,I)*XN(K,J)*FACT
+      REL(I,J) = REL(I,J) + XN(K,I)*XN2(K,J)*FACT
+   72 CONTINUE
+      REL(J,I) = REL(I,J)
+   71 CONTINUE
+   70 CONTINUE
+   
+   80 CONTINUE
+*===> FIN DE BOUCLE SUR LES POINTS DE GAUSS
+
+
+cbp,2020 : ci-dessous devient inutile
+c       
+c    
+c * specificite Kcentrifuge : on multiplie par [-OMEG x OMEG x]   
+c c       DO 90 I = 1,NBNO
+c c       DO 91 J = 1,NBNO
+c c       DO 92 IN = 1,3
+c c       DO 93 IM = 1,3
+c       DO 90 J6 = 0,(NBNO-1)*6,6
+c       DO 91 I6 = 0,(NBNO-1)*6,6
+c c       DO 92 IM = 1,3
+c c       DO 93 IN = 1,3
+c cbp,2020-03-11: on change les indices I&J par J6&I6 
+c c               et on retourne les boucles IN&IM
+c c       REL((6*I)-6+IN,(6*J)-6+IM)=REL((6*I)-6+IN,(6*J)-6+IM)
+c c      .       *ROME(IN,IM)
+c c       write(*,*) 'K(',(6*I)-6+IN,',',(6*J)-6+IM,')=',
+c c      &REL((6*I)-6+IN,(6*J)-6+IM)
+c cbp: ok,...         REL(I6+IN,J6+IM)=REL(I6+IN,J6+IM)*ROME(IN,IM)
+c c    ...mais on debobine la ligne ci-dessus et les boucles 92 et 93
+c         REL(I6+1,J6+1)=REL(I6+1,J6+1)*ROME(1,1)
+c         REL(I6+2,J6+1)=REL(I6+2,J6+1)*ROME(2,1)
+c         REL(I6+3,J6+1)=REL(I6+3,J6+1)*ROME(3,1)
+c         REL(I6+1,J6+2)=REL(I6+1,J6+2)*ROME(1,2)
+c         REL(I6+2,J6+2)=REL(I6+2,J6+2)*ROME(2,2)
+c         REL(I6+3,J6+2)=REL(I6+3,J6+2)*ROME(3,2)
+c         REL(I6+1,J6+3)=REL(I6+1,J6+3)*ROME(1,3)
+c         REL(I6+2,J6+3)=REL(I6+2,J6+3)*ROME(2,3)
+c         REL(I6+3,J6+3)=REL(I6+3,J6+3)*ROME(3,3)
+c cbp,2020-03-11: termes de rotation mis a 0 pour l'instant
+c c       REL((6*I)-6+IN,(6*J)-3+IM)=REL((6*I)-6+IN,(6*J)-3+IM)
+c c      .       *ROME(IN,IM)
+c c       REL((6*I)-3+IN,(6*J)-6+IM)=REL((6*I)-3+IN,(6*J)-6+IM)
+c c      .       *ROME(IN,IM)
+c c       REL((6*I)-3+IN,(6*J)-3+IM)=REL((6*I)-3+IN,(6*J)-3+IM)
+c c      .       *ROME(IN,IM)
+c c    93 CONTINUE
+c c    92 CONTINUE
+c    91 CONTINUE
+c    90 CONTINUE
+c    
+c *     FIN NORMALE   
+c    99 CONTINUE
+   
+      SEGDES WRK1
+*      SEGDES MINTE
+      SEGSUP WRK7
+      RETURN
+      END
+
+
+
+ 

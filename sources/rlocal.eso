@@ -1,0 +1,132 @@
+C RLOCAL    SOURCE    FANDEUR   21/08/30    21:15:04     11087          
+
+      SUBROUTINE RLOCAL (XEL,SHPTOT,NBSH,NBNN,TXR)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*
+* Attention en cas d'erreur, erreur n'est pas appelé, c'est au
+* sp appelant à le faire (prob erreur utilise esope)
+*
+************************************************************************
+*
+*                             R L O C A L
+*                             -------------
+*
+* FONCTION:
+* ---------
+*
+*     CALCUL DES COS-DIR. DES AXES LOCAUX DE L'ELEMENT MASSIF
+*
+* MODULES UTILISES:
+* -----------------
+*
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE   (+ = CONTENU DANS UN COMMUN)
+* -----------
+*
+*     XEL     (E)  TABLEAU CONTENANT LES COORDONNEES DES NOEUDS
+*     SHPTOT (E)  TABLEAU CONTENANT LES FONCTIONS DE FORME ET
+*                 LEURS DERIVEES AU  CENTRE DE L'ELEMENT
+*     NBSH   (E)  NOMBRE DE FONCTIONS D'INTERPOLATION
+*     NBNN   (E)  NOMBRE DE NOEUDS PAR ELEMENT
+*     TXR    (S)  COS.DIRECTEUR DES AXES LOCAUX/REPERE GLOBAL
+*
+* REMARQUE :
+*
+* LA TANGENTE A L'AXE KSI  AU CENTRE DE L'ELEMENT FORME L'AXE 1 ,L'AXE 3
+* EST OBTENU PAR LE PRODUIT VECTORIEL DE L'AXE 1 ET LA TANGENTE A
+* L'AXE ETA AU CENTRE DE L'ELEMENT,L'AXE 2 EST OBTENU PAR LE PRODUIT
+* VECTORIEL  DES AXES 3 ET 1
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*     P. DOWLATYARI OCT. 1990
+*
+* LANGAGE:
+* --------
+*       FORTRAN 77 + ESOPE
+*
+************************************************************************
+*
+       DIMENSION  TXR(IDIM,IDIM),XEL(3,NBNN),SHPTOT(6,NBSH,1)
+
+* CAS BIDIMENSIONNEL
+* ------------------
+      IF (IDIM.EQ.2) THEN
+
+        rz_1 = XZERO
+        rz_2 = XZERO
+        DO INO=1,NBNN
+          rz_1 = rz_1 + SHPTOT(2,INO,1)*XEL(1,INO)
+          rz_2 = rz_2 + SHPTOT(2,INO,1)*XEL(2,INO)
+        ENDDO
+
+*     NORMALISATION
+       XNORM = rz_1*rz_1 + rz_2*rz_2
+
+*      ELEMENT MASSIF DEGENERE ,REPERE LOCAL IMPOSSIBLE A DEFINIR
+       IF(XNORM.LE. XPETIT)THEN
+        nbsh=-1
+        RETURN
+       ENDIF
+       XNORM = SQRT(XNORM)
+
+       TXR(1,1) = rz_1 / XNORM
+       TXR(2,1) = rz_2 / XNORM
+       TXR(1,2) = -TXR(2,1)
+       TXR(2,2) = TXR(1,1)
+*
+* CAS TRIDIMENSIONNEL
+* -------------------
+       ELSE IF (IDIM.EQ.3) THEN
+*
+*       DO IL=1,IDIM
+       DO IL=1,3
+         r_z1 = XZERO
+         r_z2 = XZERO
+         DO INO=1,NBNN
+           r_z1 = r_z1 + SHPTOT(2,INO,1)*XEL(IL,INO)
+           r_z2 = r_z2 + SHPTOT(3,INO,1)*XEL(IL,INO)
+         ENDDO
+         TXR(IL,1) = r_z1
+         TXR(IL,2) = r_z2
+         TXR(IL,3) = XZERO
+       ENDDO
+*
+*     NORMALISATION DE L'AXE 1
+*
+       XNORM= TXR(1,1)*TXR(1,1)+TXR(2,1)*TXR(2,1)+TXR(3,1)*TXR(3,1)
+*      ELEMENT MASSIF DEGENERE ,REPERE LOCAL IMPOSSIBLE A DEFINIR
+       IF(XNORM.LE. XPETIT)THEN
+        nbsh=-1
+        RETURN
+       ENDIF
+       XNORM=SQRT(XNORM)
+       TXR(1,1)=TXR(1,1)/XNORM
+       TXR(2,1)=TXR(2,1)/XNORM
+       TXR(3,1)=TXR(3,1)/XNORM
+*
+*      CALCUL DES AXES 3 ET 2
+*
+       CALL CROSS2 (TXR(1,1),TXR(1,2),TXR(1,3),IRR)
+*      ELEMENT MASSIF DEGENERE ,REPERE LOCAL IMPOSSIBLE A DEFINIR
+       IF(IRR.EQ.0)THEN
+        nbsh=-1
+        RETURN
+       ENDIF
+       CALL CROSS2 (TXR(1,3),TXR(1,1),TXR(1,2),IRR)
+
+* CAS UNIDIMENSIONNEL
+* -------------------
+       ELSE IF (IDIM.EQ.1) THEN
+         TXR(1,1) = 1.D0
+       ENDIF
+*
+      RETURN
+      END
+
+ 

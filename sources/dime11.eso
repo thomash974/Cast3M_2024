@@ -1,0 +1,46 @@
+C DIME11    SOURCE    CB215821  22/09/20    21:15:03     11459          
+
+* DIMENSION D'UN OBJET DE TYPE "LISTOBJE".
+      SUBROUTINE DIME11 (IPOINT,LDIM)
+************************************************************************
+*
+*                             D I M E N 1
+*                             -----------
+*
+* FONCTION:
+* ---------
+*
+*     DETERMINER LA DIMENSION D'UN OBJET DE TYPE "LISTOBJE".
+*
+* MODE D'APPEL:
+* -------------
+*
+*     CALL DIME11 (IPOINT,LDIM)
+*
+* PARAMETRES:  (E)=ENTREE   (S)=SORTIE
+* -----------
+*
+*     IPOINT  ENTIER    (E)  POINTEUR DE L'OBJET DE TYPE "LISTOBJE".
+*     LDIM    ENTIER    (S)  DIMENSION DE L'OBJET.
+*
+* AUTEUR, DATE DE CREATION:
+* -------------------------
+*
+*     CLEMENT BERTHINIER     19 SEPTEMBRE 2022
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE + FORTRAN77
+*
+************************************************************************
+*
+      IMPLICIT INTEGER(I-N)
+
+-INC SMLOBJE
+
+      MLOBJE=IPOINT
+      SEGACT,MLOBJE
+      LDIM=MLOBJE.LISOBJ(/1)
+      END
+ 

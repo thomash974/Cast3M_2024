@@ -1,0 +1,69 @@
+C CRECH1    SOURCE    CB215821  19/08/20    21:16:26     10287          
+*  preconditionnement des meleme cree par crechp
+      subroutine crech1(meleme,idet)
+-INC CCPRECO
+-INC SMELEME
+      if=nbemel
+      ith=oothrd
+
+C     Activations par paquets
+      CALL oooprl(1)
+      segact meleme
+      do i=1,nbemel
+        ipt1=premel(i,ith)
+        if (ipt1.eq.0) goto 1
+        segact,ipt1
+      enddo
+ 1    CONTINUE
+      CALL oooprl(0)
+
+      if (num(/1).ne.1.or.itypel.ne.1) return
+      nbel=num(/2)
+      if (nbel.eq.0) then
+       ihash1=0
+       ihash2=0
+      elseif (nbel.eq.1) then
+       ihash1=num(1,1)
+       ihash2=num(1,1)
+      else
+       ihash1=num(1,1)+num(1,nbel)
+       ihash2=num(1,1)-num(1,nbel)
+      endif
+      do 10 i=1,nbemel
+        if (premel(i,ith).eq.0) goto 20
+        ipt1=premel(i,ith)
+        if (ipt1.eq.meleme) return
+        if (nbso(i,ith) .ne.nbel)   goto 10
+        if (hash1(i,ith).ne.ihash1) goto 10
+        if (hash2(i,ith).ne.ihash2) goto 10
+        if (ipt1.num(/2).ne.nbel)   goto 10
+        do j=1,nbel
+          if (num(1,j) .ne.ipt1.num(1,j))  goto 10
+          if (icolor(j).ne.ipt1.icolor(j)) goto 10
+        enddo
+*  maillage identiques
+*       write (6,*) ' crech1 ',meleme,' remplace par ',ipt1,
+*    >   'position ',i, 'thread ',ith
+***        if (idet.eq.1) segsup meleme
+        meleme=ipt1
+        if = i
+        goto 20
+        return
+  10  continue
+  20  continue
+      if (if.lt.nbemel/3) return
+
+*  on rajoute le maillage courant en tête
+      do j=if,2,-1
+        premel(j,ith)=premel(j-1,ith)
+        nbso(j,ith)=nbso(j-1,ith)
+        hash1(j,ith)=hash1(j-1,ith)
+        hash2(j,ith)=hash2(j-1,ith)
+      enddo
+      premel(1,ith)=meleme
+      nbso(1,ith)  =nbel
+      hash1(1,ith) =ihash1
+      hash2(1,ith) =ihash2
+      end
+
+ 

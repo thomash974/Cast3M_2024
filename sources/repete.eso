@@ -1,0 +1,294 @@
+C REPETE    SOURCE    PV090527  24/01/11    21:15:06     11818          
+C  CET OPERATEUR INITIALISE LA FONCTION REPETER DE GIBIANE
+C  IL DOIT ETRE SUIVI DU NOM D'UN BLOC REPETER
+C  SI CE BLOC EXISTE LIRNOM EST DEROUTE POUR LE LIRE
+C  SI CE BLOC N'EXISTE PAS IL LE CREE ET LIRNOM LE REMPLIT
+C  A LA PREMIERE INTERPRETATION
+C  LE BLOC FINI PAR FIN "BLOC"
+C  icle indique si on est appele par pilot ou non
+C
+      SUBROUTINE REPETE(icle)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC CCNOYAU
+-INC SMBLOC
+-INC SMLOBJE
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCPERF
+
+      INTEGER ITTIME(4)
+      CHARACTER*(8)     ICHA,INOM,ITCH
+c     CHARACTER*(9)     ICHB
+      CHARACTER*(LONOM) ICHC,CNOM
+*
+      CHARACTER*8 IJCH
+      CHARACTER*4 MFIN(1)
+      DIMENSION IMOTCO(1)
+      SAVE IMOTCO
+      DATA IMOTCO(1)/-1/
+      DATA MFIN/'FIN '/
+      LOGICAL TSTMBC
+      MBC=-1
+      mblo=-1
+      mlobje=0
+      CALL LIROBJ('BLOC    ',MBLO1,0,IREBLO)
+      IF(IERR.NE.0) RETURN
+      
+      if(IREBLO.NE.0)   then
+        imablu=jpoob2(imotlu)
+        segact mblo1
+        if (mblo1.mberr.ne.0) call erreur (1143)
+      endif
+      IF(IREBLO.EQ.0)  THEN
+            icha=' '
+            CALL LIROBJ(ICHA,IRE,1,IRETOU)
+            IF(IERR.NE.0) RETURN
+            CALL QUENOM(CNOM)
+            IF(IERR.NE.0) RETURN
+            IF(CNOM(1:1).EQ.' ') THEN
+              CALL ERREUR(315)
+              RETURN
+            ENDIF
+c          ENDIF
+      ENDIF
+*  lecture eventuelle d'un listobje
+      if (icle.eq.0) then
+      mlobje=0
+      call lirobj('LISTOBJE',mlobje,0,iretol)
+      if(mlobje.ne.0) then
+        segact mlobje
+        mbc=lisobj(/1)
+      endif
+      endif
+      if(mbc.eq.-1)  CALL LIRENT(MBC,0,IRETOe)
+      IF (IERR.NE.0) RETURN
+*  TEST QUE L'INSTRUCTION EST EPUISEE - PROBLEME AVEC LA PRECOMPILATION
+      if(icle.eq.0) then
+      ITCH=' '
+      CALL LIROBJ(ITCH,IRET,0,IRETO)
+      if(ireto.ne.0)  then
+      MOTERR(1:8)=ITCH
+      CALL ERREUR(39)
+      RETURN
+      endif
+      endif
+*  20 CONTINUE
+
+      MDEOBT=MDEOBJ
+      MFIOBT=MFIOBJ
+      MBLPRT=MBLPRO
+      MTXBLC=MTXBL
+      MARM = MARGUM
+      IF (MBLSUP.NE.0) SEGDES MTXBLC
+      ISSPOT=ISPOTE
+      SEGDES ISSPOT
+      IRETCO=MOBJCO
+      SEGDES MBLOC
+      MTEMP =MBLOC
+      IF (IREBLO.EQ.0) GOTO 10
+C
+C  LE BLOC REPETER EXISTE DEJA
+C
+      segini,mbloc=MBLO1
+      iouep2(imablu)=mbloc
+      SEGACT MBLOC*MOD
+      ISSPOT=ISPOTE
+      SEGACT ISSPOT*MOD
+*      write(6,*) 'ispote ipotem(1) ', ispote, ipotem(1)
+      MOBJCO=IRETCO
+      mdecip = mdeobt  - mdeobj
+      do iou=1,ipotem(/1)
+        ipotem(iou)=ipotem(iou)+mdecip
+      enddo
+      MDEOBJ=MDEOBT
+      MFIOBJ=MFIOBT
+      MBLPRO=MBLPRT
+      MBLSUP=MTEMP
+      MARGUM = MARM
+      MTXBLC=MTXBL
+      SEGACT MTXBLC
+*      ILON= MTXBLC(/1)
+      MBCOUR=0
+      MBCONT=MBC
+      MBFONC=0
+      MBERR =0
+
+C     Gestion du SOUCI dans le BLOC (ACTUELLEMENT INUTILISE)
+      MBSOUC=0
+
+      ICHC=NCONBO
+      ICONBO=1
+      IIPROU=ICONBO
+*      write(6,*)' bloc2 repete mbloc mdeobj lmnnom',mbloc,mdeobj,lmnnom
+
+      if(mlobje.ne.0) then
+        if(iiprou.le.lisobj(/1)) then
+        monobj=lisobj(iiprou)
+        itch=typobj
+        call nomobj(itch,ichc,monobj)
+        endif
+      else
+       CALL NOMENT(ICHC,IIPROU)
+      endif
+      mbenum=mlobje
+      TSTMBC=(MBC.EQ.0.AND.LECTAB.EQ.0)
+      GOTO 100
+
+  10  CONTINUE
+C
+C  ON EST EN DEFINITION D'UN NOUVEAU BLOC
+C
+      SEGINI,MBLOC
+      NVQTEM=20
+      SEGINI ISSPOT
+      ISPOTE= ISSPOT
+      NBNOMM=1200
+      NINST=1200
+      IPVINN=3000
+      SEGINI MTXBLC
+      NINSTV=0
+      MTXBL =MTXBLC
+      MBLSUP=MTEMP
+      MARGUM=MARM
+      MBCONT=MBC
+      MBLPRO=0
+      MBCOUR=0
+      MBFONC=1
+      MBERR =0
+
+C     Gestion du SOUCI dans le BLOC (ACTUELLEMENT INUTILISE)
+      MBSOUC=0
+
+      MDEOBJ=MDEOBT
+      MFIOBJ=MFIOBT
+      MOBJCO=IRETCO
+*      write(6,*) 'creation de bloc mblo mde lmnn',mbloc,mdeobj,lmnnom
+      CALL NOMOBJ('BLOC    ',CNOM,MBLOC)
+      call savseg(mbloc)
+      call savseg(ISSPOT)
+      call savseg(MTXBLC)
+      ICHC(1:1)='&'
+      ICHC(2:LONOM)=CNOM(1:LONOM-1)
+      NCONBO=ICHC
+      ICONBO=1
+      IIPROU=ICONBO
+      if(mlobje.ne.0) then
+        if(iiprou.le.lisobj(/1)) then
+        monobj=lisobj(iiprou)
+        itch=typobj
+        call nomobj(itch,ichc,monobj)
+        endif
+      else
+       CALL NOMENT(ICHC,IIPROU)
+      endif
+      mbenum=mlobje
+      TSTMBC=(MBC.EQ.0 .AND. MDEOBJ.EQ.1 .AND. LECTAB.EQ.0)
+*
+*     CODE QUI PERMET DE NE PAS EXECUTER LE CONTENU DU BLOC REPETER
+*     SI LA VALEUR INITIALE DU COMPTEUR VAUT ZERO (MBC = 0)
+*     ATTENTION : CE CODE NE DOIT PAS ETRE EXECUTE SI L'ON EST DANS
+*                 UNE PHASE DE LECTURE GIBIANE SANS INTERPRETATION,
+*                 COMME PAR EXEMPLE LORS DU PREMIER APPEL D'UNE
+*                 PROCEDURE OU LORS DU PASSAGE DANS LA BRANCHE FAUX
+*                 D'UN BLOC SI/SINON/FINS (CELA POUR NE PAS PERTURBER
+*                 LES VERIFICATIONS SUR L'IMBRICATION DES BLOCS DEBP,
+*                 SI ET REPE FAITES DANS LES SUBROUTINES mapr, si ET
+*                 sinon)
+ 100  CONTINUE
+        
+C     DEBUT Duree passee dans les boucles (Voir FINPRO pour la sortie)
+      call timespv(ittime,oothrd)
+      IELAPS=ITTIME(1) + ITTIME(2)
+      ICPU  =ITTIME(3) + ITTIME(4)
+      
+C     Initialisation eventuelle des Duree passee dans les boucles
+      CNOM =NCONBO(2:LONOM)
+      IF(ITPSBO .EQ. 0)THEN
+        NBBLOC=1
+        NIVMAX=10
+        SEGINI,ITPSBL
+C       Mise dans le COMMON SMPERF
+        ITPSBO=ITPSBL
+C       Protection du MENAGE
+        CALL SAVSEG(ITPSBL)
+        NICOU =1
+        ITPSBL.CDPROC(NBBLOC)  = CNOM
+        II    =1
+      
+      ELSE
+        ITPSBL = ITPSBO
+        SEGACT,ITPSBL*MOD
+        NICOU =ITPSBL.NIVCOU
+      
+        IF(NICOU .GT. 0)THEN
+C         Incremente la duree de la boucle qu'on va quitter
+          II=ITPSBL.IPRONI(NICOU)
+          ITPSBL.DURPRO(1,II)=ITPSBL.DURPRO(1,II) +
+     &                       (IELAPS - ITPSBL.TPSPRO(1,II))
+          ITPSBL.DURPRO(2,II)=ITPSBL.DURPRO(2,II) +
+     &                       (ICPU   - ITPSBL.TPSPRO(2,II))
+        ENDIF
+
+        NICOU =NICOU + 1
+        NBBLOC=ITPSBL.NBAPRO(/1)
+        DO II=1,NBBLOC
+          IF(CNOM .EQ. ITPSBL.CDPROC(II)) GOTO 11
+        ENDDO
+C       Ajout de la boucle
+        NBBLOC = NBBLOC + 1
+        NIVMAX = ITPSBL.IPRONI(/1)
+        SEGADJ,ITPSBL
+        ITPSBL.CDPROC(NBBLOC)  = CNOM
+        II = NBBLOC
+      
+ 11     CONTINUE
+        IF(NICOU .GT. NIVMAX)THEN
+          NIVMAX=NICOU * 2 + 10
+          SEGADJ,ITPSBL
+        ENDIF
+      ENDIF
+      
+      ITPSBL.NIVCOU       = NICOU
+      ITPSBL.IPRONI(NICOU)= II
+      ITPSBL.TPSPRO(1,II) = IELAPS
+      ITPSBL.TPSPRO(2,II) = ICPU
+      ITPSBL.NBAPRO(II)   = ITPSBL.NBAPRO(II) + 1
+C     FIN Duree passee dans les boucles
+ 
+      IF (TSTMBC) THEN
+        MBCONT=1
+ 101    CONTINUE
+        CALL NOUTRU
+        LECTAB=1
+        CALL LIRMO3(MFIN,1,IRET,0,IMOTCO)
+        IF (IERR.NE.0) RETURN        
+        IF (IRET.EQ.0) GOTO 101
+        
+        CALL QUETYP(IJCH,0,IRETOU)
+        IF(IERR.NE.0) RETURN        
+        IF (IRETOU.EQ.0) GOTO 101
+        
+        IF (IJCH.NE.'BLOC    ') GOTO 101
+        CALL LIROBJ('BLOC    ',IRET,1,IRETOU)
+        IF(IERR.NE.0) RETURN
+        IF (MBLOC.NE.IRET) GOTO 101
+        
+        LECTAB=0
+        CALL REFUS
+        CALL FIN
+        IF(IERR.NE.0) RETURN
+      ENDIF
+
+      END
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

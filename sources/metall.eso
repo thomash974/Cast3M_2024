@@ -1,0 +1,322 @@
+C METALL    SOURCE    SP204843  22/12/21    21:15:06     11535          
+C METALL    SOURCE    CB215821  19/06/17    21:15:16     10228          
+      SUBROUTINE METALL(iwrk52, iwrmet)
+C
+C     Modele METALLURGIE : LEBLOND / KOISTINEN
+C     Appelle par COML6
+C     En entrees : Le segment de travail WRK52 (voir include DECHE)
+C                  Le segment IMODEL du modele elementaire (metallurgie)
+C     En sortie : ecrit les proportions de phases finales
+C     dans le tableau WRK52.VARF
+C
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      PARAMETER (NPHMAX=20)
+      REAL*8     delta(NPHMAX)
+      REAL*8     Prop(NPHMAX)
+      REAL*8     VAR0L(NPHMAX)
+      REAL*8     TYPREA(NPHMAX)
+      INTEGER    NPROD(NPHMAX)
+      INTEGER    NREAC(NPHMAX)
+      REAL*8     CRITER(NPHMAX)
+
+      CHARACTER*4 MOT4a,MOT4b,MOT4c
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC CCHAMP
+-INC DECHE
+-INC CCREEL
+-INC SMMODEL
+-INC SMLENTI
+-INC SMLMOTS
+
+      wrk52  = iwrk52
+      wrkmet = iwrmet
+
+      XPREC  = XZPREC*1000
+      ITMAXI = 1000
+
+C     Convergence si la norme infini de la matrice des coeffs < 1
+C     On se donne de la securite => 0.5 < 1
+      borne = 0.5D0
+
+C     Theta-methode
+      theta = 0.5D0
+      utheta= MIN(MAX(1.D0 - theta,0.D0),1.D0)
+
+      NPHASE=VAR0(/1)
+      NTYPES=TYPES(/2)
+      if( NPHASE .gt. NPHMAX ) then
+        CALL ERREUR(5)
+      endif
+
+      do i = 1, NTYPES
+        IF     ( TYPES(i) .eq. 'KOIS' ) THEN
+          TYPREA(i) = 1
+        ELSE IF( TYPES(i) .eq. 'LEBL' ) THEN
+          TYPREA(i) = 2
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+
+C       NREAC(i) = Valeur de la position du reactif de la reaction
+C                   numero i dans le tableau PHASES
+C       Optimisation pour eviter COMPARE_STRING (LENTISSIME)
+
+        MOT4a=REACTI(i)
+        MOT4c=PRODUI(i)
+        DO III=1,NPHASE
+          MOT4b=PHASES(III)
+          IF(MOT4a .EQ. MOT4b)THEN
+            NREAC(i) = III
+          ENDIF
+          IF(MOT4c .EQ. MOT4b)THEN
+            NPROD(i) = III
+          ENDIF
+        ENDDO
+      enddo
+
+      SomPha= 1.D0
+      do ii = 1, NPHASE
+        Xflot   = VAR0(ii)
+        SomPha  = SomPha - Xflot
+        varf(ii)= Xflot
+      enddo
+      if(SomPha .GT. XPREC) then
+        REAERR(1) = SomPha - 1.D0
+        REAERR(2) = SomPha
+        CALL ERREUR(1079)
+        RETURN
+      endif
+
+      DT   = tempf -temp0
+      ndec = 1
+
+      T0   = ture0(1)
+      Tf   = turef(1)
+
+C     IINTEG=1
+ 10   continue
+      do ii = 1, NPHASE
+        VAR0L(ii) = VAR0(ii)
+      enddo
+      DTL = DT / FLOAT(ndec)
+
+C     Boucle sur les sous-pas de temps
+      do idec = 1, ndec
+C       Determination du temps debut et fin local
+        if    ( idec .eq. 1    ) then
+          temp0L = temp0
+          tempfL = temp0L + DTL
+
+        elseif( idec .eq. ndec ) then
+          temp0L = tempfL
+          tempfL = tempf
+
+        else
+          temp0L = tempfL
+          tempfL = temp0L + DTL
+        endif
+
+        alpha0 = (temp0L - temp0)/DT
+        alphaf = (tempfL - temp0)/DT
+        ulpha0 = 1.D0 - alpha0
+        ulphaf = 1.D0 - alphaf
+
+        ture0L = T0 + alpha0*(Tf - T0)
+        turefL = T0 + alphaf*(Tf - T0)
+
+        do ini = 1, NPHASE
+          Prop(ini)   = VAR0L(ini)
+          delta(ini)  = 0.D0
+          CRITER(ini) = 0.D0
+        enddo
+
+C       Boucle de convergence
+        iconv = 1
+ 30     continue
+          icont = 1
+          rmax  = 0.D0
+
+C         Boucle sur les differentes reactions
+          do i = 1, NTYPES
+            ireac = NREAC(i)
+            iprod = NPROD(i)
+
+            if( TYPREA(i) .eq. 1 ) then
+C             Cas KOISTINEN
+              aMS1 = valma0(icont  )
+              aMS2 = valmat(icont  )
+              aKM1 = valma0(icont+1)
+              aKM2 = valmat(icont+1)
+              icont= icont + 2
+
+              aMS1L = aMS1 + alpha0*(aMS2 - aMS1)
+              aKM1L = aKM1 + alpha0*(aKM2 - aKM1)
+              aMS2L = aMS1 + alphaf*(aMS2 - aMS1)
+              aKM2L = aKM1 + alphaf*(aKM2 - aKM1)
+
+C             La reaction a lieu seulement si T°C < MS
+              if(ture0L .lt. aMS1L  .OR. turefL .lt. aMS2L) then
+C               Tpoint corrige localement en cas de chevauchement avec MS
+                TpoiLo = ( MIN(turefL,aMS1L) - MIN(ture0L,aMS2L) ) / DTL
+
+C               critere de convergence local
+                crit1 = ABS(DTL*aKM2L*TpoiLo*theta)
+                CRITER(ireac) = CRITER(ireac) + crit1
+                CRITER(iprod) = CRITER(iprod) + crit1
+                critma = MAX(CRITER(ireac), CRITER(iprod))
+
+                IF( critma .ge. borne ) THEN
+C                 On sous-decoupe le pas avant de recommencer entierement
+                  ndec = (INT(critma / borne) + 1 ) * ndec
+                  GOTO 10
+                ENDIF
+
+                AijL =utheta*MIN(VAR0L(ireac)*aKM1L*TpoiLo,0.D0) +
+     &                 theta*MIN( Prop(ireac)*aKM2L*TpoiLo,0.D0)
+
+              else
+                AijL = 0.D0
+              endif
+
+            elseif ( TYPREA(i) .eq. 2 ) then
+C             Cas LEBLOND
+              PEQ1 = valma0(icont  )
+              PEQ2 = valmat(icont  )
+              TAU1 = valma0(icont+1)
+              TAU2 = valmat(icont+1)
+              F1   = valma0(icont+2)
+              F2   = valmat(icont+2)
+              icont= icont + 3
+
+              PEQ1L = PEQ1 + alpha0*(PEQ2 - PEQ1)
+              TAU1L = TAU1 + alpha0*(TAU2 - TAU1)
+              F1L   = F1   + alpha0*(F2   - F1  )
+              PEQ2L = PEQ1 + alphaf*(PEQ2 - PEQ1)
+              TAU2L = TAU1 + alphaf*(TAU2 - TAU1)
+              F2L   = F1   + alphaf*(F2   - F1  )
+
+              UPEQ1L =MIN(MAX(1.D0 - PEQ1L,0.D0),1.D0)
+              UPEQ2L =MIN(MAX(1.D0 - PEQ2L,0.D0),1.D0)
+
+C             critere de convergence local
+              IF (A_EGALE_B(TAU2L,0.D0)) THEN
+                CALL ERREUR(26)
+                RETURN
+              ENDIF
+              crit1 = ABS(DTL*F2L*utheta*        PEQ2L /TAU2L)
+              crit2 = ABS(DTL*F2L*utheta*(1.D0 - PEQ2L)/TAU2L)
+              CRITER(ireac) = CRITER(ireac) + crit1
+              CRITER(iprod) = CRITER(iprod) + crit2
+              critma = MAX(CRITER(ireac), CRITER(iprod))
+
+              IF( critma .ge. borne ) THEN
+C               On sous-decoupe le pas avant de recommencer entierement
+                ndec = (INT(critma / borne) + 1 ) * ndec
+                GOTO 10
+              ENDIF
+
+C             TAU Local doit etre superieur a XPETIT :
+              if( ABS(TAU1L) .lt. XPETIT .OR.
+     &          ABS(TAU2L) .lt. XPETIT ) THEN
+                INTERR(1) = i
+                CALL ERREUR(1081)
+                RETURN
+              endif
+
+              AijL =utheta*MIN(
+     &                (UPEQ1L*VAR0L(iprod)-PEQ1L*VAR0L(ireac))*F1L/TAU1L
+     &                         ,0.D0) +
+     &               theta*MIN(
+     &                (UPEQ2L* Prop(iprod)-PEQ2L* Prop(ireac))*F2L/TAU2L
+     &                         ,0.D0)
+
+            else
+              CALL ERREUR(21)
+              RETURN
+            endif
+
+C           Test pour verifier que le REACTIF calcule sera bien
+C           compri entre 0. et 1. Correction de AijL si besoin
+            PhTEST = VAR0L(ireac) + delta(ireac) + (DTL*AijL)
+            if(PhTEST .lt. 0.D0) then
+              AijL= (       XPREC - VAR0L(ireac) - delta(ireac)) / DTL
+            else if(PhTEST .gt. 1.D0) then
+              AijL= (1.D0 - XPREC - VAR0L(ireac) - delta(ireac)) / DTL
+            endif
+
+C           Test pour verifier que le PRODUIT calcule sera bien
+C           compri entre 0. et 1. Correction de AijL si besoin
+            PhTEST = VAR0L(iprod) + delta(iprod) - (DTL*AijL)
+            if(PhTEST .lt. 0.D0) then
+              AijL= (VAR0L(iprod) - XPREC        + delta(iprod)) / DTL
+            else if(PhTEST .gt. 1.D0) then
+              AijL= (VAR0L(iprod) + XPREC - 1.D0 + delta(iprod)) / DTL
+            endif
+
+            xincr        = DTL*AijL
+            delta(ireac) = delta(ireac) + xincr
+            delta(iprod) = delta(iprod) - xincr
+          enddo
+C         FIN Boucle sur les differentes reactions
+
+C         Actualisation des proportions de phase
+          do ii = 1, NPHASE
+C           Calcul du residu pour chaque phase (Convergence)
+            Pactu= VAR0L(ii) + delta(ii)
+            resid= ABS(Prop(ii)-Pactu)
+            rmax = MAX(resid,rmax)
+
+            Prop(ii)  = Pactu
+            delta(ii) = 0.D0
+            CRITER(ii)= 0.D0
+          enddo
+
+C         Test de convergence
+          if( iconv .LE. ITMAXI ) THEN
+C           Convergence = On sort
+            if( rmax .lt. XPREC ) GOTO 20
+
+          else
+C           Pas Convergence = On sous-decoupe le pas avant de recommencer entierement
+            ndec = ndec * 2
+            GOTO 10
+          endif
+
+          iconv = iconv + 1
+        GOTO 30
+ 20     continue
+C       SORTIE Boucle de convergence
+
+C       La prop en debut du pas N = La prop en fin de pas N-1
+        do i = 1, NPHASE
+          var0L(i) = Prop(i)
+        enddo
+      enddo
+C     FIN Boucle sur les sous-pas de temps
+
+C     Convergence de l'integration
+C     XMAX = 0.D0
+C     do ii = 1, NPHASE
+C       XDIFF    = ABS(Prop(ii) - varf(ii))
+C       XMAX     = MAX(XDIFF,XMAX)
+C     enddo
+C     IF(XMAX .GT. 1.D-4)THEN
+C       ndec = ndec * 2
+C      PRINT *,'NON-CONVERGENCE',XMAX,IINTEG
+C       IINTEG = IINTEG + 1
+C       GOTO 10
+C     ENDIF
+
+C     Ecriture du resultat final
+      do ii = 1, NPHASE
+        varf(ii) = Prop(ii)
+      enddo
+
+      END
+ 
+ 

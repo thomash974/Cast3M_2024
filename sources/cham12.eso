@@ -1,0 +1,224 @@
+C CHAM12    SOURCE    MB234859  21/11/09    21:15:01     11183          
+      SUBROUTINE CHAM12(NBTHL,ITHR,ISUP,ISAUT,MMODEL,MCHELM,ICPR,MTRA2)
+
+      implicit real*8 (a-h,o-z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+
+-INC SMCHAML
+-INC SMINTE
+-INC SMMODEL
+-INC SMELEME
+
+      CHARACTER*(NCONCH) CONM
+      CHARACTER*(LOCOMP) LENAME
+      
+      LOGICAL FLAG1
+      LOGICAL FLAG3
+      LOGICAL FLAG4
+
+      SEGMENT ISAUT(IVAL,NSOUS)
+      SEGMENT ICPR(NNNN)
+
+      SEGMENT MTRA2
+C      Copie du CHPOINT dans MTRA2 pour aller plus vite ensuite
+       CHARACTER*(LOCOMP) INCO(N2)
+       REAL*8             BB(NX,N2)
+C        INCO  : Nom des INCONNUES du CHPOINT
+C        BB    : Valeurs au noeuds du MMODEL (associees au ICPR)
+C                NX : Nombre de noeuds differents dans le MODELE
+C                N2 : Nombre de composantes dans le CHPOINT
+      ENDSEGMENT
+
+
+      CONM  =' '
+
+      NVAL=ISAUT(/1)
+      NSOUS=ISAUT(/2)
+      N2   =MTRA2.BB(/2)
+
+C     boucle sur les zones geometriques elementaires
+C
+      isouss=0
+      DO 20 ISOUS=1,NSOUS
+         IPT2=ISAUT(1,ISOUS)
+C        On saute directement les SOUS-ZONES inutiles
+         IF(IPT2 .EQ. 0)GOTO 20
+         isouss=isouss+1
+
+         IF (MMODEL.NE.0) THEN
+            IPMINT = ISAUT(4,ISOUS)
+            ISUP1  = ISAUT(6,ISOUS)
+            IMODEL = KMODEL(ISOUS)
+            CONM   = CONMOD
+            IF (ISUP1.GT.1) MELE=NEFMOD
+            IF(INFMOD(/1).NE.0) NPINT=INFMOD(1)
+         ELSE
+            ISUP1 =ISUP
+            IPMINT=0
+         ENDIF
+
+         IMACHE(ISOUSs)  =IPT2
+         CONCHE(ISOUSs)  =CONM
+         INFCHE(ISOUSs,1)=0
+         INFCHE(ISOUSs,2)=0
+         INFCHE(ISOUSs,3)=NIFOUR
+         IF (ISUP1.GT.1) THEN
+            INFCHE(ISOUSs,4)=IPMINT
+            INFCHE(ISOUSs,5)=0
+         ENDIF
+         INFCHE(ISOUSs,6)=ISUP1
+
+         MCHAML=ICHAML(ISOUSs)
+         DO ICOMP=1,N2
+           NOMCHE(ICOMP)= MTRA2.INCO(ICOMP)
+           TYPCHE(ICOMP)='REAL*8'
+         ENDDO
+         NBN1  =IPT2.NUM(/1)
+         NBELE1=IPT2.NUM(/2)
+
+C        On assure le travail contigu en memoire (Si // sur les threads)
+         IF(NBTHL .EQ. 1)THEN
+           IDEB  = 1
+           IFIN  = NBELE1
+
+         ELSE
+           NBTHR= MIN(NBELE1,NBTHL)
+           IF(ithr .GT. NBTHR) GOTO 20
+           IRES = MOD(NBELE1,NBTHR)
+           IF(IRES  .EQ. 0)THEN
+             ILON  = NBELE1 / NBTHR
+             IDEB  = (ithr-1)* ILON + 1
+           ELSE
+             IF (ithr .LE. IRES) THEN
+               ILON  = (NBELE1 / NBTHR) + 1
+               IDEB  = (ithr-1)* ILON + 1
+             ELSE
+               ILON  = NBELE1 / NBTHR
+               IDEB  = (IRES * (ILON+1)) + (ithr-IRES-1)* ILON + 1
+             ENDIF
+           ENDIF
+           IFIN  = IDEB + ILON - 1
+         ENDIF
+
+         IF (IPMINT .EQ. 0) THEN
+C          Remplissage des MELVAL aux NOEUDS de chaque composante
+           DO IE=IDEB,IFIN
+             DO IG=1,NBN1
+               INOEU=IPT2.NUM(IG,IE)
+               IPCPR=ICPR(INOEU)
+               DO ICOMP=1,N2
+                 MELVAL=IELVAL(ICOMP)
+                 VELCHE(IG,IE)=BB(IPCPR,ICOMP)
+               ENDDO
+             ENDDO
+           ENDDO
+
+         ELSE
+C           Changement de support
+            MINTE =IPMINT
+            NBPGAU=SHPTOT(/3)
+            NBNO  =ISAUT(5,ISOUS)
+
+            DO ICOMP=1,N2
+               MELVAL= IELVAL(ICOMP)
+               MELGEO=NUMGEO(MELE)
+               IF( MELGEO.EQ.12 .OR. MELGEO.EQ.13 .OR. MELGEO.EQ.29 .OR.
+     &             MELGEO.EQ.30 .OR. MELGEO.EQ.31) THEN
+C                Cas des JOINTS
+
+                 IDECA=0
+                 IF(MELGEO.EQ.29) IDECA=2
+                 IF(MELGEO.EQ.30) IDECA=3
+                 IF(MELGEO.EQ.31) IDECA=4
+                 NBNOU=NBNNE(MELGEO)-IDECA
+                 NBNOV=NBNO - IDECA
+
+                 LENAME = NOMCHE(ICOMP)
+                 IF(LENAME.EQ.'P '.OR.LENAME.EQ.'PQ '
+     &                            .OR.LENAME.EQ.'TP ') THEN
+                   NBNOV=NBNO - IDECA
+                   DO IE=IDEB,IFIN
+                     DO IG=1,NBPGAU
+                       XVAL1=0.D0
+                       DO INBNO=1,IDECA
+                         INOE =NBNOU + INBNO
+                         INB2 =NBNOV + INBNO
+                         INOEU=IPT2.NUM(INOE,IE)
+                         IPCPR=ICPR(INOEU)
+                         XVAL1=XVAL1 + BB(IPCPR,ICOMP)*SHPTOT(1,INB2,IG)
+                       ENDDO
+                       VELCHE(IG,IE)=XVAL1
+                     ENDDO
+                   ENDDO
+
+                 ELSE
+                   FAC=2.D0
+                   IF((MELGEO.EQ.12 .OR. MELGEO.EQ.13) .AND. 
+     &                 NBNOU .GT.NBNO) THEN
+                     NBNOU=NBNO
+                     FAC=1.D0
+                   ENDIF
+
+                   DO IE=IDEB,IFIN
+                     DO IG=1,NBPGAU
+                       XVAL1=0.D0
+                       DO INOE=1,NBNOU
+                         INOEU=IPT2.NUM(INOE,IE)
+                         IPCPR=ICPR(INOEU)
+                         XVAL1=XVAL1 + BB(IPCPR,ICOMP)*SHPTOT(1,INOE,IG)
+                       ENDDO
+                       VELCHE(IG,IE)=XVAL1/FAC
+                     ENDDO
+                   ENDDO
+                 ENDIF
+
+               ELSE
+C                Autres CAS
+                 DO IE=IDEB,IFIN
+                   DO IG=1,NBPGAU
+                     XVAL1=0.D0
+                     DO INOE=1,NBNO
+                       INOEU=IPT2.NUM(INOE,IE)
+                       IPCPR=ICPR(INOEU)
+                       XVAL1=XVAL1 + BB(IPCPR,ICOMP)*SHPTOT(1,INOE,IG)
+                     ENDDO
+                     VELCHE(IG,IE)=XVAL1
+                   ENDDO
+                ENDDO
+              ENDIF
+            ENDDO
+         ENDIF
+
+
+C cas integration dans l'epaisseur avec variable t temperature.
+C on transforme 'TINF' 'T' 'TSUP' en 'T' defini par une variation
+C parabolique dans l'epaisseur. si il n'y a que 'T' on ne fait rien.
+C Ce travail n'est a faire que pour les elements DKT, COQ4, COQ6 et COQ8
+C et uniquement si le MCHAML resultat n'est pas exprime aux noeuds !
+         IF (ISUP1.NE.1) THEN
+          IF ( (MELE.EQ.28.AND.NPINT.NE.0) .OR. (MELE.EQ.49) .OR.
+     &         (MELE.EQ.56) .OR. (MELE.EQ.41) ) THEN
+            FLAG1 = .FALSE.
+            FLAG3 = .FALSE.
+            FLAG4 = .FALSE.
+            DO 21 ISOU1 = 1,N2
+               LENAME=NOMCHE(ISOU1)
+               IF(LENAME.EQ.'T    ') FLAG1 = .TRUE.
+               IF(LENAME.EQ.'TINF ') FLAG3 = .TRUE.
+               IF(LENAME.EQ.'TSUP ') FLAG4 = .TRUE.
+   21       CONTINUE
+            IF (FLAG1.AND.FLAG3.AND.FLAG4) THEN
+               ISAUT(NVAL-1,ISOUS)=2
+               IVCH4=ISAUT(NVAL,ISOUS)
+               CALL CHAME4(MCHAML,IPMINT,IPT2,IVCH4)
+            ENDIF
+          ENDIF
+         ENDIF
+C
+ 20   CONTINUE
+C     fin de la boucle sur les zones elementaires
+      END 
+ 

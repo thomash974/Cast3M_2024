@@ -1,0 +1,128 @@
+C IPLCUR    SOURCE    SP204843  23/01/16    21:15:03     11552          
+      SUBROUTINE IPLCUR(ICHPO1,FLOT1,IPOIN1)
+C----------------------------------------------------------------------C
+C     Interpolation d'un point d'abscisse curviligne FLOT1.            C
+C----------------------------------------------------------------------C
+C Syntaxe : POIN1 = IPOL CHPO1 FLOT1 ;
+C
+C Entrees : 
+C - CHPO1 : CHPOINT d'abscisses curvilignes
+C - FLOT1 : FLOTTANT, valeur de l'abscisse du point a interpoler
+C
+C Sorties :
+C - POIN1 : POINT le long de la ligne GEO1 (SEG2) d'abscisse curviligne
+C           FLOT1 dans CHPO1.
+C
+C----------------------------------------------------------------------C
+      IMPLICIT REAL*8(A-H,O-Z)
+      IMPLICIT INTEGER(I-N)
+C
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMCHPOI
+-INC SMCOORD
+-INC CCREEL
+C
+C
+      MCHPO1 = ICHPO1
+      CALL ACTOBJ('CHPOINT ',MCHPO1,1)
+C
+      IPOIN1 = 0
+C
+C     ON DETERMINE LES POINTS D'ABSCISSE INF ET SUP DE FLOT1
+C
+      IPINF1 = 0
+      IPSUP1 = 0
+      NSOUP1 = MCHPO1.IPCHP(/1)
+      DO 10 I=1,NSOUP1
+        MSOUPO = MCHPO1.IPCHP(I)
+C       SEGACT, MSOUPO
+        NC = MSOUPO.NOCOMP(/2)
+        IF (NC.NE.1) THEN
+          CALL ERREUR(180)
+          RETURN
+        ENDIF 
+C
+        IPT2 = MSOUPO.IGEOC
+        MPOVAL = MSOUPO.IPOVAL
+C       SEGACT, MPOVAL
+        NBVAL1 = MPOVAL.VPOCHA(/1)
+        DO 11 JJ=1,NBVAL1
+          VALJ1 = MPOVAL.VPOCHA(JJ,1)
+          IF ((VALJ1-FLOT1).LE.(ABS(VALJ1)*XZPREC)) THEN
+            IF (IPINF1.EQ.0) IPINF1 = JJ
+            IF (MPOVAL.VPOCHA(JJ,1).GT.MPOVAL.VPOCHA(IPINF1,1))
+     &        IPINF1 = JJ
+          ENDIF
+          IF ((VALJ1-FLOT1).GE.(-1.D0*ABS(VALJ1)*XZPREC)) THEN
+            IF (IPSUP1.EQ.0) IPSUP1 = JJ
+            IF (MPOVAL.VPOCHA(JJ,1).LT.MPOVAL.VPOCHA(IPSUP1,1))
+     &        IPSUP1 = JJ
+          ENDIF
+ 11     CONTINUE
+ 10   CONTINUE
+*      write(6,*) 'IPINF1,IPSUP1,FLOT1=',IPINF1,IPSUP1,FLOT1
+      IF (IPINF1.EQ.0.OR.IPSUP1.EQ.0) THEN
+        REAERR(1) = FLOT1
+        CALL ERREUR(1009)
+        RETURN
+      ENDIF
+C
+C
+C     CREATION DU POINT
+C
+      CALL ACTOBJ('MAILLAGE',IPT2,1)
+C     SEGACT, IPT2
+      NPINF1 = IPT2.NUM(1,IPINF1)
+      NPSUP1 = IPT2.NUM(1,IPSUP1)
+C     write(6,*) 'IPINF1,IPSUP1',IPINF1,IPSUP1
+C     write(6,*) 'NPINF1,NPSUP1',NPINF1,NPSUP1
+      IF (NPINF1.EQ.NPSUP1) THEN
+        IPOIN1 = NPINF1
+      ELSE
+        XV1 = MPOVAL.VPOCHA(IPINF1,1)
+        XV2 = MPOVAL.VPOCHA(IPSUP1,1)
+        DXV = XV2 - XV1
+        XXV = MAX(ABS(XV1),ABS(XV2))
+        TOL1 = 100.D0*XZPREC*XXV
+        IF (TOL1.EQ.0.D0) TOL1 = 10.D0*XZPREC
+        IF (ABS(DXV).LE.TOL1) THEN
+          CALL ERREUR(75)
+          RETURN
+        ENDIF
+        SEGACT, MCOORD*mod
+        NBPTS = NBPTS+1
+        SEGADJ, MCOORD
+        XPOI1 = (XV2 - FLOT1) / DXV
+        XPOI2 = (FLOT1 - XV1) / DXV
+        XPOIX = XPOI1 * XPOI2 
+c       write(6,*) 'NPINF1,NPSUP1,XPOI1,XPOI2,TOL1',
+c    &              NPINF1,NPSUP1,XPOI1,XPOI2,TOL1
+        IF (XPOIX.LT.(0.D0-TOL1).OR.XPOIX.GT.(1.D0+TOL1)) THEN
+          REAERR(1) = FLOT1
+          CALL ERREUR(1009)
+          RETURN
+        ELSEIF (XPOI1.LE.TOL1) THEN
+          IPOIN1 = NPSUP1
+        ELSEIF (XPOI2.LE.TOL1) THEN
+          IPOIN1 = NPINF1
+        ELSE
+          DO 20 I=1,IDIM
+            XX1 = XCOOR((NPINF1-1)*(IDIM+1)+I)
+            XX2 = XCOOR((NPSUP1-1)*(IDIM+1)+I)
+            XX0 = XPOI1 * XX1 + XPOI2 * XX2
+            XCOOR((NBPTS-1)*(IDIM+1)+I) = XX0
+ 20       CONTINUE
+          IPOIN1 = NBPTS
+        ENDIF
+      ENDIF
+C
+      RETURN
+      END
+ 
+ 
+ 
+ 
+ 

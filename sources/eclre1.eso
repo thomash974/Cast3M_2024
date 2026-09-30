@@ -1,0 +1,34 @@
+C ECLRE1    SOURCE    PASCAL    22/06/24    21:15:03     11393          
+      SUBROUTINE ECLRE1(IRET,JENTET)
+C----------------------------------------------------------------------C
+C ECRITURE D'UN OBJET CHARGEMENT
+C----------------------------------------------------------------------C
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      CHARACTER*24       TITI
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLREEL
+      
+      MLREEL=IRET
+      SEGACT, MLREEL
+      N1=PROG(/1)
+      INTERR(1)=N1
+      INTERR(2)=MLREEL
+      CALL ERREUR(-9)
+      if(jentet.eq.1) n1 = min ( n1, 10)
+c       IF(N1.NE.0) WRITE(IOIMP,82)(PROG(J),J=1,N1)
+c  82   FORMAT(10(1X,1PG12.5))
+cbp : on lit eventuellement nombre de colonne avant retour a la ligne :
+      NMAX=10
+      CALL LIRENT(IMAX,0,IRETOU)
+      if(IRETOU.NE.0) NMAX=IMAX
+      WRITE(TITI,FMT='("(",I3,"(1X,1PG12.5))")') NMAX
+      IF(N1.NE.0) WRITE(IOIMP,TITI)(PROG(J),J=1,N1)
+
+      RETURN
+      END
+ 

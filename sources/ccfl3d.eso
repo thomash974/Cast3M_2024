@@ -1,0 +1,232 @@
+C CCFL3D    SOURCE    PV090527  23/01/27    21:15:11     11574          
+      subroutine ccfl3d(NBRINC,ninc,tauk,ttrf,eafl,kfl,
+     # teta,srw,dt,epse03,epsf03,alpha3,beta3,epsime03,epsimf03,
+     # alphaim3,betaim3,epsew)
+      
+c     changement de base d'un pseudo vecteur de deformation
+c     contenant des gama si controle=vrai
+c     les effets de W et T sont sortis du potentiel comme dans fluage3d
+c     on traite aussi la consolidation normale aux interfaces
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      integer  NBRINC,ninc 
+      real*8 teta
+c     saturation par phase      
+      real*8 srw(0:NBRINC)      
+c     temps caracteristique de fluage pour l inclusion
+      real*8 tauk(0:NBRINC)
+c     temperature de ref pour fluage inclusion
+      real*8 ttrf(0:NBRINC)
+c     energie activation pour fluage inclusion
+      real*8 eafl(0:NBRINC)
+c     potentiel de fluage de l inclusion
+      real*8 kfl(0:NBRINC)
+c     deformation elastique hydrique
+      real*8 epsew(0:NBRINC)      
+      
+c     coeff de fluage pour le pas de temps      
+      real*8 alpha3(0:NBRINC,3)
+      real*8 beta3(0:NBRINC,3)
+
+c     coeff de fluage pour l interface
+      real*8 alphaim3(1:NBRINC,3)
+      real*8 betaim3(1:NBRINC,3)
+   
+
+c     deformation actuelle de fluage
+      real*8 epsf03(0:NBRINC,3)
+      real*8 epsimf03(1:NBRINC,3)
+c     deformation actiuelle elastique
+      real*8 epse03(0:NBRINC,3) 
+      real*8 epsime03(1:NBRINC,3)
+      
+c     eps petit
+      real*8 epsmin,tureK,ture,tureR,csteR,infini
+      parameter (epsmin=1.0d-8,tureK=273.16d0,csteR=8.314d0,infini=1.d8)  
+      real*8 CT,CW,kf,epsk,ctps,rfe,tau 
+      integer inc,i,j      
+
+c     cc maxi
+      rfemax=log(infini)
+c     fluage lineaire      
+      CM=1.d0
+c     boucle sur les phases      
+      do inc=0,ninc
+c        saturation
+        CW=srw(inc)      
+c       le calcul des coeffs n est realise que sur le potentiel
+c       de fluage est superieur à epsmin 
+        if ((kfl(inc).gt.epsmin).and.(tauk(inc).gt.0.d0)) then
+          ture=teta+turek
+          tureR=ttrf(inc)+tureK
+          CT=exp(-(eafl(inc)/csteR)*((ture**(-1))-(tureR**(-1))))
+c         boucle sur les directions de chargement
+          kf=kfl(inc)          
+          do i=1,3
+             if(abs(epse03(inc,i)).ge.epsmin) then
+c              la deformation elastique initiale est non nulle
+c              la consolidation est calculable             
+               epsk=kf*(epse03(inc,i)+epsew(inc))
+c              consolidation
+               if((epsf03(inc,i)*epsk).gt.0.d0) then
+c                 la consolidation est calculable car les defs sont de même signe
+                  rfe=epsf03(inc,i)/epsk
+                  if(rfe.lt.rfemax) then              
+                      cc=(kf**(-1))*exp(rfe)
+                  else
+                      cc=infini/kf
+                  end if
+               else
+c                 la consolidation est minimale car les def sont de signe opposés
+c                  cc=(kf**(-1))
+c                  la consolidation est calculee en valeur absolue
+                  rfe=abs(epsf03(inc,i)/epsk)
+                  if(rfe.lt.rfemax) then              
+                      cc=(kf**(-1))*exp(rfe)
+                  else
+                      cc=infini/kf
+                  end if
+               end if
+               ctps=1.d0
+             else
+c              la deformation elastique initiale est nulle, le potentiel de fluage
+c              est par consequent nul, le fluage ne peut pas avoir lieu
+c              sauf si le materiau n a jamais été chargé avant
+               if(abs(epsf03(inc,i)).le.epsmin) then
+                     cc=(kf**(-1))
+                     ctps=1.d0
+               else
+                     cc=1.d0
+                     ctps=0.d0
+               end if
+             end if
+c            temps caracteristique pour la fonction de fluage
+             tau=tauk(inc)*cc
+c            fonctions de fluage
+             yf=CT*CW*ctps*dt/tau
+             bf=1.d0-exp(-yf)
+             if(ctps.eq.1.) then
+               if (yf.gt.epsmin) then
+c                 fluage normal               
+                  beta3(inc,i)=bf             
+                  alpha3(inc,i)=1.d0-bf/yf
+               else
+c                 fluage negligeable               
+                  alpha3(inc,i)=0.d0
+                  beta3(inc,i)=0.d0
+               end if
+
+             else
+c              pas de fluage             
+               alpha3(inc,i)=0.d0
+               beta3(inc,i)=0.d0
+             end if               
+          end do
+        else
+c         pas de fluage        
+          do i=1,3
+             alpha3(inc,i)=0.d0
+             beta3(inc,i)=0.d0            
+          end do            
+        end if
+      end do 
+c      print*,'ds ccfl3d'   
+c      do inc=0,ninc
+c        do i=1,3
+c            print*,'alpha(',inc,i,')=',alpha3(inc,i)
+c            print*,'beta(',inc,i,')=',beta3(inc,i)
+c        end do
+c      end do 
+
+c     boucle sur les interfaces      
+      do inc=1,ninc
+c       saturation de l interface = celle de la matrice
+        CW=srw(0) 
+c       le calcul des coeffs n est realise que sur le potentiel
+c       de fluage est superieur à epsmin 
+c       le fluage de l interface est gere par les caracteristiques de la matrice (0)
+        if ((kfl(0).gt.epsmin).and.(tauk(0).gt.0.d0)) then
+          ture=teta+turek
+          tureR=ttrf(0)+tureK
+          CT=exp(-(eafl(0)/csteR)*((ture**(-1))-(tureR**(-1))))
+c         boucle sur les directions de chargement
+          kf=kfl(0)          
+          do i=1,3
+             if(abs(epsime03(inc,i)).ge.epsmin) then
+c              la deformation elastique initiale est non nulle
+c              la consolidation est calculable             
+               epsk=kf*(epsime03(inc,i)+epsew(inc))
+c              consolidation
+               if((epsimf03(inc,i)*epsk).gt.0.d0) then
+cc                 la consolidation est calculable car les defs sont de même signe
+                  rfe=epsimf03(inc,i)/epsk
+                  if(rfe.lt.rfemax) then              
+                      cc=(kf**(-1))*exp(rfe)
+                  else
+                      cc=infini/kf
+                  end if
+               else
+c                 la consolidation est minimale car les def sont de signe opposés
+                  cc=(kf**(-1))
+cc                  la consolidation est calculee en valeur absolue
+c                  rfe=abs(epsimf03(inc,i)/epsk)
+c                  if(rfe.lt.rfemax) then              
+c                      cc=(kf**(-1))*exp(rfe)
+c                  else
+c                      cc=infini/kf
+c                  end if
+               end if
+               ctps=1.d0
+             else
+c              la deformation elastique initiale est nulle, le potentiel de fluage
+c              est par consequent nul, le fluage ne peut pas avoir lieu
+c              sauf si le materiau n a jamais été chargé avant
+               if(abs(epsimf03(inc,i)).le.epsmin) then
+                     cc=(kf**(-1))
+                     ctps=1.d0
+               else
+                     cc=1.d0
+                     ctps=0.d0
+               end if
+             end if
+c            temps caracteristique pour la fonction de fluage
+             tau=tauk(0)*cc
+c            fonctions de fluage
+             yf=CT*CW*ctps*dt/tau
+             bf=1.d0-exp(-yf)
+             if(ctps.eq.1.) then
+               if (yf.gt.epsmin) then
+c                 fluage normal               
+                  betaim3(inc,i)=bf             
+                  alphaim3(inc,i)=1.d0-bf/yf
+               else
+c                 fluage negligeable               
+                  alphaim3(inc,i)=0.d0
+                  betaim3(inc,i)=0.d0                 
+               end if
+
+             else
+c              pas de fluage             
+               alphaim3(inc,i)=0.d0
+               betaim3(inc,i)=0.d0              
+             end if               
+          end do
+        else
+c         pas de fluage        
+          do i=1,3
+             alphaim3(inc,i)=0.d0
+             betaim3(inc,i)=0.d0            
+          end do            
+        end if
+      end do       
+      return
+      end
+      
+
+                          
+             
+        
+      
+ 

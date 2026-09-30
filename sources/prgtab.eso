@@ -1,0 +1,103 @@
+C PRGTAB    SOURCE    SP204843  23/02/16    21:15:05     11600          
+      SUBROUTINE PRGTAB
+*---------------------------------------------------------------------
+*
+*     OPTION TABLE OPERATEUR PROG
+*
+*     SYNTAXE : voir notice PROG
+* 
+*--------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      CHARACTER*8 CTYP,CTYP2
+      LOGICAL     LCROI,LABSO
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLREEL
+-INC SMTABLE
+-INC SMLENTI
+
+C     write(6,*) '***PROG, option TABLE' 
+
+C---------------------------------
+C     LECTURE DE LA TABLE
+C---------------------------------
+      CALL LIROBJ('TABLE   ',ITAB1,1,IRET)
+      IF (IERR.NE.0) RETURN
+
+C---------------------------------
+C     LISTE INDICES ENTIERS DE LA TABLE
+C---------------------------------
+      MTABLE = ITAB1
+      SEGACT, MTABLE
+      JG = MLOTAB
+      SEGINI, MLENTI, MLENT1
+      DO 10 I1=1,MLOTAB
+        IF (MTABTI(I1).EQ.'ENTIER  ') THEN
+          LECT(I1) = MTABII(I1)
+          CTYP     = MTABTV(I1)
+        ENDIF
+ 10   CONTINUE
+
+c     write(6,*) 'MLENTI,MLENT1,CTYP=',MLENTI,MLENT1,CTYP
+
+C---------------------------------
+C     VERIFICATION TYPE OBJET EN INDICE
+C---------------------------------
+      IF (CTYP.NE.'FLOTTANT'.AND.CTYP.NE.'ENTIER  ') THEN
+        MOTERR(1:8) = 'FLOTTANT'
+        CALL ERREUR(37)
+        RETURN
+      ENDIF
+      CTYP2 = 'ENTIER  '
+      IF (CTYP.EQ.'ENTIER  ') CTYP2 = 'FLOTTANT'
+
+C---------------------------------
+C     RANGEMENT PAR ORDRE CROISSANT INDICES ENTIER DE LA TABLE
+C---------------------------------
+      LCROI = .true.
+      LABSO = .false.
+      CALL ORDON2(MLENTI,LCROI,LABSO,MLENT1)
+      IF (IERR.NE.0) RETURN
+      SEGACT,MLENT1
+
+c     write(6,*) 'MLENT1.lect(/1)=',MLENT1.LECT(/1)
+
+C---------------------------------
+C     DEFINITION DU LISTREEL
+C---------------------------------
+
+      JG = MLOTAB
+      SEGINI, MLREEL
+      NRE1 = 0
+      DO 1 IND1=1,MLOTAB
+        IND2  = MLENT1.LECT(IND1)
+        IF (MTABTI(IND2)(1:8).NE.'ENTIER  ') GOTO 1
+        IF (MTABTV(IND2).NE.CTYP.AND.MTABTV(IND2).NE.CTYP2) THEN
+          MOTERR(1:8) = CTYP
+          CALL ERREUR(39)
+          RETURN
+        ENDIF
+        NRE1 = NRE1+1
+        IF (MTABTV(IND2).EQ.'ENTIER  ') THEN
+          PROG(NRE1) = MTABIV(IND2)
+        ELSE IF(MTABTV(IND2).EQ.'FLOTTANT') THEN
+          PROG(NRE1) = RMTABV(IND2)
+        ELSE
+          CALL ERREUR(5)
+          RETURN
+        ENDIF
+ 1    CONTINUE
+
+C     Ecriture du resultat 
+      JG = NRE1
+      SEGADJ, MLREEL
+      CALL ECROBJ('LISTREEL',MLREEL)
+
+      RETURN
+      END
+
+ 
+ 

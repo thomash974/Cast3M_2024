@@ -1,0 +1,108 @@
+C ENUTAB    SOURCE    SP204843  23/02/16    21:15:04     11598          
+      SUBROUTINE ENUTAB
+*---------------------------------------------------------------------
+*
+*     OPTION TABLE OPERATEUR ENUMERER
+*
+*     SYNTAXE : voir notice ENUM
+* 
+*--------------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+      PARAMETER   (NMOCLE = 1)
+      CHARACTER*8 CTYP
+      LOGICAL     LCROI,LABSO
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMLOBJE
+-INC SMTABLE
+-INC SMLENTI
+
+C---------------------------------
+C     LECTURE DE LA TABLE
+C---------------------------------
+      CALL LIROBJ('TABLE   ',ITAB1,1,IRET)
+      IF (IERR.NE.0) RETURN
+
+c     write(6,*) 'ITAB1=',ITAB1
+
+C---------------------------------
+C     LISTE INDICES ENTIERS DE LA TABLE
+C---------------------------------
+      MTABLE = ITAB1
+      SEGACT, MTABLE
+      JG = MLOTAB
+      SEGINI, MLENTI, MLENT1
+      DO 10 I1=1,MLOTAB
+        IF (MTABTI(I1).EQ.'ENTIER  ') THEN
+          LECT(I1) = MTABII(I1)
+          CTYP     = MTABTV(I1)
+        ENDIF
+ 10   CONTINUE
+
+c     write(6,*) 'MLENTI,MLENT1,CTYP=',MLENTI,MLENT1,CTYP
+
+C---------------------------------
+C     VERIFICATION LISTE INDICES ENTIER
+C     EST CORRECTEMENT ORONNEE
+C---------------------------------
+      LCROI = .true.
+      LABSO = .false.
+      CALL ORDON2(MLENTI,LCROI,LABSO,MLENT1)
+      IF (IERR.NE.0) RETURN
+      SEGACT,MLENT1
+
+c     write(6,*) 'MLENT1.lect(/1)=',MLENT1.LECT(/1)
+
+      IPLAC = 0
+      CALL PLACE(LTYPOB,NTYPOB,IPLAC,CTYP)
+
+C-------------------------- CAS DU LISTOBJE ---------------------------C
+
+      IF (IPLAC.NE.0) THEN
+
+        NOBJ = MLOTAB
+        SEGINI,MLOBJE
+        TYPOBJ(1:8) = CTYP
+        
+
+C       BOUCLE DE LECTURE DES OBJETS
+        NOBLU = 0
+        DO 1 IND1=1,MLOTAB
+
+C         IND2 : indice de la table apres ORDON2
+          IND2  = MLENT1.LECT(IND1)
+
+C         TYPE DE L'INDICE : PAS ENTIER => ON ITERE
+c         write(6,*) 'IND2,(MTABTI(IND2)=',IND2,MTABTI(IND2)
+          IF (MTABTI(IND2)(1:8).NE.'ENTIER  ') GOTO 1
+
+C         VERIFICATION DU TYPE de L'OBJET CONTENU EN INDICE
+          CTYP = MTABTV(IND2)
+c         write(6,*) 'CTYP=',CTYP
+          IF (CTYP.NE.TYPOBJ) THEN
+            MOTERR(1:8) = CTYP
+            CALL ERREUR(39)
+            RETURN
+          ENDIF
+
+C         AJOUT A LA LISTE
+          NOBLU = NOBLU + 1
+          LISOBJ(NOBLU) = MTABIV(IND2)
+
+ 1      CONTINUE
+
+C       Ecriture du resultat 
+        NOBJ = NOBLU
+        SEGADJ, MLOBJE
+        CALL ECROBJ('LISTOBJE',MLOBJE)
+
+      ENDIF
+
+      RETURN
+      END
+
+ 
+ 

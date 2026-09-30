@@ -1,0 +1,2685 @@
+C NUMATE    SOURCE    JK148537  23/03/17    21:15:03     11636          
+      SUBROUTINE NUMATE(LESFOR,NFOR,LESPRO,NMAT,DMAT3,CMATE,
+     &IMATE,INATU)
+* kich : fichier attribuant CMATE, IMATE, INATU 
+* mise a jour // nomate.eso
+*  le dernier numero de materiau utilise est le   :    189
+
+*--------------------------------------------------------------------*
+*                                                                    *
+*                                                                    *
+*                                                                    *
+*     DETERMINER UN NUMERO POUR UN MODELE DE MATERIAU                *
+*     _______________________________________________                *
+*                                                                    *
+*  ENTREES                                                           *
+*                                                                    *
+*     lesfor  Liste des formulations                                 *
+*     NFOR    Nombre de formulations                                 *
+*     lespro  Liste des mat{riaux                                    *
+*     NMAT    Nombre de mat{riaux                                    *
+*                                                                    *
+*  SORTIES                                                           *
+*                                                                    *
+*     NMAT                                                           *
+*     lespro                                                         *
+*     CMATE   Nom du materiau (isotrope, orthotrope....)             *
+*     IMATE   Num{ro du mat{riau                                     *
+*     INATU   Num{ro de nature                                       *
+*                                                                    *
+*  NOMS DE MATERIAUX POSSIBLES                                       *
+*                                                                    *
+*--------------------------------------------------------------------*
+*     1/ 'THERMIQUE'                                                 *
+*                                                                    *
+*     'ISOTROPE'                                                     *
+*     'ORTHOTROPE'                                                   *
+*     'ANISOTROPE'                                                   *
+*     'CONDUCTION'                                                   *
+*     'CONVECTION'                                                   *
+*     'ADVECTION'   non lineaire de conduction                       *
+*     'PHASE'       non lineaire de conduction                       *
+*     'DISSIPATION'                                                  *
+*--------------------------------------------------------------------*
+*     2/ 'MECANIQUE'    OU   6/ 'POREUX'                             *
+*                                                                    *
+*  ELASTIQUE                                                         *
+*     'ISOTROPE'                                                     *
+*     'ORTHOTROPE'                                                   *
+*     'ANISOTROPE'                                                   *
+*     'POREUX'                                                       *
+*     'HOMOGENEISE'                                                  *
+*     'UNIDIRECTIONNEL'                                              *
+*     'SECTION'                                                      *
+*     'ARMATURE'                                                     *
+*     'MODAL'                                                        *
+*     'STATIQUE'                                                     *
+*     'ZONE_COHESIVE'                                                *
+*                                                                    *
+*  PLASTIQUE                                                         *
+*     'PARFAIT'                                    INATU = 1         *
+*     'LINESPRING'                                 INATU = 2         *
+*     'DRUCKER-SIMPLE'                             INATU = 3         *
+*     'CINEMATIQUE'                                INATU = 4         *
+*     'ISOTROPE'                                   INATU = 5         *
+*     'CHABOCHE1'                                  INATU = 7         *
+*     'BETON'                                      INATU = 9         *
+*     'CHABOCHE2'                                  INATU = 12        *
+*     'TUYAU-FISSURE'                              INATU = 14        *
+*     'DRUCKER-PRAGER'                             INATU = 15        *
+*     'GAUVAIN'                                    INATU = 16        *
+*     'ENDOMMAGEABLE'                              INATU = 26        *
+*     'UBIQUITOUS'                                 INATU = 28        *
+*     'GLOBAL'                                     INATU = 32        *
+*     'CAM-CLAY'                                   INATU = 33        *
+*     'COULOMB'                                    INATU = 34        *
+*     'JOINT_DILATANT'                             INATU = 35        *
+*     'BETON_AXI'                                  INATU = 36        *
+*     'GURSON'                                     INATU = 38        *
+*     'BETON_UNI'                                  INATU = 39        *
+*     'ACIER_UNI'                                  INATU = 40        *
+*     'FRAGILE_UNI'                                INATU = 78        *
+*     'BETON_BAEL'                                 INATU = 79        *
+*     'PARFAIT_UNI'                                INATU = 80        *
+*     'STRUT_UNI'                                  INATU = 83        *
+*     'CINEMATIQUE_ANCRAGE'                        INATU = 92        *
+*     'ACIER_ANCRAGE'                              INATU = 93        *
+*     'SECTION'                                    INATU = 41        *
+*     'OTTOSEN'                                    INATU = 42        *
+*     'OTTOVARI'                                   INATU = 148       *
+*     'MAZARS_FIB'                                 INATU = 46        *
+*     'AMADEI'                                     INATU = 47        *
+*     'HUJEUX'                                     INATU = 48        *
+*     'STEINBERG'                                  INATU = 49        *
+*     'ZERILLI'                                    INATU = 50        *
+*     'PRESTON'                                    INATU = 52        *
+*     'BETOCYCL'                                   INATU = 54        *
+*     'ROTATING_CRACK'                             INATU = 55        *
+*     'JOINT_SOFT'                                 INATU = 56        *
+*     'ANCRAGE_ELIGEHAUSEN'                        INATU = 91        *
+*     'BILI_MOMY'                                  INATU = 57        *
+*     'BILI_EFFZ'                                  INATU = 58        *
+*     'TAKEMO_MOMY'                                INATU = 59        *
+*     'TAKEMO_EFFZ'                                INATU = 60        *
+*     'BETON_INSA'                                 INATU = 66        *
+*     'ECROUIS_DECOU'                              INATU = 67        *
+*     'PARFAIT_DECOU'                              INATU = 68        *
+*     'ALONSO'                                     INATU = 69        *
+*     'BA1D'                                       INATU = 147       *
+*     'PAKZAD'                                     INATU = 71        *
+*     'INFILL_UNI'                                 INATU = 72        *
+*     'CISAIL_NL'                                  INATU = 73        *
+*     'HINT'                                       INATU = 89        *
+*     'BETON_URGC'                                 INATU = 99        *
+*     'UNILATERAL'  (Fibre)                        INATU = 104       *
+*     'INCO'                                       INATU = 129       *
+*     'INTIMP'                                     INATU = 145       *
+*     'RICJOI'                                     INATU = 146       *
+*     'OUGLOVA'                                    INATU = 175       *
+*     'MRS_LADE'                                   INATU = 111       *
+*     'J2'                                         INATU = 112       *
+*     'RH_COULOMB'                                 INATU = 113       *
+*     'VMT_FEFP'                                   INATU = 114       *
+*     'RHMC_FEFP'                                  INATU = 115       *
+*     'POWDER_FEFP'                                INATU = 116       *
+*     'POWDERCAP_FEFP'                             INATU = 117       *
+*     'JOINT_COAT'                                 INATU = 119       *
+*     'CONCRETE_UNI'                               INATU = 123       *
+*     'MUR_SHEAR'                                  INATU = 126       *
+*     'DRUCKER_PRAGER2'                            INATU = 140       *
+*     'BILIN_EFFX'                                 INATU = 150       *
+*     'ISS_GRANGE'                                 INATU = 151       *
+*     'RUP_THER'                                   INATU = 152       *
+*     'RICBET_UNI'                                 INATU = 160       *
+*     'LIAISON_ACBE'                               INATU = 171       *
+*     'DP_SOL'                                     INATU = 172       *
+*     'CONCYC'                                     INATU = 173       *
+*     'IWPR3D_SOL'                                 INATU = 176       *
+*     'NORTON'      (Fibre)                        INATU = 181       *
+*     'POLYNOMIAL'  (Fibre)                        INATU = 182       *
+*     'BLACKBURN'   (Fibre)                        INATU = 183       *
+*     'BLACKBURN_2' (Fibre)                        INATU = 184       *
+*     'LEMAITRE'    (Fibre)                        INATU = 185       *
+*                                                                    *
+*  FLUAGE                                                            *
+*     'NORTON'                                     INATU = 19        *
+*     'BLACKBURN'                                  INATU = 20        *
+*     'POLYNOMIAL'                                 INATU = 21        *
+*     'RCCMR-316'                                  INATU = 22        *
+*     'RCCMR-304'                                  INATU = 23        *
+*     'LEMAITRE'                                   INATU = 24        *
+*     'BLACKBURN_2'                                INATU = 61        *
+*     'CERAMIQUE'                                  INATU = 65        *
+*     'MAXWELL'                                    INATU = 74        *
+*     'COMETE'                                     INATU = 84        *
+*     'CCPL'                                       INATU = 85        *
+*     'X11'                                        INATU = 86        *
+*     'BPEL_RELAX'                                 INATU = 95        *
+*     'BETON_URGC'                                 INATU = 101       *
+*     'SODERBERG'                                  INATU = 102       *
+*     'MAXOTT'                                     INATU = 106       *
+*     'FBB1'                                       INATU = 127       *
+*     'FBB2'                                       INATU = 128       *
+*     'KELVIN'                                     INATU = 174       *
+*                                                                    *
+*  VISCOPLASTIQUE                                                    *
+*     'GUIONNET'                                   INATU = 17        *
+*     'ONERA'                                      INATU = 25        *
+*     'VISCODOMMAGE'                               INATU = 29        *
+*     'PARFAIT'                                    INATU = 43        *
+*     'POUDRE_A'                                   INATU = 44        *
+*     'POUDRE_B'                                   INATU = 45        *
+*     'OHNO'                                       INATU = 53        *
+*     'DDI'                                        INATU = 63        *
+*     'KOCKS'                                      INATU = 70        *
+*     'NOUAILHAS_A'                                INATU = 76        *
+*     'NOUAILHAS_B'                                INATU = 77        *
+*     'VISK2'                                      INATU = 82        *
+*     'VISCOHINT'                                  INATU = 90        *
+*     'MISTRAL'                                    INATU = 94        *
+*     'BETON_URGC'                                 INATU = 100       *
+*     'BETON_URGC_ENDO'                            INATU = 122       *
+*     'LEMENDO'                                    INATU = 103       *
+*     'FLUNOR2'                                    INATU = 105       *
+*     'GATT_MONERIE'                               INATU = 107       *
+*     'UO2'                                        INATU = 108       *
+*     'VISCODD'                                    INATU = 130       *
+*     'CHAB_SINH_R'                                INATU = 136       *
+*     'CHAB_SINH_X'                                INATU = 137       *
+*     'CHAB_NOR_R'                                 INATU = 138       *
+*     'CHAB_NOR_X'                                 INATU = 139       *
+*     'PELLET'                                     INATU = 142       *
+*     'FLUTRA'                                     INATU = 143       *
+*     'SYCO1'                                      INATU = 153       *
+*     'SYCO2'                                      INATU = 154       *
+*     'CHABOCHE'                                   INATU = 165       *
+*     'FLUENDO3D'                                  INATU = 187
+*     'INCLUSION3D'                                INATU = 188
+*     'ENDO3D'                                     INATU = 189
+*                                                                    *
+*  ENDOMMAGEABLE                                                     *
+*     'MAZARS'                                     INATU = 30        *
+*     'UNILATERAL'                                 INATU = 31        *
+*     'ROTATING_CRACK'                             INATU = 37        *
+*     'SIC_SIC'                                    INATU = 88        *
+*     'MICROPLANS'                                 INATU = 96        *
+*     'VISCOUNILATERAL'                            INATU = 97        *
+*     'MICROISO'                                   INATU = 98        *
+*     'SICSCAL'                                    INATU = 131       *
+*     'SICTENS'                                    INATU = 132       *
+*     'FATSIN'                                     INATU = 141       *
+*     'RICRAG'                                     INATU = 144       *
+*     'MVM'                                        INATU = 118       *
+*     'CRUCRA'                                     INATU = 124       *
+*     'DAMAGE_TC'                                  INATU = 125       *
+*     'DESMORAT'                                   INATU = 134       *
+*     'GLRC_DM'                                    INATU = 157       *
+*     'RICBET'                                     INATU = 158       *
+*     'RICCOQ'                                     INATU = 159       *
+*     'EFEM'                                       INATU = 177       *
+*                                                                    *
+*  PLASTIQUE_ENDOM(MAGEABLE)                                         *
+*     'PSURY'                                      INATU = 51        *
+*     'ROUSSELIER'                                 INATU = 62        *
+*     'GURSON2'                                    INATU = 64        *
+*     'DRAGON'                                     INATU = 75        *
+*     'BETON_URGC'                                 INATU = 120       *
+*     'BETON_INSA'                                 INATU = 121       *
+*     'BETON_DYNAR_LMT'                            INATU = 133       *
+*     'ENDO_PLAS'                                  INATU = 135       *
+*     'GERNAY'                                     INATU = 155       *
+*     'WELLS'                                      INATU = 156       *
+*                                                                    *
+*   ELASTIQUE NON_LINEAIRE                                           *
+*     'EQUIPLAS'                                   INATU = 87        *
+*     'UTILISATEUR'                                INATU = -1        *
+*                                                                    *
+*   VISCO_EXTERNE                                                    *
+*     'GENERAL'             IVIEX = 1              INATU = -2        *
+*     'DRUCKER_PRAGER'      IVIEX = 2          en sortie de NOMATE,  *
+*     'COHESION'            IVIEX = 3          INATU = -2 - IVIEX    *
+*     'CONSOLIDATION'       IVIEX = 4          ce qui permet de      *
+*     'UTILISATEUR'         IVIEX = 5          recuperer IVIEX       *
+*                                                                    *
+*   IMPEDANCE                                                        *
+*      'ELASTIQUE'                                 INATU = 161       *
+*      'VOIGT'                                     INATU = 162       *
+*      'MAXWELL'                                   INATU = 163       *
+*      'COMPL??'                                   INATU = 164       *
+*--------------------------------------------------------------------*
+*     3/ 'LIQUIDE '                                                  *
+*           'ISOTROPE'                                               *
+*--------------------------------------------------------------------*
+*     4/ 'CONVECTION'                                                *
+*            la formulation suffit                                   *
+*--------------------------------------------------------------------*
+*     5/ 'MECANIQUE+LIQUIDE'                                         *
+*            la formulation suffit                                   *
+*--------------------------------------------------------------------*
+*     6/ 'POREUX'    VOIR 2/                                         *
+*--------------------------------------------------------------------*
+*     7/ 'DARCY'                                                     *
+*                                                                    *
+*     'ISOTROPE'                                                     *
+*     'ORTHOTROPE'                                                   *
+*     'ANISOTROPE'                                                   *
+*--------------------------------------------------------------------*
+*     8/ 'CONTACT   '                                                *
+*                                                                    *
+*     'COULOMB'              INATU=1                                 *
+*     'FROCABLE'             INATU=2                                 *
+*--------------------------------------------------------------------*
+*     9/ 'RAYONNEMENT'                                               *
+*          imate=1    ancien rayonnement avec table                  *
+*          imate=2    fac_a_fac                                      *
+*          imate=3    infini                                         *
+*          imate=4    cavite                                         *
+*          inatu 1    cavite toute simple                            *
+*          inatu=2    cavite ferme                                   *
+*          inatu=3    cavite syme                                    *
+*          inatu=4    cavite convexe                                 *
+*          inatu=5    cavite syme  convexe                           *
+*          inatu=6    cavite ferme convexe                           *
+*          inatu=7    cavite syme  ferme                             *
+*          inatu=8    cavite syme  convexe   ferme                   *
+*--------------------------------------------------------------------*
+*     10/ 'MAGNETODYNAMIQUE'                                         *
+*                                                                    *
+*     'POTENTIEL_VECTEUR'                                            *
+*     'ISOTROPE'                                                     *
+*     'ORTHOTROPE'                                                   *
+*--------------------------------------------------------------------*
+*     11/ 'NAVIER_STOKES'                                            *
+*                                                                    *
+*     'NEWTONIEN'                                                    *
+*     'BINGHAM'                                                      *
+*     'VISCOPLASTIQUE'                                               *
+*--------------------------------------------------------------------*
+*      12/ 'MELANGE'                                                 *
+*                                                                    *
+*      'CEREM'                                                       *
+*      'ZTMAX'                                                       *
+*      'PARALLELE'                                                   *
+*      'SERIE'                                                       *
+*      'UTILISATEUR'                                                 *
+*--------------------------------------------------------------------*
+*     13/ 'EULER'                                                    *
+*                                                                    *
+*     'NEWTONIEN'                                                    *
+*--------------------------------------------------------------------*
+*     14/ 'FISSURE'                                                  *
+*                                                                    *
+*     'MASS' 'PARF' 'POISEU_BLASIUS'                                 *
+*     'FILM' 'REEL' 'POISEU_COLEBROOK'                               *
+*                   'FROTTEMENT1'                                    *
+*                   'FROTTEMENT2'                                    *
+*                   'FROTTEMENT3'                                    *
+*                   'FROTTEMENT4'                                    *
+*--------------------------------------------------------------------*
+*     15/ 'LIAISON'                                                  *
+*                                                                    *
+*     'POINT_PLAN_FLUIDE'                                            *
+*      'POINT_PLAN_FROTTEMENT'                                       *
+*      'POINT_PLAN'                                                  *
+*      'POINT_POINT_FROTTEMENT'                                      *
+*      'POINT_POINT_DEPLACEMENT_PLASTIQUE'                           *
+*      'POINT_POINT_ROTATION_PLASTIQUE'                              *
+*      'POINT_POINT'                                                 *
+*      'POINT_CERCLE_MOBILE'                                         *
+*      'POINT_CERCLE_FROTTEMENT'                                     *
+*      'POINT_CERCLE'                                                *
+*      'CERCLE_PLAN_FROTTEMENT'                                      *
+*      'CERCLE_CERCLE_FROTTEMENT'                                    *
+*      'PROFIL_PROFIL_INTERIEUR'                                     *
+*      'PROFIL_PROFIL_EXTERIEUR'                                     *
+*      'LIGNE_LIGNE_FROTTEMENT'                                      *
+*      'LIGNE_CERCLE_FROTTEMENT'                                     *
+*      'PALIER_FLUIDE'                                               *
+*      'NEWMARK'                                                     *
+*--------------------------------------------------------------------*
+*   16/ 'THERMOHYDRIQUE'                                             *
+*                                                                    *
+*      'SCHREFLER'                                                   *
+*--------------------------------------------------------------------*
+*   17/ 'ELECTROSTATIQUE'                                            *
+*                                                                    *
+*       'ISOTROPE'                                                   *
+*       'ORTHOTROPE'                                                 *
+*       'ANISOTROPE'                                                 *
+*--------------------------------------------------------------------*
+*   18/ 'DIFFUSION'                                                  *
+*                                                                    *
+*       'ISOTROPE'                                                   *
+*       'ORTHOTROPE'                                                 *
+*       'ANISOTROPE'                                                 *
+*       'FICK'                INATU = 0                              *
+*       'SORET'               INATU = 1                              *
+*       'UTILISATEUR'         INATU =-1                              *
+*--------------------------------------------------------------------*
+*   19/ 'METALLURGIE'         INATU = 178                            *
+*--------------------------------------------------------------------*
+*   20/ 'CHANGEMENT_PHASE'                                           *
+*                                                                    *
+*       'PARFAIT'             INATU = 179                            *
+*       'SOLUBILITE'          INATU = 180                            *
+*--------------------------------------------------------------------*
+*     'SOURCE'                source de chaleur : CMATE = 'SOURCE'   *
+*                                                                    *
+*     formulation generale :                INATU = 1 / IMATE = 1    *
+*                                                                    *
+*     formulation generale :'               INATU = 2 / IMATE = 1    *
+*     'GAUSSIENNE' 'ISOTROPE_TRANSVERSE'    INATU = 2 / IMATE = 2    *
+
+*--------------------------------------------------------------------*
+* PPU  MODIF POUR LES MATERIAUX UNIDIRECTIONELS EN PLASTIQUE
+
+
+*--------------------------------------------------------------------*
+*      DECLARATIONS
+*--------------------------------------------------------------------*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+      LOGICAL  DMAT3,dinli,d_conv,d_syme,d_ferm,d_gaus,d_met(4),d_mlg
+      INTEGER       NFOR,NMAT
+      CHARACTER*(*) CMATE
+      CHARACTER*16  LESFOR(*),LESPRO(*),mojmoc
+*
+      CHARACTER*16  MOMODL(200),motmat(50),forfo1,forfo2
+*
+      CHARACTER*16  LISTMT(3),OPTEMP(3),OPTMAG(1)
+      CHARACTER*12  CMAT1,CMAT2,CMAT3
+
+      DATA LISTMT / 'ISOTROPE        ',
+     &              'ORTHOTROPE      ',
+     &              'ANISOTROPE      ' /
+      DATA OPTEMP/'PHASE           ','ADVECTION       ',
+     $            'CONDUCTION      '/
+      DATA OPTMAG/'POTENTIEL_VECTEU'/
+*
+      CMATE = ' '
+      IMATE = 0
+      INATU = 0
+*
+      jmat = nmat
+      INMAT = 0
+*
+      forfo1 = lesfor(1)
+*
+      IF (NFOR.EQ.1) THEN
+*
+*--------------------------------------------------------------------*
+* 0/ Cas particuliers : THERMIQUE  CONVECTION ->  4/                 *
+*                                 RAYONNEMENT ->  9/                 *
+*                                      SOURCE -> 22/                 *
+*--------------------------------------------------------------------*
+        IF (forfo1.eq.'THERMIQUE' ) THEN
+          icov = 0
+          CALL PLACE(lespro,NMAT,icov,'CONVECTION')
+          IF (icov.NE.0) THEN
+            forfo1 = 'CONVECTION'
+          ELSE
+            iray = 0
+            CALL PLACE(lespro,NMAT,iray,'RAYONNEMENT')
+            IF (iray.NE.0) THEN
+              forfo1 = 'RAYONNEMENT'
+            ELSE
+              isrc = 0
+              CALL PLACE(lespro,NMAT,isrc,'SOURCE')
+              IF (isrc.NE.0) THEN
+                forfo1 = 'SOURCE'
+              ENDIF
+            ENDIF
+          ENDIF
+          if (isrc.gt.0) then
+                 inmat = inmat + 1
+                 motmat(inmat) = forfo1
+                  lespro(isrc) = ' '
+                  jmat = jmat - 1
+          endif
+        ENDIF
+
+*--------------------------------------------------------------------*
+*        1-7/ Cas de la formulation 'THERMIQUE' OU 'DARCY'           *
+*--------------------------------------------------------------------*
+      
+        IF (forfo1.eq.'THERMIQUE'.OR.forfo1.EQ.'DARCY'
+     &   .OR.forfo1.eq.'RAYONNEMENT'.or.forfo1.eq.'CONVECTION' ) THEN
+          IF (NMAT.EQ.0) THEN
+*
+*     par defaut la formulation est isotrope
+*
+               CMATE='ISOTROPE'
+               IMATE=1
+               INMAT  = INMAT+1
+               motmat(INMAT)='ISOTROPE'
+         
+          ELSE
+               do im = 1,nmat
+                CALL PLACE(LISTMT,3,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  CMATE = lespro(im)
+                  IMATE=IPLAC
+                  inmat = inmat + 1
+                  motmat(inmat) = LISTMT(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  goto 1201
+                endif 
+               enddo
+               if (CMATE.eq.' ') then
+                  inmat = inmat + 1
+                  IMATE = 1 
+                  motmat(inmat) = LISTMT(IMATE)
+                  CMATE = LISTMT(IMATE)
+               endif
+               
+ 1201          continue 
+          ENDIF
+
+          if(iray.gt.0.or.icov.gt.0) then
+                 inmat = inmat + 1
+                 motmat(inmat) = forfo1
+          endif
+
+        ENDIF
+        
+*--------------------------------------------------------------------*
+*        1/ Cas de la formulation 'THERMIQUE'                        *
+*--------------------------------------------------------------------*
+*     1  2  3  4  5  6  7  8
+         IF (forfo1.EQ.'THERMIQUE') THEN
+
+           IF (NMAT.EQ.0) THEN
+                 INMAT  = INMAT+1
+                 motmat(INMAT)='CONDUCTION'
+           ELSE
+               CALL MODTHE(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  goto 1202
+                endif 
+               enddo
+c par defaut
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(5)                 
+ 1202          continue 
+ 
+C         Ajout du mot 'CONDUCTION' si besoin avec phase et advection
+          idoico=0
+          idejco=0
+          DO jj=1,inmat
+            CALL PLACE (OPTEMP,3,iplac,motmat(jj))
+            if(iplac.eq.1.or.iplac.eq.2) idoico=1
+            if(iplac.eq.3) idejco=1
+          enddo
+
+          if( idoico.ne.0.and.idejco.eq.0) then
+            inmat=inmat+1
+            motmat(inmat)='CONDUCTION'
+          endif
+
+           ENDIF
+*--------------------------------------------------------------------*
+*     2/ Cas de la formulation 'MECANIQUE' OU 'POREUX'               *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'MECANIQUE'.OR.
+     .            forfo1.EQ.'POREUX') THEN
+
+            IF (NMAT.GT.0)THEN
+               jmat = nmat
+*
+*           Comportement reversible
+*           ---------------------
+               CALL MODLIN(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  goto 2201
+                endif 
+               enddo
+ 2201          continue    
+               IF (IPLAC.EQ.0) THEN
+*
+* par defaut  Materiau elastique lineaire ( seule option disponible )
+*
+                  INMAT=INMAT+1
+                  motmat(inmat) = MOMODL(1)
+               ENDIF
+               if (jmat.eq.0) then
+* par defaut
+                 CALL MODELA(MOMODL,NMOD)
+                  INMAT=INMAT+1
+                  motmat(inmat) = MOMODL(1)
+*
+*                 Option par defaut dans le cas elastique
+*
+                     CMATE = 'ISOTROPE'
+                     IMATE=1
+                 goto 90
+               endif                 
+*
+*            On teste la "tropie de la formulation"
+*
+               CALL MODELA(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  CMATE  = momodl(iplac)
+                  goto 2202
+                endif 
+               enddo
+ 2202          continue    
+               IF (IPLAC.EQ.0) THEN
+* par defaut
+                  INMAT=INMAT+1
+                  motmat(inmat) = MOMODL(1)
+*
+*                 Option par defaut dans le cas elastique
+*
+                     CMATE = 'ISOTROPE'
+                     IMATE=1
+               ELSE
+                 ITROP = IPLAC
+                     IF (ITROP.EQ.0) THEN
+                        CMATE = 'ISOTROPE'
+                        IMATE=1
+                     ELSE
+                        CMATE = MOMODL(ITROP)
+                        IF (ITROP.LE.3) THEN
+                           IMATE=ITROP
+                        ELSE IF (ITROP.EQ.4) THEN
+                           IMATE=7
+                        ELSE IF (ITROP.EQ.5) THEN
+                           IMATE=9
+                        ELSE IF (ITROP.EQ.6) THEN
+                           IMATE=4
+                        ELSE IF (ITROP.EQ.7) THEN
+                           IMATE=11
+                        ELSE IF (ITROP.EQ.9.OR.ITROP.EQ.10) THEN
+                           IMATE=ITROP
+                        ELSE IF (ITROP.EQ.11) THEN
+*                        on met 12 car 11 est deja pris
+                           IMATE=12
+                        END IF
+                     END IF
+               ENDIF
+
+            ELSE 
+* par défaut (nmat = 0)
+              inmat = 2
+              CALL MODLIN(MOMODL,NMOD)
+              motmat(1) = momodl(1)
+              CALL MODELA(MOMODL,NMOD)
+              motmat(2) = momodl(1)
+                        CMATE = 'ISOTROPE'
+                        IMATE=1
+                        goto 90
+            END IF
+*
+  25        continue
+c             write(6,*) 'numat0',imate,inmat,nmat,jmat
+  
+            if(jmat.eq.0) goto 90
+*
+*              Comportement non lineaire
+*              -------------------------
+               dinli = .true.
+               CALL MODNLI(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = lespro(im)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  INLI = IPLAC
+                  dinli = .false.
+                  goto 2203
+                endif 
+               enddo
+ 2203          continue    
+               if (jmat.eq.0) then
+                 if (iplac.eq.0) then
+*                   write(6,*) 'numate-bizarre'
+                   call erreur(5)
+                   return
+                 else
+* par defaut
+                  IMOD = 1
+C  Par defaut : PLASTIQUE ISOTROPE
+          IF (IPLAC.EQ.1) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='ISOTROPE'
+C  Par defaut : FLUAGE NORTON
+          ELSE IF (IPLAC.EQ.2) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='NORTON'
+C  Par defaut : VISCOPLASTIQUE ONERA
+          ELSE IF (IPLAC.EQ.3) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='ONERA'
+C  Par defaut : ENDOMMAGEMENT MAZARS
+          ELSE IF (IPLAC.EQ.4) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='MAZARS'
+C  Par defaut : ENDOMMAGEMENT PLASTIQUE P/Y
+          ELSE IF (IPLAC.EQ.5) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='PSURY'
+          ELSE IF (IPLAC.EQ.6) THEN
+C  Si 'MECANIQUE' OU 'POREUX' : pas de comportement par defaut
+C pour 'NON_LINEAIRE'
+              CALL ERREUR(945)
+              RETURN
+          ELSE IF (IPLAC.EQ.7) THEN
+C  Si 'MECANIQUE' : pas de comportement par defaut pour 'VISCO_EXTERNE'
+            IF (LESFOR(1).EQ.'MECANIQUE') THEN
+              CALL ERREUR(946)
+C  Si 'POREUX' : option non implementee
+            ELSE IF (LESFOR(1).EQ.'POREUX') THEN
+              CALL ERREUR(251)
+            ENDIF
+            RETURN
+          ELSE IF (IPLAC.EQ.8) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='ELASTIQUE'
+          ENDIF
+                 endif
+               endif
+c             write(6,*) 'numat1',imate,inmat,nmat,INLI,IMOD,jmat
+
+             if(jmat.gt.0) then
+* quelle famille non-linéaire ?
+              do 29 im = 1,nmat
+               if (lespro(im).ne.' ') then
+c                write(6,*) 'lesprim',im,lespro(im)
+            if (INLI.GT.0)
+     &       GOTO (2211,2212,2213,2214,2215,2216,2217,2218),INLI
+
+*inversion PLASTIQUE et FLUAGE car NORTON existe dans les 2 cas
+ 2212                 CALL MODFLU(MOMODL,NMOD)
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 2
+                    INMAT=INMAT+1
+                    motmat(INMAT)='FLUAGE'
+                  endif
+                  goto 27
+                endif
+
+*inversion PLASTIQUE et ENDOMMAGEMENT car MAZARS existe dans les 2 cas
+ 2214                 CALL MODEND(MOMODL,NMOD)
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 4
+                    INMAT=INMAT+1
+                    motmat(INMAT)='ENDOMMAGEMENT'
+                  endif
+                  goto 27
+                endif
+                
+ 2211                  CALL MODPLA(MOMODL,NMOD)
+                    CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 1
+                    INMAT=INMAT+1
+                    motmat(INMAT)='PLASTIQUE'
+                  endif
+                  goto 27
+                endif
+
+
+ 2213                 CALL MODVIS(MOMODL,NMOD)
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 3
+                    INMAT=INMAT+1
+                    motmat(INMAT)='VISCOPLASTIQUE'
+                  endif
+                  goto 27
+                endif
+
+
+ 2215                 CALL MODPLE(MOMODL,NMOD)  
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 5
+                    INMAT=INMAT+1
+                    motmat(INMAT)='PLASTIQUE_ENDOM'
+                  endif
+                  goto 27
+                endif
+
+ 2216                 CALL MODENL(MOMODL,NMOD)  
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 6
+                    INMAT=INMAT+1
+                    motmat(INMAT)='NON_LINEAIRE'
+                  endif
+                  goto 27
+                endif
+
+ 2217                 CALL MODVIX(MOMODL,NMOD)  
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 7
+                    INMAT=INMAT+1
+                    motmat(INMAT)='VISCO_EXTERNE'
+                  endif
+                  goto 27
+                endif
+
+ 2218                 CALL MODIMP(MOMODL,NMOD)  
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  if (dinli) then 
+                    INLI = 8
+                    INMAT=INMAT+1
+                    motmat(INMAT)='IMPEDANCE'
+                  endif
+                  goto 27
+                endif
+                
+               endif
+               goto 29
+
+  27              continue
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  IMOD = IPLAC        
+C            write(6,*) 'numat2',imate,inmat,nmat,INLI,IMOD,jmat
+                  goto 29
+
+
+  29          continue
+             endif   
+
+ 2204         continue    
+
+
+            if (IMOD.LE.0) then
+              if (INLI.GT.0) then
+* par defaut
+                  IMOD = 1
+C  Par defaut : PLASTIQUE ISOTROPE
+          IF (INLI.EQ.1) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='ISOTROPE'
+C  Par defaut : FLUAGE NORTON
+          ELSE IF (INLI.EQ.2) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='NORTON'
+C  Par defaut : VISCOPLASTIQUE ONERA
+          ELSE IF (INLI.EQ.3) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='ONERA'
+C  Par defaut : ENDOMMAGEMENT MAZARS
+          ELSE IF (INLI.EQ.4) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='MAZARS'
+C  Par defaut : ENDOMMAGEMENT PLASTIQUE P/Y
+          ELSE IF (INLI.EQ.5) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='PSURY'
+          ELSE IF (INLI.EQ.6) THEN
+C  Si 'MECANIQUE' OU 'POREUX' : pas de comportement par defaut
+C pour 'NON_LINEAIRE'
+              CALL ERREUR(945)
+              RETURN
+          ELSE IF (INLI.EQ.7) THEN
+C  Si 'MECANIQUE' : pas de comportement par defaut pour 'VISCO_EXTERNE'
+            IF (LESFOR(1).EQ.'MECANIQUE') THEN
+              CALL ERREUR(946)
+C  Si 'POREUX' : option non implementee
+            ELSE IF (LESFOR(1).EQ.'POREUX') THEN
+              CALL ERREUR(251)
+            ENDIF
+            RETURN
+          ELSE IF (INLI.EQ.8) THEN
+            INMAT=INMAT+1
+            motmat(INMAT)='ELASTIQUE'
+          ENDIF
+              else  
+*
+*           Materiau non reconnu
+*
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+* a clarifier
+c              write(6,*) 'numate-bizz5'
+c              write(6,*)'LESPRO',(LESPRO(IM),IM = 1, NMAT)
+              call erreur(5)
+              return
+              endif   
+            endif   
+
+            if (jmat.GT.0) then
+       do jma=1,nmat
+         if(lespro(jma).eq.'CRIP') then
+           INMAT = INMAT+1
+           motmat(inmat) = 'CRIP'
+           lespro(jma) = ' '
+           jmat = jmat - 1
+         elseif(lespro(jma).eq.'FUSION') then
+           INMAT = INMAT+1
+           motmat(inmat) = 'FUSION'
+           lespro(jma) = ' '
+           jmat = jmat - 1
+         endif
+       enddo
+            endif
+
+             
+            IF (IMATE.EQ.1) THEN
+*
+* >>>>>>>>>>>  Dans le cas d'une formulation elastique isotrope
+*
+  20         CONTINUE
+                  IF (INLI.EQ.0) THEN
+                  ELSE IF (INLI .EQ. 1) THEN
+*
+*                    Comportement plastique
+*                    ----------------------
+
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1) THEN
+*     ISOTROPE
+                           INATU=5
+                        ELSE IF (IMOD.EQ.2) THEN
+*     PARFAIT
+                           INATU=1
+                        ELSE IF (IMOD.EQ.3) THEN
+*     CINEMATIQUE
+                           INATU=4
+                        ELSE IF (IMOD.EQ.4) THEN
+*     DRUCKER-PRAGER
+                           INATU=15
+                        ELSE IF (IMOD.EQ.5) THEN
+*     DRUCKER-SIMPLE
+                           INATU=3
+                        ELSE IF (IMOD.EQ.6) THEN
+*     BETON
+                           INATU=9
+                        ELSE IF (IMOD.EQ.7) THEN
+*     CHABOCHE1
+                           INATU=7
+                        ELSE IF (IMOD.EQ.8) THEN
+*     CHABOCHE2
+                           INATU=12
+                        ELSE IF (IMOD.EQ.9) THEN
+*     TUYAU-FISSURE
+                           INATU=14
+                        ELSE IF (IMOD.EQ.10) THEN
+*     ENDOMMAGEABLE
+                           INATU=26
+                        ELSE IF (IMOD.EQ.11) THEN
+*     GAUVAIN
+                           INATU=16
+                        ELSE IF (IMOD.EQ.12) THEN
+*     LINESPRING
+                           INATU=2
+                        ELSE IF (IMOD.EQ.13) THEN
+*     UBIQUITOUS
+                           INATU=28
+                        ELSE IF (IMOD.EQ.14) THEN
+*     GLOBAL
+                           INATU=32
+                        ELSE IF (IMOD.EQ.15) THEN
+*     CAM-CLAY
+                           INATU=33
+                        ELSE IF (IMOD.EQ.16) THEN
+*     MOHR COULOMB
+                           INATU=34
+                        ELSE IF (IMOD.EQ.17) THEN
+*     JOINT DILATANT
+                           INATU=35
+                        ELSE IF (IMOD.EQ.18) THEN
+*     BETON_AXI
+                           INATU=36
+                        ELSE IF (IMOD.EQ.19) THEN
+*     GURSON
+                          INATU=38
+                        ELSE IF (IMOD.EQ.20) THEN
+*     BETON_UNI
+                           INATU=39
+                        ELSE IF (IMOD.EQ.21) THEN
+*     ACIER_UNI
+                           INATU=40
+                        ELSE IF (IMOD.EQ.51) THEN
+*     ACIER_ANCRAGE
+                           INATU=93
+                        ELSE IF (IMOD.EQ.23) THEN
+*     OTTOSEN (BETON)
+                           INATU=42
+                        ELSE IF (IMOD.EQ.83) THEN
+*     OTTOVARI (BETON)
+                           INATU=148
+                        ELSE IF (IMOD.EQ.24) THEN
+*     MAZARS_FIB
+                           INATU=46
+                        ELSE IF (IMOD.EQ.53) THEN
+*     UNILATERAL (Fibre)
+                           INATU=104
+                        ELSE IF (IMOD.EQ.44) THEN
+*     FRAGILE_UNI
+                           INATU=78
+*
+                        ELSE IF (IMOD.EQ.45) THEN
+*     BETON_BAEL
+                           INATU=79
+*
+                        ELSE IF (IMOD.EQ.46) THEN
+*     PARFAIT_UNI
+                           INATU=80
+*
+                        ELSE IF (IMOD.EQ.50) THEN
+*     PARFAIT_ANCRAGE
+                           INATU=92
+C +BR
+                        ELSE IF (IMOD.EQ.72) THEN
+*     RICBET_UNI
+                           INATU=160
+C -BR
+*
+                        ELSE IF (IMOD.EQ.47) THEN
+*     STRUT_UNI
+                           INATU=83
+*
+                        ELSE IF (IMOD.EQ.25) THEN
+*     AMADEI-SAEB
+                           INATU=47
+                        ELSE IF (IMOD.EQ.26) THEN
+*     HUJEUX
+                           INATU=48
+                        ELSE IF (IMOD.EQ.27) THEN
+*     STEINBERG-COCHRAN-GUINAN
+                           INATU=49
+                        ELSE IF (IMOD.EQ.28) THEN
+*     ZERILLI-ARMSTRONG
+                           INATU=50
+                        ELSE IF (IMOD.EQ.29) THEN
+*     PRESTON-TONKS-WALLACE
+                           INATU=52
+                        ELSE IF (IMOD.EQ.30) THEN
+*     BETOCYCL
+                           INATU=54
+                        ELSE IF (IMOD.EQ.31) THEN
+*     ROTATING_CRACK
+                           INATU=55
+                        ELSE IF (IMOD.EQ.32) THEN
+*     JOINT_SOFT
+                           INATU=56
+                        ELSE IF (IMOD.EQ.49) THEN
+*     ANCRAGE_ELIGEHAUSEN
+                           INATU=91
+                        ELSE IF (IMOD.EQ.33) THEN
+*     BILI_MOMY
+                           INATU=57
+                        ELSE IF (IMOD.EQ.34) THEN
+*     BILI_EFFZ
+                           INATU=58
+                        ELSE IF (IMOD.EQ.35) THEN
+*     TAKEMO_MOMY
+                           INATU=59
+                        ELSE IF (IMOD.EQ.36) THEN
+*     TAKEMO_EFFZ
+                           INATU=60
+                        ELSE IF (IMOD.EQ.37) THEN
+*     BETON_INSA
+                           INATU=66
+                        ELSE IF (IMOD.EQ.40) THEN
+*     ALONSO
+                           INATU=69
+                        ELSE IF (IMOD.EQ.41) THEN
+*     PAKZAD
+                           INATU=71
+                        ELSE IF (IMOD.EQ.42) THEN
+*     INFILL_UNI
+                           INATU=72
+                        ELSE IF (IMOD.EQ.43) THEN
+*     CISAIL_NL
+                           INATU=73
+                        ELSE IF (IMOD.EQ.48) THEN
+*     HINTE
+                           INATU=89
+                        ELSE IF (IMOD.EQ.52) THEN
+*     BETON_URGC
+                           INATU=99
+* BCN
+                        ELSE IF (IMOD.EQ.54) THEN
+*     MRS_LADE
+                           INATU=111
+                        ELSE IF (IMOD.EQ.55) THEN
+*     J2
+                           INATU=112
+                        ELSE IF (IMOD.EQ.56) THEN
+*     RH_COULOMB
+                           INATU=113
+                        ELSE IF (IMOD.EQ.57) THEN
+*     VMT_FEFP
+                           INATU=114
+                        ELSE IF (IMOD.EQ.58) THEN
+*     RHMC_FEFP
+                           INATU=115
+                        ELSE IF (IMOD.EQ.59) THEN
+*     POWDER_FEFP
+                           INATU=116
+                        ELSE IF (IMOD.EQ.60) THEN
+*     POWDERCAP_FEFP
+                           INATU=117
+* BCN
+                        ELSE IF (IMOD.EQ.61) THEN
+*     JOINT_COAT
+                           INATU=119
+
+                        ELSE IF (IMOD.EQ.62) THEN
+*     CONCRETE_UNI
+                           INATU=123
+
+                        ELSE IF (IMOD.EQ.73) THEN
+*     BA1D
+                           INATU=147
+
+                        ELSE IF (IMOD.EQ.63) THEN
+*     MUR_SHEAR
+                           INATU=126
+
+                        ELSE IF (IMOD.EQ.64) THEN
+*     INCO
+                           INATU=129
+                        ELSE IF (IMOD.EQ.65) THEN
+*     DRUCKER_PRAGER2
+                           INATU=140
+                        ELSE IF (IMOD.EQ.67) THEN
+*     INTIMP
+                           INATU=145
+                        ELSE IF (IMOD.EQ.68) THEN
+*     INTJOI
+                           INATU=146
+                        ELSE IF (IMOD.EQ.69) THEN
+*     BILIN_EFFX
+                           INATU=150
+*     LIAISON_ACBE ( liaison acier beton)
+                        ELSE IF (IMOD.EQ.74) THEN
+                            INATU=171
+*     DP_SOL
+                        ELSE IF (IMOD.EQ.75) THEN
+                            INATU=172
+*     OUGLOVA
+                        ELSE IF (IMOD.EQ.76) THEN
+                           INATU=175
+*     IWPR3D_SOL
+                        ELSE IF (IMOD.EQ.77) THEN
+                           INATU=176
+*     NORTON
+                        ELSE IF (IMOD.EQ.78) THEN
+                           INATU=181
+*     POLYNOMIAL
+                        ELSE IF (IMOD.EQ.79) THEN
+                           INATU=182
+*     BLACKBURN
+                        ELSE IF (IMOD.EQ.80) THEN
+                           INATU=183
+*     BLACKBURN_2
+                        ELSE IF (IMOD.EQ.81) THEN
+                           INATU=184
+*     LEMAITRE
+                        ELSE IF (IMOD.EQ.82) THEN
+                           INATU=185
+                        ENDIF
+
+                  ELSE IF (INLI .EQ. 2) THEN
+*
+*                    Comportement FLUAGE
+*                    -------------------
+                        IF (IMOD.EQ.0 ) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1 ) THEN
+*     NORTON
+                           INATU=19
+                        ELSE IF (IMOD.EQ.2 ) THEN
+*     BLACKBURN
+                           INATU=20
+                        ELSE IF (IMOD.EQ.3 ) THEN
+*     RCCMR-316
+                           INATU=22
+                        ELSE IF (IMOD.EQ.4 ) THEN
+*     RCCMR-304
+                           INATU=23
+                        ELSE IF (IMOD.EQ.5 ) THEN
+*     LEMAITRE
+                           INATU=24
+                        ELSE IF (IMOD.EQ.6 ) THEN
+*     POLYNOMIAL
+                           INATU=21
+                        ELSE IF (IMOD.EQ.7 ) THEN
+*    BLACKBURN_2
+                           INATU=61
+                        ELSE IF (IMOD.EQ.8) THEN
+*    CERAMIQUE
+                           INATU=65
+                       ELSE IF (IMOD.EQ.9) THEN
+*    MAXWELL
+                                           INATU=74
+                        ELSE IF (IMOD.EQ.10) THEN
+*     COMETE
+                           INATU = 84
+                        ELSE IF (IMOD.EQ.11) THEN
+*     CCPL
+                           INATU = 85
+                        ELSE IF (IMOD.EQ.12) THEN
+*     X11
+                           INATU = 86
+                        ELSE IF (IMOD.EQ.13) THEN
+*     BPEL_RELAX
+                           INATU = 95
+                        ELSE IF (IMOD.EQ.14) THEN
+*     BETON_URGC
+                           INATU = 101
+                        ELSE IF (IMOD.EQ.15) THEN
+*     SODERBERG
+                           INATU = 102
+                        ELSE IF (IMOD.EQ.16) THEN
+*     MAXOTT
+                           INATU = 106
+                        ELSE IF (IMOD.EQ.17) THEN
+*     FBB1
+                           INATU = 127
+                        ELSE IF (IMOD.EQ.18) THEN
+*     FBB2
+                           INATU = 128
+                        ELSE IF (IMOD.EQ.19) THEN
+*     KELVIN
+**                         INATU = 174
+*  AM 3/3/17  MODELE INDISPONIBLE
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+*
+                  ELSE IF (INLI .EQ. 3) THEN
+*
+*                    Comportement VISCOPLASTIQUE
+*                    ---------------------------
+                        IF (IMOD.EQ.0 ) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1 ) THEN
+*     GUIONNET
+                           INATU=17
+                        ELSE IF (IMOD.EQ.2 ) THEN
+*     ONERA    
+                        INATU=25
+                        ELSE IF (IMOD.EQ.3 ) THEN
+*     VISCODOMMAGE
+                           INATU=29
+                        ELSE IF (IMOD.EQ.4 ) THEN
+*     PARFAIT
+                           INATU = 43
+                        ELSE IF (IMOD.EQ.5 ) THEN
+*     POUDRE_A
+                           INATU = 44
+                        ELSE IF (IMOD.EQ.6 ) THEN
+*     POUDRE_B
+                           INATU = 45
+                        ELSE IF (IMOD.EQ.7 ) THEN
+*     OHNO
+                           INATU = 53
+                        ELSE IF (IMOD.EQ.8 ) THEN
+*     DDI
+                           INATU = 63
+                        ELSE IF (IMOD.EQ.9 ) THEN
+*     KOCK
+                           INATU = 70
+                        ELSE IF (IMOD.EQ.10 ) THEN
+*     NOUAILHAS_A
+                           INATU = 76
+                        ELSE IF (IMOD.EQ.11 ) THEN
+*     NOUAILHAS_B
+                           INATU = 77
+                        ELSE IF (IMOD.EQ.12) THEN
+*     VISK2
+                           INATU = 82
+                        ELSE IF (IMOD.EQ.13 ) THEN
+*     VISCOHINTE
+                           INATU = 90
+                        ELSE IF (IMOD.EQ.14) THEN
+*     MISTRAL
+                           INATU = 94
+                        ELSE IF (IMOD.EQ.15) THEN
+*     BETON_URGC
+                           INATU = 100
+                        ELSE IF (IMOD.EQ.16 ) THEN
+*     LEMENDO
+                           INATU = 103
+                        ELSE IF (IMOD.EQ.17) THEN
+*     FLUNOR2
+                           INATU = 105
+                        ELSE IF (IMOD.EQ.18) THEN
+*     GATT_MONERIE
+                           INATU = 107
+                        ELSE IF (IMOD.EQ.19) THEN
+*     UO2
+                           INATU = 108
+                        ELSE IF (IMOD.EQ.20) THEN
+*     BETON_URGC_ENDO
+                           INATU = 122
+                        ELSE IF (IMOD.EQ.21) THEN
+*     LOI DE COMPORTEMENT VISQUEUSE AVEC DOUBLE ENDO
+                           INATU = 130
+                        ELSE IF (IMOD.EQ.22) THEN
+*     'CHAB_SINH_R'
+                           INATU = 136
+                        ELSE IF (IMOD.EQ.23) THEN
+*     'CHAB_SINH_X'
+                           INATU = 137
+                        ELSE IF (IMOD.EQ.24) THEN
+*     'CHAB_NOR_R'
+                           INATU = 138
+                        ELSE IF (IMOD.EQ.25) THEN
+*      'CHAB_NOR_X'
+                           INATU = 139
+                        ELSE IF (IMOD.EQ.26) THEN
+*      'PELLET'
+                           INATU = 142
+                        ELSE IF (IMOD.EQ.27) THEN
+*      'FLUTRA'
+                           INATU = 143
+                        ELSE IF (IMOD.EQ.28) THEN
+*      'SYCO1'
+                           INATU = 153
+                        ELSE IF (IMOD.EQ.29) THEN
+*      'SYCO2'
+                           INATU = 154
+                        ELSE IF (IMOD.EQ.30) THEN
+*      'CHABOCHE' 
+                           INATU = 165
+                        ELSE IF (IMOD.EQ.31) THEN
+*      'FLUENDO3D' 'Sellier'      
+                           INATU = 187
+                        ELSE IF (IMOD.EQ.32) THEN
+*      'INCLUSION3D' 'Sellier'      
+                           INATU = 188  
+                        ELSE IF (IMOD.EQ.33) THEN
+*      'ENDO3D' 'Sellier'      
+                           INATU = 189 
+                        ENDIF
+*
+                  ELSE IF (INLI .EQ. 4) THEN
+*
+*                    Comportement type ENDOMMAGEMENT
+*                    -------------------------------
+                        IF (IMOD.EQ.0 ) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1 ) THEN
+*     MAZARS
+                           INATU=30
+                        ELSE IF (IMOD.EQ.2 ) THEN
+*     UNILATERAL
+                           INATU=31
+                        ELSE IF (IMOD.EQ.3 ) THEN
+*     ROTATING_CRACK
+                           INATU=37
+*                        ELSE IF (IMOD.EQ.4) THEN
+*     SIC_SIC
+*                            INATU=88
+                        ELSE IF (IMOD.EQ.5) THEN
+*     MICROPLANS
+                           INATU=96
+                        ELSE IF (IMOD.EQ.6) THEN
+*     VISCOUNILATERAL
+                           INATU=97
+                        ELSE IF (IMOD.EQ.7) THEN
+*     MICROISO
+                           INATU=98
+*     BCN
+                        ELSE IF (IMOD.EQ.8) THEN
+*     MODIFIED VON MISES
+                           INATU=118
+
+                        ELSE IF (IMOD.EQ.9) THEN
+*     CRUCRA
+                           INATU=124
+                        ELSE IF (IMOD.EQ.10) THEN
+*     DAMAGE_TC - R. Faria & J. Oliver
+                           INATU=125
+*                        ELSE IF (IMOD.EQ.11) THEN
+*     SICSCAL - modele scalaire SiCf/SiC ONERA
+*                            INATU=131
+*                         ELSE IF (IMOD.EQ.12) THEN
+*     SICTENS - modele pseudo tensoriel SiCf/SiC ONERA
+*                            INATU=132
+                        ELSE IF (IMOD.EQ.13) THEN
+*     DESMORAT
+                           INATU=134
+                        ELSE IF (IMOD.EQ.14) THEN
+*     FATSIN
+                           INATU=141
+                        ELSE IF (IMOD.EQ.15) THEN
+*     RICRAG2D
+                           INATU=144
+C +BR
+                        ELSE IF (IMOD.EQ.16) THEN
+*     GLRC_DM
+                           INATU=157
+                        ELSE IF (IMOD.EQ.17) THEN
+*     RICBET
+                           INATU=158
+                        ELSE IF (IMOD.EQ.18) THEN
+*     RICCOQ
+                           INATU=159
+                        ELSE IF (IMOD.EQ.19) THEN
+*     RICBET
+                           INATU=173
+                        ELSE IF (IMOD.EQ.20) THEN
+*     RICBET
+                           INATU=177
+C -BR
+*
+                        ENDIF
+*
+                  ELSE IF (INLI .EQ. 5) THEN
+*
+*
+*                    Comportement PLASTIQUE ENDOM(MAGEABLE)
+*                    --------------------------------------
+                        IF (IMOD.EQ.0 ) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1 ) THEN
+*     PSURY
+                           INATU=51
+                        ELSE IF (IMOD.EQ.2 ) THEN
+*     ROUSSELIER
+                           INATU=62
+                        ELSE IF (IMOD.EQ.3 ) THEN
+*     GURSON2
+                           INATU=64
+                        ELSE IF (IMOD.EQ.4 ) THEN
+*     DRAGON
+                           INATU=75
+                        ELSE IF (IMOD.EQ.5 ) THEN
+*     BETON_URGC
+                           INATU=120
+                        ELSE IF (IMOD.EQ.6 ) THEN
+*     BETON_INSA
+                           INATU=121
+                        ELSE IF (IMOD.EQ.7 ) THEN
+*     BETON_DYNAR_LMT
+                          INATU=133
+                        ELSE IF (IMOD.EQ.8) THEN
+*     ENDO_PLAS
+                           INATU=135
+                        ELSE IF (IMOD.EQ.9) THEN
+*     GERNAY
+                           INATU=155
+                        ENDIF
+C
+                  ELSE IF (INLI.EQ.6) THEN
+C
+C                    Comportement ELASTIQUE NON_LINEAIRE
+C                    -----------------------------------
+                        IF (IMOD.EQ.0 ) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1 ) THEN
+*     EQUIPLAS
+                           INATU=87
+                        ELSE IF (IMOD.EQ.2) THEN
+C     UTILISATEUR
+                           INATU = -1 
+                        ENDIF
+C
+                  ELSE IF (INLI.EQ.7) THEN
+C
+C                    Comportement VISCO_EXTERNE
+C                    --------------------------
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE
+                              INATU = -2-IMOD
+c* Permet de recuperer IMOD=IVIEX (>0) en sortie de NOMATE avant de fixer
+c* la valeur de INATU a -2
+                        ENDIF
+
+                  ELSE IF (INLI.EQ.8) THEN
+c
+c ------------------------ IMPEDANCE  --------------------------
+                IF (IMOD.EQ.0) THEN
+                          CMATE='IMPELAST'
+                          INATU=161
+                ELSE
+
+                 IF (IMOD.EQ.1) THEN
+                           CMATE='IMPELAST'
+                           INATU = 161
+                 ELSEIF (IMOD.EQ.2) THEN
+                           CMATE='IMPVOIGT'
+                           INATU = 162
+                 ELSEIF (IMOD.EQ.3) THEN
+                           CMATE='IMPREUSS'
+                           INATU = 163
+                 ELSEIF (IMOD.EQ.4) THEN
+                           CMATE='IMPCOMPL'
+                           INATU = 164
+                 ELSE
+                          CMATE=' '
+                          IMATE=0
+                           INATU=0
+                 ENDIF
+                ENDIF
+
+*
+*                  ELSEIF (INLI.GT.8) THEN
+                  ENDIF
+*
+*
+            ELSE IF (IMATE.EQ.2) THEN
+*
+* >>>>>>>>>>>  Dans le cas d'une formulation elastique orthotrope
+*              on se limite pour l'instant �
+*              2 comportements plastiques,
+*              1 comportement viscoplastique,
+*              1 comportement endommageable,
+*              + le comportement 'NON_LINEAIRE' 'UTILISATEUR'
+*
+c mistral :
+                  IF (INLI.NE.1.AND.INLI.NE.3.AND.INLI.NE.4.AND.
+     &                INLI.NE.6) THEN
+c mistral.
+*
+*           Materiau non reconnu
+*
+                     call erreur(21)
+                     return
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+*
+                  ELSE IF (INLI.EQ.1) THEN
+*
+*                    Comportement plastique
+*                    ----------------------
+
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.16) THEN
+*     MOHR COULOMB
+                           INATU=34
+                        ELSE IF (IMOD.EQ.38) THEN
+*     ECROUIS_INSA
+                           INATU=67
+                        ELSE IF (IMOD.EQ.39) THEN
+*     PARFAIT_INSA
+                           INATU=68
+                        ELSE IF (IMOD.EQ.70) THEN
+*     ISS_GRANGE
+                           INATU=151
+                        ELSE IF (IMOD.EQ.71) THEN
+*     RUP_THER
+                           INATU=152
+                        ELSE
+                           CMATE=' '
+                           imate=0
+                           inatu=0
+                        ENDIF
+c mistral :
+                  ELSE IF (INLI.EQ.3) THEN
+*
+*                    Comportement VISCOPLASTIQUE
+*                    ---------------------------
+                        IF (IMOD.EQ.0 ) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.14) THEN
+*     MISTRAL
+                           INATU = 94
+                        ELSE
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+c mistral.
+                  ELSE IF(INLI.EQ.4) THEN
+*
+*                    Comportement endommageable
+*                    --------------------------
+
+                         IF (IMOD.EQ.0) THEN
+                            CMATE=' '
+                            IMATE=0
+                            INATU=0
+                         ELSE IF (IMOD.EQ.4) THEN
+*     SIC_SIC
+                            INATU=88
+                        ELSE IF (IMOD.EQ.11) THEN
+*     SICSCAL - mod�le scalaire SiCf/SiC ONERA
+                            INATU=131
+                         ELSE IF (IMOD.EQ.12) THEN
+*     SICTENS - mod�le pseudo tensoriel SiCf/SiC ONERA
+                            INATU=132
+                         ELSE
+                            CMATE=' '
+                            IMATE=0
+                            INATU=0
+                         ENDIF
+C
+                  ELSE IF (INLI.EQ.6) THEN
+C
+C                    Comportement NON_LINEAIRE
+C                    -------------------------
+                        IF (IMOD.EQ.2) THEN
+C     UTILISATEUR
+                              INATU = -1
+                        ELSE
+C     Autres cas non autorises
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+                  ENDIF
+*
+*
+            ELSE IF (IMATE.EQ.3) THEN
+C
+C >>>>>>>>>>>  Dans le cas d'une formulation elastique anisotrope
+C              on se limite pour l'instant au comportement
+C              'NON_LINEAIRE' 'UTILISATEUR'
+C
+                  IF (INLI.NE.6) THEN
+C
+C                    Materiau non reconnu
+C
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+C
+                  ELSE
+C
+C                    Comportement NON_LINEAIRE
+C                    -------------------------
+                        IF (IMOD.EQ.2) THEN
+C     UTILISATEUR
+                              INATU = -1
+                        ELSE
+C     Autres cas non autorises
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+                  ENDIF
+C
+C
+            ELSE IF (IMATE.EQ.4) THEN
+*
+* >>>>>>>>>>>  Dans le cas d'une formulation elastique unidirectionnelle
+*              on se limite pour l'instant � quelques comportements
+*              plastiques et visqueux
+*              + le comportement 'NON_LINEAIRE' 'UTILISATEUR'
+*
+                  IF (INLI.NE.1.AND.INLI.NE.2.AND.INLI.NE.6) THEN
+*
+*           Materiau non reconnu
+*
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+*
+                  ELSE IF(INLI.EQ.1) THEN
+*
+*                    Comportement plastique
+*                    ----------------------
+
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.70) THEN
+*     ISS_GRANGE
+                           INATU=151
+                        ELSE IF (IMOD.EQ.71) THEN
+*     RUP_THER
+                           INATU=152
+                        ELSE IF (IMOD.EQ.1) THEN
+*     ISOTROPE
+                           INATU=5
+                        ELSE IF (IMOD.EQ.2) THEN
+*     PARFAIT
+                           INATU=1
+                        ELSE IF (IMOD.EQ.3) THEN
+*     CINEMATIQUE
+                           INATU=4
+                        ELSE IF (IMOD.EQ.21) THEN
+*     ACIER_UNI
+                           INATU=40
+                        ENDIF
+*
+                  ELSE IF(INLI.EQ.2) THEN
+*
+*                    Comportement FLUAGE
+*                    -------------------
+
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.9) THEN
+*     MAXWELL
+                           INATU=74
+                        ENDIF
+C
+                  ELSE IF (INLI.EQ.6) THEN
+C
+C                    Comportement NON_LINEAIRE
+C                    -------------------------
+                        IF (IMOD.EQ.2) THEN
+C     UTILISATEUR
+                              INATU = -1
+                        ELSE
+C     Autres cas non autorises
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+
+                  ENDIF
+*
+* MODAL et STATIQUE
+*
+            ELSE IF (IMATE.EQ.9.OR.IMATE.EQ.10) THEN
+C             write(6,*) 'numa',imate,inli,imod
+                 IF (INLI.EQ.0) THEN
+*
+*           Materiau non reconnu
+*
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+                 ELSE IF (INLI .EQ. 1) THEN
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.1) THEN
+*     ISOTROPE
+                           INATU=5
+                        ELSE IF (IMOD.EQ.2) THEN
+*     PARFAIT
+                           INATU=1
+                        ELSE IF (IMOD.EQ.3) THEN
+*     CINEMATIQUE
+                           INATU = 3
+                        ENDIF
+                 ELSE IF (INLI.EQ.8) THEN
+c
+c ------------------------ IMPEDANCE  --------------------------
+                  IMATE = 1
+                  IF (IMOD.EQ.0) THEN
+                          CMATE='IMPELAST'
+                          INATU=161
+                  ELSE
+
+                   IF (IMOD.EQ.1) THEN
+                           CMATE='IMPELAST'
+                           INATU = 161
+                   ELSEIF (IMOD.EQ.2) THEN
+                           CMATE='IMPVOIGT'
+                           INATU = 162
+                   ELSEIF (IMOD.EQ.3) THEN
+                           CMATE='IMPREUSS'
+                           INATU = 163
+                   ELSEIF (IMOD.EQ.4) THEN
+                           CMATE='IMPCOMPL'
+                           INATU = 164
+                   ELSE
+                          CMATE=' '
+                          IMATE=0
+                           INATU=0
+                   ENDIF
+                  ENDIF
+
+*
+                 ENDIF
+*
+* >>>>>>>>>>>  CAS DES POUTRES A FORMULATION SECTION
+*
+            ELSE IF (IMATE.EQ.11) THEN
+*
+                  IF (INLI.NE.1) THEN
+*
+*           Materiau non reconnu
+*
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+                  ELSE
+*
+*                    Comportement plastique
+*                    ----------------------
+
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.22) THEN
+*     SECTION
+                           INATU=41
+                        ELSE
+*
+*     cas non autorise
+*
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+*
+                  ENDIF
+
+            ELSE IF (IMATE.EQ.12) THEN
+*             ************************
+*             | cas 'ZONE_COHESIVE'  |
+*             ************************
+* >>>>>>>>>>>  Dans le cas d'une formulation elastique zone_cohesive
+*              on se limite pour l'instant a quelques comportements
+*              plastique_endo
+*              + le comportement 'NON_LINEAIRE' 'UTILISATEUR'
+
+                  IF (INLI.NE.5.AND.INLI.NE.6) THEN
+*
+*           Materiau non reconnu
+*
+                     CMATE=' '
+                     IMATE=0
+                     INATU=0
+*
+                  ELSE IF(INLI.EQ.5) THEN
+*
+*                    Comportement plastique_endo
+*                    --------------------------
+
+                        IF (IMOD.EQ.0) THEN
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ELSE IF (IMOD.EQ.10) THEN
+*     WELLS
+                           INATU=156
+                        ENDIF
+*
+C
+                  ELSE IF (INLI.EQ.6) THEN
+C
+C                    Comportement NON_LINEAIRE
+C                    -------------------------
+                        IF (IMOD.EQ.2) THEN
+C     UTILISATEUR
+                              INATU = -1
+                        ELSE
+C     Autres cas non autorises
+                           CMATE=' '
+                           IMATE=0
+                           INATU=0
+                        ENDIF
+                  ENDIF
+
+**          ELSE IF (IMATE.GT.12) THEN
+            ENDIF
+
+*--------------------------------------------------------------------*
+*     3/ CAS DE LA FORMULATION 'LIQUIDE '                            *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'LIQUIDE') THEN
+
+            IF (NMAT.EQ.0) THEN
+               CMATE='ISOTROPE'
+               IMATE=1
+            ELSE IF (NMAT.EQ.1) THEN
+               CALL PLACE(LISTMT,3,IPLAC,lespro(1))
+               INMAT=INMAT+1
+               IF (IPLAC.EQ.1) THEN
+                  CMATE = lespro(1)
+                  IMATE=1
+               ENDIF
+            ENDIF
+
+*--------------------------------------------------------------------*
+*     4/ CAS DE LA FORMULATION 'THERMIQUE' 'CONVECTION'              *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'CONVECTION') THEN
+            CMATE = 'CONVECTI'
+            IMATE = 1
+            IF (NMAT.gt.0)THEN
+                 CALL MODCON(MOMODL,NMOD)
+                do ic = 1,NMAT
+                 CALL PLACE(MOMODL,NMOD,IPLAC,lespro(ic))
+                 IF (IPLAC.NE.0)THEN
+                   CMATE = MOMODL(IPLAC)
+                   IMATE = IPLAC
+            inmat = inmat + 1
+            motmat(inmat) = momodl(iplac)
+                 ENDIF
+                enddo
+            ENDIF
+*
+*--------------------------------------------------------------------*
+*     9/ CAS DE LA FORMULATION 'THERMIQUE' 'RAYONNEMENT'             *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'RAYONNEMENT') THEN
+            CMATE ='RAYONNEM'
+            IMATE = 1
+            d_syme = .false.
+            d_ferm = .false.
+            d_conv = .false.
+            if(NMAT.ne.0) then
+               call modray(momodl,nmod)
+              do im = 1,nmat
+                call place (momodl,nmod,iplac,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+
+               if( iplac.eq.1)then
+                  imate=2
+               elseif( iplac.eq.2) then
+                  imate=3
+               elseif(iplac.eq.3) then
+                  imate=4
+               elseif(iplac.eq.4) then
+                 d_syme = .true.
+               elseif(iplac.eq.5) then
+                 d_conv = .true.
+               elseif(iplac.eq.6) then
+                 d_ferm = .true.
+               endif
+                endif               
+              enddo
+              if ((d_conv.or.d_syme.or.d_ferm).and.imate.eq.1) then                
+           do iur=1,inmat-2
+             motmat(inmat+2-iur)=motmat(inmat +1-iur)
+           enddo
+               motmat(3) = momodl(3) 
+               inmat = inmat + 1
+               imate = 4
+              endif
+              
+              if (imate.eq.4) then
+*          inatu 1    cavite toute simple                            *
+                if(.not.(d_syme.and.d_ferm.and.d_conv)) inatu = 1
+*          inatu=2    cavite ferme                                   *
+                if(d_ferm.and.(.not.(d_syme.and.d_conv))) inatu = 2
+*          inatu=3    cavite syme                                    *
+                if(d_syme.and.(.not.(d_ferm.and.d_conv))) inatu = 3
+*          inatu=4    cavite convexe                                 *
+                if(d_conv.and.(.not.(d_ferm.and.d_syme))) inatu = 4
+*          inatu=5    cavite syme  convexe                           *
+                if(d_conv.and.d_syme.and.(.not.d_ferm)) inatu = 5
+*          inatu=6    cavite ferme convexe                           *
+                if(d_conv.and.d_ferm.and.(.not.d_syme)) inatu = 6
+*          inatu=7    cavite syme  ferme                             *
+                if(d_syme.and.d_ferm.and.(.not.d_conv)) inatu = 7
+*          inatu=8    cavite syme  convexe   ferme                   *
+                if(d_conv.and.d_ferm.and.d_syme) inatu = 8
+              endif
+                
+            else
+            endif
+*
+*--------------------------------------------------------------------*
+*     22/ CAS DE LA FORMULATION 'THERMIQUE' 'SOURCE'                 *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'SOURCE') THEN
+            CMATE = 'SOURCE'
+            INATU = 0
+            IMATE = 0 
+            d_gaus = .false.
+            CALL MODSRC(MOMODL,NMOD)
+C On identifie le modele de SOURCE gaussienne...
+            IF (NMAT.GT.1) THEN
+              do im = 1,nmat
+                call place (momodl,nmod,iplac,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+              IF (IPLAC.EQ.1) THEN
+C             Cas Source Gaussienne
+               INATU = 2
+                d_gaus = .true.
+C               Gaussienne : Isotrope ou Isotrope_Transverse ?
+              ELSEIF (IPLAC.EQ.2) THEN
+                    IMATE = 1 
+              ELSEIF (IPLAC.EQ.3) THEN
+                    IMATE = 2
+              ELSE
+                    MOTERR(1:40)  = 'SOURCE '//lespro(2)//lespro(3)
+                    CALL ERREUR(1048)
+                    RETURN
+              ENDIF
+                endif             
+              enddo
+              if(.not.d_gaus.and.imate.gt.0) then
+               motmat(inmat+1) = motmat(inmat)
+               motmat(inmat) = momodl(1)
+               inmat = inmat + 1               
+               inatu = 2
+              endif
+              if(d_gaus.and.imate.eq.0) then
+               inmat = inmat + 1               
+               motmat(inmat) = momodl(2)
+               imate = 1
+              endif
+              
+              if (jmat.gt.0) then
+                MOTERR(1:8)  = lespro(2)
+                MOTERR(9:16) = 'SOURCE  '
+                CALL ERREUR(81)
+                RETURN
+              endif
+            ELSE
+* par defaut densite uniforme de chaleur
+              INATU = 1
+              IMATE = 1
+            ENDIF
+*
+*--------------------------------------------------------------------*
+*    11/ CAS DE LA FORMULATION 'NAVIER_STOKES'                       *
+*    13/ CAS DE LA FORMULATION 'EULER'                               *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'NAVIER_STOKES'.OR.forfo1.EQ.'EULER') THEN
+          IF(NMAT.NE.0) THEN
+            IF (forfo1.EQ.'NAVIER_STOKES') CALL MONAST(MOMODL,NMOD)
+            IF (forfo1.EQ.'EULER') CALL MOEULR(MOMODL,NMOD)
+             do im = 1,nmat
+                call place (momodl,nmod,iplac,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+               IF (CMATE.eq.' ')THEN
+                  IMATE = iplac
+                  CMATE = MOMODL(IPLAC)
+               ELSE
+                  if (imate.gt.0) then
+* kich : traite 1 mot a la fois               
+                  call erreur(21)
+                   return
+                  endif
+               ENDIF
+                endif
+            enddo
+
+               if (imate.eq.0) then
+* il y a un probleme
+                 INMAT = -1
+                 goto 99        
+               endif
+              
+          ELSE
+* par defaut
+            CMATE='NEWTONIE'
+            INMAT=INMAT+1
+            motmat(inmat) = CMATE
+            IMATE=1
+          ENDIF
+*
+*--------------------------------------------------------------------*
+*     10/ CAS DE LA FORMULATION 'MAGNETODYNAMIQUE'                     *
+*--------------------------------------------------------------------*            
+         ELSE IF (forfo1.EQ.'MAGNETODYNAMIQUE') THEN
+            IF(NMAT.NE.0) THEN
+              do im = 1,nmat
+                CALL PLACE(OPTMAG,1,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = OPTMAG(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                endif
+              enddo
+              if (jmat.eq.nmat) then
+* par defaut
+               INMAT=INMAT+1
+               motmat(inmat)= OPTMAG(1)
+              endif              
+              do im = 1,nmat
+                CALL PLACE(LISTMT,3,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = listmt(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  if (iplac.eq.1) then
+                CMATE='CORFOU  '
+                IMATE=1
+                  else
+                  CMATE=LISTMT(IPLAC)
+                  IMATE=IPLAC
+                  endif
+                endif
+              enddo
+
+              if(jmat.gt.0) then
+                call erreur(21)
+                return
+              endif
+            ELSE
+               INMAT=INMAT+1
+                 motmat(inmat)= OPTMAG(1)
+               INMAT=INMAT+1
+                 motmat(inmat)=LISTMT(1)
+              CMATE='CORFOU  '
+              IMATE=1
+            ENDIF
+*
+*--------------------------------------------------------------------*
+*     8/ CAS DE LA FORMULATION 'CONTACT'                          *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'CONTACT') THEN
+            imate=0
+            inatu=0
+* imate=1 unilateral; imate=2 maintenu; inatu=0 pas de frottement
+* inatu=1 coulomb; inatu=2 frocable
+   88       continue
+            IF(NMAT.NE.0) THEN
+               CALL MOCONT(MOMODL,NMOD)
+              do im = 1,nmat
+               CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+               if(iplac.eq.1) then
+                 CMATE=momodl(1)
+                 imate=1
+               elseif (IPLAC.EQ.2)    THEN
+                  CMATE=momodl(2)
+                  imate=2
+               elseif (IPLAC.EQ.3)   THEN
+                  inatu=1
+               elseif (iplac.eq.4) then
+                  inatu=1
+               elseif(iplac.eq.5) then
+                  inatu=2
+               endif
+                endif
+              enddo
+              
+              if (CMATE.eq.' ') then
+           do iur=1,inmat
+             motmat(inmat+2-iur)=motmat(inmat +1-iur)
+           enddo
+           motmat(1)=momodl(1)
+           inmat=inmat+1
+                 CMATE=momodl(1)
+                 imate=1              
+              endif
+              
+            ELSE
+           inmat=inmat+1
+           motmat(inmat)='UNILATERAL'
+                 CMATE='UNILATERAL'
+                 imate=1
+            ENDIF
+
+*--------------------------------------------------------------------*
+*     12/ CAS DE LA FORMULATION 'MELANGE'                            *
+* on renvoie le premier modele trouve !!!                            *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'MELANGE') THEN
+            CALL MODMEL(MOMODL,NMOD)
+            IF (NMAT.GE.1)THEN
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = lespro(im)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+               IF (CMATE.eq.' ')THEN
+                  IMATE = iplac
+                  CMATE = MOMODL(IPLAC)
+               ELSE
+                  if (imate.gt.0) then
+* kich : traite 1 mot a la fois               
+                  call erreur(21)
+                   return
+                  endif
+               ENDIF
+                endif              
+               enddo
+               if (imate.eq.0) then
+* il y a un probleme
+                 INMAT = -1
+                 goto 99        
+               endif
+               
+            ELSE
+* par defaut
+             CMATE = momodl(3)
+             IMATE = 3
+            ENDIF
+*
+*--------------------------------------------------------------------*
+*     14/ CAS DE LA FORMULATION 'FISSURE'                            *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'FISSURE') THEN
+            IF (NMAT.NE.0) THEN
+*           mode de condensation
+               CALL MODCDE(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = lespro(im)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  CMATE(1:2)=lespro(im)(1:2)
+                endif
+               enddo
+               IF (CMATE(1:2).eq.' ') THEN
+                  CMATE(1:2)='MA'
+               END IF
+*
+*           comportement de la vapeur
+               CALL MODVAP(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = lespro(im)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  CMATE(3:4)=lespro(im)(1:2)
+                endif
+               enddo
+               IF (CMATE(3:4).eq.' ') THEN
+                  CMATE(3:4)='PA'
+               END IF
+*
+*           lois de frottement
+               CALL MODFRT(MOMODL,NMOD)
+               do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = lespro(im)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  CMATE(5:8)=lespro(im)(8:11)
+                endif
+               enddo
+               IF (CMATE(5:8).eq.' ') THEN
+                  CMATE(8:11)='BLAS'
+               END IF
+*
+               IMATE=1
+               INATU=1
+            ELSE
+*
+*     par defaut vapeur=gaz parfait, condensation= en masse,
+*                                                 frottement=canal lisse
+*
+          NMAT = 3
+          inmat = inmat + 1
+          motmat(inmat)='MASS'
+          inmat = inmat + 1
+          motmat(inmat)='PARF'
+          inmat = inmat + 1
+          motmat(inmat)='POISEU_BLASIUS'
+               CMATE = 'MAPABLAS'
+               IMATE=1
+               INATU=1
+            END IF
+*--------------------------------------------------------------------*
+*        15/ CAS DE LA FORMULATION 'LAISON'                           *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'LIAISON') THEN
+              IMOD = 0
+              IMO2 = 0
+              CALL MODLIA(MOMODL,NMOD)
+              do im = 1,nmat
+                CALL PLACE(MOMODL,NMOD,iplac,lespro(im))
+                if (iplac.gt.0) then
+                  inmat = inmat + 1
+                  motmat(inmat) = momodl(iplac)
+                  lespro(im) = ' '
+                  jmat = jmat - 1
+                  if (IMOD.eq.0) then
+                    IMOD = iplac
+                  else
+                    IMO2 = iplac
+                  endif
+                endif
+              enddo
+              IF (IMOD.EQ.0) THEN
+                        call erreur(21)
+                        return
+              ENDIF
+              IF (IMOD.EQ.1.AND.IMO2.EQ.3) THEN
+                           CMATE='PO_PL_FL'
+                           IMATE=1
+              ELSEIF (IMOD.EQ.1.AND.IMO2.EQ.2) THEN
+                           CMATE='PO_PL_FR'
+                           IMATE=2
+              ELSEIF (IMOD.EQ.1.AND.IMO2.EQ.0) THEN
+                           CMATE='PO_PL'
+                           IMATE=3
+              ELSEIF (IMOD.EQ.4.AND.IMO2.EQ.2) THEN
+                           CMATE='PO_PO_FR'
+                           IMATE=4
+              ELSEIF (IMOD.EQ.4.AND.IMO2.EQ.5) THEN
+                           CMATE='PO_PO_DP'
+                           IMATE=5
+              ELSEIF (IMOD.EQ.4.AND.IMO2.EQ.6) THEN
+                           CMATE='PO_PO_RP'
+                           IMATE=6
+              ELSEIF (IMOD.EQ.4.AND.IMO2.EQ.0) THEN
+                           CMATE='PO_PO'
+                           IMATE=7
+              ELSEIF (IMOD.EQ.8.AND.IMO2.EQ.9) THEN
+                           CMATE='PO_CE_MO'
+                           IMATE=8
+              ELSEIF (IMOD.EQ.8.AND.IMO2.EQ.2) THEN
+                           CMATE='PO_CE_FR'
+                           IMATE=9
+              ELSEIF (IMOD.EQ.8.AND.IMO2.EQ.0) THEN
+                           CMATE='PO_CE'
+                           IMATE=10
+              ELSEIF (IMOD.EQ.11.AND.IMO2.EQ.2) THEN
+                           CMATE='CE_PL_FR'
+                           IMATE=11
+              ELSEIF (IMOD.EQ.12.AND.IMO2.EQ.2) THEN
+                           CMATE='CE_CE_FR'
+                           IMATE=12
+              ELSEIF (IMOD.EQ.10.AND.IMO2.EQ.13) THEN
+                           CMATE='PR_PR_IN'
+                           IMATE=13
+              ELSEIF (IMOD.EQ.10.AND.IMO2.EQ.14) THEN
+                           CMATE='PR_PR_EX'
+                           IMATE=14
+              ELSEIF (IMOD.EQ.15.AND.IMO2.EQ.2) THEN
+                           CMATE='LI_LI_FR'
+                           IMATE=15
+              ELSEIF (IMOD.EQ.16.AND.IMO2.EQ.2) THEN
+                           CMATE='LI_CE_FR'
+                           IMATE=16
+              ELSEIF (IMOD.EQ.17.AND.IMO2.EQ.22) THEN
+                           CMATE='PA_FL_RO'
+                           IMATE=17
+              ELSEIF (IMOD.EQ.18.AND.IMO2.EQ.19) THEN
+                           CMATE='COUP_DEP'
+                           IMATE=18
+              ELSEIF (IMOD.EQ.18.AND.IMO2.EQ.20) THEN
+                           CMATE='COUP_VIT'
+                           IMATE=19
+              ELSEIF (IMOD.EQ.21.AND.IMO2.EQ.0) THEN
+                           CMATE='POLYNOMI'
+                           IMATE=20
+              ELSEIF (IMOD.EQ.23.AND.IMO2.EQ.24) THEN
+                           CMATE='NEWMOD'
+                           IMATE=23
+              ELSE
+                   call erreur(21)
+                   return
+              ENDIF
+
+*--------------------------------------------------------------------*
+*     16/ CAS DE LA FORMULATION 'THERMOHYDRIQUE'                     *
+*--------------------------------------------------------------------*
+         ELSE IF (forfo1.EQ.'THERMOHYDRIQUE') THEN
+            IF (NMAT.NE.0)THEN
+               IF(lespro(1).NE.'SCHREFLER') THEN
+                 CMATE='        '
+                 IMATE=0
+                 INATU=0
+               ELSE
+                 INMAT=1
+                 motmat(inmat)='SCHREFLER'
+                 IMATE=1
+               ENDIF
+            ELSE
+               INMAT=INMAT+1
+                 motmat(inmat)='SCHREFLER'
+              IMATE=1
+              CMATE= motmat(inmat)(1:8)
+            ENDIF
+*
+*----------------------------------------------------------------------*
+*     17/ CAS DE LA FORMULATION 'ELECTROSTATIQUE'                      *
+*----------------------------------------------------------------------*
+         ELSE IF ( forfo1.EQ.'ELECTROSTATIQUE' ) THEN
+           INATU = 0
+*     Par defaut la formulation est isotrope
+           IF (NMAT.EQ.0) THEN
+             CMATE = 'ISOTROPE'
+             IMATE = 1
+                 INMAT=1
+                 motmat(inmat)='ISOTROPE'
+           ELSE
+            do im=1,NMAT
+C     Recuperation de la "tropie"
+             CALL PLACE(LISTMT,3,IPLAC,lespro(im))
+             IF (IPLAC.NE.0) THEN
+               INMAT = INMAT+1
+               CMATE = listmt(iplac)
+               IMATE = IPLAC
+               motmat(1)=listmt(iplac)
+               lespro(im) = ' '
+             ENDIF
+            enddo
+
+            if(CMATE.eq.' ') then
+               INMAT = INMAT+1
+               CMATE = listmt(1)
+               IMATE = 1
+               motmat(1)=listmt(1)
+            endif
+
+            DO i=NMAT,1,-1
+             if (lespro(i).ne.' ') then
+               inmat = inmat + 1
+               motmat(inmat)=LESPRO(i)
+             endif
+            ENDDO
+
+           ENDIF
+*
+*----------------------------------------------------------------------*
+*     18/ CAS DE LA FORMULATION 'DIFFUSION'                            *
+*----------------------------------------------------------------------*
+         ELSE IF ( forfo1.EQ.'DIFFUSION' ) THEN
+           INATU = 0
+           ina2 = 0
+*     Par defaut la formulation est isotrope
+           IF (NMAT.EQ.0) THEN
+             CMATE = 'ISOTROPE'
+             IMATE = 1
+             INMAT = INMAT+1
+             motmat(inmat) = 'ISOTROPE'
+             INMAT = INMAT+1
+             motmat(inmat) = 'FICK'
+           ELSE
+            do im=1,NMAT
+C     Recuperation de la "tropie"
+             CALL PLACE(LISTMT,3,IPLAC,lespro(im))
+             IF (IPLAC.NE.0) THEN
+               INMAT = INMAT+1
+               CMATE = listmt(iplac)
+               IMATE = IPLAC
+               motmat(inmat)=listmt(iplac)
+               lespro(im) = ' '
+             ENDIF
+            enddo
+
+            if(CMATE.eq.' ') then
+               INMAT = INMAT+1
+               CMATE = listmt(1)
+               IMATE = 1
+               motmat(inmat)=listmt(1)
+            endif
+
+             CALL MODDIF(MOMODL,NMOD)
+             do im = 1,NMAT
+               CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+               IF (IPLAC.GT.0) THEN
+                 INMAT = INMAT+1
+                 motmat(inmat) = momodl(iplac)
+                 if (iplac.le.4) ina2 = iplac
+C     FICK (lineaire)
+                 IF (IPLAC.EQ.1) THEN
+                   INATU = 0
+C     SORET (non lineaire)
+                 ELSE IF (IPLAC.EQ.2) THEN
+                   INATU = 1
+C     UTILISATEUR (non lineaire)
+                 ELSE IF (IPLAC.EQ.3) THEN
+                     INATU = -1
+C DISSIPATION
+                 ELSE IF (IPLAC.EQ.4) THEN
+                  if(im.lt.nmat) then
+               CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im+1))
+C AFFINE / VISQUEUSE
+                   if (iplac.eq.5.or.iplac.eq.6) then
+                    CMATE = momodl(iplac)
+                    inatu = iplac
+                    motmat(inmat) = momodl(iplac)
+                    lespro(im+1) = ' '
+                   endif
+                  else
+                   call erreur(21)
+                  endif
+C ADVECTION
+                 ELSE IF (IPLAC.EQ.7) THEN
+                  if (ina2.gt.0) then
+                  else
+                   if(im.lt.nmat) then
+                     CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im+1))
+                   else
+                     inmat = inmat + 1
+                     motmat(inmat) = momodl(1)
+                   endif
+                  endif
+                 ENDIF
+               ENDIF
+             enddo
+           ENDIF
+*
+*----------------------------------------------------------------------*
+*     19/ CAS DE LA FORMULATION 'CHARGEMENT     '                      *
+*----------------------------------------------------------------------*
+         ELSE IF ( forfo1.EQ.'CHARGEMENT' ) THEN
+           INATU = 0
+           CALL MOCHAR(MOMODL,NMOD)
+          IF (NMAT.GT.0) THEN
+          
+          do im = 1,NMAT
+           CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+           if(iplac.gt.0) then
+             CMATE = momodl(iplac)
+             IMATE = IPLAC
+             INMAT = INMAT+1
+             motmat(inmat) = momodl(iplac)
+           endif
+          enddo
+          IF (CMATE.eq.' ') THEN
+              CALL ERREUR(21)
+              RETURN
+          ENDIF
+          
+          ELSE
+*           CALL ERREUR(251)
+*           return
+             iplac = 1
+             CMATE = momodl(iplac)
+             IMATE = IPLAC
+             INMAT = INMAT+1
+             motmat(inmat) = momodl(iplac)
+           ENDIF
+        
+
+*---------------------------------------------------------------------*
+*     20/ CAS DE LA FORMULATION 'METALLURGIE'                         *
+*---------------------------------------------------------------------*
+         ELSE IF (forfo1 .EQ. 'METALLURGIE') THEN
+            CALL MOMETA(MOMODL,NMOD)
+C           La syntaxe veut que NMAT=4 si tout vas bien :
+            if( NMAT .lt. 4 ) then
+              CALL ERREUR(21)
+              RETURN
+            endif
+            do lm = 1,nmod
+              d_met(lm) = .false.
+            enddo
+            do imat = 1,nmat
+C On verifie que le mot lespro(imat) se trouve bien dans le tableau
+C contenu dans modmet.eso
+              CALL PLACE(MOMODL,NMOD,IPLAC,lespro(imat))
+              if (IPLAC.NE.0)then
+                lespro(imat) = ' '
+                jmat = jmat - 1
+                d_met(iplac) = .true.
+              else
+                CALL ERREUR(21)
+                RETURN
+              endif
+            enddo
+            d_mlg = .true.
+            do lm =1,nmod
+              d_mlg = d_mlg.and.d_met(lm)
+            enddo
+            if(d_mlg) then
+              CMATE = 'METALLUR'
+              INATU = 178
+              inmat = nmod
+            else
+              call erreur(21)
+              RETURN
+            endif
+
+*---------------------------------------------------------------------*
+*     21/ CAS DE LA FORMULATION 'CHANGEMENT_PHASE'                    *
+*---------------------------------------------------------------------*
+         ELSEIF (forfo1 .EQ. 'CHANGEMENT_PHASE') THEN
+           INATU = 0
+           CALL MOCHPH(MOMODL,NMOD)
+          IF (NMAT.GT.0) THEN
+          
+          do im = 1,NMAT
+           CALL PLACE(MOMODL,NMOD,IPLAC,lespro(im))
+           if(iplac.gt.0) then
+             CMATE = momodl(iplac)
+             IMATE = IPLAC
+             INMAT = INMAT+1
+             motmat(inmat) = momodl(iplac)
+              IF    (IPLAC .EQ. 1) THEN
+                CMATE = 'CHPH_PAR'
+                INATU = 179
+              ELSEIF(IPLAC .EQ. 2) THEN
+                CMATE = 'CHPH_SOL'
+                INATU = 180
+              ELSEIF (IPLAC.NE.0 .AND. INATU.NE.0) THEN
+                CMATE = '        '
+                INMAT = 0
+                IMATE = 0
+                INATU = 0
+                CALL ERREUR(21)
+                RETURN
+              ENDIF
+           endif
+          enddo
+          IF (CMATE.eq.' ') THEN
+              CALL ERREUR(21)
+              RETURN
+          ENDIF
+          
+          ELSE
+*           CALL ERREUR(251)
+*           return
+             iplac = 1
+             CMATE = momodl(iplac)
+             IMATE = IPLAC
+             INMAT = INMAT+1
+             motmat(inmat) = momodl(iplac)
+          ENDIF
+            
+
+*--------------------------------------------------------------------*
+*        ENDIF correspondant a la FIN des formulations simples       *
+*--------------------------------------------------------------------*
+         ENDIF
+*
+       ELSEIF (NFOR.EQ.2) THEN
+*--------------------------------------------------------------------*
+* NFOR=2 1/ CAS DE LA FORMULATION 'LIQUIDE '+ 'MECANIQUE'            *
+*--------------------------------------------------------------------*
+         forfo2=lesfor(2)
+         IF (     ( forfo1.EQ.'LIQUIDE         '.AND.
+     &              forfo2.EQ.'MECANIQUE       '     )
+     &       .OR. ( forfo2.EQ.'LIQUIDE         '.AND.
+     &              forfo1.EQ.'MECANIQUE       '   ) ) THEN
+*
+*           La formulation suffit
+*
+             CMATE='LIQ+MECA'
+             IMATE=1
+         ENDIF
+      ENDIF
+
+      IF (NMAT .GT. INMAT) THEN
+       call erreur(21)
+       return
+      ENDIF
+      if(cmate.eq.' '.and.imate.eq.0.and.inatu.eq.0) then
+       call erreur(21)
+       return
+      endif      
+      
+ 90   continue
+      do jm = 1,inmat
+        lespro(jm) = motmat(jm)
+      enddo
+      if (inmat.gt.NMAT) NMAT = inmat
+      dmat3 = .true.
+      RETURN
+      
+ 99   continue 
+*      write(6,*) 'erreur dans numate' 
+      call erreur(5)
+      RETURN
+
+      END
+ 
+ 
+ 
+ 
+ 
+ 
+ 

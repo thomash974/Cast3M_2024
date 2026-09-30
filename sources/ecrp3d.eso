@@ -1,0 +1,42 @@
+C ECRP3D    SOURCE    PV090527  23/01/27    21:15:28     11574          
+c***********************************************************************
+      subroutine ecrp3d(epldpd,edppic,Cdp_min,Cdp_max,Cdp,Hdp)
+     
+c     sous programme de traitement de l ecrouissage parabolique pre pic
+c     Alain SELLIER 2021/05/05
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+      real*8 epldpd,edppic,Cdp_min,Cdp_max,Cdp,Hdp
+      real*8 CdpM,cg,cg1,ldppic,ldp      
+      
+c     variable dp equivalente = integrale du multiplicateur      
+      ldp=epldpd    
+      ldppic = edppic
+
+      if(ldppic.gt.0.d0) then
+          if(ldp.lt.ldppic) then      
+c           cohesion
+            cg=Cdp_min
+            CdpM=Cdp_max
+            t1 = CdpM - cg
+            t2 = ldp ** 2
+            t7 = ldppic ** 2
+            Cdp =0.1D1/t7 *(0.2D1 *ldppic * ldp * t1+ t7 * cg - t2 * t1)      
+c           module d ecrouissage
+            t4 = ldppic ** 2
+            Hdp = -0.2D1 / t4 * (ldp - ldppic) * (CdpM - cg)
+          else      
+            Cdp=Cdp_max
+            Hdp=0.d0      
+          end if
+      else      
+        Cdp=Cdp_max
+        Hdp=0.d0      
+      end if
+      
+      return
+      end
+      
+ 

@@ -1,0 +1,30 @@
+C PRONLI    SOURCE    JK148537  23/11/20    21:15:13     11790          
+      SUBROUTINE PRONLI(IPMOD1,ICHP1,ICHP2)
+*
+* construire 2nd membre resolution champ de pression 
+* ecoulement / NAVIER-STOKES NLIN
+*      
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMMODEL
+
+
+      MMODEL = IPMOD1
+      nsous = kmodel(/1)
+      
+        imodel = kmodel(1)
+        if (formod(1).ne.'NAVIER_STOKES'.or.cmatee.ne.'NLIN') then
+          call erreur(21)
+          return
+        endif
+        
+        call GO2NLI(IPMOD1,ICHP1,ICHP2,6)
+        if (ierr.ne.0) return
+        
+      RETURN
+      END
+ 

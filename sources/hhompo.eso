@@ -1,0 +1,100 @@
+C HHOMPO    SOURCE    OF166741  24/05/06    21:15:12     11082          
+C HHOMPO    SOURCE                                                      
+
+C Maillage des points supports des ddls :
+C - des cellules a partir de la liste des cellules et du maillage MPFHHO
+C - des faces    a partir de la liste des faces    et du maillage MPOHHO
+C Liste inverse des points supports dans la liste des faces 
+
+      SUBROUTINE HHOMPO (chaopt,lfaHHO, ipsHHO)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMELEME
+-INC SMLENTI
+
+      CHARACTER*(*) chaopt
+
+      ipsHHO = 0
+
+      mlenti = lfaHHO
+c      segact,mlenti
+c-dbg      write(ioimp,*)
+c-dbg      write(ioimp,*) 'HHOMPO - ',lect(/1)
+c-dbg      write(ioimp,*) (lect(i),i=1,lect(/1))
+
+      IF (chaopt(1:4).EQ.'FACE') THEN
+        ipt2 = MPFHHO
+        segact,ipt2
+        nbnn   = 1
+        nbelem = mlenti.lect(/1) / 2
+        nbsous = 0
+        nbref  = 0
+        SEGINI,ipt1
+        ipt1.itypel = 1
+        DO i = 1, nbelem
+          je = mlenti.lect(2*i-1)
+          ip = ABS(mlenti.lect(2*i))
+c-dbg      if (ip.eq.0) write(ioimp,*) 'HHOMPO FACE: Bizarre...',i,je,ip
+          jp = ip + NBFHHO(je-1)
+          ipt1.num(1,i) = ipt2.num(1,jp)
+c-dbg      write(ioimp,*) 'HHOMPO FACE:',i,je,ip,jp,nbelem
+        END DO
+c        SEGDES,ipt1
+        ipsHHO = ipt1
+
+      ELSE IF (chaopt(1:4).EQ.'CELL') THEN
+        ipt2 = MPCHHO
+        segact,ipt2
+        nbnn   = 1
+        nbelem = mlenti.lect(/1) / 2
+        nbsous = 0
+        nbref  = 0
+        SEGINI,ipt1
+        ipt1.itypel = 1
+        DO i = 1, nbelem
+          je = mlenti.lect(2*i-1)
+          ip = ABS(mlenti.lect(2*i))
+c-dbg      if (ip.eq.0) write(ioimp,*) 'HHOMPO CELL: Bizarre...',i,je,ip
+          jp = ip + NBCHHO(je-1)
+          ipt1.num(1,i) = ipt2.num(1,jp)
+c-dbg      write(ioimp,*) 'HHOMPO CELL:',i,je,ip,jp,nbelem
+        END DO
+c        SEGDES,ipt1
+        ipsHHO = ipt1
+
+      ELSE IF (chaopt(1:4).EQ.'LGFA') THEN
+        ipt2 = MPFHHO
+        segact,ipt2
+        JG = NBPTS
+        SEGINI,mlent1
+        nbelem = mlenti.lect(/1) / 2
+        DO i = 1, nbelem
+          je = mlenti.lect(2*i-1)
+          ip = ABS(mlenti.lect(2*i))
+c-dbg      if (ip.eq.0) write(ioimp,*) 'HHOMPO LGFA: Bizarre...',i,je,ip
+          jp = ip + NBFHHO(je-1)
+          kp = ipt2.num(1,jp)
+          mlent1.lect(kp) = i
+c-dbg      write(ioimp,*) 'HHOMPO LGFA:',i,je,ip,jp,kp,nbelem
+        END DO
+        ipsHHO = mlent1
+
+      ELSE
+        write(ioimp,*) 'HHOMPO: ',chaopt(1:4),' option unknown'
+        call erreur(5)
+        return
+      END IF
+
+      RETURN
+      END
+
+ 

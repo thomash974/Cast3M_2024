@@ -1,0 +1,68 @@
+C TJOI1C    SOURCE    CB215821  21/08/30    21:15:06     11092          
+      SUBROUTINE TJOI1C(IPMAIL,IVAMAT,IPMATR)
+
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+C=======================================================================
+C=                            T J O I 1 C                              =
+C=                            -----------                              =
+C=                                                                     =
+C=  Fonction :                                                         =
+C=  ----------                                                         =
+C=  Calcul de la matrice de CONDUCTION d'un element JOI1               =
+C=                                                                     =
+C=  Clement BERTHINIER, le 04 fevrier 2021.                            =
+C=======================================================================
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMELEME
+-INC SMRIGID
+-INC SMCHAML
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS),IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      MELEME = IPMAIL
+      NBNN   = NUM(/1)
+      NBELEM = NUM(/2)
+
+      MPTVAL = IVAMAT
+      XMATRI = IPMATR
+
+C     Preparation du champ de caracteristiques 'KT'
+      MPTVAL = IVAMAT
+      MELVAL = MPTVAL.IVAL(1)
+      IVEL1  = VELCHE(/1)
+      IVEL2  = VELCHE(/2)
+
+C     BOUCLE SUR LES POI1 DU MAILLAGE ELEMENTAIRE IPMAIL
+C     ==================================================
+      DO iElt = 1, NBELEM
+        IEMN = MIN(iElt,IVEL2)
+C       Noeud 1 :
+        iNOE  = 1
+        IGMN  = MIN(iNOE,IVEL1)
+        XKT1  = MELVAL.VELCHE(IGMN,IEMN)
+
+C       Noeud 2 :
+        iNOE  = 2
+        IGMN  = MIN(iNOE,IVEL1)
+        XKT2  = MELVAL.VELCHE(IGMN,IEMN)
+
+C       Remplissage de la matrice de CONDUCTIVITE
+        XMATRI.RE(1,1,iElt) = XKT1
+        XMATRI.RE(2,1,iElt) =-XKT2
+        XMATRI.RE(1,2,iElt) =-XKT1
+        XMATRI.RE(2,2,iElt) = XKT2
+      ENDDO      
+
+C     La rigidite est quelconque
+      XMATRI.SYMRE  = 2
+
+      END
+ 

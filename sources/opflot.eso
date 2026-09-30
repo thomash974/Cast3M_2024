@@ -1,0 +1,58 @@
+C OPFLOT    SOURCE    CB215821  23/10/18    21:15:07     11760          
+      SUBROUTINE OPFLOT(XIN1,XIN2,IIN1,BATAN2,IOPERA,XOUT)
+C=======================================================================
+C      EFFECTUE DIVERSES OPERATIONS SUR LES FLOTTANTS
+C=======================================================================
+C  ENTREES
+C     XIN1= FLOTTANT sur lequel on effectue l'operation
+C     XIN2= deuxieme argument FLOTTANT pour l'operation ATAN2
+C     IIN1= troisieme argument ENTIER pour l'operation FLOTTANT ** ENTIER
+C   BATAN2= TRUE  Booleen permettant de faire l'operation ATAN2
+C         = FALSE Booleen permettant de faire l'operation ATAN
+C     IOPERA= 1  COSINUS
+C           = 2  SINUS
+C           = 3  TANGENTE
+C           = 4  ARCOSINUS
+C           = 5  ARCSINUS
+C           = 6  ARCTANGENTE
+C           = 7  EXPONENTIELLE
+C           = 8  LOGARITHME
+C           = 9  VALEUR ABSOLUE
+C           = 10 COSINUS  HYPERBOLIQUE
+C           = 11 SINUS    HYPERBOLIQUE
+C           = 12 TANGENTE HYPERBOLIQUE
+C           = 13 ERF  FONCTION D'ERRREUR DE GAUSS
+C           = 14 ERFC FONCTION D'ERRREUR complementaire DE GAUSS (1-erf(x))
+C           = 15 ARGCH (Fonction reciproque de COSH)
+C           = 16 ARGSH (Fonction reciproque de SINH)
+C           = 17 ARGTH (Fonction reciproque de TANH)
+C           = 18 SIGN(1.D0,XIN1)
+C
+C           = 19 PRODUIT   XIN1 *  XIN2
+C           = 20 DIVISION  XIN1 /  XIN2
+C           = 21 PUISSANCE XIN1 ** XIN2
+C           = 22 PUISSANCE XIN1 ** IIN1
+C
+C  SORTIES
+C     XOUT=FLOTTANT RESULTAT
+C
+C HISTORIQUE :
+C   - CB215821                   2014  --> Creation
+C   - CB215821             05/06/2018  --> Ajout de la fonction SIGN a un argument
+C   - CB215821             17/10/23    --> SOURCE Obsolete (invoquer optabj.eso)
+C
+C=======================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+C
+      MOTERR='OPFLOT'
+      CALL ERREUR(1039)
+      RETURN
+      END
+ 

@@ -1,0 +1,69 @@
+C INFOPA    SOURCE    PV        22/02/23    08:40:35     11296          
+      SUBROUTINE INFOPA(demand,IRET,pNoti)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCNOYAU
+         integer IRET
+         integer nNotice,nLig,nEnt,iNoti
+         integer anumfic,acarDeb
+         character*(LONOM) demand
+         logical langok
+         segment,noti
+             character*(LONOM) nomOpe
+             character*500     blig(nlig)
+         endsegment
+         pointeur pNoti.NOTI
+*        write(6,*) 'entree dans infopa demand ',demand,iret,pnoti
+         numnot=0
+         call infol2(demand,numnot)
+*        write(6,*) 'apres infol2 ',demand,numnot
+         moterr(1:8)=demand
+         if(numnot.eq.0) return
+         if(numnot.eq.0) call erreur(1135)
+         if(ierr.ne.0) return
+         call infopo(numnot,iret)
+*        write(6,*) 'apres infopo ',demand,numnot,iret
+         if(numnot.eq.0) return
+         if(numnot.eq.0) call erreur(1135)
+         if(ierr.ne.0) return
+         IF (demand.EQ.' ') THEN 
+            IRET=2
+            RETURN
+         ENDIF
+*  creation segment contenant la notice (a ajuster a la fin)
+         nlig=1000
+         segini noti
+         pnoti=noti
+         nomope=demand
+         langok=.true.
+         ilig=1
+   20    continue
+         if(ilig.gt.nlig) then
+          nlig=nlig+1000
+          segadj noti
+         endif
+         call infoli(blig(ilig),iret)
+         if(iret.eq.99999)  goto 10
+         if (blig(ilig)(5:8).eq.'====') then
+          if (blig(ilig)(1:4).eq.LANGUE.or.blig(ilig)(1:4).eq.'====') 
+     >      then
+            langok=.true.
+          else
+            langok=.false.
+          endif
+**        ilig=ilig-1
+          goto 20
+         endif
+         if (langok) ilig=ilig+1
+         goto 20
+   10    CONTINUE
+**       write(6,*) 'nombre de lignes lues ',ilig-1
+         iret=1
+         nlig=ilig-1
+         segadj noti
+      end
+ 
+ 
+ 
+ 

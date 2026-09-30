@@ -1,0 +1,179 @@
+C ELEMAP    SOURCE    JB251061  22/01/05    21:15:02     11253          
+
+      SUBROUTINE ELEMAP(mextr, mappu, iopt, mresu, nltot)
+C ====================================================================
+C Sous-programme ELEMAP :
+C
+C --------------------------
+C Paramètres Entrée/Sortie :
+C --------------------------
+C
+C E/  mextr : MAILLAGE dont on veut extraire des elements
+C E/  mappu : MAILLAGE sur lequel on s'appuie
+C E/  iopt  : ENTIER valant 1 (resp. 2) si l'on veut les elements de
+C              mextr appuyes strictement (resp. largement) sur les
+C              noeuds de mappu
+C
+C  /S mresu : MAILLAGE resultat (potentiellement vide)
+C  /S nltot : ENTIER egal au nombre total d'elements extraits
+C
+C --------------------------------------------------------------------
+C Appelé par : extrel.eso
+C ====================================================================
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+C --------------------------------------------------------------------
+C     Declarations
+C --------------------------------------------------------------------
+
+C     Includes
+-INC PPARAM
+-INC CCOPTIO
+-INC CCREEL
+-INC CCGEOME
+-INC SMELEME
+-INC SMCOORD
+
+C     icpr permet d'identifier les noeuds appartenants à mappu
+      segment icpr(nbpts)
+C     icps est une liste de numeros d'elements a extraire
+      segment icps(nbels)
+C     on stocke les pointeurs des differents maillages extraits dans imail
+      segment imail(nsm)
+      logical contenu
+      pointeur mextr.meleme, mappu.meleme, mresu.meleme, mpapp.meleme
+      pointeur msouz.meleme, mrsou.meleme
+
+
+C --------------------------------------------------------------------
+C     Initialisation
+C --------------------------------------------------------------------
+
+      segact mcoord
+C
+      segini,mpapp = mappu
+      if((mpapp.itypel).ne.1) call change(mpapp, 1)
+C
+      segini icpr
+      do i=1,nbpts
+        icpr(i) = 0
+      enddo
+C     Identification des noeuds de mpapp
+      do j=1,mpapp.num(/2)
+        icpr(mpapp.num(1, j)) = 1
+      enddo
+C
+      nbels = 0
+      segini icps
+C     nso est le nombre de sous-objets de mextr
+      nso = mextr.lisous(/1)
+C     nso est egal a nso si mextr a des sous-objets, 1 sinon
+      nsm = max(1, nso)
+      segini imail
+C     nnvid permet de compter le nombre de sous-objets non-vides extraits
+      nnvid = 0
+      nltot = 0
+
+
+C --------------------------------------------------------------------
+C     On fait le travail
+C --------------------------------------------------------------------
+
+      do iso=1,nsm
+C       Boucle sur le nombre de sous-objets
+
+        if(nso.ne.0) then
+          msouz = mextr.lisous(iso)
+          segact msouz
+        else
+          msouz = mextr
+        endif
+C       Nombre de noeuds par element et nombre d'elements du sous-objet
+        nbnn = msouz.num(/1)
+        nbels = msouz.num(/2)
+        segadj icps
+C       On commence par compter le nombre d'elements a extraire => icount
+        icount = 0
+        macro, (strictement, largement)
+        case, iopt
+        when, strictement
+          do iel=1,nbels
+C           Boucle sur les elements du sous-objet
+            contenu = .true.
+            ino = 1
+            do while (ino.le.nbnn.and.contenu)
+C             Boucle sur les noeuds de l'element
+C             On s'arrete avant la fin si on trouve un noeud pas dans ipt2
+              contenu = icpr(msouz.num(ino, iel)).eq.1
+              ino = ino + 1
+            enddo
+            if(contenu) then
+C             Si on arrive ici avec contenu = .true. alors l'element est a extraire
+              icount = icount + 1
+              icps(icount) = iel
+            endif
+          enddo
+        when, largement
+          do iel=1,nbels
+            contenu = .false.
+            ino = 1
+            do while (ino.le.nbnn.and..not.contenu)
+C             Boucle sur les noeuds de l'element
+C             On s'arrete des qu'on trouve un noeud dans ipt2
+              contenu = icpr(msouz.num(ino, iel)).eq.1
+              ino = ino + 1
+            enddo
+            if(contenu) then
+C             Si on arrive ici avec contenu = .true. alors l'element est a extraire
+              icount = icount + 1
+              icps(icount) = iel
+            endif
+          enddo
+        endcase
+C       On extrait ensuite les elements si on en a trouve a extraire
+        if(icount.gt.0) then
+C         on initialise le maillage resultant de la sous-zone
+          nnvid = nnvid + 1
+          nbsous = 0
+          nbref = 0
+          nbelem = icount
+          segini mrsou
+          mrsou.itypel = msouz.itypel
+C         Puis on extrait les elements
+          do iel=1,nbelem
+            do ino=1,nbnn
+              mrsou.num(ino, iel) = msouz.num(ino, icps(iel))
+            enddo
+            mrsou.icolor(iel) = msouz.icolor(icps(iel))
+          enddo
+          imail(nnvid) = mrsou
+          nltot = nltot + icount
+          segdes mrsou
+        endif
+        if(nso.ne.0) segdes msouz
+      enddo
+C     On met finalement les sous-objets dans un meme MAILLAGE
+      if(nltot.eq.0) then
+C       On renvoie un maillage vide si aucun element trouve
+        call melvid(ilcour, mresu)
+      else
+C       On ne garde que les maillages non-vides
+        if(nnvid.eq.1) then
+          mresu = imail(1)
+        else
+          nbsous = nnvid
+          nbref = 0
+          nbnn = 0
+          nbelem = 0
+          segini mresu
+          do iso=1,nnvid
+            mresu.lisous(iso) = imail(iso)
+          enddo
+        endif
+      endif
+      segsup icpr, icps, imail
+
+      END
+ 

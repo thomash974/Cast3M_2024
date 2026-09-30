@@ -1,0 +1,223 @@
+C BORNE5    SOURCE    CB215821  20/11/04    21:15:14     10766          
+
+      SUBROUTINE BORNE5 (IPCHME,MLCOMP,MLIOPE,MLBMIN,MLBMAX, IPCHMS)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMLREEL
+      POINTEUR MLREE4.MLREEL,MLREE5.MLREEL
+-INC SMLENTI
+-INC SMLMOTS
+-INC SMEVOLL
+
+      MACRO, (BORN_MAX, BORN_MIN, BORN_COMPRIS)
+
+      CHARACTER*(LOCOMP)  char_A
+      CHARACTER*16 mot16
+
+      IPCHMS = 0
+      IRETS  = 0
+      MCHEL1 = IPCHME
+      SEGINI,MCHELM=MCHEL1
+
+C- Quelques verifications
+      MLMOTS = MLCOMP
+      NBMOTS=MOTS(/2)
+      DO i = 1, NBMOTS
+        char_A = MOTS(i)
+        DO j = 1, i-1
+          IF (char_A.EQ.MOTS(j)) MOTS(j) = '    '
+        ENDDO
+      ENDDO
+      NCOMP = 0
+      DO i = 1, NBMOTS
+        IF (MOTS(i).NE.'    ') NCOMP = NCOMP+1
+      ENDDO
+      IF (NCOMP.EQ.0) THEN
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+
+      MLENTI = MLIOPE
+      MLREE1 = MLBMIN
+      MLREE2 = MLBMAX
+
+C- Realisation du bornage des champs par element
+      N1 = ICHAML(/1)
+      N3 = INFCHE(/2)
+      DO i = 1, N1
+        MCHAM1 = ICHAML(i)
+        NCOMP = MCHAM1.NOMCHE(/2)
+        SEGINI,MCHAML=MCHAM1
+        N2 = 0
+        DO 100 icour = 1, NCOMP
+          char_A = MCHAM1.NOMCHE(icour)
+          CALL PLACE(MOTS,NBMOTS,ncour,char_A)
+          IF (ncour.EQ.0) GOTO 100
+          N2 = N2 + 1
+          NOMCHE(N2) = char_A
+          mot16      = MCHAM1.TYPCHE(icour)
+          TYPCHE(N2) = mot16
+          MELVA1     = MCHAM1.IELVAL(icour)
+
+          N1PTEL     = MELVA1.VELCHE(/1)
+          N1EL       = MELVA1.VELCHE(/2)
+          N2PTEL     = MELVA1.IELCHE(/1)
+          N2EL       = MELVA1.IELCHE(/2)
+
+          SEGINI,MELVAL
+          IELVAL(N2)   = MELVAL
+          INDOPE       = MLENTI.LECT(ncour)
+          XBMIN        = MLREE1.PROG(ncour)
+          XBMAX        = MLREE2.PROG(ncour)
+
+          IF (mot16.EQ.'REAL*8          ') THEN
+            DO iel = 1, N1EL
+              DO igau = 1, N1PTEL
+                X=MELVA1.VELCHE(igau,iel)
+                CASE, INDOPE
+                  WHEN, BORN_MAX
+                    VELCHE(igau,iel)=MIN(X, XBMAX)
+                  WHEN, BORN_MIN
+                    VELCHE(igau,iel)=MAX(X, XBMIN)
+                  WHEN, BORN_COMPRIS
+                    VELCHE(igau,iel)=MAX(MIN(X, XBMAX), XBMIN)
+                ENDCASE
+              ENDDO
+            ENDDO
+
+          ELSEIF (mot16.EQ.'POINTEURLISTREEL') THEN
+            DO iel = 1, N1EL
+              DO igau = 1, N1PTEL
+                MLREE5 = MELVA1.IELCHE(igau,iel)
+                JG=MLREE5.PROG(/1)
+                SEGINI,MLREEL
+                DO iv=1,JG
+                  X=MLREE5.PROG(iv)
+                  CASE, INDOPE
+                    WHEN, BORN_MAX
+                      MLREEL.PROG(iv)=MIN(X, XBMAX)
+                    WHEN, BORN_MIN
+                      MLREEL.PROG(iv)=MAX(X, XBMIN)
+                    WHEN, BORN_COMPRIS
+                      MLREEL.PROG(iv)=MAX(MIN(X, XBMAX), XBMIN)
+                  ENDCASE
+                ENDDO
+                IELCHE(igau,iel) = MLREEL
+              ENDDO
+            ENDDO
+
+          ELSEIF (mot16.EQ.'POINTEURLISTENTI') THEN
+            IBMIN  = NINT(XBMIN)
+            IBMAX  = NINT(XBMAX)
+            DO iel = 1, N1EL
+              DO igau = 1, N1PTEL
+                MLENT1 = MELVA1.IELCHE(igau,iel)
+                JG=MLENT1.LECT(/1)
+                SEGINI,MLENTI
+                DO iv=1,JG
+                  I1=MLENT1.LECT(iv)
+                  CASE, INDOPE
+                    WHEN, BORN_MAX
+                      MLENTI.LECT(iv)=MIN(I1, IBMAX)
+                    WHEN, BORN_MIN
+                      MLENTI.LECT(iv)=MAX(I1, IBMIN)
+                    WHEN, BORN_COMPRIS
+                      MLENTI.LECT(iv)=MAX(MIN(I1, IBMAX), IBMIN)
+                  ENDCASE
+                ENDDO
+                IELCHE(igau,iel) = MLENTI
+              ENDDO
+            ENDDO
+
+          ELSEIF (mot16.EQ.'POINTEUREVOLUTIO') THEN
+            DO iel = 1, N1EL
+              DO igau = 1, N1PTEL
+                MEVOL1 = MELVA1.IELCHE(igau,iel)
+                N      = MEVOL1.IEVOLL(/1)
+                IF(N .NE. 1) THEN
+                  CALL ERREUR(21)
+                  RETURN
+                ENDIF
+                KEVOL1=MEVOL1.IEVOLL(1)
+                SEGINI,MEVOLL,KEVOLL
+                MEVOLL.IEVOLL(1)= KEVOLL
+                MEVOLL.ITYEVO   = MEVOL1.ITYEVO
+                MEVOLL.IEVTEX   = MEVOL1.IEVTEX
+
+                KEVOLL.IPROGX=KEVOL1.IPROGX
+                KEVOLL.NUMEVX=KEVOL1.NUMEVX
+                KEVOLL.NUMEVY=KEVOL1.NUMEVY
+                KEVOLL.TYPX  =KEVOL1.TYPX
+                KEVOLL.TYPY  =KEVOL1.TYPY
+                KEVOLL.NOMEVX=KEVOL1.NOMEVX
+                KEVOLL.NOMEVY=KEVOL1.NOMEVY
+                KEVOLL.KEVTEX=KEVOL1.KEVTEX
+
+                MLREE5=KEVOL1.IPROGY
+                JG=MLREE5.PROG(/1)
+                SEGINI,MLREEL
+                DO iv=1,JG
+                  X=MLREE5.PROG(iv)
+                  CASE, INDOPE
+                    WHEN, BORN_MAX
+                      MLREEL.PROG(iv)=MIN(X, XBMAX)
+                    WHEN, BORN_MIN
+                      MLREEL.PROG(iv)=MAX(X, XBMIN)
+                    WHEN, BORN_COMPRIS
+                      MLREEL.PROG(iv)=MAX(MIN(X, XBMAX), XBMIN)
+                  ENDCASE
+                ENDDO
+                KEVOLL.IPROGY = MLREEL
+                IELCHE(igau,iel) = MEVOLL
+              ENDDO
+            ENDDO
+
+          ELSE
+            MOTERR(1:8)=MCHAM1.NOMCHE(icour)
+            CALL ERREUR(679)
+            IRETS = -1
+          ENDIF
+ 100    CONTINUE
+
+        IF (IRETS.NE.-1) THEN
+          IF (N2.NE.0) THEN
+            IRETS = IRETS + 1
+            IF (N2.NE.NCOMP) THEN
+              SEGADJ,MCHAML
+            ENDIF
+            ICHAML(IRETS) = MCHAML
+            IF (IRETS.NE.i) THEN
+              CONCHE(IRETS) = CONCHE(i)
+              IMACHE(IRETS) = IMACHE(i)
+              DO j = 1, N3
+                INFCHE(IRETS,j) = INFCHE(i,j)
+              ENDDO
+            ENDIF
+          ELSE
+            SEGSUP,MCHAML
+          ENDIF
+        ENDIF
+      ENDDO
+
+      IF (IRETS.GT.0) THEN
+        IF (IRETS.NE.N1) THEN
+          N1 = IRETS
+          L1 = TITCHE(/1)
+          SEGADJ,MCHELM
+        ENDIF
+        IPCHMS = MCHELM
+      ELSEIF (IRETS.EQ.0) THEN
+        CALL ERREUR(280)
+      ENDIF
+
+ 900  CONTINUE
+      IF (IPCHMS.EQ.0) SEGSUP,MCHELM
+
+      END
+ 
+ 

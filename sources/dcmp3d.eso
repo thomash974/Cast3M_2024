@@ -1,0 +1,65 @@
+C DCMP3D    SOURCE    PV090527  23/01/27    21:15:21     11574          
+        subroutine dcmp3d(iphase,itps,NBRINC,x6,x3,xc6,
+     #   v33,v33t,affiche,nomt)
+         
+c       recuperation des projections normale d un tenseur sur les axes
+c       de la base v33 ->x3
+c       construction du tenseur complementaire dans la base fixe->xc6
+
+c       tables de dimension fixe pour resolution des systemes lineaires 
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+        
+        logical affiche
+        character*5 nomt
+
+        integer NBRINC,iphase,itps
+       
+        real*8 x6(-1:NBRINC,6,0:1)
+        real*8 x3(-1:NBRINC,3),xc6(-1:NBRINC,6)
+        real*8 v33(3,3),v33t(3,3)
+                
+        real*8 x06(6),x03(3),x16(6)
+        integer  j
+        
+        if((iphase.lt.-1).or.(iphase.gt.NBRINC)) then
+          print*,'Pb dans incl3d'
+          print*,'dimension NBRINC dans dcmp3d'
+          stop
+        end if
+
+        do j=1,6
+            x06(j)=x6(iphase,j,itps)
+        end do
+        call prjc3d(x06,v33,v33t,x03,x16,.false.)
+        do j=1,6
+             if(j.le.3) then
+c               recuperation des projections            
+                x3(iphase,j)=x03(j)
+             end if 
+c           recuperation de la partie complémentaire            
+            xc6(iphase,j)=x16(j)
+        end do
+        
+        
+        if(affiche) then
+              print*,'Dans Decomp3D'
+              write(*,'(A26,1X,A5,1X,A12,I2)')
+     #        'Decomposition du tenseur :',nomt,'de la phase:',iphase 
+              do icomp=1,6
+                 write(*,'(A5,A1,I2,A2,E10.3,1X,A5,A6,I2,A2,E10.3 )')
+     #           nomt,'(',icomp,')=',x6(iphase,icomp,0),
+     #           nomt,'_Comp(',icomp,')=',xc6(iphase,icomp)
+              end do     
+              do icomp=1,3
+                    write(*,'(A5,A6,I2,A2,E10.3)') 
+     #              nomt,'_PRIN(',icomp,')=',x3(iphase,icomp)
+              end do
+c              print*,'Valider pour continuer'
+c              read*
+         end if 
+        
+        return
+        end
+         
+ 

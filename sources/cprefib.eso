@@ -1,0 +1,846 @@
+C CPREFIB   SOURCE    FD218221  24/02/07    21:15:08     11834          
+       SUBROUTINE CPREFIB(IPMODL,MLMOTS,ISUP,ICARA)
+*----------------------------------------------------------------------------------------------
+*           preconditionnement caracteristiques materiau pour modele de fibres 
+*                                                    dans FLDO3D
+*----------------------------------------------------------------------------------------------
+*
+* PARAMETRES:   (E)=ENTREE   (S)=SORTIE   (+ = CONTENU DANS UN COMMUN)
+* -----------
+*
+*     IPMODL  (E)   POINTEUR D'OBJET MODELE
+*     MLMOTS  (E)   POINTEUR SUR LE LISTMOTS DE CARACTERISTIQUES
+*     ISUP    (E)   NUMERO DE SUPPORT DEMANDE
+*     ICARA  (E+S)  POINTEUR SUR LE CHAMELEM
+*
+* LANGAGE:
+* --------
+*
+*     ESOPE + FORTRAN77
+*
+*-----------------------------------------------------------------------
+*
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+ 
+      REAL*8 COEFFK1(10),COEFFK2(10),COEFFWP1(10),COEFFWP2(10)
+      REAL*8 COEFFFP(10),COEFFWF(10),COEFFW03(10),MAXFP,MINFP
+      REAL*8 MAXWP1,MINWP1,MAXWP2,MINWP2,MAXWF,MINWF,MAXW03,MINW03
+      REAL*8 MAXK02,MINK02,MAXK01,MINK01
+      
+ 
+      PARAMETER (XUnDemi=0.5,XUn=1.)
+         
+        parameter (niter=20,nligne=10000)   
+      parameter (nangl=7,nlongfi=60,nrt=8)
+      parameter (phit=80.d0,phicrit=50.d0)
+      parameter (nangredu=int(phicrit*nangl/phit+1))        
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCHAMP
+-INC SMCHAML
+-INC SMMODEL
+-INC SMCOORD
+-INC SMLMOTS
+-INC SMLREEL
+*
+*      SEGMENT INFO
+*       INTEGER INFELE(JG)
+*      ENDSEGMENT
+
+       SEGMENT MWOR
+           real*8 fel(mligne),ld1(mligne,miter),ld2(mligne,miter)
+           real*8 sp1(mligne),fcrit1(mligne,miter),fcrit2(mligne,miter)        
+           real*8 L1(mligne,miter),L2(mligne,miter),dls1(mligne,miter)
+           real*8 dls2(mligne,miter),ls1(mligne,miter),ls2(mligne,miter)
+           real*8 F(mligne,miter),w1(mligne,miter),w2(mligne,miter)
+           real*8 Fd1(mligne,miter),sd1(mligne,miter),lsf1(mligne)
+           real*8 sel1(mligne,miter),sdf1(mligne)
+           real*8 Fo(mligne,miter),ldf2(mligne),Ffo(mligne)
+           real*8 lsf2(mligne),Lf2(mligne),sdf2(mligne),Fco(mligne)
+           real*8 sd2(mligne,miter),sel2(mligne,miter)
+           real*8 Dwf(mligne),Ff(mligne),Lf1(mligne),ldf1(mligne)   
+           real*8 ffo2(mligne,mangl1,mlongfi)
+           real*8 Ffo1(mligne,mangl1,mlongfi)
+           real*8 FmoyL(mligne,mangl1),wf1(mligne,mangl1,mlongfi)
+           real*8 Fmoylis(mligne),wlist(mligne)                 
+*                   
+          real*8 lisRt(mrtang1),lisphid(mrtang1)
+          real*8 lisfp(mrtang1),lisk0m(mrtang1)
+          real*8 liswf(mrtang1)
+          real*8 lisw03(mrtang1)        
+*       
+          real*8 lisrt1(mangnrt),lisphid1(mangnrt)
+          real*8 lisrt2(mangnan)
+          real*8 lisphid2(mangnan)  
+          real*8 liswp1(mangnrt),liswp2(mangnan)     
+          real*8 lisk01(mangnrt),lisk02(mangnan)        
+       ENDSEGMENT
+*
+      CHARACTER*(NCONCH)  CONM
+*
+      SEGACT,MLMOTS
+*
+*      La composante 'K1'  existe t-elle deja? Si oui, on considere que le preconditionnement 
+*      a deja ete fait et on s'en va.
+*      A adapter pour le modele de fibres 
+*
+      DO 1 I=1,MOTS(/2)
+      IF(MOTS(I).EQ.'K11') THEN
+         SEGDES MLMOTS
+         RETURN
+      ENDIF
+   1  CONTINUE
+*
+*     ACTIVATIONS
+*
+      MMODEL=IPMODL
+      NSOUS=KMODEL(/1)
+      MCHELM=ICARA
+      SEGACT MCHELM
+
+
+*
+*     BOUCLE SUR LES SOUS ZONES DU MODELE
+*
+      DO 200 ISOUS=1,NSOUS
+
+*
+*     TRAITEMENT DU MODELE
+*
+      IMODEL=KMODEL(ISOUS)
+      MELE  =NEFMOD
+      IPMAIL=IMAMOD
+      CONM  =CONMOD
+*
+*
+*     INFORMATIONS SUR L'{L{MENT FINI
+*
+*      CALL ELQUOI(MELE,0,ISUP,INFO,IMODEL)
+      IF (IERR.NE.0) THEN
+         SEGDES MCHELM
+         RETURN
+      ENDIF
+      MFR =INFELE(13)
+      LHOOK=INFELE(10)
+      IF(MFR.NE.1) THEN
+*         SEGSUP INFO
+         GO TO 200
+      ENDIF
+*
+*     RECHERCHE DE LA ZONE DU CHAMELEM
+*
+      N1  = IMACHE(/1)
+      N3  = INFCHE(/2)
+      LAZON = 0
+      DO 11 I=1,N1
+         IF (IPMAIL.NE.IMACHE(I) .OR.
+     .         CONM.NE.CONCHE(I)) GO TO 11
+            LAZON=I
+            GO TO 12
+ 11   CONTINUE
+*
+      CALL ERREUR(472)
+      SEGDES MCHELM
+*      SEGSUP INFO
+      RETURN
+*
+ 12   CONTINUE
+      MCHAML=ICHAML(LAZON)
+      SEGACT MCHAML
+      N2=NOMCHE(/2)
+      NPAR=84
+*      print *, 'N2=',N2
+      
+*  on cherche les indices des parametres materiau necessaires aux calculs du preconditionnement 
+*    par exemple le diametre des fibres et la longueur des fibres 
+      IVDIFI=0
+      IVLOFI=0
+      IVHFI=0
+      IVTMAX=0
+      IVTD=0
+      IVSK=0
+      IVFABO=0
+      IVALEC=0
+      IVMECR=0
+      IVLCAN=0
+      IVMUF=0
+      IVYOFI=0
+      IVLECH=0
+      IVMW=0
+      IVFU=0
+      IVRTEC=0
+      IVFYF=0
+c     
+      JVDIFI=0
+      JVLOFI=0
+      JVHFI=0
+      JVTMAX=0
+      JVTD=0
+      JVSK=0
+      JVFABO=0
+      JVALEC=0
+      JVMECR=0
+      JVLCAN=0
+      JVMUF=0
+      JVYOFI=0
+      JVLECH=0
+      JVMW=0
+      JVFU=0
+      JVRTEC=0
+      JVFYF=0     
+      
+      do i=1,n2
+        if(NOMCHE(i).EQ.'DIFI') then
+        IVDIFI=i
+        JVDIFI=1
+        endif       
+        if(NOMCHE(i).EQ.'LOFI') then 
+        IVLOFI=i
+        JVLOFI=1
+        endif
+        if(NOMCHE(i).EQ.'HFI') then
+        IVHFI=i
+        JVHFI=1
+        endif
+        if(NOMCHE(i).EQ.'TMAX') then 
+        IVTMAX=i
+        JVTMAX=1
+        endif       
+        if(NOMCHE(i).EQ.'TD') then 
+        IVTD=i
+        JVTD=1
+        endif
+        if(NOMCHE(i).EQ.'SK') then 
+        IVSK=i
+        JVSK=1
+        endif
+        if(NOMCHE(i).EQ.'FABO') then 
+        IVFABO=i
+        JVFABO=1
+        endif
+        if(NOMCHE(i).EQ.'ALEC') then
+        IVALEC=i
+        JVALEC=1
+        endif
+        if(NOMCHE(i).EQ.'MECR') then 
+        IVMECR=i
+        JVMECR=1
+        endif
+        if(NOMCHE(i).EQ.'LCAN') then 
+        IVLCAN=i
+        JVLCAN=1
+        endif
+        if(NOMCHE(i).EQ.'MUF') then 
+        IVMUF=i
+        JVMUF=1
+        endif
+        if(NOMCHE(i).EQ.'YOFI') then
+        IVYOFI=i
+        JVYOFI=1
+        endif
+        if(NOMCHE(i).EQ.'LECH') then 
+        IVLECH=i
+        JVLECH=1
+        endif
+        if(NOMCHE(i).EQ.'MW') then
+        IVMW=i
+        JVMW=1
+        endif
+        if(NOMCHE(i).EQ.'FU') then 
+        IVFU=i
+        JVFU=1
+        endif
+        if(NOMCHE(i).EQ.'RTEC') then
+        IVRTEC=i   
+        JVRTEC=1
+        endif
+        if(NOMCHE(i).EQ.'FYF')  then
+        IVFYF=i   
+        JVFYF=1
+        endif
+      enddo
+      
+*  on teste si il faut continuer ou sortir de cprefib     
+      
+            isomm = JVDIFI+JVLOFI+JVHFI+JVTMAX+JVTD+JVSK+JVFABO
+     &    +JVALEC+JVMECR+JVLCAN+JVMUF+JVYOFI+JVLECH+JVMW
+     &    +JVFU+JVRTEC+JVFYF
+      
+            if(isomm.eq.0) then
+               SEGDES MCHAML 
+               SEGDES MCHELM
+               RETURN
+             else if (isomm.ne.17) then
+             call erreur(5)
+               SEGDES MCHAML 
+               SEGDES MCHELM
+               RETURN            
+            endif      
+            
+            
+*
+*  on va ajouter les composantes associees aux parametres des surfaces ( 3 pour l'exemple : K1, K2, K3)  
+*  a adapter pour le modele de fibres : remplacer 3 par le nombre de parametres
+*  calcules par preconditionnement
+*
+      N2A = N2 
+      N2=N2A+NPAR
+      SEGADJ MCHAML
+* on ajuste la taille du segment     
+* rigidite initiale 1      
+      NOMCHE(N2A+1)='K11'
+      TYPCHE(N2A+1)='REAL*8'
+      NOMCHE(N2A+2)='K12'
+      TYPCHE(N2A+2)='REAL*8'
+      NOMCHE(N2A+3)='K13'
+      TYPCHE(N2A+3)='REAL*8'      
+      NOMCHE(N2A+4)='K14'
+      TYPCHE(N2A+4)='REAL*8'
+      NOMCHE(N2A+5)='K15'
+      TYPCHE(N2A+5)='REAL*8'     
+      NOMCHE(N2A+6)='K16'
+      TYPCHE(N2A+6)='REAL*8'      
+      NOMCHE(N2A+7)='K17'
+      TYPCHE(N2A+7)='REAL*8'
+      NOMCHE(N2A+8)='K18'
+      TYPCHE(N2A+8)='REAL*8'
+      NOMCHE(N2A+9)='K19'
+      TYPCHE(N2A+9)='REAL*8'
+      NOMCHE(N2A+10)='K110'
+      TYPCHE(N2A+10)='REAL*8'
+* rigidite initiale 2         
+      NOMCHE(N2A+11)='K21'
+      TYPCHE(N2A+11)='REAL*8'
+      NOMCHE(N2A+12)='K22'
+      TYPCHE(N2A+12)='REAL*8'
+      NOMCHE(N2A+13)='K23'
+      TYPCHE(N2A+13)='REAL*8'     
+      NOMCHE(N2A+14)='K24'
+      TYPCHE(N2A+14)='REAL*8'
+      NOMCHE(N2A+15)='K25'
+      TYPCHE(N2A+15)='REAL*8'    
+      NOMCHE(N2A+16)='K26'
+      TYPCHE(N2A+16)='REAL*8'      
+      NOMCHE(N2A+17)='K27'
+      TYPCHE(N2A+17)='REAL*8'
+      NOMCHE(N2A+18)='K28'
+      TYPCHE(N2A+18)='REAL*8'
+      NOMCHE(N2A+19)='K29'
+      TYPCHE(N2A+19)='REAL*8'
+      NOMCHE(N2A+20)='K210'
+      TYPCHE(N2A+20)='REAL*8'
+* ouverture au pic 1      
+      NOMCHE(N2A+21)='W11'
+      TYPCHE(N2A+21)='REAL*8'
+      NOMCHE(N2A+22)='W12'
+      TYPCHE(N2A+22)='REAL*8'
+      NOMCHE(N2A+23)='W13'
+      TYPCHE(N2A+23)='REAL*8'     
+      NOMCHE(N2A+24)='W14'
+      TYPCHE(N2A+24)='REAL*8'
+      NOMCHE(N2A+25)='W15'
+      TYPCHE(N2A+25)='REAL*8'    
+      NOMCHE(N2A+26)='W16'
+      TYPCHE(N2A+26)='REAL*8'      
+      NOMCHE(N2A+27)='W17'
+      TYPCHE(N2A+27)='REAL*8'
+      NOMCHE(N2A+28)='W18'
+      TYPCHE(N2A+28)='REAL*8'
+      NOMCHE(N2A+29)='W19'
+      TYPCHE(N2A+29)='REAL*8'
+      NOMCHE(N2A+30)='W110'
+      TYPCHE(N2A+30)='REAL*8'
+* ouverture au pic 2      
+      NOMCHE(N2A+31)='W21'
+      TYPCHE(N2A+31)='REAL*8'
+      NOMCHE(N2A+32)='W22'
+      TYPCHE(N2A+32)='REAL*8'
+      NOMCHE(N2A+33)='W23'
+      TYPCHE(N2A+33)='REAL*8'     
+      NOMCHE(N2A+34)='W24'
+      TYPCHE(N2A+34)='REAL*8'
+      NOMCHE(N2A+35)='W25'
+      TYPCHE(N2A+35)='REAL*8'    
+      NOMCHE(N2A+36)='W26'
+      TYPCHE(N2A+36)='REAL*8'      
+      NOMCHE(N2A+37)='W27'
+      TYPCHE(N2A+37)='REAL*8'
+      NOMCHE(N2A+38)='W28'
+      TYPCHE(N2A+38)='REAL*8'
+      NOMCHE(N2A+39)='W29'
+      TYPCHE(N2A+39)='REAL*8'
+      NOMCHE(N2A+40)='W210'
+      TYPCHE(N2A+40)='REAL*8'      
+* Force au pic     
+      NOMCHE(N2A+41)='FP1'
+      TYPCHE(N2A+41)='REAL*8'
+      NOMCHE(N2A+42)='FP2'
+      TYPCHE(N2A+42)='REAL*8'
+      NOMCHE(N2A+43)='FP3'
+      TYPCHE(N2A+43)='REAL*8'     
+      NOMCHE(N2A+44)='FP4'
+      TYPCHE(N2A+44)='REAL*8'
+      NOMCHE(N2A+45)='FP5'
+      TYPCHE(N2A+45)='REAL*8'    
+      NOMCHE(N2A+46)='FP6'
+      TYPCHE(N2A+46)='REAL*8'      
+      NOMCHE(N2A+47)='FP7'
+      TYPCHE(N2A+47)='REAL*8'
+      NOMCHE(N2A+48)='FP8'
+      TYPCHE(N2A+48)='REAL*8'
+      NOMCHE(N2A+49)='FP9'
+      TYPCHE(N2A+49)='REAL*8'
+      NOMCHE(N2A+50)='FP10'
+      TYPCHE(N2A+50)='REAL*8'      
+* ouverture intermediaire a 0.3fp    
+      NOMCHE(N2A+51)='W31'
+      TYPCHE(N2A+51)='REAL*8'
+      NOMCHE(N2A+52)='W32'
+      TYPCHE(N2A+52)='REAL*8'
+      NOMCHE(N2A+53)='W33'
+      TYPCHE(N2A+53)='REAL*8'     
+      NOMCHE(N2A+54)='W34'
+      TYPCHE(N2A+54)='REAL*8'
+      NOMCHE(N2A+55)='W35'
+      TYPCHE(N2A+55)='REAL*8'    
+      NOMCHE(N2A+56)='W36'
+      TYPCHE(N2A+56)='REAL*8'      
+      NOMCHE(N2A+57)='W37'
+      TYPCHE(N2A+57)='REAL*8'
+      NOMCHE(N2A+58)='W38'
+      TYPCHE(N2A+58)='REAL*8'
+      NOMCHE(N2A+59)='W39'
+      TYPCHE(N2A+59)='REAL*8'
+      NOMCHE(N2A+60)='W310'
+      TYPCHE(N2A+60)='REAL*8'      
+* ouverture finale f=0      
+      NOMCHE(N2A+61)='WF1'
+      TYPCHE(N2A+61)='REAL*8'
+      NOMCHE(N2A+62)='WF2'
+      TYPCHE(N2A+62)='REAL*8'
+      NOMCHE(N2A+63)='WF3'
+      TYPCHE(N2A+63)='REAL*8'     
+      NOMCHE(N2A+64)='WF4'
+      TYPCHE(N2A+64)='REAL*8'
+      NOMCHE(N2A+65)='WF5'
+      TYPCHE(N2A+65)='REAL*8'    
+      NOMCHE(N2A+66)='WF6'
+      TYPCHE(N2A+66)='REAL*8'      
+      NOMCHE(N2A+67)='WF7'
+      TYPCHE(N2A+67)='REAL*8'
+      NOMCHE(N2A+68)='WF8'
+      TYPCHE(N2A+68)='REAL*8'
+      NOMCHE(N2A+69)='WF9'
+      TYPCHE(N2A+69)='REAL*8'
+      NOMCHE(N2A+70)='WF10'
+      TYPCHE(N2A+70)='REAL*8' 
+* min et max des listes calculees      
+      NOMCHE(N2A+71)='K1MI'
+      TYPCHE(N2A+71)='REAL*8'
+      NOMCHE(N2A+72)='K1MA'
+      TYPCHE(N2A+72)='REAL*8'
+      NOMCHE(N2A+73)='K2MI'
+      TYPCHE(N2A+73)='REAL*8'
+      NOMCHE(N2A+74)='K2MA'
+      TYPCHE(N2A+74)='REAL*8'
+      NOMCHE(N2A+75)='W1MI'
+      TYPCHE(N2A+75)='REAL*8'
+      NOMCHE(N2A+76)='W1MA'
+      TYPCHE(N2A+76)='REAL*8'
+      NOMCHE(N2A+77)='W2MI'
+      TYPCHE(N2A+77)='REAL*8'
+      NOMCHE(N2A+78)='W2MA'
+      TYPCHE(N2A+78)='REAL*8'
+      NOMCHE(N2A+79)='FPMI'
+      TYPCHE(N2A+79)='REAL*8'
+      NOMCHE(N2A+80)='FPMA'
+      TYPCHE(N2A+80)='REAL*8'
+      NOMCHE(N2A+81)='W3MI'
+      TYPCHE(N2A+81)='REAL*8'
+      NOMCHE(N2A+82)='W3MA'
+      TYPCHE(N2A+82)='REAL*8'
+      NOMCHE(N2A+83)='WFMI'
+      TYPCHE(N2A+83)='REAL*8'
+      NOMCHE(N2A+84)='WFMA'
+      TYPCHE(N2A+84)='REAL*8'
+
+
+      
+*      MELEME=IPMAIL
+*      SEGACT MELEME
+*      NBNN=NUM(/1)
+*
+*  CREATION DES MELVALs ET REMPLISSAGE
+*
+*  on gere d'abord la taille necessaire, en fonction de la taille des autres parametres materiau
+
+      N1EL=0
+      N1PTEL=0
+      MELVAL=IELVAL(IVDIFI)
+      NGDIFI=VELCHE(/1)
+      NBDIFI=VELCHE(/2)
+             
+      MELVAL=IELVAL(IVLOFI)
+      NGLOFI=VELCHE(/1)
+      NBLOFI=VELCHE(/2)
+      
+      MELVAL=IELVAL(IVHFI)
+      NGHFI=VELCHE(/1)
+      NBHFI=VELCHE(/2)   
+      
+      MELVAL=IELVAL(IVTMAX)
+      NGTMAX=VELCHE(/1)
+      NBTMAX=VELCHE(/2)  
+      
+      MELVAL=IELVAL(IVTD)
+      NGTD=VELCHE(/1)
+      NBTD=VELCHE(/2)    
+      
+      MELVAL=IELVAL(IVSK)
+      NGSK=VELCHE(/1)
+      NBSK=VELCHE(/2)    
+      
+      MELVAL=IELVAL(IVFABO)
+      NGFABO=VELCHE(/1)
+      NBFABO=VELCHE(/2)    
+      
+      MELVAL=IELVAL(IVALEC)
+      NGALEC=VELCHE(/1)
+      NBALEC=VELCHE(/2)     
+     
+      MELVAL=IELVAL(IVMECR)
+      NGMECR=VELCHE(/1)
+      NBMECR=VELCHE(/2)
+     
+      MELVAL=IELVAL(IVLCAN)
+      NGLCAN=VELCHE(/1)
+      NBLCAN=VELCHE(/2)
+     
+      MELVAL=IELVAL(IVMUF)
+      NGMUF=VELCHE(/1)
+      NBMUF=VELCHE(/2)
+   
+      MELVAL=IELVAL(IVYOFI)
+      NGYOFI=VELCHE(/1)
+      NBYOFI=VELCHE(/2)     
+      
+      MELVAL=IELVAL(IVLECH)
+      NGLECH=VELCHE(/1)
+      NBLECH=VELCHE(/2)     
+      
+      MELVAL=IELVAL(IVMW)
+      NGMW=VELCHE(/1)
+      NBMW=VELCHE(/2) 
+      
+      MELVAL=IELVAL(IVFU)
+      NGFU=VELCHE(/1)
+      NBFU=VELCHE(/2)      
+         
+      MELVAL=IELVAL(IVRTEC)
+      NGRTEC=VELCHE(/1)
+      NBRTEC=VELCHE(/2) 
+      
+      MELVAL=IELVAL(IVFYF)
+      NGFYF=VELCHE(/1)
+      NBFYF=VELCHE(/2)       
+      
+*Ici on est en train de regarder si les données mx sont constantes sur le maillage et dans les elements ?
+      IF(NGDIFI.EQ.1.AND.NGLOFI.EQ.1.AND.NGHFI.EQ.1.AND.NGTMAX.EQ.1
+     #.AND.NGTD.EQ.1.AND.NGSK.EQ.1.AND.NGFABO.EQ.1.AND.NGALEC.EQ.1.
+     #AND.NGMECR.EQ.1.AND.NGLCAN.EQ.1.AND.NGMUF.EQ.1.AND.NGYOFI.EQ.1
+     #.AND.NGLECH.EQ.1.AND.NGMW.EQ.1.AND.NGFU.EQ.1.AND.NGRTEC.EQ.1
+     # .AND.NGFYF.EQ.1) THEN
+        N1PTEL=1
+      ELSE 
+        N1PTEL=MAX(NGDIFI,NGLOFI,NGHFI,NGTMAX,NGTD,NGSK,NGFABO,NGALEC,
+     #NGMECR,NGLCAN,NGMUF,NGYOFI,NGLECH,NGMW,NGFU,NGRTEC,NGFYF)
+      ENDIF
+      IF(NBDIFI.EQ.1.AND.NBLOFI.EQ.1.AND.NBHFI.EQ.1.AND.NBTMAX.EQ.1
+     #.AND.NBTD.EQ.1.AND.NBSK.EQ.1.AND.NBFABO.EQ.1.AND.NBALEC.EQ.1.
+     #AND.NBMECR.EQ.1.AND.NBLCAN.EQ.1.AND.NBMUF.EQ.1.AND.NBYOFI.EQ.1
+     #.AND.NBLECH.EQ.1.AND.NBMW.EQ.1.AND.NBFU.EQ.1.AND.NBRTEC.EQ.1
+     #.AND.NBFYF.EQ.1) THEN
+        N1EL=1
+      ELSE 
+        N1EL=MAX(NBDIFI,NBLOFI,NBHFI,NBTMAX,NBTD,NBSK,NBFABO,NBALEC,
+     #NBMECR,NBLCAN,NBMUF,NBYOFI,NBLECH,NBMW,NBFU,NBRTEC,NBFYF)
+      ENDIF
+      N2EL=0
+      N2PTEL=0       
+
+*  creation des  3 melvals, associés à K1,K2,K3
+*  a adapter pour le modele de fibres : remplacer 3 par le nombre de parametres
+*  calcules par preconditionnement
+
+      DO I=1,NPAR
+        SEGINI MELVAL
+        IELVAL(N2A+I)=MELVAL
+      ENDDO     
+
+ 
+*  on crée un segment de travail    
+              MLIGNE = nligne
+              MITER = niter
+              MANGL1 = nangl+1
+              MLONGFI = nlongfi
+              MRTANG1 = nrt*(nangl+1)
+              MANGNRT = nangredu*nrt
+              MANGNAN = (nangl+1-nangredu)*nrt
+              SEGINI MWOR
+
+
+ 
+*
+*  calcul de K1,K2,K3  
+*   boucle sur les elements et sur les points de Gauss
+* donc si le champ est constant sur le maillage et les elements niel = 1 et n1ptel=1 et on va faire l'appel qu'une seule fois
+            DO     IB=1,N1EL       
+              DO     IGAU=1,N1PTEL
+*  recuperation du diametre de la fibre
+               MELVAL=IELVAL(IVDIFI)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XDIFI =VELCHE(IGMN,IBMN)
+* recuperation de la longueur de la fibre 
+               MELVAL=IELVAL(IVLOFI)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XLOFI =VELCHE(IGMN,IBMN)
+* recuperation de la rigidite de l interface
+               MELVAL=IELVAL(IVHFI)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XHFI =VELCHE(IGMN,IBMN)               
+* recuperation de la contrainte de cisaillement max
+               MELVAL=IELVAL(IVTMAX)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XTMAX =VELCHE(IGMN,IBMN) 
+* recuperation de la contrainte de frottement             
+               MELVAL=IELVAL(IVTD)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XTD =VELCHE(IGMN,IBMN)                        
+* recuperation du glissement caracteristique             
+               MELVAL=IELVAL(IVSK)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XSK =VELCHE(IGMN,IBMN)                  
+* recuperation de la contrainte de la force d about          
+               MELVAL=IELVAL(IVFABO)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XFABO =VELCHE(IGMN,IBMN)   
+* recuperation de l angle du cone de rupture et d ecaill        
+               MELVAL=IELVAL(IVALEC)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XALEC =VELCHE(IGMN,IBMN)   
+* recuperation du module d ecrouissage d abrasion          
+               MELVAL=IELVAL(IVMECR)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XMECR =VELCHE(IGMN,IBMN)   
+* recuperation de la longueur  dancrage caracteristique            
+               MELVAL=IELVAL(IVLCAN)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XLCAN =VELCHE(IGMN,IBMN)   
+* recuperation du coefficient de frottement fibre matrice            
+               MELVAL=IELVAL(IVMUF)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XMUF =VELCHE(IGMN,IBMN)   
+* recuperation du module d elasticite de la fibre             
+               MELVAL=IELVAL(IVYOFI)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XYOFI =VELCHE(IGMN,IBMN)   
+* recuperation de la longueur de l echantillon qui a donne RTEC            
+               MELVAL=IELVAL(IVLECH)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XLECH =VELCHE(IGMN,IBMN)             
+* recuperation du parametre de weibull            
+               MELVAL=IELVAL(IVMW)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XMW =VELCHE(IGMN,IBMN)   
+* recuperation de la contrainte ultime des fibres           
+               MELVAL=IELVAL(IVFU)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XFU =VELCHE(IGMN,IBMN) 
+* recuperation de la resistance a la traction associee a lech          
+               MELVAL=IELVAL(IVRTEC)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XRTEC =VELCHE(IGMN,IBMN)      
+* recuperation de la LIMITE ELASTIQUE DES FIBRES         
+               MELVAL=IELVAL(IVFYF)
+               IGMN=MIN(IGAU,VELCHE(/1))
+               IBMN=MIN(IB  ,VELCHE(/2))
+               XFYF =VELCHE(IGMN,IBMN) 
+               
+   
+     
+           CALL PRPFI0(COEFFK1,COEFFK2,COEFFWP1,
+     #COEFFWP2,COEFFFP,COEFFWF,COEFFW03,XLECH,XMW,
+     #MAXFP,MINFP,MAXWP1,MINWP1,MAXWP2,MINWP2,MAXWF,
+     #MINWF,MAXW03,MINW03,XLOFI,XMUF,XTD,XTMAX,XYOFI,XHFI,XDIFI,XSK,
+     #XFABO,XALEC,XMECR,XFU,XLCAN,XRTEC,MAXK02,MINK02,MAXK01,MINK01,
+     #XFYF,
+     #mwor,nligne,niter,nangl,nlongfi,nrt,nangredu,phit,phicrit)     
+               
+
+C   REMPLISSAGE DES RESULTATS
+C
+*  a adapter pour le modele de fibres : remplacer 3 par le nombre de parametres
+*  calcules par preconditionnement
+
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I)           
+                VELCHE(IGAU,IB)=COEFFK1(I)
+              ENDDO  
+              
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I+10)        
+                VELCHE(IGAU,IB)=COEFFK2(I)
+              ENDDO                
+
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I+20)        
+                VELCHE(IGAU,IB)=COEFFWP1(I)
+              ENDDO                      
+
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I+30)        
+                VELCHE(IGAU,IB)=COEFFWP2(I)
+              ENDDO  
+
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I+40)        
+                VELCHE(IGAU,IB)=COEFFFP(I)
+              ENDDO  
+
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I+50)        
+                VELCHE(IGAU,IB)=COEFFW03(I)
+              ENDDO  
+
+              DO I=1,10
+                MELVAL=IELVAL(N2A+I+60)        
+                VELCHE(IGAU,IB)=COEFFWF(I)
+              ENDDO  
+
+c min et max des surfaces
+              MELVAL=IELVAL(N2A+71)        
+              VELCHE(IGAU,IB)=MINK01
+              MELVAL=IELVAL(N2A+72)        
+              VELCHE(IGAU,IB)=MAXK01 
+              MELVAL=IELVAL(N2A+73)        
+              VELCHE(IGAU,IB)=MINK02              
+              MELVAL=IELVAL(N2A+74)        
+              VELCHE(IGAU,IB)=MAXK02
+              MELVAL=IELVAL(N2A+75)        
+              VELCHE(IGAU,IB)=MINWP1   
+              MELVAL=IELVAL(N2A+76)        
+              VELCHE(IGAU,IB)=MAXWP1  
+              MELVAL=IELVAL(N2A+77)        
+              VELCHE(IGAU,IB)=MINWP2  
+              MELVAL=IELVAL(N2A+78)        
+              VELCHE(IGAU,IB)=MAXWP2
+              MELVAL=IELVAL(N2A+79)        
+              VELCHE(IGAU,IB)=MINFP
+              MELVAL=IELVAL(N2A+80)        
+              VELCHE(IGAU,IB)=MAXFP
+              MELVAL=IELVAL(N2A+81)        
+              VELCHE(IGAU,IB)=MINW03
+              MELVAL=IELVAL(N2A+82)        
+              VELCHE(IGAU,IB)=MAXW03  
+              MELVAL=IELVAL(N2A+83)        
+              VELCHE(IGAU,IB)=MINWF
+              MELVAL=IELVAL(N2A+84)        
+              VELCHE(IGAU,IB)=MAXWF  
+
+              
+*             
+              ENDDO    
+            ENDDO    
+*
+*     DESACTIVATION DES SEGMENTS PROPRES A LA ZONE GEOMETRIQUE ISOUS
+*
+*      SEGDES MELEME
+      MELVAL=IELVAL(IVDIFI)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVLOFI)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVHFI)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVTMAX)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVTD)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVSK)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVFABO)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVALEC)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVMECR)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVLCAN)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVMUF)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVYOFI)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVLECH)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVMW)
+      SEGDES MELVAL
+      MELVAL=IELVAL(IVFU)
+      SEGDES MELVAL      
+      MELVAL=IELVAL(IVRTEC)
+      SEGDES MELVAL      
+      MELVAL=IELVAL(IVFYF)
+      SEGDES MELVAL            
+      
+      
+      
+*  a adapter pour le modele de fibres : remplacer 3 par le nombre de parametres
+*  calcules par preconditionnement
+      
+      DO I=1,NPAR
+         MELVAL=IELVAL(N2A+I)
+         SEGDES MELVAL  
+       ENDDO        
+      SEGDES MCHAML
+
+*  on supprime le segment de travail
+        SEGSUP  MWOR      
+      
+      
+      
+*      SEGSUP INFO
+*
+  200 CONTINUE
+*
+      SEGDES MCHELM
+      SEGDES,MLMOTS
+      RETURN
+      END
+
+
+
+
+
+
+
+
+
+
+ 
+ 

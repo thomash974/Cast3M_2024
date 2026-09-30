@@ -1,0 +1,97 @@
+C DQRANK    SOURCE    PV090527  23/02/07    11:58:36     11592          
+      subroutine dqrank ( a, lda, m, n, tol, kr, jpvt, qraux, work )
+      
+c*****************************************************************************80
+c
+c! DQRANK computes the QR factorization of a rectangular matrix.
+c
+c  Discussion:
+c
+c    This routine is used in conjunction with sqrlss to solve
+c    overdetermined, underdetermined and singular linear systems
+c    in a least squares sense.
+c
+c    DQRANK uses the LINPACK subroutine DQRDC to compute the QR
+c    factorization, with column pivoting, of an M by N matrix A.
+c    The numerical rank is determined using the tolerance TOL.
+c
+c    Note that on output, ABS ( A(1,1) ) / ABS ( A(KR,KR) ) is an estimate
+c    of the condition number of the matrix of independent columns,
+c    and of R.  This estimate will be .le. 1/TOL.
+c
+c  Reference:
+c
+c    Jack Dongarra, Cleve Moler, Jim Bunch, Pete Stewart,
+c    LINPACK User's Guide,
+c    SIAM, 1979,
+c    ISBN13: 978-0-898711-72-1,
+c    LC: QA214.L56.
+c
+c  Parameters:
+c
+c    Input/output, real*8 A(LDA,N).  On input, the matrix whose
+c    decomposition is to be computed.  On output, the information from DQRDC.
+c    The triangular matrix R of the QR factorization is contained in the
+c    upper triangle and information needed to recover the orthogonal
+c    matrix Q is stored below the diagonal in A and in the vector QRAUX.
+c
+c    Input, integer LDA, the leading dimension of A, which must
+c    be at least M.
+c
+c    Input, integer M, the number of rows of A.
+c
+c    Input, integer N, the number of columns of A.
+c
+c    Input, real*8 TOL, a relative tolerance used to determine the
+c    numerical rank.  The problem should be scaled so that all the elements
+c    of A have roughly the same absolute accuracy, EPS.  Then a reasonable
+c    value for TOL is roughly EPS divided by the magnitude of the largest
+c    element.
+c
+c    Output, integer KR, the numerical rank.
+c
+c    Output, integer JPVT(N), the pivot information from DQRDC.
+c    Columns JPVT(1), ..., JPVT(KR) of the original matrix are linearly
+c    independent to within the tolerance TOL and the remaining columns
+c    are linearly dependent.
+c
+c    Output, real*8 QRAUX(N), will contain extra information defining
+c    the QR factorization.
+c
+c    Workspace, real*8 WORK(N).
+c
+        implicit real*8 (a-h,o-z)
+        implicit integer (i-n)
+      
+        integer lda
+        integer n
+      
+        real*8 a(lda,n)
+        integer j
+        integer job
+        integer jpvt(n)
+        integer k
+        integer kr
+        integer m
+        real*8 qraux(n)
+        real*8 tol
+        real*8 work(n)
+      
+        jpvt(1:n) = 0
+        job = 1
+      
+        call dqrdc ( a, lda, m, n, qraux, jpvt, work, job )
+      
+        kr = 0
+        k = min ( m, n )
+      
+        do j = 1, k
+          if ( abs ( a(j,j) ) .le. tol * abs ( a(1,1) ) ) then
+            return
+          end if
+          kr = j
+        end do
+      
+        return
+      end
+ 

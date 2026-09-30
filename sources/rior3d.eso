@@ -1,0 +1,141 @@
+C RIOR3D    SOURCE    FD218221  24/02/07    21:15:25     11834          
+       subroutine rior3d(xmat,nmat,nbelas,ierr1,H,C,P33,TP33)
+     
+c     A Sellier 2023 12 18     
+
+c     matrices de raideur et de souplesse pour le materiau orthotrope
+c     en base d orthotropie, matrice de passage en base d orthotropie et matrice inverse
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+c     variables globales
+      integer nmat,ierr1,nbelas
+      real*8 xmat(nmat)
+
+c     variables locales 
+      real*8 E1,E2,E3,nu12,nu23,nu13,G12,G23,G13
+      real*8 v1x,v1y,v1z,v2x,v2y,v2z      
+      real*8 H(6,6),C(6,6),P33(3,3),TP33(3,3)      
+
+      call xmat3d(E1,xmat,nmat,vnmat,nstype,nbelas,0,1)
+      call xmat3d(E2,xmat,nmat,vnmat,nstype,nbelas,0,2)
+      call xmat3d(E3,xmat,nmat,vnmat,nstype,nbelas,0,3)
+      call xmat3d(nu12,xmat,nmat,vnmat,nstype,nbelas,0,4) 
+      call xmat3d(nu23,xmat,nmat,vnmat,nstype,nbelas,0,5) 
+      call xmat3d(nu13,xmat,nmat,vnmat,nstype,nbelas,0,6) 
+      call xmat3d(G12,xmat,nmat,vnmat,nstype,nbelas,0,7)
+      call xmat3d(G23,xmat,nmat,vnmat,nstype,nbelas,0,8)
+      call xmat3d(G13,xmat,nmat,vnmat,nstype,nbelas,0,9)
+      
+c     matrice de raideur H base d orthotropie 
+      do i=1,6
+        do j=1,6
+            H(i,j)=0.d0
+        end do
+      end do    
+
+      t1 = E3 * nu23 ** 2
+      t2 = E2 * nu12 ** 2
+      t3 = E3 * nu13 ** 2
+      t4 = E2 * nu12
+      t5 = -0.2D1 * t4 * E3 * nu13 * nu23 - (-E1 + t2 + t3) * E2 - t1 * 
+     #E1
+      t5 = 0.1D1 / t5
+      t6 = E2 * E1 * (E3 * nu13 * nu23 + t4) * t5
+      t7 = E1 * (nu12 * nu23 + nu13) * t5 * E3 * E2
+      t4 = (E1 * nu23 + t4 * nu13) * t5 * E3 * E2
+      H(1,1) = E1 ** 2 * (E2 - t1) * t5
+      H(1,2) = t6
+      H(1,3) = t7
+      H(2,1) = t6
+      H(2,2) = (E1 - t3) * E2 ** 2 * t5
+      H(2,3) = t4
+      H(3,1) = t7
+      H(3,2) = t4
+      H(3,3) = t5 * E3 * (E1 - t2) * E2
+      H(4,4) = 0.2D1 * G12
+      H(5,5) = 0.2D1 * G13
+      H(6,6) = 0.2D1 * G23
+      
+c      print*,'H en base principale d orthotropie'
+c      call afic66(H)
+        
+      
+c     matrice de souplesse C en base d orthotropie  
+      do i=1,6
+        do j=1,6
+            C(i,j)=0.d0
+        end do
+      end do      
+      
+      t1 = 0.1D1 / E1
+      t2 = nu12 * t1
+      t3 = nu13 * t1
+      t4 = 0.1D1 / E2
+      t5 = nu23 * t4
+      C(1,1) = t1
+      C(1,2) = -t2
+      C(1,3) = -t3
+      C(2,1) = -t2
+      C(2,2) = t4
+      C(2,3) = -t5
+      C(3,1) = -t3
+      C(3,2) = -t5
+      C(3,3) = 0.1D1 / E3
+      C(4,4) = 0.1D1 / G12 / 0.2D1
+      C(5,5) = 0.1D1 / G13 / 0.2D1
+      C(6,6) = 0.1D1 / G23 / 0.2D1
+      
+c      print*,'C en base principale d orthotropie'
+c      call afic66(C)      
+      
+c     recuperation de la matrice de passage en base fixe
+
+c     recuperation des directions d orthotropie
+      call xmat3d(v1x,xmat,nmat,vnmat,nstype,nbelas,0,10)      
+      call xmat3d(v1y,xmat,nmat,vnmat,nstype,nbelas,0,11)
+      call xmat3d(v1z,xmat,nmat,vnmat,nstype,nbelas,0,12)
+      call xmat3d(v2x,xmat,nmat,vnmat,nstype,nbelas,0,13)
+      call xmat3d(v2y,xmat,nmat,vnmat,nstype,nbelas,0,14)  
+      call xmat3d(v2z,xmat,nmat,vnmat,nstype,nbelas,0,15)
+      
+c     vecteur manquant
+      v3x = v1y * v2z - v1z * v2y
+      v3y = -v1x * v2z + v1z * v2x
+      v3z = v1x * v2y - v1y * v2x
+      
+c     controle validite de la base d orthotropie
+      v3=sqrt(v3x*v3x+v3y*v3y+v3z*v3z)
+      if(abs(v3-1.d0).gt.1.0d-6) then
+        print*,'Dans rior3d v3 n est pas unitaire :',v3
+        print*,'il faut donner des directions d orthotropie orthormees'
+        ierr=1
+        return
+      end if
+
+
+c     matrice de passage d un vecteur courant 
+      P33(1,1)=v1x
+      P33(2,1)=v1y
+      P33(3,1)=v1z
+      
+      P33(1,2)=v2x
+      P33(2,2)=v2y
+      P33(3,2)=v2z   
+
+      P33(1,3)=v3x
+      P33(2,3)=v3y
+      P33(3,3)=v3z
+      
+c     matrice inverse
+      call traps1(TP33,P33,3)     
+
+c      print*,'Matrice de passage en base orthotrope'
+c      call afic33(P33)      
+      
+         
+  
+      
+      return
+      end
+       

@@ -1,0 +1,83 @@
+C MREM      SOURCE    CB215821  20/11/25    13:34:31     10792          
+       SUBROUTINE MREM
+************************************************************************
+*      remontee de la sotution complete  apres resolution a partir
+*  d une matrice condensee par CMCT ( hors de resou )
+*
+*     Syntaxe :
+*         chpo3 = MREM chpo1 (rig1 et rig2) chpo2 ;
+*
+*               chpo1  solution reduite sur les ddl non elimines
+*               rig1  rigidites initiale (hors  dependances )
+*               rig2  rigidites de dependances
+*
+*               chpo3  solution complete en deplacements et LX
+*
+*************************************************************************
+      IMPLICIT INTEGER(I-N)
+        IMPLICIT REAL*8(A-H,O-Z)
+
+-INC SMRIGID
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMLCHPO
+        segment idemem(0)
+        segment ideme0(idemem(/1),30)
+        segment ideme1(idemem(/1),30)
+
+        noen=1
+        ipt8=0
+        segini idemem
+        CALL LIROBJ('CHPOINT',mchpoi,1,IRETOU)
+       IF(IERR.NE.0) GO TO 5000
+        idemem(**)=mchpoi
+        segini ideme0,ideme1
+        CALL LIROBJ('LISTCHPO',mlchpo,1,IRETOU)
+       IF(IERR.NE.0) GO TO 5000
+        CALL LIROBJ('LISTCHPO',mlchp1,1,IRETOU)
+       IF(IERR.NE.0) GO TO 5000
+       segact mlchpo,mlchp1
+       if=mlchpo.ichpoi(/1)
+       if (if.ne.mlchp1.ichpoi(/1)) call erreur(5)
+       do 1000 i=1,if
+         ideme0(1,i)=mlchpo.ichpoi(i)
+         ideme1(1,i)=mlchp1.ichpoi(i)
+ 1000  continue
+
+        CALL LIROBJ('RIGIDITE',mrigid,1,IRETOU)
+       IF(IERR.NE.0) GO TO 5000
+      do 2010 ifois=1,30
+      segact mrigid
+      mrigid=jrsup
+      if (mrigid.eq.0) goto 2011
+      segact mrigid
+      isouci=1
+      iverif=0
+      call resour(idemem,ideme0,ideme1,mrigid,if,noen,ipt8,
+     >  isouci,iverif)
+      if=if-1
+ 2010 continue
+ 2011 continue
+       if (if.ne.0) call erreur(5)
+       iret=idemem(1)
+       call ecrobj('CHPOINT',iret)
+
+5000   continue
+       return
+       end
+
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 

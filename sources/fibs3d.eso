@@ -1,0 +1,1188 @@
+C FIBS3D    SOURCE    FD218221  24/02/07    21:15:11     11834          
+      subroutine fibs3d(Df,Lf,lech,mw,rtec,rhof,eo,vf1,vf2,Gf,
+     #cokf1,cokf2,cowp1,cowp2,cofp,cow03,cowf,mink01,maxk01,mink02,
+     #maxk02,minwp1,maxwp1,minwp2,maxwp2,minfp,maxfp,minw03,maxw03,
+     #minwf,maxwf,sigf06,vwpl6,wmax,wmoy,etw,ncf,sigfr,wmax6,le,
+     #nc0,wmoy0,etw0,vw30,rig0t,wmax0,vw3,rmax1,rmax2,rmax3,phimoy,
+     #wferm,sigdec,iloc,wpsigt,wmiloc,sigmaxt,vecw33,sigfx6,wmaxd,
+     #wmaxd0,epstf6,Ef,fu,young,xmt,dtiso,epict,rt00,cvar,wplmax)
+     
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)   
+      integer err1,nvari,ncalc,rmax,r,rmaxi,rmax1,rmax2,rmax3
+      integer i,j,k,l,iloc(3)
+      parameter (PI=3.141592653589793D0)
+      real*8 incremwlis,precision1,precision2
+      parameter (incremwlis=2.5d-6,precision1=1.0d-8,precision2=1.0d-8)
+
+      
+      real*8 rhof,Df,Lf,phicrit,Rtec,mw,Rtb,lech,le(3),Gf
+      real*8 young,xmt,epict,dt3
+     
+      parameter (nvari=7,phicrit=55.d0,npos=10)
+c attention npos doit être redefini dans disp3d
+c Rtec est celui de lech     
+C       parameter(mu=0.5d0,Td=6.4d0,Tmax=8.d0,rhof=0.02,
+C      # Ef=210000.d0,Df=2.0d-4,Hf=8000000.d0,sk=3.0d-2,
+C      #  F0=5.0d-6,alphad=30.d0,M0=8.d0,
+C      # Rtec=4.d0,fu=2800.d0,L0=5.0d-3,
+C      # Lf=0.013d0,lech=1.d0,mw=12.d0)
+c       parameter (ncalc=max(int(Lf/(incremwlis)),1000))
+      parameter (ncalc=1000)
+      parameter (rmaxi=10)  
+      real*8 vecw(3),wmax0(3)
+      real*8 Eo(3),Vwpl6(6),vwpl33(3,3),vw3(3)
+      real*8 veo(3,3),vecw33(3,3)
+      real*8 stri(npos,2*npos-2),xg(npos,2*npos-2),yg(npos,2*npos-2)
+      real*8 zg(npos,2*npos-2),vei(3)
+      real*8 phi1,phi1d(npos,2*npos-2),f1(npos,2*npos-2)
+      real*8 pscal(npos,2*npos-2),normv
+      real*8 si0(npos,2*npos-2),si1,Reiw(npos,2*npos-2)
+      real*8 wmaxa(3,3),wmaxac(3,3),wmaxact(3),wmax6(6),wmax33(3,3)
+      real*8 rig0(3,rmaxi),sig0(3),vwfi(3,ncalc)
+      real*8 sigmax(3,rmaxi),sigf(3,rmaxi,ncalc),sigf06(6)
+      real*8 sigf033(3,3),sigf03(3)
+      real*8 ratio(npos,2*npos-2),vwfi0(3),wfis(3)
+      real*8 wpsig(3,rmaxi),wmi0(1),cvar(3),wplmax(3)
+      real*8 wmiloc(3),phimoy(3),nf(npos,2*npos-2)
+      real*8 Romeg(npos,2*npos-2),Sr(3),Sigb(3),Sig(3),wfist(3)
+      real*8 nc(rmaxi),Rt(rmaxi),nct(rmaxi),Romeg1(npos,2*npos-2)
+      real*8 wmi(rmaxi),wt(3,ncalc),sigt(3,ncalc),wmul(3,rmaxi)
+
+c variables pour la reduction du modele      
+      real*8 k0m, wp,fp,f03,w03,wf
+      real*8 cokf1(10),cokf2(10),cowp1(10),cowp2(10)
+      real*8 cofp(10),cowf(10),cow03(10)
+      real*8 maxfp,minfp,maxwp1,minwp1,maxwf,minwf,maxw03,minw03
+      real*8 maxwp2,minwp2,B,vf1(3),vf2(3)
+      real*8 maxk02,mink02,maxk01,mink01,phi2d(npos,2*npos-2)     
+      real*8 tri(npos,2*npos-2,3,3),Reiw1,Reiw2,Reiw3,vst1(3),vst2(3)
+      real*8 vst3(3),theta1,gamma1,theta2,gamma2,theta3,gamma3
+
+c    variable ajoutée pour contrainte totale 
+      real*8 wpsigt(3),rig0t(3),sigmaxt(3),sigfr(3),rt00    
+      logical loc(3),dtiso
+      real*8 varft(nvari,ncalc),rig0td(3),gfap(3)
+      real*8 wmr(rmaxi),wer(rmaxi),wmoy(3),etw(3),wmax(3)
+      real*8 sigfp33(3,3),sigfx33(3,3),sigfx6(6),ncf(3)
+      real*8 dw3(3),vw30(3),wmoy0(3),etw0(3),nc0(3)
+      real*8 wferm(3),sigdec(3),sigfe(3),epse13(3),vecwj(3)
+      real*8 wmaxd(3),wmaxd0(3),w1(3),rtmin,epstf6(6),epse133(3,3)
+      real*8 vecs33(3,3)
+
+    
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+c CONSTRUCTION DES 3 COURBES CONTRAINTES - OUVERTURE TOTALES DANS LA BASE 
+c CCCCCCCCCCCCCCCC  DE FISSURE ACTUELLE CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+   
+      
+c recuperation des ouvertures max
+      call x6x33(wmax6,wmax33)      
+      call x6x33(vwpl6,vwpl33)
+c     vw3 : vecteur des valeurs principales de fissures
+c     vecw33 matrice des vecteurs d'orientation des fissures actuelles
+      call b3_v33(vwpl33,vw3,vecw33)
+      
+C        print*,vecw33(1,1),vecw33(2,1),vecw33(3,1),"vw1"
+C        print*,vecw33(1,2),vecw33(2,2),vecw33(3,2),"vw2"
+C        print*,vecw33(1,3),vecw33(2,3),vecw33(3,3),"vw3"
+
+       
+c on passe le tenseur d'ouverture max dans la base de fissure actuelle
+c pour comparer les valeurs max et actuelles
+c      vecw33t=transpose(vecw33)
+      wmaxa=matmul(transpose(vecw33),wmax33)
+      wmaxac=matmul(wmaxa,vecw33)
+            
+c on récupère les valeurs diag
+c c'est cette valeur qu'on va décomposer en multifissure
+      do i=1,3
+        do j=1,3
+        if(i.eq.j) then 
+        wmaxact(i)=wmaxac(i,j)
+        end if
+        end do
+      end do    
+
+c recuperation du tenseur des contraintes fibres du pas d avant  
+c il sert a calculer une eventuelle decharge   
+      call x6x33(sigf06,sigf033)
+      call b3_v33(sigf033,sigf03,vecs33) 
+c      print*,sigf03(1),sigf03(2),sigf03(3),"contraintes fibres 0"    
+
+c tenseur d orientation des fibres dans la base d'orientations principales     
+      if((Eo(1).eq.0.d0).or.(Eo(2).eq.0.d0).or.(Eo(3).eq.0.d0)) then
+        print*,"arret du prigramme dans fibs3d.eso"
+        print*,"Donnez des valeurs du tenseur d'orientation non nulles"
+        stop
+        err1=1
+      end if      
+
+c vecteurs principaux du tenseur d'orientation des fibres dans la base du maillage
+c on donne 2 vecteurs et on calcule le 3ème 
+      veo(1,1)=vf1(1)
+      veo(2,1)=vf1(2)
+      veo(3,1)=vf1(3)
+      
+      veo(1,2)=vf2(1)
+      veo(2,2)=vf2(2)
+      veo(3,2)=vf2(3)
+      
+      veo(1,3)=veo(2,1)*veo(3,2)-veo(3,1)*veo(2,2)
+      veo(2,3)=veo(3,1)*veo(1,2)-veo(1,1)*veo(3,2)
+      veo(3,3)=veo(1,1)*veo(2,2)-veo(2,1)*veo(1,2)
+      
+      if(abs(
+     #  veo(1,1)*veo(1,2)+veo(2,1)*veo(2,2)+veo(3,1)*veo(3,2)).gt.
+     #  precision1) then
+        print*,"arret du prigramme dans fibs3d.eso"
+        print*,"Donnez vecteurs orthogonaux d'orientation des fibres "
+c       read*
+        stop
+        err1=1
+      end if
+      
+c    normalisation des vecteurs
+      do i=1,3
+          normv=sqrt(veo(1,i)**2+veo(2,i)**2+veo(3,i)**2)
+          veo(1,i)=veo(1,i)/normv
+          veo(2,i)=veo(2,i)/normv
+          veo(3,i)=veo(3,i)/normv
+      end do
+c  discrétisation de l'espace en angles solides  
+      call disp3d(stri,xg,yg,zg,tri,npos)             
+c traitement des fissures
+      do i=1,3  
+c       initialisation
+        loc(i)=.false.  
+c       wmi=0.d0
+        if(i.eq.1) then
+            rmax=rmax1
+        else if(i.eq.2) then
+            rmax=rmax2
+        else if(i.eq.3) then
+            rmax=rmax3
+        end if
+      
+        if(vw3(i).lt.precision2) then
+            sigfr(i)=0.d0
+            wmax(i)=0.d0
+            rig0t(i)=0.d0
+            wmoy(i)=0.d0
+            etw(i)=0.d0    
+            wmi=0.d0
+            wmul=0.d0
+            wmr=0.d0 
+            wer=0.d0 
+            nc=0.d0
+            nct=0.d0
+      
+            if(wmaxact(i).lt.precision2) then
+                wmoy(i)=0.d0
+                etw(i)=0.d0
+                ncf(i)=0.d0
+                sigfr(i)=0.d0
+                if(nc0(i).gt.0.d0) then
+                    ncf(i)=nc0(i)
+                else
+                    ncf(i)=0.d0
+                end if     
+            else  
+                ncf(i)=nc0(i)
+            end if
+      
+c           calcul de phimoy
+            
+            phimoy(i)=0.d0
+      
+      
+            go to 70
+        end if
+      
+        if((wmaxact(i).gt.0.d0).and.(nc0(i).eq.0.d0)) then
+            nc0(i)=1.d0
+        end if
+
+c       vecteurs orientations de fissure
+c       vecw(j,i) : orientation de la fissure i (normé? --> oui)
+        vecw(1)=vecw33(1,i)
+        vecw(2)=vecw33(2,i)
+        vecw(3)=vecw33(3,i)
+      
+      
+c       on construit les rayons de l ellipse et les angles une seule fois pour toute
+c       c'est les memes pour tous         
+        do n=1,npos
+          do k=1,2*npos-2           
+c           vecteur sommet des triangles vst(sommet,coordonnée)
+c           sommet 1
+            vst1(1)=tri(n,k,1,1) 
+            vst1(2)=tri(n,k,1,2)
+            vst1(3)=tri(n,k,1,3) 
+c             sommet 2
+            vst2(1)=tri(n,k,2,1) 
+            vst2(2)=tri(n,k,2,2)
+            vst2(3)=tri(n,k,2,3) 
+c           sommet 3
+            vst3(1)=tri(n,k,3,1) 
+            vst3(2)=tri(n,k,3,2)
+            vst3(3)=tri(n,k,3,3)          
+c           vecteur dans la direction ei (il est déjà normalisé dans disp3d)
+            vei(1)=xg(n,k)
+            vei(2)=yg(n,k)
+            vei(3)=zg(n,k)
+         
+c           passage de vei dans la base du maillage puis de fissuration 
+c           NON vecw est dans la base du maillage, il suffit de passer 
+c           vei dans la base du maillage 
+c           veo est la matrice de passage P du maillage a l ellipse
+c           ici on veut passer de l'ellipse au maillage donc P A
+            vei=matmul(veo,vei)                 
+c           vei=matmul(vecw33,vei)          
+c           produit scalaire entre l'orientation de la fissure et de ei
+            pscal(n,k)=abs(sum(vei*vecw))
+c           calcul de l'angle entre la fissure et la direction ei
+            phi1=acos(pscal(n,k))  
+            phi1d(n,k)=180.d0*phi1/pi  
+c           calculs sont effectues dans la base de l ellipse          
+c           calcul des angles d'orientation de chaque sommet du triangle n,k
+            theta1=acos(vst1(3))
+              if(vst1(1).eq.0.d0) then
+                gamma1=pi/2.d0
+              else
+                gamma1=atan(vst1(2)/vst1(1))  
+              end if
+              theta2=acos(vst2(3))
+              if(vst2(1).eq.0.d0) then
+                gamma2=pi/2.d0
+              else
+                gamma2=atan(vst2(2)/vst2(1))
+              end if        
+              theta3=acos(vst3(3))
+              if(vst3(1).eq.0.d0) then
+                gamma3=pi/2.d0
+              else
+                gamma3=atan(vst3(2)/vst3(1))
+              end if  
+          
+c rayon de l'ellipse d'orientation des fibres dans la direction des sommets             
+      Reiw1 = (Eo(1) ** 2 * Eo(3) ** 2 * sin(theta1)**2*sin(gamma1)** 2 
+     #- Eo(2) ** 2 * Eo(3) ** 2 * sin(theta1) ** 2*sin(gamma1) ** 2-Eo(1
+     #) ** 2 * Eo(2) ** 2 * sin(theta1) ** 2 + Eo(2) ** 2 * Eo(3) ** 2 * 
+     #sin(theta1) ** 2+ Eo(1) ** 2 * Eo(2) ** 2) ** (-0.1D1 / 0.2D1) * E
+     #o(3) * Eo(2) * Eo(1)
+     
+      Reiw2 = (Eo(1) ** 2 * Eo(3) ** 2 * sin(theta2)**2*sin(gamma2)** 2 
+     #- Eo(2) ** 2 * Eo(3) ** 2 * sin(theta2) ** 2*sin(gamma2) ** 2-Eo(1
+     #) ** 2 * Eo(2) ** 2 * sin(theta2) ** 2 + Eo(2) ** 2 * Eo(3) ** 2 * 
+     #sin(theta2) ** 2+ Eo(1) ** 2 * Eo(2) ** 2) ** (-0.1D1 / 0.2D1) * E
+     #o(3) * Eo(2) * Eo(1)     
+     
+      Reiw3 = (Eo(1) ** 2 * Eo(3) ** 2 * sin(theta3)**2*sin(gamma3)** 2 
+     #- Eo(2) ** 2 * Eo(3) ** 2 * sin(theta3) ** 2*sin(gamma3) ** 2-Eo(1
+     #) ** 2 * Eo(2) ** 2 * sin(theta3) ** 2 + Eo(2) ** 2 * Eo(3) ** 2 * 
+     #sin(theta3) ** 2+ Eo(1) ** 2 * Eo(2) ** 2) ** (-0.1D1 / 0.2D1) * E
+     #o(3) * Eo(2) * Eo(1)     
+
+            Reiw(n,k)=(Reiw1+Reiw2+Reiw3)/3.d0         
+
+c           stockage de reiw*omegai
+            Romeg(n,k)=Reiw(n,k)*stri(n,k)
+            Romeg1(n,k)=Reiw(n,k)*stri(n,k)*pscal(n,k)  
+c           terme proportionnel à la densité volumique de fibres dans une direction ei
+c           car on ne sait pas calculer la somme rei*omegai 
+c           ratio(n,k)=Reiw(n,k)*stri(n,k)*rhof     
+c           proportionnel au nombre de fibres du paquet n,k traversant la fissure i  
+c           nf(n,k)=4*ratio(n,k)*pscal(n,k)/(pi*Df**2)        
+c           proportionnel a l ancrage moyen des fibres du paquet ei pondéré par le nombre de fibres traversant la fissure        
+c           Lm(n,k)=(Lf/2-Lf/(4*cos(phi1)))*nf(n,k)
+c           l angle moyen reflete les fibres qui traversent effectivement le plan
+            phi2d(n,k)=Reiw(n,k)*stri(n,k)*phi1d(n,k)*pscal(n,k)  
+c           fin de la 1ere boucle sur n,k qui sert a connaitre reiw(n,k) et phi1d(n,k)          
+          end do 
+c         fin de boucle sur k      
+        end do 
+c        fin de boucle sur n          
+c     angle moyen
+      phimoy(i)=sum(phi2d)/sum(romeg1) 
+      
+      if(vw3(i).gt.wplmax(i)) then
+      wplmax(i)=vw3(i)
+      end if
+
+
+c      if((vw3(i).ge.wmaxact(i)).and.(vw3(i).ge.vw30(i))) then  
+c      if(vw3(i).ge.wmaxact(i)) then 
+
+      if(vw3(i).lt.wferm(i)) then
+      go to 100
+      end if           
+    
+      if((vw3(i).ge.wplmax(i))) then        
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c on ouvre la fissure i    
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c       modif
+c      wpsigt0(i)=wpsigt(i)
+
+      rtmin=Rtec*(lech/(0.5d0*sqrt(2*pi)))**(1/mw)  
+      do r=1,rmax
+        if(r.eq.1) then
+            Rt(r)=rt00
+        else
+            Rt(r)=Rtec*(lech*2.d0**(r-1)/le(i))**(1/mw)
+        end if
+
+        if(rt(r).lt.rtmin) then
+        rt(r)=rtmin
+        end if
+      end do   
+c   Rtec valeur pour lech quand r=1 on fait les fissures a le/2   
+
+c   initialisation      
+      wmi=0.d0
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c ici on test si on etait dans une phase de localisation
+c si c est le cas on ne reconstruit pas les courbes on va 
+c directement dans la phase de localisation
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+      if(iloc(i).eq.1) then
+        go to 80
+      end if
+      
+ 
+ 
+      do r=1,rmax
+        Rtb=Rt(r)
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc      
+c construction des courbes contraintes ouvertures de fissures pour chaque rt
+c pour 1 fissure fictive incrementale dans la base de fissuration actuelle   
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc   
+        do l=1,ncalc
+       
+c           récupération de la contrainte du pas fictif d'avant
+            if(l.eq.1) then
+                sig0(1)=0.d0
+                sig0(2)=0.d0
+                sig0(3)=0.d0
+                vwfi0(1)=0.d0
+                vwfi0(2)=0.d0
+                vwfi0(3)=0.d0         
+            else
+                sig0(1)=varft(1,l-1)
+                sig0(2)=varft(2,l-1) 
+                sig0(3)=varft(3,l-1) 
+                vwfi0(1)=varft(4,l-1)
+                vwfi0(2)=varft(5,l-1)
+                vwfi0(3)=varft(6,l-1)        
+            end if 
+  
+c           fissure fictive
+            vwfi(i,l)=l*incremwlis
+        
+c           et ici on recommence donc une boucle ou on va calculer les contraintes
+c           jusqu au pic pour tous les Rt
+            do n=1,npos
+                do k=1,2*npos-2            
+c               calcul de la force moyenne pour une fibre traversant la fissure i inclinée de phi1d
+c               calcul des points caractéristiques de la courbe force ouverture de fissure pour Td et phid
+c               rigidité initiale
+                if(phi1d(n,k).le.phicrit) then 
+                    call reconf(cokf1,k0m,Rtb,phi1d(n,k),mink01,maxk01)
+                else
+                    call reconf(cokf2,k0m,Rtb,phi1d(n,k),mink02,maxk02)
+                end if         
+c               ouverture au pic
+                if(phi1d(n,k).le.phicrit) then 
+                    call reconf(cowp1,wp,Rtb,phi1d(n,k),minwp1,maxwp1)
+                else
+                    call reconf(cowp2,wp,Rtb,phi1d(n,k),minwp2,maxwp2)
+                end if          
+c               force au pic
+                call reconf(cofp,fp,Rtb,phi1d(n,k),minfp,maxfp)  
+c               force intermédiaire post pic     
+                f03=0.3d0*fp          
+c               ouverture pour f=0.3fp  
+                call reconf(cow03,w03,Rtb,phi1d(n,k),minw03,maxw03)
+                if(w03.le.wp) then        
+                    w03=3.0d0*wp  
+                end if  
+c               ouverture finale (f=0)    
+                call reconf(cowf,wf,Rtb,phi1d(n,k),minwf,maxwf)
+                if(wf.le.w03) then        
+                    wf=3.0d0*w03  
+                end if  
+c               calcul de la force dans la fissure i pour les fibres orientées selon ei
+                if(vwfi(i,l).le.wp) then
+                    B=(k0m*wp-fp)/(fp*wp)
+                    f1(n,k)=k0m*vwfi(i,l)/(B*vwfi(i,l)+1.d0)
+                else 
+                 if(vwfi(i,l).lt.wf) then
+                    f1(n,k)=fp*exp(log(f03/fp)*(vwfi(i,l)-wp)/(w03-wp))
+c                   print*,2,f1(n,k),wp,wf
+                 else
+                    f1(n,k)=precision1 
+                 end if
+                end if
+c               calcul du terme à l'intérieur de la somme de la contrainte
+                si0(n,k)=Reiw(n,k)*stri(n,k)*pscal(n,k)*f1(n,k)       
+            end do 
+c           fin de boucle sur k      
+          end do 
+c        fin de boucle sur n 
+c        valeurs fictives 
+         si1=sum(si0)   
+         sigf(i,r,l)=4.d0*rhof*si1/(pi*Df**2*(sum(Romeg))) 
+         
+
+c        stockage de la rigidité initiale
+         if(l.eq.1) then        
+            rig0(i,r)=sigf(i,r,l)/incremwlis
+         end if      
+            if(rig0(i,r).ne.rig0(i,r).or.(rig0(i,r).eq.0.d0)) then
+
+            print*, "Probleme de rigidite initiale",rig0(i,r)
+            err1=1
+         end if  
+
+         if((sigf(i,r,l).lt.sig0(i)).or.(vwfi(i,l).gt.(vw3(i)
+     # +2.d0*incremwlis))) then 
+c        on calcule la contrainte jusqu'au pic uniquement ou l ouverture actuelle
+         wpsig(i,r)=vwfi0(i)
+         sigmax(i,r)=sig0(i)
+         go to 10
+c       on passe au rt d'apres (on sort de l) pour les rt autres que la premiere fissure
+         end if         
+                 
+c stockage des variables fictives du pas        
+         varft(1,l)=sigf(1,r,l)
+         varft(2,l)=sigf(2,r,l)
+         varft(3,l)=sigf(3,r,l) 
+         varft(4,l)=vwfi(1,l)
+         varft(5,l)=vwfi(2,l)
+         varft(6,l)=vwfi(3,l)        
+         end do 
+c        fin de boucle sur l 
+   10    continue
+C               if(i.eq.3) then              
+C         print*,sigf(i,r,l),r,l,rig0(i,r),rt(r),si1
+C         end if  
+        end do 
+c      fin de boucle sur les Rtb  
+
+ 
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c on recommence une boucle de fissures fictives pour avoir la loi totale
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+       nct=0.d0
+       do l=1,ncalc    
+c récupération de la contrainte du pas fictif d'avant
+       if(l.eq.1) then
+       sig0(1)=0.d0
+       sig0(2)=0.d0
+       sig0(3)=0.d0
+       vwfi0(1)=0.d0
+       vwfi0(2)=0.d0
+       vwfi0(3)=0.d0 
+       wmi0(1)=0.d0 
+c       wt(i,l-1)=0.d0
+c       sigt(i,l-1)=0.d0
+       else
+       sig0(1)=varft(1,l-1)
+       sig0(2)=varft(2,l-1) 
+       sig0(3)=varft(3,l-1) 
+       vwfi0(1)=varft(4,l-1)
+       vwfi0(2)=varft(5,l-1)
+       vwfi0(3)=varft(6,l-1) 
+       wmi0(1)=varft(7,l-1)        
+       end if
+c fissure fictive totale cette fois ci
+       vwfi(i,l)=l*incremwlis   
+
+      call endo3f(vwfi(i,l),gf,young,
+     # xmt,dtiso,dt3,epict,rt(1),le(i))       
+       
+c       wk1=(Gf-gfap(i))/Rt(1)
+c       wk1=(Gf)/Rt(1)
+   
+      if(l.eq.1) then
+      epse13(i)=vwfi(i,l)/le(i)
+      else
+      epse13(i)=wt(i,l-1)/le(i)
+      end if
+          
+      sigfe(i)=(1.d0-dt3)*
+     #rhof*max(min(Ef*epse13(i)*cos(phimoy(i)*
+     #pi/180.d0)**2,fu*cos(phimoy(i)*pi/180.d0)**2),-fu)
+
+*      sigfe(i)=0.d0      
+      
+       sigb(i)=Rt(1)*(1.d0-dt3)    
+       sig(i)=sigb(i)+sigf(i,1,l)*dt3+
+     #sigfe(i)
+     
+c      print*,sig(i),sigb(i),sigf(i,1,l),dt3,sigfe(i),"precons"
+       
+       Sr(i)=lech/exp(log(sig(i)/Rtec)*mw)  
+
+c on fixe la limite   
+       
+       s1=Rtec*(lech*8.d0/(Lf*cos(pi*phimoy(i)/180.d0)))**(1/mw)
+     
+
+
+c      if(Sr(i).lt.Lf*cos(pi*phimoy(i)/180.d0)/4) then    
+       if(sig(i).gt.s1) then   
+       Sr(i)=Lf*cos(pi*phimoy(i)/180.d0)/4
+c       wmiloc(i)=vwfi(i,l)
+       sig(i)=s1
+       loc(i)=.true.
+       end if
+
+       if(sig(i).lt.rt(2)) then 
+
+c      il n y a qu une seule fissure
+       wfist(i)=vwfi(i,l)
+       nct(1)=1.d0
+       wmi(1)=vwfi(i,l)
+       wt(i,l)=wfist(i)
+       sigt(i,l)=sigf(i,1,l)
+       else 
+c      on multifissure
+
+          do r=1,rmax 
+          if(r.eq.1) then
+          nct(r)=1.d0
+          wmi(1)=vwfi(i,l)
+          else
+              if(Sr(i).le.le(i)/(2.d0**(r-1))) then  
+                if(le(i)/Sr(i).lt.2.d0**(r)) then
+                nct(r)=(le(i)/Sr(i)-(2.d0**(r-1)))/2.d0
+                else
+                nct(r)=2.d0**(r-2)
+                end if 
+              do k=1,ncalc   
+
+c ici pour trouver les ouvertures de micro fissures on peut aussi equilibrer avec sigf(i,1,l) au lieu de sig(i)
+c ca paraitrait peut etre plus logique ?
+C               if(sig(i)-sigf(i,r,k).le.0.d0) then
+C               if(k.eq.1) then
+C        wmi(r)=(sig(i)-(sigf(i,r,k)-((sigf(i,r,k)-0)/
+C      #incremwlis)*vwfi(i,k)))/((sigf(i,r,k)-0)/incremwlis)             
+C               else 
+C       wmi(r)=(sig(i)-(sigf(i,r,k)-((sigf(i,r,k)-sigf(i,r,k-1))/
+C      #incremwlis)*vwfi(i,k)))/((sigf(i,r,k)-sigf(i,r,k-1))/incremwlis)
+C               end if
+C               go to 20               
+C               end if
+
+              if(sigf(i,1,l)*dt3-sigf(i,r,k).le.0.d0) then
+              if(k.eq.1) then
+       wmi(r)=(sigf(i,1,l)*dt3-(sigf(i,r,k)-((sigf(i,r,k)-0)/
+     #incremwlis)*vwfi(i,k)))/((sigf(i,r,k)-0)/incremwlis)             
+              else 
+      wmi(r)=(sigf(i,1,l)*dt3-(sigf(i,r,k)-((sigf(i,r,k)-sigf(i,r,k-1))/
+     #incremwlis)*vwfi(i,k)))/((sigf(i,r,k)-sigf(i,r,k-1))/incremwlis)
+     
+
+              end if
+              go to 20               
+              end if
+
+              end do
+              
+  20          continue  
+  
+C               if(i.eq.3) then
+C               print*,wmi(r),r,nct(r),"pre",sr(i),sig(i),rt(r)
+C               end if
+              
+              if(wmi(r).lt.0.d0) then
+              print*,wmi(r)
+              read*
+              end if
+              wmi(r)=nct(r)*wmi(r)
+              else       
+c              wmi(r)=0.d0
+              go to 30
+              end if 
+        end if
+        
+        
+        end do 
+c        fin de boucle sur les Rt
+   30  continue        
+c       ici on va calculer des segments de droite pour reconstruire notre courbe
+        wfist(i)=sum(wmi)
+        wt(i,l)=wfist(i)
+        sigt(i,l)=sigf(i,1,l)
+
+
+       end if  
+
+c       fin du si on multifissure      
+        
+c stockage de la rigidité initiale
+      if(l.eq.1) then        
+      rig0t(i)=sigf(i,1,l)/incremwlis
+      end if      
+      
+      if(l.gt.1) then
+      if(rig0t(i).ne.rig0t(i).or.(rig0t(i).eq.0.d0)) then
+      print*, "Probleme de rigidite initiale",rig0t(i)
+      err1=1
+      end if 
+      end if     
+
+       
+      if(l.gt.1) then       
+      if((vwfi(i,l).gt.wpsig(i,1)).or.(loc(i)).or.(wt(i,l-1).gt.vw3(i)
+     # )) then 
+     
+c      print*, vwfi(i,l),wpsig(i,1),loc(i),wt(i,l-1),vw3(i),"w",vwfi0(i)
+
+c      on calcule la contrainte jusqu'au pic uniquement
+      wpsigt(i)=vwfi0(i)
+c modif      
+C       if(wpsigt(i).lt.wpsigt0(i)) then
+C       wpsigt(i)=wpsigt0(i)
+C       end if
+      wmiloc(i)=wmi0(1)
+      sigmaxt(i)=sig0(i)
+      go to 40
+c      on sort de la boucle des deuxiemes fissures fictives l
+      end if    
+      end if      
+
+c stockage des variables fictives du pas        
+      varft(1,l)=sigf(1,1,l)
+      varft(2,l)=sigf(2,1,l)
+      varft(3,l)=sigf(3,1,l) 
+      varft(4,l)=wfist(1)
+      varft(5,l)=wfist(2)
+      varft(6,l)=wfist(3)
+      varft(7,l)=wmi(1)
+      
+      end do 
+c      fin de boucle sur les fissures fictives l
+
+   40 continue     
+c       print*,l,"l1"  
+cccccccccccccccccccccccccccccccccccccccccccccccc  
+c on passe au calcul reel ici 
+cccccccccccccccccccccccccccccccccccccccccccccccc
+      if(vw3(i).le.wpsigt(i)) then 
+ccccccccccccccccccccccccccccccccccccccccccccccccccc      
+c       on charge
+cccccccccccccccccccccccccccccccccccccccccccccccccccc
+      wmul=0.d0
+      wmr=0.d0 
+      wer=0.d0 
+      nc=0.d0
+
+c on calcule la contrainte relle dans la fissure i et l'ouverture de la première fissure
+c on peut calculer l ouverture w1 car wt a été construit en imposant vwfi dans la premiere fissure
+      if(vw3(i).gt.0.d0) then
+       
+      do l=1,ncalc
+        if(wt(i,l)-vw3(i).gt.0.d0) then        
+           if(l.eq.1) then
+            sigfr(i)=(sigt(i,l)-0)/(wt(i,l)-0)*
+     #vw3(i)+sigt(i,l)-(sigt(i,l)-0)/(wt(i,l)-0)*
+     #wt(i,l)          
+     
+      w1(i)=vwfi(i,l)/wt(i,l)*vw3(i)     
+           else
+           
+           sigfr(i)=(sigt(i,l)-sigt(i,l-1))/(wt(i,l)-wt(i,l-1))*
+     #vw3(i)+sigt(i,l)-(sigt(i,l)-sigt(i,l-1))/(wt(i,l)-wt(i,l-1))*
+     #wt(i,l)
+     
+      w1(i)=(vwfi(i,l)-vwfi(i,l-1))/(wt(i,l)-wt(i,l-1))*vw3(i)+
+     #vwfi(i,l)-(vwfi(i,l)-vwfi(i,l-1))/(wt(i,l)-wt(i,l-1))*wt(i,l)     
+           end if
+           go to 50
+        end if      
+      end do
+      
+      
+
+       
+       
+      else 
+      sigfr(i)=0.d0
+      sigb(i)=0.d0
+      end if
+50    continue
+c       print*,l,"l2"
+
+      call endo3f(w1(i),gf,young,
+     # xmt,dtiso,dt3,epict,rt(1),le(i))    
+       
+c calcul de la déformation totale de l element pour prendre en compte lacontrainteelastique des fibres       
+      call x6x33(epstf6,epse133)
+      
+      do j=1,3
+      vecwj(1)=vecw33(1,j)
+      vecwj(2)=vecw33(2,j)
+      vecwj(3)=vecw33(3,j)
+      epse13(j)=sum(matmul(vecw,epse133)*vecw)
+      sigfe(j)=(1.d0-dt3)*
+     #rhof*max(min(Ef*epse13(j)*cos(phimoy(j)*
+     #pi/180.d0)**2,fu*cos(phimoy(j)*pi/180.d0)**2),-fu)
+      end do
+       
+*       sigfe(i)=0.d0
+       
+       sigb(i)=Rt(1)*(1.d0-dt3)
+       sig(i)=sigb(i)+sigfr(i)*dt3+
+     #sigfe(i)
+     
+c      print*,sig(i),s1,"calc reel"
+     
+     
+c      print*,sig(i),sigb(i),sigfr(i),dt3,sigfe(i)
+     
+
+       if(sig(i).gt.0.d0) then
+         Sr(i)=lech/exp(log(sig(i)/Rtec)*mw)
+        s1=Rtec*(lech*8.d0/(Lf*cos(pi*phimoy(i)/180.d0)))**(1/mw)
+c        print*,sr(i),Lf*cos(pi*phimoy(i)/180.d0)/4.d0
+        if(sig(i).gt.s1) then 
+         sig(i)=s1
+         Sr(i)=Lf*cos(pi*phimoy(i)/180.d0)/4.d0
+         wpsigt(i)=vw3(i)
+         sigmaxt(i)=min(sigfr(i),sig(i))
+c         sigmaxt(i)=sig(i)
+c          sigmaxt(i)=sigf03(i)
+c         print*,sigfr(3),sig(3),sigfe(i),sigb(i)
+
+         end if
+       else
+       Sr(i)=le(i)
+       end if
+         
+c ici l ouverture de la fissure 1 est calculée de maniuere exacte
+c mais pour les autres on suppose que l endo du beton est le meme pour tous     
+      if(sig(i).lt.rt(2)) then 
+         nc(1)=1.d0
+         wmul(i,1)=vw3(i)
+       else 
+c       on multifissure
+        nc(1)=1.d0
+        wmul(i,1)=w1(i)
+          do r=2,rmax 
+          
+      
+              if(Sr(i).le.le(i)/(2.d0**(r-1))) then
+                if(le(i)/Sr(i).lt.2.d0**(r)) then
+                nc(r)=(le(i)/Sr(i)-(2.d0**(r-1)))/2.d0
+                else
+                nc(r)=2.d0**(r-2)
+                end if 
+                if(r.eq.1) then
+                nc(r)=1.d0
+                end if               
+              do k=1,ncalc
+c ici sig(i) est remplacé par sigfr(i)   
+c ca ne change apparemment rien           
+                if(sigfr(i)*dt3-sigf(i,r,k).lt.0.d0) then            
+                 if(k.eq.1) then
+       wmul(i,r)=sigfr(i)*dt3*incremwlis/sigf(i,r,k)                
+                 else             
+      wmul(i,r)=(sigfr(i)*dt3-(sigf(i,r,k)-((sigf(i,r,k)-sigf(i,r,k-1))/
+     #incremwlis)*vwfi(i,k)))/((sigf(i,r,k)-sigf(i,r,k-1))/incremwlis)
+c fin remplacement
+                 end if
+                go to 60               
+                end if
+              end do
+  60   continue 
+
+c              print*,k,"k2",r,"r" 
+              
+              
+              
+              else                
+             wmul(i,r)=0.d0
+             nc(r)=0.d0
+             if(r.eq.1) then
+             nc(1)=1.d0
+             wmul(i,1)=vw3(i)
+             end if
+              end if
+C         if(i.eq.3) then              
+C         print*,r,nc(r),sr(i),"calc",sig(i),s1
+C         end if
+        end do 
+c        fin de boucle sur les Rt            
+      end if  
+c fin du si sig(i).lt.rt(2)  
+
+
+      
+       if(vw3(i).gt.0.d0) then      
+c calcul de l'ouverture moyenne
+       do r=1,rmax
+
+       wmr(r)=nc(r)*wmul(i,r)
+       end do    
+c       print*,wmr,nc,"nc",sig(i),rt(2)
+c       print*,Sr(i),le(i)/(2.d0**(1-1)),"test1"
+c       print*,le(i)/Sr(i),2.d0**(1),"test2"
+       wmoy(i)=sum(wmr)/sum(nc)  
+       
+       if(wmoy(i).ne.wmoy(i)) then
+       print*,"pb wmr,nc",sum(wmr),sum(nc),rmax,sig(i),rt(2),Sr(i),
+     #le(i)
+       print*,"elements finis trop petits"
+       read*
+       end if       
+c calcul de l'ecart type d ouverture      
+       do r=1,rmax
+        if(nc(r).eq.0.d0) then
+        wer(r)=0.d0
+        else
+        wer(r)=nc(r)*(wmul(i,r)-wmoy(i))**2
+        end if
+       end do
+       Etw(i)=sqrt(sum(wer)/sum(nc))
+       cvar(i)=etw(i)/wmoy(i)
+       else
+       wmoy(i)=0.d0
+       etw(i)=0.d0
+       wmr=0.d0
+       wer=0.d0
+       cvar(i)=0.d0
+       end if
+c ouverture max 
+       wmax(i)=wmul(i,1) 
+
+c nombre total de fissures
+       ncf(i)=sum(nc)
+       
+       if(ncf(i).lt.nc0(i)) then
+       ncf(i)=nc0(i)
+       end if
+       
+
+
+        if(sig(i).ge.s1) then 
+         go to 80 
+         end if           
+       
+
+c sauvegarde de la contrainte de decharge    
+c      sigdec(i)=sigf03(i)
+      sigdec(i)=sigfr(i)
+      
+  
+         
+     
+      
+**  AM       
+**       else 
+        endif
+ccccccccccccccccccccccccccccccccccccccccc      
+c       on localise la fissure en ouvrant
+ccccccccccccccccccccccccccccccccccccccccc
+80     continue
+
+**  AM
+
+       if( ((VW3(I).LE.WPSIGT(I)).and.(SIG(I).GE.S1)) . OR.
+     &     (VW3(I).GT.WPSIGT(I)) ) then 
+       iloc(i)=1
+
+c le nombre fissure ne peut plus augmenter
+       ncf(i)=nc0(i)
+c seule la fissure 1 continue de s ouvrir les autres ne se dechargent pas...       
+       wfis(i)=wmiloc(i)+(vw3(i)-wpsigt(i))
+C        if(vw3(i).lt.wpsigt(i)) then
+C        wfis(i)=vw3(i)
+C        end if
+
+       
+C et donc ici on peut recalculer la contrainte comme provenant d'une mono fissure
+c rt a bien ete construit dans tous les cas       
+       Rtb=Rt(1)
+        do n=1,npos
+          do k=1,2*npos-2               
+c calcul de la force moyenne pour une fibre traversant la fissure i inclinée de phi1d
+c calcul des points caractéristiques de la courbe force ouverture de fissure pour Td et phid
+c rigidité initiale
+      if(phi1d(n,k).le.phicrit) then 
+      call reconf(cokf1,k0m,Rtb,phi1d(n,k),mink01,maxk01)
+      else
+      call reconf(cokf2,k0m,Rtb,phi1d(n,k),mink02,maxk02)
+      end if       
+c ouverture au pic
+      if(phi1d(n,k).le.phicrit) then 
+      call reconf(cowp1,wp,Rtb,phi1d(n,k),minwp1,maxwp1)
+      else
+      call reconf(cowp2,wp,Rtb,phi1d(n,k),minwp2,maxwp2)
+      end if        
+c force au pic
+      call reconf(cofp,fp,Rtb,phi1d(n,k),minfp,maxfp)
+c force intermédiaire post pic     
+      f03=0.3d0*fp        
+c ouverture pour f=0.3fp  
+      call reconf(cow03,w03,Rtb,phi1d(n,k),minw03,maxw03)
+        if(w03.le.wp) then        
+        w03=3.0d0*wp  
+        end if  
+c ouverture finale (f=0)    
+      call reconf(cowf,wf,Rtb,phi1d(n,k),minwf,maxwf)
+        if(wf.le.w03) then        
+        wf=3.0d0*w03  
+        end if  
+c calcul de la force dans la fissure i pour les fibres orientées selon ei     
+       if(wfis(i).le.wp) then
+       B=(k0m*wp-fp)/(fp*wp)
+       f1(n,k)=k0m*wfis(i)/(B*wfis(i)+1.d0)
+       else 
+         if(wfis(i).lt.wf) then
+         f1(n,k)=fp*exp(log(f03/fp)*(wfis(i)-wp)/(w03-wp))
+c        print*,2,f1(n,k),wp,wf
+         else
+         f1(n,k)=precision1
+         end if
+       end if
+c calcul du terme à l'intérieur de la somme de la contrainte
+        si0(n,k)=Reiw(n,k)*stri(n,k)*pscal(n,k)*f1(n,k)
+      
+         end do 
+c         fin de boucle sur k      
+        end do 
+c        fin de boucle sur n 
+c  calc de la contrainte 
+      si1=sum(si0)   
+c      wk1=(Gf-gfap(i))/Rt(1)
+c             wk1=(Gf)/Rt(1)
+      sigfr(i)=4.d0*rhof*si1/(pi*Df**2*(sum(Romeg)))
+      
+      if(sigfr(i).gt.sigmaxt(i)) then
+      sigfr(i)=sigmaxt(i)
+      end if
+      
+
+       if(wfis(i).gt.0.d0) then      
+c calcul de l'ouverture moyenne
+C        do r=1,rmax
+C        nc(r)=ncr0(r)
+C          if(r.eq.1) then
+C          wmr(1)=wfis(i)
+C          else
+C          wmr(r)=nc(r)*wmul(i,r)
+C          end if
+C        end do    
+C        wmoy(i)=sum(wmr)/(sum(nc)) 
+         dw3(i)= vw3(i)-vw30(i)
+
+c calcul de l'ecart type d ouverture      
+C        do r=1,rmax
+C          if(r.eq.1) then
+C          wer(1)=(wfis(i)-wmoy(i))**2
+C          else
+C          wer(r)=nc(r)*(wmul(i,r)-wmoy(i))**2
+C          end if
+C        end do
+C        Etw(i)=sqrt(sum(wer)/sum(nc))
+         if(nc0(i).eq.1.d0) then
+         etw(i)=0.d0
+         wmoy(i)=vw3(i)
+         else       
+c         wmoy(i)=wmoy0(i)+dw3(i)/nc0(i)   
+         wmoy(i)=wmoy0(i)      
+C on conserve le coefficient de variation lors de la localisation
+         etw(i)=etw0(i)
+         end if
+
+       else
+       wmoy(i)=0.d0
+       etw(i)=0.d0
+       wmr=0.d0
+       wer=0.d0
+       end if
+c ouverture max 
+       wmax(i)=wfis(i) 
+c      print*,wmax(i),i,"loc",vw3(i),vw30(i),wmaxact(i),rmax,le(i)
+c      print*, wpsigt(i),sigmaxt(i),sum(Romeg),sigfr(i),wfis(i),nc0(i),
+c     # wmiloc(i)
+c       print*,"loc",dw3(i),vw30(i),etw(i),etw0(i),wmoy(i),i
+
+
+c sauvegarde de la contrainte pour decharge
+c      sigdec(i)=sigf03(i)
+      sigdec(i)=sigfr(i)
+      
+c      print*,sigdec(i),i,vw3(i),vw30(i),wmaxact(i)
+      
+      if(vw3(i).le.wferm(i)) then
+      go to 100
+      end if      
+      
+C       if(sigfr(i).lt.0.d0) then
+C       print*,sigfr(i),vw3(i),vw30(i),wmaxact(i),wfis(i),
+C      #wmiloc(i),vw3(i),wpsigt(i)
+C       read*
+C       end if
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc       
+       end if   
+c       fin calcul avec w qui augmente    
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccc     
+
+
+**  AM       
+**      else 
+        endif  
+
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc      
+c      on a vw3(i).lt.wmaxact(i) donc on a fermé la fissure on est dans une phase décharge
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  
+
+100   continue  
+**  AM  
+              IF(    (VW3(I).LT.WFERM(I)) .OR. 
+     &             (VW3(I).LT.WPLMAX(I))) THEN
+
+    
+C       if(vw30(i).ge.vw3(i)) then
+C       sigfr(i)=sigf03(i)-rig0t(i)*(vw30(i)-vw3(i))
+C       else
+C       print*,"comme par hasard",vw30(i),vw3(i)
+C       read*
+C       if(sigf03(i)-rig0t(i)*(vw30(i)-vw3(i)).gt.sigf03(i)) then
+C       sigfr(i)=sigf03(i)
+C       else
+C       sigfr(i)=sigf03(i)-rig0t(i)*(vw30(i)-vw3(i))
+C       end if
+C       end if
+      
+c modif
+c      sigfr(i)=sigf03(i)-rig0t(i)*(wmaxact(i)-vw3(i))
+
+
+      if(vw30(i).ge.vw3(i)) then
+      sigfr(i)=sigf03(i)-rig0t(i)*(vw30(i)-vw3(i))
+c      else if(wmaxact(i).ge.vw3(i)) then
+c      sigfr(i)=sigf03(i)-rig0t(i)*(wmaxact(i)-vw3(i))
+      else if(sigf03(i)-rig0t(i)*(vw30(i)-vw3(i)).ge.sigf03(i)) then
+      sigfr(i)=sigf03(i)-rig0t(i)*(vw30(i)-vw3(i))
+c      else if(sigf03(i)-rig0t(i)*(wmaxact(i)-vw3(i)).ge.sigf03(i)) then
+c      sigfr(i)=sigf03(i)-rig0t(i)*(wmaxact(i)-vw3(i))
+      end if
+      
+c      print*,sigfr(i),sigf03(i),sigdec(i)
+
+      
+      if((sigfr(i).lt.0.d0).and.(sigf03(i).gt.0.d0)) then
+      sigfr(i)=0.d0
+      if(vw3(i).gt.wferm(i)) then
+      wferm(i)=vw3(i)
+      end if
+      end if
+      
+      if(sigfr(i).lt.0.d0) then
+      sigfr(i)=0.d0
+      else if(sigfr(i).gt.sigdec(i)) then
+      sigfr(i)=sigdec(i)      
+      end if
+      
+      if(vw3(i).lt.wferm(i)) then
+      sigfr(i)=0.d0
+      end if 
+      
+     
+      ncf(i)=nc0(i)
+      dw3(i)= vw3(i)-vw30(i)
+
+      
+
+      if(nc0(i).eq.1.d0) then
+      etw(i)=0.d0
+      wmoy(i)=vw3(i)
+      wmax(i)=vw3(i)
+      else
+      wmoy(i)=wmoy0(i)+dw3(i)/nc0(i)
+c      Etw(i)=etw0(i)/wmoy0(i)*wmoy(i)
+      Etw(i)=cvar(i)*wmoy(i)
+      end if
+      wmax(i)=wmax0(i)+dw3(i)/nc0(i)
+      if(wmax(i).lt.0.d0) then
+      wmax(i)=0.d0
+      end if
+
+      end if
+      
+70    continue 
+
+       if(ncf(i).lt.nc0(i)) then
+       print*,"le nombre de fissures a diminue"
+       print*,ncf(i),nc0(i),i,vw3(i),vw30(i),wmaxact(i)
+       stop
+       end if
+       
+      if(wmax(i).ge.wmaxd0(i)) then
+      wmaxd(i)=wmax(i)
+      else
+      wmaxd(i)=wmaxd0(i)
+      end if
+      end do 
+c      fin de boucle sur les fissures 
+
+C       print*,sigfr(1),sigfr(2),sigfr(3),"sig"
+C       print*,vw3(1),vw3(2),vw3(3),"vw"
+C       print*,ncf(1),ncf(2),ncf(3),"nc"
+C       print*,etw(1),etw(2),etw(3),"etw"
+      
+      if(etw(1).ne.etw(1).or.etw(2).ne.etw(2).or.etw(3).ne.etw(3)) then
+      print*,"probleme ecart type fissure" ,etw(1),etw(2),etw(3)   
+      print*,Etw0(1),vw3(1),dw3(1),wmoy(1),nc0(1),wmaxact(1),wmoy0(1),
+     #ncf(1),iloc(1)
+      print*,Etw0(2),vw3(2),dw3(2),wmoy(2),nc0(2),wmaxact(2),wmoy0(2),
+     #ncf(2),iloc(2)
+      print*,Etw0(3),vw3(3),dw3(3),wmoy(3),nc0(3),wmaxact(3),wmoy0(3),
+     #ncf(3),iloc(3)   
+      read*
+      end if
+      
+C       if(nc(3).gt.16.d0) then
+C       print*,'pb'
+C       read*
+C       end if
+
+c  reconstruction du tenseur des contraintesde fibres avec endo dans la base fixe
+      do i=1,3
+        do j=1,3
+        if(i.eq.j) then 
+        sigfp33(i,j)=sigfr(i)
+        else
+        sigfp33(i,j)=0.d0
+        end if
+        end do
+      end do    
+c      sigfx33=matmul(matmul(transpose(vecw33),sigfp33),vecw33)
+c     vecw33 est la matrice de passage de la base maillage a fissuration
+c     ici on veut faire l inverse cad : P A tP
+      sigfx33=matmul(matmul(vecw33,sigfp33),transpose(vecw33))
+      call x33x6(sigfx33,sigfx6)
+
+C       print*,"wmax",wmax
+C       print*,"wmoy",wmoy
+C       print*,"etw",etw
+C       print*,"ncf",ncf
+C       if(sum(sigfx6*sigfx6).gt.0.d0) then
+C        print*,"sigfx6",sigfx6
+C        end if
+
+C          print*,"sig(3)",sig(3),"sigfr",sigfr(3),s1
+C      #,"dt3","wmaxd",wmaxd(3),dt3
+      return
+      
+      end
+ 
+ 
+ 

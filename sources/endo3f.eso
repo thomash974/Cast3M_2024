@@ -1,0 +1,86 @@
+C ENDO3F    SOURCE    PV090527  23/01/27    21:15:30     11574          
+      subroutine endo3f(wplx3,gft_app,young,
+     # xmt,dtiso,dt3,epict,rteff_app,longr)
+      
+c     calcul de l endommagement 
+      
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)
+      
+
+
+      real*8 reft,rteff_app
+      real*8 wplx3
+      real*8 gft_app
+
+      real*8 young,nu
+      real*8 xmt
+      logical dtiso
+      integer i,j,k,l
+      
+      real*8 dt3
+      real*8 gf1,gf2,gfrmin,gfreff
+      
+c     endo maxi et precision 
+      real*8 dmaxi,drgimaxi,xngf,precision1
+      parameter (precision1=0.d0)
+      parameter (dmaxi=1.d0-precision1,drgimaxi=1.0d0-precision1)
+      parameter (xngf=6.d0) 
+      
+c     declaration complementaires juillet 2015
+      real*8 wkt
+c     endommagement isotrope au pic de traction
+      real*8 dtisopic 
+c     longueur de l element dans chaque direction
+      real*8 longr
+c     energie de fissuration recuperee dans la decharge elastique
+      real*8 gfmin,gfpp,errgf,errgf1,errgf0,gfap 
+c     deformation au pic de traction
+      real*8 epict  
+
+
+
+c***********************************************************************
+c     prise en compte de l endommagement de traction
+c*********************************************************************** 
+c     endo iso max au pic de traction
+      if(dtiso) then
+c         l endommagement isotrope conduit a utiliser rteff_app=rt_app/(1-dtpic)>rt_app
+          dtisopic=1.d0-exp(-1.d0/xmt)
+      else
+          dtisopic=0.d0
+      end if            
+c     passage de Gf dans la base principale des ouvertures maxi enlevé le seul truc peut etre a ajouter ? 
+
+c       energie elastique consommee au pic dans cette direction
+c longr peut etre pris directement dans fibre    
+c       gf mini pour controler l ecrouissage negatif post pic
+
+        gfmin=longr*((rteff_app*(1.d0-dtisopic))**2)/young*
+     #  (4.d0/xngf+1.d0/(1.d0-dtisopic) )/2.d0 
+c       gf pre pic     
+        gfap= longr*(rteff_app*(1.d0-dtisopic))*epict/2.d0  
+        if(gfmin.lt.gft_app) then
+c          le controle de l energie de fissuration sans snap back local est possible
+           gfpp=gft_app-gfap
+        else
+c          un snap back local est necessaire on calcule l erreur comise
+c          en preservant une decroissance post pic correspondant à gft_app/10
+           gfpp=gfmin-gfap
+
+        end if                           
+c       ouverture caracteristique ds cette direction  
+        wkt=gfpp/(rteff_app*(1.d0-dtisopic))
+c       endo localise        
+        dt3=wplx3*(wplx3+2.d0*wkt)/(wkt+wplx3)**2
+c       borne de dt a dmaxi
+        dt3=min(dmaxi,dt3) 
+
+      
+c      print*,"endo3d wkt",wkt,gfpp,rteff_app,gfap
+c       print*,"endofibre",gfmin,gft_app,gfap,gfpp,rteff_app
+
+       
+1000  return
+      end      
+ 

@@ -1,0 +1,136 @@
+C JPMAGV    SOURCE    PV090527  23/03/08    21:15:04     11619          
+      SUBROUTINE JPMAGV
+
+* ---------------------------------------------------------------------
+* 
+*                               ROUTINE JPMAGV
+* 
+* ---------------------------------------------------------------------
+* Auteur : Nikola JERANCE
+* 
+* Historique : 
+* 
+*       20/09/2022 - Première écriture (N. Jerance)
+*     
+* 
+* Descriptif :
+* 
+*  Le potentiel magnétique vecteur est calculé à partir de J(x,y)
+*  et la matrice obtenue par MPMAGV. Le potentiel est en 3D.
+* 
+*  
+*  
+* ENTREES/SORTIES :
+* 
+*       (E)     ILREE1 = Pointeur sur la liste de réels (matrice obtenue par MPMA)
+*       (E)     ICHAMJ = Pointeur sur J(x,y) en tant que MCHAML
+*       (E)     IMOD1 = Pointeur sur le modèle
+*       (S)     ICHAMA = Pointeur sur A(x,y) au milieu de l'épaisseur, MCHAML
+* 
+* ---------------------------------------------------------------------
+
+* ----------------------------------------------------------------------
+* 
+*                         0 - DECLARATIONS ET IMPORTS
+* 
+* ----------------------------------------------------------------------
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC CCREEL
+-INC SMCOORD
+-INC SMELEME
+-INC SMLREEL
+-INC SMCHAML
+-INC SMMODEL
+-INC SMINTE
+
+
+
+      SEGMENT INFO
+        INTEGER INFELL(JG)
+      ENDSEGMENT
+
+
+*      WRITE(IOIMP,*) '    PARTIE 00 : LECTURE'
+
+      CALL LIROBJ('MCHAML',ICHAMJ,1,IRETOU)
+      
+      IF (IERR.NE.0) RETURN
+      
+      
+      CALL LIROBJ('MMODEL',IPMODL,1,IRETOU)
+      
+      IF (IERR.NE.0) RETURN
+      
+* Ouverture du segment MMODEL
+      MMODE1 = IPMODL
+      SEGACT,MMODE1
+
+* Contrôle du nombre de IMODEL : MODELE ELEMENTAIRE. On veut un modèle
+* simple, i.e. avec un seul IMODEL
+      NBMOD = MMODE1.KMODEL(/1)
+      IF (NBMOD .GT. 1) THEN
+        SEGDES,MMODE1
+        CALL ERREUR(21)
+        RETURN
+      ENDIF
+
+* Ouverture du segment IMODEL : MODELE ELEMENTAIRE
+      IMODE1 = MMODE1.KMODEL(1)
+      SEGACT,IMODE1
+      
+* Ouverture du segment MELEME
+      IPT1 = IMODE1.IMAMOD
+      SEGACT,IPT1
+
+* Vérification que le maillage est un maillage simple, c-à-d avec un
+* seul type d'éléments
+      IF (IPT1.LISOUS(/1) .NE. 0) THEN
+        SEGDES,IPT1
+         SEGDES,IMODE1,MMODE1
+         CALL ERREUR(426)
+         RETURN
+      ENDIF
+
+      NBNN = IPT1.NUM(/1)
+      NBELEM = IPT1.NUM(/2)
+
+* Récupération du segment SMINTE pour un MCHAML aux centres de
+* gravité et constants par éléments sur le type TRI3
+      IELTYP = IPT1.ITYPEL
+      CALL ELQUOI(IELTYP,0,2,IPINF,IMODE1)
+      IF (IERR .NE. 0) THEN
+        SEGDES,IPT1
+         SEGDES,IMODE1,MMODE1
+        RETURN
+      ENDIF
+      INFO = IPINF
+      MINTE1 = INFO.INFELL(11)
+
+      SEGACT,MINTE1
+      SEGSUP,INFO
+
+
+      CALL LIROBJ('LISTREEL',ILREE,1,IRETOU)
+      
+      IF (IERR.NE.0) RETURN
+      
+      
+      ICHAMA = 0
+      
+      CALL JPMAG1(ILREE,ICHAMJ,ICHAMA,IMODE1,MINTE1,NBELEM)
+
+
+* On calcule les valeurs du champ par élément 
+*      WRITE(IOIMP,*) '    PARTIE FF : ECRITURE'
+      
+      CALL ECROBJ('MCHAML',ICHAMA)
+
+
+      RETURN
+      END 

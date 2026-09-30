@@ -1,0 +1,189 @@
+C COML12    SOURCE    MB234859  23/02/03    21:15:04     11581          
+      SUBROUTINE COML12(iqmod,wrk52,wrk53,wrk54,IB,igau,wrk2,
+     &         mwrkxe,iretou,iecou,necou,dlttmp)
+
+*----------------------------------------------------------------
+* lois locales pour la mecanique
+*  decrites au point d integration
+*----------------------------------------------------------------
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMMODEL
+-INC SMELEME
+-INC SMINTE
+-INC CCHAMP
+-INC SMCOORD
+* segment deroulant le mcheml
+-INC DECHE
+*
+      SEGMENT WRK2
+        REAL*8 TRAC(LTRAC)
+      ENDSEGMENT
+*
+      SEGMENT MWRKXE
+        REAL*8 XEL(3,NBNNbi)
+      ENDSEGMENT
+*
+*  Segment NECOU utilisé dans ECOINC
+*
+      SEGMENT NECOU
+       INTEGER NCOURB,IPLAST,IT,IMAPLA,ISOTRO,
+     . ITYP,IFOURB,IFLUAG,
+     . ICINE,ITHER,IFLUPL,ICYCL,IBI,
+     . JFLUAG,KFLUAG,LFLUAG,
+     . IRELAX,JNTRIN,MFLUAG,JSOUFL,JGRDEF
+      ENDSEGMENT
+*
+*  Segment IECOU: sert de fourre-tout pour les initialisations
+*  d'entiers
+*
+      SEGMENT IECOU
+      INTEGER NYOG,NYNU,NYALFA,NYSMAX,NYN,NYM,NYKK,NYALF1,
+     .  NYBET1,NYR,NYA,NYRHO,NSIGY,NNKX,NYKX,IND,NSOM,NINV,
+     .  NINCMA,NCOMP,JELEM,LEGAUS,INAT,NCXMAT,LTRAC,MFRBI,
+     .  IELE,NHRM,NBNNBI,NBELMB,ICARA,LW2BI,NDEF,NSTRSS,
+     .  MFR1,NBGMAT,NELMAT,MSOUPA,NUMAT1,LENDO,NBBB,NNVARI,
+     .  KERR1,MELEMB,NYOG1,NYNU1,NYALFT1,NYSMAX1,NYN1,NYM1,
+     .  NYKK1,NYALF2,NYBET2,NYR1,NYA1,NYQ1,NYRHO1,NSIGY1
+      ENDSEGMENT
+*
+      REAL*8 DLTTMP
+      dimension xcar(1)
+C-----------------------------------------------------------------------
+C
+c     moterr(1:6) = 'COML12 '
+c     moterr(7:15) = 'element '
+c     interr(1) = ib
+c     interr(2) = igau
+c     call erreur(-329)
+*      write(6,*) ' entrée dans coml12 iecou ', iecou
+      imodel = iqmod
+c
+c     traitement du modele
+c
+      NBPGAU = nbgs
+      NVARI = NVART
+      TETA1 = ture0(1)
+      TETA2 = turef(1)
+      SUCC1 = -1.D35
+      SUCC2 = -1.D35
+      nexo = exova0(/1)
+      if (nexo.gt.0) then
+        do 1296 inex = 1,nexo
+          if ((nomexo(inex).eq.'SUCC    ').and.
+     &        (conexo(inex)(1:LCONMO).eq.CONM(1:LCONMO))) then
+            SUCC1 = exova0(inex)
+            SUCC2 = exova1(inex)
+            goto 1295
+          endif
+ 1296   continue
+      endif
+ 1295 continue
+C
+C     MODELE PLASTIQUE 'LIAISON_ACBE'
+      IF(INPLAS.EQ.171) then
+         call aclj(wrk52,wrk53,wrk54,nvari,iecou)
+C
+C     MODELE ENDOMMAGEABLE 'RICRAG'
+      ELSE IF (INPLAS.EQ.144) THEN
+        if(ifour.ne.2) then
+          CALL RIC2NL(wrk52,wrk53,wrk54,nvari,iecou)
+        else
+          CALL RIC3NL(wrk52,wrk53,wrk54,nvari,iecou)
+        endif
+C
+C     MODELE PLASTIQUE 'INTIMP'
+      ELSE IF (INPLAS.EQ.145  .AND. mfrbi.eq.7) THEN
+        nstrbi=nstrss
+        icarbi=icara
+        CALL CBIFLE(wrk52,wrk53,wrk54,NSTRbi,NVARI,ICARbi)
+        nstrss=nstrbi
+        icara=icarbi
+C
+C     MODELE PLASTIQUE 'RICJOI'
+      ELSE IF (INPLAS.EQ.146) then
+*        write(6,*) ' ifour ',ifour
+*        if(ib+igau.eq.2) write(6,*)'sig0', (SIG0 (iou),iou=1,nstrs)
+*        if(ib+igau.eq.2) write(6,*)'depst', (DEPST (iou),iou=1,nstrs)
+        if(ifour.ne.2) then
+         CALL RICJ2(IB,IGAU,NSTRS,SIG0,EPIN0,VAR0,NVARI,DEPST,IFOURB,
+     &               XMAT,NMATT,ivalma,DD,SIGF,DEFP,VARF,KERRE)
+        else
+         CALL RICJ3(IB,IGAU,NSTRS,SIG0,EPIN0,VAR0,NVARI,DEPST,IFOURB,
+     &               TETA1,TETA2,
+     &               XMAT,NMATT,ivalma,DD,SIGF,DEFP,VARF,KERRE)
+        endif
+*        if(ib+igau.eq.2) write(6,*)'SIGF', (SIGF(iou),iou=1,nstrs)
+C +BR
+C
+C     MODELE ENODMMAGEABLE 'GLRC_DM'
+      ELSEIF(INPLAS.EQ.157) then
+        CALL LCGLDM(XMAT,VAR0,VARF,SIG0,SIGF,DEPST,XCARB)
+C
+C     MODELE ENODMMAGEABLE 'RICBET'
+      ELSEIF(INPLAS.EQ.158) then
+        CALL RICBET(wrk52,wrk53,wrk54,nvari,iecou)
+C
+C     MODELE ENODMMAGEABLE 'RICCOQ'
+      ELSEIF(INPLAS.EQ.159) then
+        CALL ELOCRAK1(wrk52,wrk53,wrk54,nvari,iecou)
+C
+C     MODELE PLASTIQUE 'CONCYC'
+      ELSEIF(INPLAS.EQ.173) then
+        CALL CONCYC1(wrk52,wrk53,wrk54,nvari,iecou)
+C
+C     MODELE PLASTIQUE 'OUGLOVA'
+      ELSEIF(INPLAS.EQ.175) then
+        IF (MFR.EQ.27) THEN
+           CALL OUGLOB(XMAT,DEPST,SIG0,VAR0,SIGF,VARF)
+        ELSE
+           CALL OUGLOV(XMAT,VAR0,VARF,SIG0,SIGF,DEPST,IFOUR)
+        ENDIF
+C -BR
+C
+C     MODELES VISCOPLASTIQUE 'SYCO1' ET 'SYCO2' (Symonds & Cowper)
+      ELSE IF (INPLAS.EQ.153.OR.INPLAS.EQ.154) then
+C       on recupere la courbe de traction
+        nccor=ncourb
+        call CCOTRA(WRK52,WRK2,NCCOR,WRK53)
+        ncourb= nccor
+C
+C       meme maniere de proceder que dans ecoin0
+        nccor=ncourb
+        iforb=ifourb
+        CALL SYCO12(wrk52,wrk53,wrk54,wrk2,IB,IGAU,
+     &                  NBPGAU,NCcor,IFORB,iecou,dlttmp)
+C
+        ncourb=nccor
+        ifourb=iforb
+C
+C     MODELE PLASTIQUE 'DP_SOL'
+      ELSEIF(INPLAS.EQ.172) then
+        CALL DP_SOL(XMAT,VAR0,VARF,SIG0,SIGF,DEPST,XCARB)
+C
+C     MODELE PLASTIQUE 'IWPR3D_SOL'
+      ELSEIF(INPLAS.EQ.176) then
+        CALL IWPR3D(XMAT,VAR0,VARF,SIG0,SIGF,DEPST,XCAR,
+     &              EPIN0,EPINF,EPST0,EPSTF)
+
+C
+C     MODELE ENDOMMAGEABLE 'EFEM'
+      ELSEIF(INPLAS.EQ.177) then 
+        IF ((IFOUR.EQ.-2).AND.(ILCOUR.EQ.4)) THEN
+          CALL PBEFEM(wrk52,wrk53,wrk54,nvari,iecou,mwrkxe)
+        ELSE
+          CALL ERREUR(5)
+        ENDIF
+C
+      ELSE
+        write(ioimp,*) 'Branchement incorrect dans COML12'
+        CALL ERREUR(5)
+      ENDIF
+
+      RETURN
+      END
+ 

@@ -1,0 +1,89 @@
+C ADTUY     SOURCE    CB215821  23/04/28    21:15:03     11660          
+      SUBROUTINE adtuy (NEF,IPMAIL,IPINTE,IMATE,IVAMAT,NMATR,
+     &                   IPMATR,NLIGR)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+-INC SMCOORD
+-INC SMELEME
+-INC SMINTE
+-INC SMRIGID
+
+      SEGMENT MPTVAL
+        INTEGER IPOS(NS),NSOF(NS),IVAL(NCOSOU)
+        CHARACTER*16 TYVAL(NCOSOU)
+      ENDSEGMENT
+
+      SEGMENT,MMAT1
+        REAL*8 CEL(NBNN,NBNN),XE(3,NBNN)
+      ENDSEGMENT
+
+C  1 - INITIALISATIONS ET VERIFICATIONS
+C ======================================
+      MELEME = IPMAIL
+c*      SEGACT,MELEME
+      NBNN   = NUM(/1)
+      NBELEM = NUM(/2)
+C =====
+      MINTE = IPINTE
+c*      SEGACT,MINTE
+      NBPGAU = POIGAU(/1)
+
+C =====
+      MPTVAL = IVAMAT
+c*      SEGACT,MPTVAL
+C =====
+      XMATRI = IPMATR
+
+C =====
+C Initialisation des segments de travail
+C =====
+      IF (IFOMOD.EQ.1) THEN
+         NDIM = 3
+      ELSE
+         NDIM = IDIM
+      ENDIF
+      SEGINI,MMAT1
+
+C  2 - BOUCLE SUR LES ELEMENTS DU MAILLAGE ELEMENTAIRE IPMAIL
+C ============================================================
+      DO IEL = 1, NBELEM
+*
+* MISE A ZERO DU TABLEAU CEL
+*
+        CALL ZERO(CEL,NBNN,NBNN)
+*
+* COORDONNEES DES NOEUDS DE L'ELEMENT IEL DANS LE REPERE GLOBAL
+*
+        CALL DOXE(XCOOR,IDIM,NBNN,NUM,IEL,XE)
+
+        DO IGAU = 1, NBPGAU
+*-        Recuperation de rho cp et section en un point de la barre
+*-        NB : ces composantes sont obligatoires donc IVAL(i) n'est pas nul !
+          rhsvs = 1.D0
+          DO i = 1, NMATR
+            MELVAL = IVAL(i)
+            ibmn = MIN(iel ,VELCHE(/2))
+            igmn = MIN(igau,VELCHE(/1))
+            rhsvs= rhsvs*VELCHE(igmn,ibmn)
+          ENDDO
+
+          rhosv= rhsvs*poigau(igau)
+          DO i=1,nbnn
+              cz=  shptot(1,i,igau)* rhosv
+            DO j=1,nbnn
+              cel(i,j)=cel(i,j) +cz*shptot(2,j,igau)
+            ENDDO
+          ENDDO
+        ENDDO
+
+        CALL rempms(cel,nbnn,re(1,1,iel))
+      ENDDO
+      
+      SEGSUP,MMAT1
+      RETURN
+      END
+ 

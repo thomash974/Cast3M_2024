@@ -1,0 +1,68 @@
+C CRBARY    SOURCE    KICH      22/11/21    21:15:03     11505          
+      subroutine crbary(ith)
+C
+C
+      implicit integer(i-n)
+      implicit real*8(a-h,o-z)
+
+-INC  CCASSIS
+
+      PARAMETER(MASDIM=64)
+      common/CCONNE/iwrk3,ipmodl1,xmultl,icle1,ihgsel
+      common/CCONNE/jconl,ihg1,ihg2,ihg,nbthr,ixlong1
+      common/CCONN1/d,pt1(3),pt2(3)
+      common/CCONN1/xmn(masdim),ymn(masdim),zmn(masdim)
+      common/CCONN1/xmx(masdim),ymx(masdim),zmx(masdim)
+      common/CCONN1/hmxt(masdim),xlg2m(masdim)
+
+      segment hgsele
+         real*8 xmult,ymult,zmult
+         real*8 hmaxt,xlong2,tmax,tmin,xlong2m
+         integer nels,nbpb,ipass
+         integer nbzt,indt,khug
+      endsegment
+      segment hg
+        integer ielh(nbpb,2)
+        real*8 hmax(nbpb)
+        real*8 xll(nbpb)
+        integer inoa(nbpb,nsous+1)
+      endsegment
+      segment conl
+         integer iconl(nbpb)
+      endsegment
+      segment hg1
+        real*8 hcoor(3*nbpb)
+      endsegment
+      pointeur hg2.hg1
+      hgsele = ihgsel
+      icle = icle1
+      ixlong = ixlong1
+      hg = ihg
+      ipmodl = ipmodl1
+      nbthr1 = nbthr
+      if (ith.gt.nbthr1) goto 9999
+      ires = mod(nbpb,nbthr1)
+      if (ires.eq.0) then
+         ilon = nbpb / nbthr1
+         ideb = (ith - 1) * ilon + 1
+      else
+         if (ith.le.ires) then
+            ilon = nbpb / nbthr1 + 1
+            ideb = (ith - 1) * ilon + 1
+         else
+            ilon = nbpb / nbthr1
+            ideb = (ires * (ilon + 1)) + (ith - ires - 1) * ilon + 1
+         endif
+      endif
+      ifin = ideb + ilon - 1
+      if (ifin.ge.ideb) then
+          call crbar1(iwrk3,ipmodl,ideb,ifin,xmultl,icle,d,pt1,pt2
+     +      ,jconl,ihg1,ihg2,xmn,ymn,zmn,xmx,ymx,zmx
+     +      ,hmxt,ihg,ith,ixlong,xlong2,xlg2m)
+      endif
+ 9999 continue
+      return
+      end
+
+ 
+ 

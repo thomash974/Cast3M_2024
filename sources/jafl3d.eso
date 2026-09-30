@@ -1,0 +1,201 @@
+C JAFL3D    SOURCE    PV090527  23/01/27    21:15:44     11574          
+      subroutine jacobflu3d(tauk1,psi1,taum1,taumdtt1,CM1,dt1,Jf,err1)
+      
+c     calul du Jacobien de [Depse,Depsk,Depsm*]/[v*,epse0,epsk0]
+c     avec v*=(Depsimpose-Depsepl)/Dt si dt .ne. 0.
+c     et v*=(Depsimpose-Depsepl) si dt.eq.0.
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+c     variables externes    
+      real*8 tauk1,psi1,taum1,taumdtt1,CM1,dt1  
+      real*8 tauk,psi,taum,taumdtt,dt,CM
+      real*8 Jf(3,3)
+c     variables locales      
+      real*8 tauf
+c     erreur
+      integer err1 
+      
+c     limite de calcul  
+      real*8 grand,petit    
+      parameter(grand=1.0d7,petit=1.0d-7)  
+
+c     affichage
+      logical affiche,approx
+      affiche=.false.      
+     
+c     copie sur variables locales
+      dt=dt1
+      tauk=tauk1
+      taum=taum1
+      taumdtt=taumdtt1
+c     prise en compte de la reduction de la deformation de maxwell pour
+c     les chargements inferieurs au seuil      
+      cm=min(cm1,1.d0)
+      psi=psi1
+      
+      
+c     temps global de maxwell 
+           
+      if((taumdtt.gt.0.).and.(taum.gt.0.)) then
+          tauf=(taum**(-1)+taumdtt**(-1))**(-1)
+      else
+          tauf=taum
+      end if  
+
+c     limitation de tauf et tauk sur dt pour permettre le calcul numerique en double rpecision
+      if(dt.gt.0.d0) then
+         approx=.false.
+         if(tauf.gt.grand*dt) then
+             tauf=grand*dt
+             if(affiche) then              
+                 print*,'reduction de TAUF dans jacobflu3d'
+             end if
+             approx=.true.
+         end if 
+         if(tauk.gt.grand*dt) then
+             tauk=grand*dt
+             if(affiche) then 
+                 print*,'reduction de TAUK  dans jacobflu3d'
+             end if
+             approx=.true.
+         end if
+         if(psi.gt.grand) then
+             psi=grand
+             if(affiche) then 
+                 print*,'reduction de PSI dans jacobflu3d'
+             end if
+             approx=.true.
+         endif         
+         if(CM.gt.grand*psi) then
+             CM=grand*psi
+             if(affiche) then              
+                 print*,'reduction de CM dans jacobflu3d'
+             end if
+             approx=.true.
+         end if
+         if(approx.and.affiche) then
+            print*,'Donnees approchee dans jafl3d'
+            print*,'tauk',tauk
+            print*,'psi',psi
+            print*,'taum*cc',taum
+            print*,'taumdtt*cc',taumdtt
+            print*,'tauf',tauf
+            print*,'cm',CM
+            print*,'dt',dt
+            read*
+         end if
+
+c      if(cm.ne.0.) then      
+c     termes de la matrice jacobienne
+c        print*,'Donnees  dans jafl3d'
+c        print*,'tauk',tauk,'tauf',tauf
+c        print*,'psi',psi
+c        print*,'taum*cc',taum
+c        print*,'taumadtt',taumdtt
+c        print*,'cm',CM
+c        print*,'dt',dt
+      goto 20
+      if(abs(tauk-tauf).lt.(petit*tauf)) then
+            tauk=(1.d0-petit)*max(tauf,tauk)
+      end if
+
+20    t1 = CM + psi
+      t2 = psi - CM
+      t3 = psi ** 2
+      t4 = tauk * psi
+      t5 = t2 * tauf
+      t6 = t1 ** 2 * tauf ** 2 + t3 * tauk ** 2 - 0.2D1 * t5 * t4
+      t7 = t6 ** (-0.1D1 / 0.2D1)
+      t6 = t6 * t7
+      t8 = t1 * tauf
+      t9 = t4 + t8 - t6
+      t10 = 0.1D1 / tauk
+      t11 = 0.1D1 / psi
+      t12 = 0.1D1 / tauf
+      t13 = exp(-t9 * dt * t10 * t11 * t12 / 0.2D1)
+      t14 = t4 + t8 + t6
+      t10 = exp(-t14 * dt * t10 * t11 * t12 / 0.2D1)
+      t12 = 0.2D1 * t6
+      t15 = -t12 + (-t4 + t8 + t6) * t13 - (-t4 + t8 - t6) * t10
+      t16 = t5 - t4 + t6
+      t5 = t5 - t4 - t6
+      t17 = t13 - t10
+      t18 = -t10 * t9 + t13 * t14 - t12
+      t2 = t4 * t2
+      t14 = 0.1D1 / t14
+      t9 = 0.1D1 / t9
+      t3 = 0.2D1 * t3
+      Jf(1,1) = -t15 * tauf * t7 / 0.2D1
+      Jf(1,2) = -(t10 * t5 / 0.2D1 - t13 * t16 / 0.2D1 + t12 / 0.2D1) * 
+     #t7
+      Jf(1,3) = psi * tauf * t17 * t7
+      Jf(2,1) = -t18 * CM * tauf * t7 * t11 / 0.2D1
+      Jf(2,2) = t17 * CM * tauf * t7
+      Jf(2,3) = (t10 * t16 / 0.2D1 - t13 * t5 / 0.2D1 - t12 / 0.2D1) * t
+     #7
+      Jf(3,1) = 0.2D1 * t4 * tauf * ((0.2D1 * psi * dt - 0.2D1 * t8) * t
+     #6 + tauf * (t10 * (t1 * (-t8 + t6) + t2) + t13 * (t1 * (t8 + t6) -
+     # t2))) * t7 * t9 * t14
+      Jf(3,2) = -t3 * t15 * tauk * tauf * t7 * t9 * t14
+      Jf(3,3) = -t3 * t18 * tauk * tauf * t7 * t9 * t14
+
+
+      
+c      else
+cc       cas cm=0
+c      t1 = exp(-0.1D1 / tauf * dt)
+c      t2 = 0.1D1 - t1
+c      t3 = exp(-dt / tauk)
+c      t4 = tauk - tauf
+c      t4 = 0.1D1 / t4
+c      Jf(1,1) = t2 * tauf
+c      Jf(1,2) = -t2
+c      Jf(1,3) = -tauf * (t1 - t3) * t4
+c      JF(2,1) = 0.d0
+c      JF(2,2) = 0.d0
+c      Jf(2,3) = -0.1D1 + t3
+c      
+c      end if
+
+      
+            if(approx.and.affiche) then
+                 print*,'Resultats'
+                 print*,'jf(1,1)',jf(1,1)
+c                 read*
+            end if
+      
+        else
+c           dt=0 : pas de fluage
+            print*,'dt=0 dans jacobFlu3d appele par couplage3d'
+            print*,'dans fldo3d'
+            err1=1
+            return
+        end if
+c       if((dt.lt.0.11).and.(dt.gt.0.099)) then 
+c        print*,'tauk',tauk
+c        print*,'psi',psi
+c        print*,'taum*cc',taum
+c        print*,'taumdtt*cc',taumdtt
+c        print*,'tauf',tauf
+c        print*,'cm',CM
+c        print*,'dt',dt       
+c        do i=1,2
+c           do j=1,3
+c                print*,'ds jacobflu3d jf(',i,j,')=',jf(i,j)
+c           end do
+c        end do
+c        err1=1
+c        return  
+c      end if        
+
+      
+c      print*,'jacobflu3d'
+c      print*,tauk,psi,taum,taumdtt,dt,Jf
+c      read*      
+      
+      return
+      end
+      
+
+ 

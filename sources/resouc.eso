@@ -1,0 +1,200 @@
+C RESOUC    SOURCE    PV090527  23/09/13    21:15:03     11739          
+      subroutine resouc(mrigid,mrigic,idemem,ideme0,ideme1,
+     >      nounil,lagdua,icond,imult,if,imtvid,nelim)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C
+C **** Eliminiation des relations dans une raideur
+C **** mrigic est la raideur resultante
+C      icond dit si on a reussi a condense qque chose
+C      imult dit si il reste des multiplicateurs non condensees
+C      Ensuite reduction des seconds membres
+C
+-INC SMRIGID
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMELEME
+      segment idemem(0)
+      segment ideme0(idemem(/1),30)
+      segment ideme1(idemem(/1),30)
+C  on va separer les raideurs
+      segact mrigid
+      if (jrcond.eq.0.and.ichole.eq.0) then
+       call separm(mrigid,ri1,ri2,nounil,lagdua,nelim,if)
+         if(ierr.ne.0) return
+       segact ri1*mod
+       segact ri2*mod
+*      write(6,*) 'resouc ri1 ',ri1.mtymat
+*      write(6,*) 'resouc ri2 ',ri2.mtymat
+       if (ri1.ne.mrigid) ri1.mtymat='TEMPORAI'
+*xx    ri2.mtymat='TEMPORAI'
+       segact mrigid*mod
+       jrelim=ri1
+       jrgard=ri2
+       imlag=max(0,lagdua)
+*      write(6,*) ' if lagdua ',if,lagdua
+       call fusrig(ri1,ri2,ipoir0)
+         if(ierr.ne.0) return
+       jrtot=ipoir0
+      else
+       ri1=jrelim
+       ri2=jrgard
+       ipoir0=jrtot
+       lagdua=imlag
+       ipt1=lagdua
+       if (ipt1.ne.0) segact ipt1
+      endif
+      iri1s=ri1
+      iri2s=ri2
+C
+1010  continue
+C
+*    mrigid matrice complete
+*    ri1    dependance
+*    ri2    les autres matrices
+*    ri6    matrice de transfert
+*    ri3    matrice reduite
+*    ri5    matrice de transfert transposee
+C
+C   on va proceder  a la condensation rigidite puis forces
+*      write(6,*) ' resouc jrcond ichole ',jrcond,ichole
+       if(jrcond.eq.0.and.ichole.eq.0) then
+
+         CALL DEPEN3(RI1,RI6)
+         if(ierr.ne.0) return
+*      write(6,*) 'resouc ri6 ',ri6.mtymat
+         segact ri6*mod
+         if (ri6.ne.mrigid) ri6.mtymat='TEMPORAI'
+         call scnd2 (ri2,ri6,ri3)
+         if(ierr.ne.0) return
+         segact ri3*mod
+*      write(6,*) 'resouc ri3 ',ri3.mtymat
+         if (ri3.ne.mrigid) ri3.mtymat='TEMPORAI'
+         if(ierr.ne.0) then
+         segsup ri1,ri2,ri6
+         return
+         endif
+
+         segact mrigid*mod
+         jrcond=ri3
+         JRDEPP=RI6
+C     dualisation  de la (les) matrice(s) de dependance
+         call dual00(ri6,ri5)
+         if(ierr.ne.0) return
+*      write(6,*) 'resouc ri5 ',ri5.mtymat
+         if (ri5.ne.mrigid) then
+           segact ri5*mod
+            ri5.mtymat='TEMPORAI'
+         endif
+         jrdepd=ri5
+         ipoiri = ri3
+       else
+         ipoiri= jrcond
+         RI6   = JRDEPP
+         ri5   = jrdepd
+       endif
+*  test si on a condense quelque chose
+         segact ri1
+         imult=ri1.irigel(/2)
+         if (ri1.irigel(/2).gt.0) then
+          imult=0
+          do ir=1,ri1.irigel(/2)
+          ipt1=ri1.irigel(1,ir)
+          segact ipt1
+*          if (ipt1.itypel.eq.22) then
+          imult=imult+ipt1.num(/2)
+          enddo
+         endif
+
+
+*  test si il reste des multiplicateurs dans ri3
+         segact mrigid
+         ri3=jrcond
+         segact ri3*mod
+         icond=0
+         if (ri3.irigel(/2).eq.0) then
+           imtvid=1
+*          write(6,*) ' matrice vide ri3 '
+         endif
+         do ir=1,ri3.irigel(/2)
+          ipt3=ri3.irigel(1,ir)
+          segact ipt3
+          if (ipt3.itypel.eq.22) icond=icond+ipt3.num(/2)
+         enddo
+C
+*
+      ri3.jrsup=mrigid
+      mrigic = ri3
+* maintenant reduction des second membres
+* en cas de contacts on ne dualise pas . Ce sera fait dans unilater
+      ifrot=0
+      SEGACT MRIGID*MOD
+      DO  I=1,IRIGEL(/2)
+       IF(IRIGEL(6,I).ne.0) ifrot=1
+      enddo
+      if (nounil.eq.1) ifrot=0
+      if (lagdua.gt.0) then
+      ipt8=lagdua
+      if (ierr.ne.0) return
+      segact ipt8
+      endif
+      do 1050 ig=1,idemem(/1)
+      ichp2= idemem(ig)
+      ideme0(ig,if)=ichp2
+*     write(6,*) 'ideme0 ig if ',ideme0(ig,if),ig,if
+*  transferer les valeurs imposees des relations sur les inconnues (à éliminer)
+      call transr(ichp2,ri1,ichp3)
+         if(ierr.ne.0) return
+      ideme1(ig,if)=ichp3
+*     write(6,*) 'ideme1 ig if ',ideme1(ig,if),ig,if
+      call mucpri(ichp3,ri2,ichp4)
+         if(ierr.ne.0) return
+*  ri2 est deja dualise. Il faut donc dedualiser ichp4
+      if (lagdua.gt.0) then
+      call dbbcd(ichp4,lagdua)
+         if(ierr.ne.0) return
+*     write(6,*) ' appel dbbcf ',lagdua
+      endif
+      call adchpo(ichp2,ichp4,ichp1,1.D0,-1.0D0)
+         if(ierr.ne.0) return
+      call dtchpo(ichp4)
+      call mucpri(ichp1,ri5,ichp2)
+         if(ierr.ne.0) return
+         mchpo1=ichp1
+      mchpo2= ichp1
+      segact mchpo2*mod
+      mchpo2.jattri(1)=2
+      mchpo2= ichp2
+      segact mchpo2*mod
+      mchpo2.jattri(1)=2
+C
+      call fuchpo (ichp1,ichp2,ichp3)
+         if(ierr.ne.0) return
+      if (ichp2.ne.ichp3) call dtchpo(ichp2)
+      idemem(ig)=ichp3
+*  vecteur a resoudre
+*  dualisation des mult de lagrange
+      if (lagdua.gt.0.and.ifrot.eq.0) then
+      call dbbch(ichp3,lagdua)
+         if(ierr.ne.0) return
+*     write(6,*) ' appel dbbch ',lagdua
+      endif
+1050  continue
+
+      segdes ri1,ri2,ri3,ri5,ri6,mrigid
+      return
+      end
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

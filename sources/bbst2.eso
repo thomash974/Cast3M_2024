@@ -1,0 +1,229 @@
+C BBST2     SOURCE    OF166741  23/04/25    21:15:06     11608          
+      SUBROUTINE BBST2(TRACE,NBPGAU,IFOUR,MELE,POIGAU,QSIGAU,
+     &                 ETAGAU,DZEGAU,SHPTOT,NBNO,SHP,XE,PP)
+c
+c     projection de la trace de epsi2 sur la base reduite des elements icq
+c
+c entree
+c   trace  : tableau contenant la valeur de trace de epsi2 en
+c            chaque point de gauss
+c   nbpgau : nombre de point de gauss
+c   ifour  : variable du ccoptio
+c   mele   : numero de l'element
+c   poigau : poids d'integration
+c   qsigau : 1ere composante sur l'element de reference
+c   etagau : 2eme composante sur l'element de reference
+c   dzegau : 3eme composante sur l'element de reference
+c   shptot : valeurs des fonctions de forme
+c
+c sortie
+c   trac   : contient la correction a apporter a chaque composante diagonale de
+c            la deformation
+c
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+c
+      DIMENSION TRACE(*),POIGAU(*),QSIGAU(*),ETAGAU(*),DZEGAU(*),
+     &          SHPTOT(6,NBNO,*),SHP(6,*),XE(3,*),PP(4,*)
+      DIMENSION P(3,3),T(4)
+
+      PARAMETER (X1s2=0.5D0,
+     &           X1s3=0.333333333333333333333333333333333333333333D0)
+
+c-----------------------------------------------------------
+c      elements icq4 et ict3 et ict6 et lineaires 3D
+c-----------------------------------------------------------
+      IF (MELE.EQ.69.OR.MELE.EQ.70.OR.MELE.EQ.71.or.
+     &    MELE.EQ.73.or.MELE.EQ.74.or.MELE.EQ.75.or.
+     &    MELE.EQ.273) THEN
+        AIRE   = 0.D0
+        TRINTG = 0.D0
+        DO I=1,NBPGAU
+          DO J=1,NBNO
+            DO K =1,4
+              SHP(K,J)=SHPTOT(K,J,I)
+            ENDDO
+          ENDDO
+          if(mele.ge.73) then
+           CALL JACOBI(XE,SHP,3,NBNO,DJAC)
+          else
+           CALL JACOBI(XE,SHP,2,NBNO,DJAC)
+          endif
+          r_z    = POIGAU(I)*DJAC
+          AIRE   = AIRE + r_z
+          TRINTG = TRINTG + r_z*TRACE(I)
+        ENDDO
+        trintg = TRINTG / AIRE
+c
+        COEF = X1s2
+        IF (IFOUR .EQ. 0 ) COEF = X1s3
+        DO I=1,NBPGAU
+          TRACE(I) = (TRINTG - TRACE(I))*COEF
+        ENDDO
+
+c-------------------------------------------
+c   Element ICQ8 et quadratiques 3D
+c-------------------------------------------
+      ELSE IF ( MELE.EQ.72.or.MELE.GE.76) THEN
+c
+c    mele 72 ICQ8 matrice P calculee analytiquement voir routine BBCALC
+c
+      P(1,1) = 2.D0/3.D0*(XE(1,1)*(XE(2,2)-XE(2,8))
+     1         +XE(1,2)*(XE(2,3)-XE(2,1))
+     1         +XE(1,3)*(XE(2,4)-XE(2,2))+XE(1,4)*(XE(2,5)-XE(2,3))
+     2         +XE(1,5)*(XE(2,6)-XE(2,4))+XE(1,6)*(XE(2,7)-XE(2,5))
+     3         +XE(1,7)*(XE(2,8)-XE(2,6))+XE(1,8)*(XE(2,1)-XE(2,7)))
+     4         +1.D0/6.D0*((XE(1,1)-XE(1,5))*(XE(2,7)-XE(2,3))
+     5         +(XE(1,3)-XE(1,7))*(XE(2,1)-XE(2,5)))
+
+      P(1,2) = 5.D0/9.D0*(-XE(2,2)*(XE(1,1)+XE(1,3))
+     1         +XE(1,2)*(XE(2,1)+XE(2,3))+XE(1,6)*(-XE(2,5)-XE(2,7))
+     1         +XE(2,6)*(XE(1,5)+XE(1,7)))
+     2         +4.D0/9.D0*(XE(1,8)*(XE(2,7)+XE(2,2)-XE(2,6)-XE(2,1))
+     2         +XE(2,8)*(-XE(1,7)-XE(1,2)+XE(1,6)+XE(1,1))
+     2         +XE(1,4)*(XE(2,2)-XE(2,6)+XE(2,5)-XE(2,3))
+     2         +XE(2,4)*(-XE(1,2)+XE(1,6)-XE(1,5)+XE(1,3)))
+     3         +7.D0/45.D0*(XE(1,2)*(XE(2,5)+XE(2,7))
+     3         -XE(2,2)*(XE(1,5)+XE(1,7))-XE(1,6)*(XE(2,1)+XE(2,3))
+     3         +XE(2,6)*(XE(1,1)+XE(1,3)))
+     4         +8.D0/15.D0*(XE(1,6)*XE(2,2)-XE(1,2)*XE(2,6))
+     5         +7.D0/90.D0*(XE(1,7)*XE(2,1)-XE(1,3)*XE(2,5)
+     5         +XE(1,5)*XE(2,3)-XE(1,1)*XE(2,7))
+     6         +1.D0/30.D0*(-XE(1,7)*XE(2,3)+XE(1,3)*XE(2,7)
+     6         -XE(1,5)*XE(2,1)+XE(1,1)*XE(2,5))
+
+      P(1,3) = 5.D0/9.D0*(-XE(1,8)*(XE(2,7)+XE(2,1))
+     1         +XE(2,8)*(XE(1,7)+XE(1,1))
+     1         +XE(1,4)*(XE(2,3)+XE(2,5))
+     1         -XE(2,4)*(XE(1,3)+XE(1,5)))
+     2        +4.D0/9.D0*((XE(1,8)-XE(1,4))*(XE(2,2)+XE(2,6))
+     2         +(-XE(2,8)+XE(2,4))*(XE(1,2)+XE(1,6))
+     2         +XE(1,2)*(XE(2,1)-XE(2,3))+XE(2,2)*(-XE(1,1)+XE(1,3))
+     2         +XE(1,6)*(XE(2,7)-XE(2,5))+XE(2,6)*(-XE(1,7)+XE(1,5)))
+     3         +7.D0/45.D0*(-XE(1,8)*(XE(2,3)+XE(2,5))
+     3         +XE(2,8)*(XE(1,3)+XE(1,5))
+     3         +XE(1,4)*(XE(2,1)+XE(2,7))
+     3         -XE(2,4)*(XE(1,1)+XE(1,7)))
+     4         +1.D0/30.D0*(-XE(1,7)*XE(2,3)+XE(1,3)*XE(2,7)
+     4         +XE(1,5)*XE(2,1)-XE(1,1)*XE(2,5))
+     5         +7.D0/90.D0*(XE(1,7)*XE(2,5)-XE(1,3)*XE(2,1)
+     5         -XE(1,5)*XE(2,7)+XE(1,1)*XE(2,3))
+     6         +8.D0/15.D0*(XE(1,8)*XE(2,4)-XE(1,4)*XE(2,8))
+
+      P(2,1) = P(1,2)
+
+      P(2,2) = 16.D0/45.D0*(XE(2,6)*(XE(1,5)-XE(1,7))
+     1         +XE(1,6)*(XE(2,7)-XE(2,5))+XE(1,2)*(XE(2,3)-XE(2,1))
+     1         +XE(2,2)*(XE(1,1)-XE(1,3)))
+     2         +14.D0/45.D0*(XE(2,4)*(XE(1,3)-XE(1,5))
+     2         +XE(1,4)*(XE(2,5)-XE(2,3))+XE(1,8)*(XE(2,1)-XE(2,7))
+     2         +XE(2,8)*(XE(1,7)-XE(1,1)))
+     3         +8.D0/45.D0*(XE(1,4)*(XE(2,2)-XE(2,6))
+     3         +XE(1,8)*(XE(2,6)-XE(2,2))+XE(1,2)*(XE(2,8)-XE(2,4))
+     3         +XE(1,6)*(XE(2,4)-XE(2,8)))
+     4         +2.D0/45.D0*(XE(2,2)*(XE(1,5)-XE(1,7))
+     4         +XE(1,2)*(XE(2,7)-XE(2,5)) +XE(1,6)*(XE(2,3)-XE(2,1))
+     4         +XE(2,6)*(XE(1,1)-XE(1,3)))
+     5         +4.D0/45.D0*(XE(2,4)*(XE(1,1)-XE(1,7))
+     5         +XE(1,4)*(XE(2,7)-XE(2,1)) +XE(1,8)*(XE(2,3)-XE(2,5))
+     5         +XE(2,8)*(XE(1,5)-XE(1,3)))
+     6         +17.D0/90.D0*(XE(1,7)*XE(2,5)+XE(1,3)*XE(2,1)
+     6         -XE(1,5)*XE(2,7)-XE(1,1)*XE(2,3))
+     7         +1.D0/90.D0*(-XE(1,7)*XE(2,1)-XE(1,3)*XE(2,5)
+     7         +XE(1,5)*XE(2,3)+XE(1,1)*XE(2,7))
+
+      P(2,3) = 1.D0/3.D0*(XE(1,5)*(XE(2,6)-XE(2,4))
+     1         +XE(1,8)*(XE(2,7)+XE(2,1))+XE(1,7)*(XE(2,6)-XE(2,8))
+     1         -XE(1,2)*(XE(2,1)+XE(2,3))+XE(1,1)*(XE(2,2)-XE(2,8))
+     1         +XE(1,4)*(XE(2,5)+XE(2,3))-XE(1,6)*(XE(2,7)+XE(2,5))
+     1         +XE(1,3)*(XE(2,2)-XE(2,4)))
+     2         +4.D0/9.D0*(-XE(1,4)*(XE(2,2)+XE(2,6))
+     2         -XE(1,8)*(XE(2,6)+XE(2,2))+XE(1,2)*(XE(2,8)+XE(2,4))
+     2         +XE(1,6)*(XE(2,4)+XE(2,8)))
+     3         +1.D0/9.D0*(XE(1,7)*(XE(2,2)-XE(2,4))
+     3         +XE(1,8)*(XE(2,3)+XE(2,5))
+     3         +XE(1,5)*(XE(2,2)-XE(2,8))+XE(1,3)*(XE(2,6)-XE(2,8))
+     3         -XE(1,2)*(XE(2,5)+XE(2,7))+XE(1,1)*(XE(2,6)-XE(2,4))
+     3         +XE(1,4)*(XE(2,1)+XE(2,7))-XE(1,6)*(XE(2,1)+XE(2,3)))
+
+      P(3,1) = P(1,3)
+
+      P(3,2) = P(2,3)
+
+      P(3,3) =  14.D0/45.D0*(XE(1,6)*(XE(2,7)-XE(2,5))
+     1         +XE(2,6)*(XE(1,5)-XE(1,7))+XE(1,2)*(XE(2,3)-XE(2,1))
+     1         +XE(2,2)*(XE(1,1)-XE(1,3)))
+     2         +16.D0/45.D0*(XE(1,8)*(XE(2,1)-XE(2,7))
+     2         +XE(2,8)*(XE(1,7)-XE(1,1))+XE(1,4)*(XE(2,5)-XE(2,3))
+     2         +XE(2,4)*(XE(1,3)-XE(1,5)))
+     3         +8.D0/45.D0*(XE(1,4)*(XE(2,2)-XE(2,6))
+     3         +XE(1,8)*(XE(2,6)-XE(2,2))+XE(1,2)*(XE(2,8)-XE(2,4))
+     3         +XE(1,6)*(XE(2,4)-XE(2,8)))
+     4         +2.D0/45.D0*(XE(2,4)*(XE(1,7)-XE(1,1))
+     4         +XE(1,8)*(XE(2,5)-XE(2,3))+XE(2,8)*(-XE(1,5)+XE(1,3))
+     4         +XE(1,4)*(XE(2,1)-XE(2,7)))
+     5         +4.D0/45.D0*(XE(2,2)*(XE(1,7)-XE(1,5))
+     5         +XE(1,2)*(XE(2,5)-XE(2,7))+XE(1,6)*(XE(2,1)-XE(2,3))
+     5         +XE(2,6)*(XE(1,3)-XE(1,1)))
+     6         +1.D0/90.D0*(-XE(1,5)*XE(2,7)+XE(1,3)*XE(2,1)
+     6         +XE(1,7)*XE(2,5)-XE(1,1)*XE(2,3))
+     7         +17.D0/90.D0*(-XE(1,7)*XE(2,1)-XE(1,3)*XE(2,5)
+     7         +XE(1,5)*XE(2,3)+XE(1,1)*XE(2,7))
+c
+c  calcul des produits <tr eII . 1 > , <tr eII . eta > , <tr eII . xsi >
+c
+        T(1) = 0.D0
+        T(2) = 0.D0
+        T(3) = 0.D0
+        T(4) = 0.D0
+        DO I=1,NBPGAU
+          DO J=1,NBNO
+            DO K =1,4
+              SHP(K,J)=SHPTOT(K,J,I)
+            ENDDO
+          ENDDO
+          if(mele.ge.76) then
+           CALL JACOBI(XE,SHP,3,NBNO,DJAC)
+          else
+           CALL JACOBI(XE,SHP,2,NBNO,DJAC)
+          endif
+          r_z  = POIGAU(I)*TRACE(I)*DJAC
+          T(1) = T(1) + r_z
+          T(2) = T(2) + r_z*QSIGAU(I)
+          T(3) = T(3) + r_z*ETAGAU(I)
+          if(mele.ge.76)
+     &      T(4) = T(4) + r_z*DZEGAU(I)
+        ENDDO
+c
+c    resolution du systme P.X=T
+c    calcul du terme correctif
+c
+        if (mele.ge.76) then 
+          CALL GAUSSJ(PP,4,4,T,1,1)
+          COEF = X1s3
+          DO I=1,NBPGAU
+            TRACE(I)=(T(1)+QSIGAU(I)*T(2)+ETAGAU(I)*T(3)+DZEGAU(I)*T(4)
+     &               -TRACE(I))*COEF
+          ENDDO
+        else
+          CALL GAUSSJ(P,3,3,T,1,1)
+          COEF = X1s2
+          IF (IFOUR .EQ. 0) COEF = X1s3
+          DO I=1,NBPGAU
+            TRACE(I)=(T(1)+QSIGAU(I)*T(2)+ETAGAU(I)*T(3)-TRACE(I))*COEF
+          ENDDO
+        endif
+c--------------------
+c     pas de  correction pour les autres elements
+c--------------------
+      ELSE
+        DO I=1,NBPGAU
+          TRACE(I)=0.D0
+        ENDDO
+
+      ENDIF
+
+c      RETURN
+      END
+
+ 

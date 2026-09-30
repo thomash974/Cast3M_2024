@@ -1,0 +1,298 @@
+C HHOEXT    SOURCE    OF166741  24/05/06    21:15:10     11082          
+C HHOEXT    SOURCE    FANDEUR                                           
+C
+      SUBROUTINE HHOEXT (IPMODL,chopt, IPOBJ,chobj, iret)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC CCHHOPA
+-INC CCHHOPR
+
+-INC SMCOORD
+-INC SMMODEL
+-INC SMELEME
+-INC SMLENTI
+
+      CHARACTER*(*) chopt,chobj
+
+      CHARACTER*(4) motopt
+c*      CHARACTER*(16) motHHO
+
+      EXTERNAL LONG
+
+      iret = 0
+      IPOBJ = 0
+      chobj = '__VIDE__'
+
+      IF (IDIM.NE.2) THEN
+        iret = 5
+        RETURN
+      END IF
+
+      n_z = LONG(chopt)
+      CALL CHCASS(chopt(1:n_z),1,chopt(1:n_z))
+      IF (chopt(1:4).NE.'HHO_') THEN
+        write(ioimp,*) 'HHOEXT: incorrect keyword ',chopt(1:4)
+        iret = 21
+        RETURN
+      END IF
+      motopt(1:4) = chopt(5:8)
+      IF ( (motopt.NE.'FACE') .AND. (motopt.NE.'PFAC') .AND.
+     &     (motopt.NE.'PCEL') ) THEN
+        write(ioimp,*) 'HHOEXT: incorrect keyword ',motopt
+        iret = 21
+        RETURN
+      END IF
+
+      mmodel = IPMODL
+c*      segact,mmodel*nomod (segment actif en entree)
+      NSOUM = mmodel.kmodel(/1)
+
+      NSOHHO = 0
+      DO im = 1, NSOUM
+        imodel = mmodel.kmodel(im)
+        IF (imodel.nefmod .EQ. HHO_NUM_ELEMENT) NSOHHO = NSOHHO + 1
+      END DO
+
+C= Cas Particulier : pas de HHO dans le MMODEL -> Maillage VIDE
+      IF (NSOHHO.EQ.0) THEN
+        nbnn   = 1
+        nbelem = 0
+        nbsous = 0
+        nbref  = 0
+        SEGINI,ipt1
+        ipt1.itypel = 1
+        IPOBJ = ipt1
+        chobj = 'MAILLAGE'
+        RETURN
+      END IF
+
+C= EXTRACTION DES POINTS SUPPORTS DES DDLS DES FACES / CELLULES :
+      IF ((motopt.EQ.'PFAC') .OR. (motopt.EQ.'PCEL')) THEN
+        IF (motopt.EQ.'PFAC') THEN
+          ipt2 = MPFHHO
+          iel1 = NFAHHO
+          indhho = 2
+        END IF
+        IF (motopt.EQ.'PCEL') THEN
+          ipt2 = MPCHHO
+          iel1 = NCEHHO
+          indhho = 4
+        END IF
+c*        segact,ipt2
+
+        nbnn   = 1
+        nbelem = iel1
+        nbsous = 0
+        nbref  = 0
+        SEGINI,ipt1
+        ipt1.itypel = 1
+
+        DO im = 1, NSOUM
+          imodel = mmodel.kmodel(im)
+          IF (imodel.nefmod .NE. HHO_NUM_ELEMENT) GOTO 100
+          CALL HHONOB(imodel,nobHHO,iret)
+          IF (nobHHO.LE.0) THEN
+            write(ioimp,*) 'HHOEXT: nobHHO undefined'
+            iret = 5
+            RETURN
+          END IF
+          IF (imodel.TYMODE(nobHHO+indHHO) .NE. 'LISTENTI') THEN
+            write(ioimp,*) 'HHOEXT: indHHO LISTENTI undefined'
+            iret = 5
+            RETURN
+          END IF
+          mlent3 = imodel.IVAMOD(nobHHO+indHHO)
+          SEGACT,mlent3
+          nbel3 = mlent3.lect(/1)
+          DO i = 2, nbel3, 2
+            je = mlent3.lect(i-1)
+            ip = ABS(mlent3.lect(i))
+      if (ip.eq.0) write(ioimp,*) 'HHOEXT P... Bizarre...',i/2,je,ip
+            IF (motopt.EQ.'PFAC') THEN
+              jp = ip + NBFHHO(je-1)
+            ELSE IF (motopt.EQ.'PCEL') THEN
+              jp = ip + NBCHHO(je-1)
+            END IF
+            ipt1.num(1,jp) = ipt2.num(1,jp)
+          END DO
+          SEGDES,mlent3
+ 100      CONTINUE
+        END DO
+C= On compacte le maillage de POI1
+        iel1 = 0
+        DO i1 = 1, nbelem
+          IF (ipt1.num(1,i1).NE.0) THEN
+            iel1 = iel1 + 1
+            IF (iel1.NE.i1) THEN
+              ipt1.num(1,iel1) = ipt1.num(1,i1)
+              ipt1.num(1,i1) = 0
+            END IF
+          END IF
+        END DO
+        IF (iel1.LT.nbelem) THEN
+          nbelem = iel1
+          SEGADJ,ipt1
+        END IF
+C= Fin
+c*        SEGDES,ipt1
+        IPOBJ = ipt1
+        chobj = 'MAILLAGE'
+        RETURN
+      END IF
+
+C= EXTRACTION DES FACES :
+      IF (chopt(5:8).EQ.'FACE') THEN
+        indHHO = 2
+        JG = NFAMAX
+        SEGINI,mlent1
+        DO i = 1, JG
+          mlent1.lect(i) = 0
+        END DO
+C= Preparation des donnees (MAILLAGE) : Maillage a "ZERO"
+        nbs = NUFHHO
+        IF (IDIM.EQ.2) THEN
+          ideb = 2
+          ifin = 2
+          if (nbs.ne.1) then
+            write(ioimp,*) 'HHOEXT: incompatibility 2D NFUHHO'
+            iret = 5
+            return
+          end if
+        END IF
+        IF (IDIM.EQ.3) THEN
+          ideb = 3
+          ifin = HHO_MAX_EDGE
+        END IF
+        isou = 0
+        DO i = ideb, ifin
+          nbelem = NBFHHO(i) - NBFHHO(i-1)
+          IF (nbelem.EQ.0) GOTO 200
+          isou = isou + 1
+          nbnn   = i
+          nbsous = 0
+          nbref  = 0
+          SEGINI,ipt1
+          ipt2 = MAFHHO(i)
+          segact,ipt2
+          ipt1.itypel = ipt2.itypel
+c*          segdes,ipt2
+          mlent1.lect(i) = ipt1
+ 200      CONTINUE
+        END DO
+        IF (isou.NE.nbs) THEN
+          write(ioimp,*) 'HHOEXT(2): incompatibility NBSOUS'
+          iret = 5
+          return
+        END IF
+
+        ISOHHO = 0
+        DO im = 1, NSOUM
+          imodel = mmodel.kmodel(im)
+          IF (imodel.nefmod .NE. HHO_NUM_ELEMENT) GOTO 250
+          CALL HHONOB(imodel, nobHHO, iret)
+          IF (nobHHO.LE.0) THEN
+            write(ioimp,*) 'HHOEXT : nobHHO undefined'
+            iret = 5
+            RETURN
+          END IF
+          IF (imodel.TYMODE(nobHHO+indHHO) .NE. 'LISTENTI') THEN
+            write(ioimp,*) 'HHOEXT : nobHHO+indHHO LISTENTI undefined'
+            iret = 5
+            RETURN
+          END IF
+          ISOHHO = ISOHHO + 1
+          mlent3 = imodel.IVAMOD(nobHHO+indHHO)
+          SEGACT,mlent3
+          nbel3 = mlent3.lect(/1)
+          DO i = 2, nbel3, 2
+            je = mlent3.lect(i-1)
+            ip = ABS(mlent3.lect(i))
+      if (ip.eq.0) write(ioimp,*) 'HHOEXT FACE Bizarre...',i/2,je,ip
+            ipt2 = MAFHHO(je)
+            ipt1 = mlent1.lect(je)
+            DO j = 1, je
+              ipt1.num(j,ip) = ipt2.num(j,ip)
+            END DO
+          END DO
+          SEGDES,mlent3
+ 250      CONTINUE
+        END DO
+C= On compacte le maillage
+        isou = 0
+        DO i = 1, NFAMAX
+          ipt1 = mlent1.lect(i)
+          IF (ipt1.EQ.0) GOTO 270
+          nbnn1 = ipt1.num(/1)
+          nbel1 = ipt1.num(/2)
+          iel1 = 0
+          DO i1 = 1, nbel1
+            IF (ipt1.num(1,i1).NE.0) THEN
+              iel1 = iel1 + 1
+              IF (iel1.NE.i1) THEN
+                DO j = 1, nbnn1
+                  ipt1.num(j,iel1) = ipt1.num(j,i1)
+                END DO
+                ipt1.num(1,i1) = 0
+              END IF
+            END IF
+          END DO
+          IF (iel1.EQ.0) THEN
+            SEGSUP,ipt1
+            mlent1.lect(i) = 0
+          ELSE
+            isou = isou + 1
+            IF (iel1.LT.nbel1) THEN
+              nbnn   = nbnn1
+              nbelem = iel1
+              nbsous = 0
+              nbref  = 0
+              SEGADJ,ipt1
+            END IF
+          END IF
+ 270      CONTINUE
+        END DO
+        IF (isou.EQ.0) THEN
+          nbnn   = 1
+          nbelem = 0
+          nbsous = 0
+          nbref  = 0
+          SEGINI,ipt2
+          ipt2.itypel = 1
+        ELSE IF (isou.EQ.1) THEN
+          DO i = 1, NFAMAX
+            ipt1 = mlent1.lect(i)
+            IF (ipt1.NE.0) ipt2 = ipt1
+          END DO
+        ELSE
+          nbnn   = 0
+          nbelem = 0
+          nbsous = isou
+          nbref  = 0
+          SEGINI,ipt2
+          jsou = 0
+          DO i = 1, NFAMAX
+            ipt1 = mlent1.lect(i)
+            IF (ipt1.NE.0) THEN
+              jsou = jsou + 1
+              ipt2.lisous(jsou) = ipt1
+            END IF
+          END DO
+          if (isou.ne.jsou) then
+            write(ioimp,*) 'HHOEXT FACE : incompatibility isou-jsou'
+          end if
+        END IF
+        SEGSUP,mlent1
+        IPOBJ = ipt2
+        chobj = 'MAILLAGE'
+        RETURN
+      END IF
+
+C*      RETURN
+      END
+
+ 

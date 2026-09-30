@@ -1,0 +1,54 @@
+C PREACT    SOURCE    PV090527  23/12/14    21:15:04     11208          
+
+C   AJOUTE UN ELEMENT DANS UN SEGMENT S'IL N'Y EST DEJA
+C
+      SUBROUTINE PREACT(ITAB,IEL)
+      
+      IMPLICIT INTEGER(I-N)
+      
+      SEGMENT ITAB(NNN),ISEG(0)
+
+      IF(IEL .LE. 0)CALL ERREUR(5)
+
+      ILONG=ITAB(1)
+C     Verification que le SEGMENT ne soit pas deja dans ITAB(2:ILONG)
+      DO 2 I=ilong,max(ilong-64,2),-1
+        IF(ITAB(I).NE.IEL) GOTO 2
+*       write (6,*) 'preact segment deja en queue',ilong-i
+        return
+   2  CONTINUE
+
+C     Mise en queue d'activation du SEGMENT IEL
+      ILONG=ILONG+1
+      IF(ILONG .GT. ITAB(/1))THEN
+        NNN=ILONG*2 + 50
+        SEGADJ,ITAB
+      ENDIF
+      ITAB(1)    =ILONG
+      ITAB(ILONG)=IEL
+      RETURN
+
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+C     VIDE LE BUFFER DE SEGACT !
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+      ENTRY FINACT(ITAB)
+  10  continue
+      ILONG=ITAB(1)
+      IF(ILONG .EQ. 1)RETURN
+      IF(ILONG .EQ. 0)CALL ERREUR(5)
+C     Positionnement du PERSISTANT LOCK
+      CALL oooprl(1)
+      DO II=2,ILONG
+        ISEG=ITAB(II)
+        SEGACT,ISEG
+      ENDDO
+C     Retrait du PERSISTANT LOCK
+      CALL oooprl(0)
+      ITAB(1)=1
+      END
+
+ 
+ 
+ 
+ 
+ 

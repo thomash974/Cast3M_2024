@@ -1,0 +1,125 @@
+$$$$ RECOVIBC
+* RECOVIBC  PROCEDUR  BP208322  22/02/15    21:15:02     11284          
+*
+* ======================== DEBUT DOCUMENTATION ========================
+* .. _procedur_recovibc:
+* 
+* recovibc
+* --------
+* 
+* **Description**
+* 
+* Recombine une base modale complexe TbasC2 notée [q] obtenue avec VIBC
+* sur un problème projeté sur la base de modes réelles TbasR1 notée [X],
+* qui n'aurait pas déjà été recombinée directement par VIBC.
+* Les déformées modales complexes recombinée :math:`z_j` sont ainsi
+* supportées par les degrés de liberté du modèle éléments finis : 
+*
+* .. math::
+* 
+*    z_j^R = [X] \cdot q_j^R
+*
+* **Appel**
+* 
+* .. code-block:: none
+* 
+*   RECOVIBC TbasC2 TbasR1;
+*
+* **Arguments**
+* 
+* Détail des indices de la table TbasC2 : 
+*
+* - en entrée (E) de RECOVIBC ::
+*
+*   TbasC2
+*   . 'MODES' 
+*     . 'MAILLAGE'  = maillage des point_repere des modes
+*     . j           = table du j ème mode complexe
+*       . 'DEFORMEE_MODALE_REELLE'       = q_j^R 
+*       . 'DEFORMEE_MODALE_IMAGINAIRE'   = q_j^I 
+* 
+* - en sortie (S) de RECOVIBC ::
+*
+*   TbasC2
+*   . 'MODES' 
+*     . 'MAILLAGE'    = maillage de TbasR1
+*     . 'MAILLAGE_P'  = maillage des point_repere des modes
+*     . j = table du j ème mode complexe
+*       . 'DEFORMEE_MODALE_REELLE'       = z_j^R 
+*       . 'DEFORMEE_MODALE_IMAGINAIRE'   = z_j^I 
+*       . 'DEFORMEE_MODALE_REELLE_P'     = q_j^R 
+*       . 'DEFORMEE_MODALE_IMAGINAIRE_P' = q_j^I
+*
+* **Auteur**
+*
+* Benoit Prabel, 2022
+*
+************************************************************************
+*
+* TODO : - prevoir cas des solutions statiques [Y]
+*        - passer dans RECO ?
+
+DEBP RECOVIBC TbasC2*'TABLE' TbasR1*'TABLE';
+
+
+************************************************************************
+* RECUPERATION DES INPUT
+************************************************************************
+
+* BASE COMPLEXE A RECOMBINER
+* --------------------------
+  TmodC2 = TbasC2 . 'MODES';
+  NmodC2 = DIME TmodC2;
+    
+* BASE DE REFERENCE 
+* -----------------
+* TbasR1;
+
+
+************************************************************************
+* CHANGEMENT DE MAILLAGE
+************************************************************************
+  TmodC2 . 'MAILLAGE_P' = TmodC2 . 'MAILLAGE';
+  TmodC2 . 'MAILLAGE'   = TbasR1 . 'MODES' . 'MAILLAGE';
+  
+  
+************************************************************************
+* BOUCLE SUR LES MODES COMPLEXES
+************************************************************************
+  REPE BmodC2 NmodC2;
+  
+*   TEST DE L'EXISTENCE
+    SI (NON (EXIS TmodC2 &BmodC2));
+      NmodC2 = &BmodC2 - 1;
+      QUIT BmodC2;
+    FINSI;
+    
+    SI ((VALE 'DEBUG') > 0); MESS 'RECO de z_{'&BmodC2'}' ; FINSI;
+    
+*   RECUP DE LA DEFORMEE COMPLEXE
+    qR = TmodC2 . &BmodC2 . 'DEFORMEE_MODALE_REELLE'    ;
+    qI = TmodC2 . &BmodC2 . 'DEFORMEE_MODALE_IMAGINAIRE';    
+    
+*   SAUVEGARDE DES MODES COMPLEXES PROJETES
+    TmodC2 . &BmodC2 . 'DEFORMEE_MODALE_REELLE_P'     = qR;
+    TmodC2 . &BmodC2 . 'DEFORMEE_MODALE_IMAGINAIRE_P' = qI;
+    
+*   RECOMBINAISON
+    zR = RECO qR TbasR1;
+    zI = RECO qI TbasR1;
+    
+*   STOCKAGE
+    TmodC2 . &BmodC2 . 'DEFORMEE_MODALE_REELLE'     = zR;
+    TmodC2 . &BmodC2 . 'DEFORMEE_MODALE_IMAGINAIRE' = zI;   
+    
+    
+  FIN  BmodC2;
+************************************************************************
+
+  
+
+FINP;
+
+
+ 
+ 

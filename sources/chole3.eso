@@ -1,0 +1,241 @@
+C CHOLE3    SOURCE    PV        22/10/17    21:15:02     11482          
+      SUBROUTINE CHOLE3(IPREL,IDERL,lpl,IPPR,IDDR,IVPO,
+     # nbg1,VAL,VAL1,IVPO1              ,imasq,nbo,irondi,irondf,ivd)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+-INC SMRIGID
+-INC CCHOLE
+-INC CCREEL
+      DIMENSION IVPO(*),VAL(*),VAL1(*),IVPO1(*)
+      DIMENSION imasq(*)
+      real*8 pt(36)
+
+*  nombre max de lignes traitees simultanement
+      nbl=6
+*  recuperer en cas de super element dans cchole
+      xmatri=matric
+      nbnnma=nbnnmc
+
+
+
+C  inconnues correspondant aux noeuds
+
+**    write (6,*) ' chole3 irondi irondj ',irondi
+
+C val1 en stockage compacte
+C val mis a jour et utilise imasq pour avoir les termes non nuls
+C  nombres de groupes (incluant la diagonale)
+**      nbg1=ippvv1(2)-1
+      nbg=1
+C  nb ligne
+      na=iderl-iprel+1
+      na1=iddr-ippr+1
+C  longueur de la premiere ligne incluant la diagonale
+      lpl1=ivpo1(2*(nbg1+1))-ivpo1(2*1)
+C  nb termes premiere ligne
+      nval1=ivpo1(2*(nbg1+1)-1)-ivpo1(2*1-1)
+C  longueur de la premiere ligne de val
+**      lpl=ippvv(2)-ippvv(1)
+C  nb termes premiere ligne de val
+      nval=lpl
+C  position depart de val et val1
+      idepv=iprel-nval+1
+      idepv1=ippr-nval1+1
+      imb=idepv1-idepv
+C     write (6,*) 'chole3 idepv1 iml',idepv1,iml
+C  les groupes (hors groupe diagonal)
+      kidepg=ivpo(1)
+      do 121 im=2,na
+        kidepg=max(kidepg,ivpo(im))
+ 121  continue
+
+      do 10 ig1=1,nbg1-1
+C  il position dans la ligne compressee
+C  i position relative dans la ligne
+        ildeb1=ivpo1(2*ig1)
+        ilfin1=ivpo1(2*(ig1+1))-1
+        ideb1=ivpo1(2*ig1-1)
+        ifin1=ideb1+ilfin1-ildeb1
+        ifin1=min(ifin1,nbnnma-idepv1+1)
+
+        ideb1n=max(1-imb,ideb1)
+        long=ifin1-ideb1n+1
+        lond=min(long,kidepg-imb-ideb1n+1)
+**      write(6,*) ' lond ',lond
+        ifin1=lond+ideb1n-1
+        ideb1n=max(irondi-imb,ideb1n)
+*  verif rapide avec imasq qu'il y a du travail a faire
+        jini=(ideb1n+imb)/masdim
+        if(-imasq(jini).gt.iddr) then
+**        write(6,*) ' chole3 sortie rapide ',-imasq(jini),ippr,iddr
+          goto 11
+        endif
+        if(-imasq(jini).gt.ifin1+imb) goto 10
+        ifin1 =min(irondf-imb,ifin1 )
+        lond=ifin1-ideb1n+1
+        if (ifin1.lt.ivd-imb) then
+**    fin d'operation avant le premier terme significatif de la rondelle
+**       write (6,*) ' chole3 saut',ivd,irondi,irondf
+         goto 10
+        endif
+        if (lond.le.0) goto 10
+C optimisation pour le cas na>1 na1>1
+C on decoupe les operations en groupes de 6x6 car au dela n'est pas programme
+       if (na.gt.1.or.na1.gt.1) then
+       do 301 ia=0,na-1,nbl
+        iposrb=imb+ia*lpl+(ia*(ia-1))/2
+       do 300 ia1=0,na1-1,nbl
+        ilpos1b=-ideb1+ildeb1+ia1*lpl1+(ia1*(ia1-1))/2
+           nboq=nbo
+**         write(6,*) 'appel mamupv ia na ia1 na1 ',ia,na,ia1,na1
+           npa=min(nbl,na-ia)
+           npa1=min(nbl,na1-ia1)
+           call mamupv(ideb1n,ifin1,val(1),iposrb,lpl+ia,val1(1),
+     >     ilpos1b,lpl1+ia1,imasq(1),imb,pt,
+     >     npa,npa1,nbo)
+           if (nbo.eq.nboq) then
+*  rien a mettre a jour
+***        write (6,*) ' mamupv rien a mettre a jour '
+           goto 300
+           endif
+C  mise a jour val
+           do ic=1,npa
+             ivad=ippr-idepv+ia1+(ia+ic-1)*lpl+
+     >         ((ia+ic-1)*(ia+ic-2))/2
+             iaux=-ivad+(ic-1)*npa1
+           do iv=max(1,1+ivad),npa1+ivad
+             if(abs(pt(iv+iaux)).gt.xpetit)
+     >       val(iv)=val(iv)-pt(iv+iaux)
+           enddo
+           enddo
+  300  continue
+  301  continue
+       elseif (na.eq.1.and.na1.eq.1) then
+             ideqb= ideb1n+imb
+         im1=1
+             idebzc=ideb1n-ideb1+ildeb1+(im1-1)*lpl1+((im1-2)*(im1-1))/2
+         im=1
+           ideq= ideqb+(im-1)*lpl+((im-2)*(im-1))/2
+           nboq=nbo
+           p=ddotpw(lond,val(ideq),val1(idebzc),imasq(1),ideqb,nbo)
+           if (nbo.ne.nboq) then
+C  mise a jour val
+           ivad=ippr-idepv+im1+(im-1)*lpl+((im-2)*(im-1))/2
+           if (ivad.ge.1.and.abs(p).gt.xpetit) val(ivad)=val(ivad)-p
+           endif
+       endif
+  10  continue
+  11  continue
+999   continue
+      if (irondi-imb.gt.nval1.or.irondf-imb.lt.nval1 ) return
+
+C  le groupe diagonal
+      ig1=nbg1
+C les lignes de val1 on s'arrete avant le terme diagonal.
+          ivadb=ippr-idepv+1
+C*   >      ippr,iblcd
+          kidepb=ivpo(1)
+          do 210 im=1,na
+          icol=iprel +im-1-nbnnma
+**        write(6,*) 'super3 nbnnma icol ',nbnnma,icol
+           kidep=ivpo(im)
+C  comparaison au terme diagonal
+           dnorm = 
+     >       max(precc * abs(val(im*lpl+(im*(im-1))/2)),xpetit)
+          do 220 im1=1,na1
+          ilig=ippr+im1-1-nbnnma
+          p=0.d0
+
+           ildeb1=ivpo1(2*ig1)
+C*           ilfin1=ildeb1+im1-2
+           ideb1=ivpo1(2*ig1-1)
+           ideb1n=max(1-imb,ideb1)
+           ifin1=ideb1+im1-2
+        ifin1=min(ifin1,nbnnma-idepv1+1)
+C le travail sur les colonnes de val
+            ilpos1=ideb1n-ideb1+ildeb1 +(im1-1)*lpl1+((im1-2)*(im1-1))/2
+            iposr=ideb1n+imb+(im-1)*lpl+((im-2)*(im-1))/2
+            ideqb=ideb1n+imb
+
+**         p=ddotpw(ifin1-ideb1n+1,val(iposr),val1(ilpos1),imasq(1),
+**   >           ideqb,nbo)
+          
+* il y a trop peu de travail pour appeler ddotpw
+
+           if (ifin1-ideb1n.ge.0) then
+           nbo=nbo+ifin1-ideb1n+1
+           do 200 ipos=ideb1n,ifin1
+            p=p+val(iposr)*val1(ilpos1)
+            ilpos1=ilpos1+1
+            iposr=iposr+1
+ 200       continue
+           endif
+C  mise a jour val
+           ivad=ippr-idepv+im1+(im-1)*lpl+((im-2)*(im-1))/2
+           if (ivad.lt.1) goto 220
+           ivadb=ippr-idepv+im1
+           if (ivadb.lt.1) goto 220
+            if(abs(p).gt.xpetit) val(ivad)=val(ivad)-p
+**    write(6,*) 'super3 xmatri ilig icol re ',
+**   > xmatri,ilig,icol,val(ivad)
+*  cas du super element
+            if(xmatri.ne.0.and.ilig.ge.1.and.icol.ge.1) then
+            re(ilig,icol,1)=val(ivad)
+            re(icol,ilig,1)=val(ivad)
+            endif
+            if (abs(val(ivad)).gt.dnorm) then
+             imasq(ivad/masdim+1)=1
+             if (ivadb.le.lpl) imasq(ivadb/masdim+1)=1
+C  mise a jour imasq
+             do imt=kidep/masdim+1+1,ivad/masdim+1-1
+              imasq(imt)=-(ivad/masdim)*masdim+1
+             enddo
+             kidep=ivad
+C*           if (im.eq.1) then
+C*            kidepb=kidep
+C*           endif
+
+             if (im.ne.1) then
+              do imt=kidepb/masdim+1+1,ivadb/masdim+1-1
+               imasq(imt)=-(ivadb/masdim)*masdim+1
+              enddo
+             endif
+             kidepb=max(ivadb,kidepb)
+           else
+C  si on note que la valeur est nulle, il faut qu'elle le soit vraiment
+**           val(ivad)=0.d0
+C*           write (6,*) ' chole3 ivad lpl ',ivad,lpl
+           endif
+ 220      continue
+          ivpo(im)=kidep
+          ivpo(1)=kidepb
+ 210      continue
+**       if(ivpo(1).ne.1) write(6,*) 'chole3 ivpo',ivpo(1)
+
+      RETURN
+      END
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

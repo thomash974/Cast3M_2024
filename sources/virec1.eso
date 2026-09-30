@@ -1,0 +1,215 @@
+C VIREC1    SOURCE    PB245956  20/12/21    21:15:20     10747          
+C RESOUR    SOURCE    CB215821  19/07/30    21:17:58     10273          
+      SUBROUTINE VIREC1(LVIBC,ideme0,ideme1,IPRIGI,IPMASS,IPAMOR,
+     &                        ICMODR,ICMODI,WR,WI,NELIM)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+*     RECONSTRUCTION D'UN MODE (REEL OU COMPLEXE) 
+*     APRES OPERATIONS SUR MATRICES CONDENSEES
+*     code en grande partie extrait de resour.eso
+
+-INC SMRIGID
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHPOI
+-INC SMELEME
+
+      SEGMENT IDEME0(1,2)
+      SEGMENT IDEME1(1,2)
+
+      SEGMENT ICMODE(NVIBR)
+      SEGMENT ICMOD1(NVIBR)
+      SEGMENT ICHRHS(NVIBR)
+
+      LOGICAL LVIBC 
+
+      NMXELM=2
+      IPT8=0
+      ISOUCI=0
+      IVERIF=0
+      NOEN=1
+
+      NVIBR=1
+      ICORR=0
+
+
+      SEGACT IDEME0,IDEME1
+
+      SEGINI ICMODE,ICMOD1,ICHRHS
+      SEGACT ICMODE*MOD,ICMOD1*MOD,ICHRHS*MOD
+
+      ICMODE(1)=ICMODR
+      IF (LVIBC) THEN
+         NVIBR=2
+         SEGADJ ICMODE,ICMOD1,ICHRHS
+         ICMODE(2)=ICMODI
+      ENDIF
+
+C-------------------------------------------------------
+*C     LA SOLUTION EST CALCULEE --> ON LA MET EN FORME
+
+
+      MRIGID=IPRIGI
+      IELIM=NELIM
+
+      DO IFOIS=1,NMXELM  
+
+         SEGACT MRIGID
+         MRIGID=JRSUP
+         IF(MRIGID.EQ.0) GOTO 999
+         
+         segact mrigid
+         ri6 = jrdepp
+         ri2 = jrgard
+         ri1 = jrelim
+
+         DO IR=1,NVIBR
+
+            MCHPOI=ICMODE(IR)
+C-----------------------
+* reintroduction des inconnues supprimees
+            call mucpri(mchpoi,ri6,ichp3)
+            call adchpo(mchpoi,ichp3,ichp2,1D0,1D0)
+            mchpo1=ideme1(1,IELIM)
+            call adchpo(ichp2,mchpo1,iret,1D0,1D0)
+            call dtchpo(ichp3)
+            call dtchpo(ichp2)
+            mchpo1=iret
+            segact mchpo1*mod
+            mchpo1.jattri(1)=1
+            SEGDES MCHPO1
+            ICMODE(IR)=MCHPO1
+C -------------     deplacements  complets: sur k uniquement
+            call mucpri(mchpo1,ri2,ichp5)
+            mchpo2=ichp5
+            mchpo4=ichp5
+            segact mchpo4*mod
+            mchpo4.jattri(1)=1 
+            SEGDES MCHPO4
+            ICMOD1(IR)=MCHPO4
+
+         ENDDO
+C -------------     deplacements  complets
+*        outre K*phi, le reste est mis dans le second membre 
+*        au final on aura dans le rhs ICHRHS + izero 
+
+C*        Cas reel: on a M*(w**2)*phi dans le second membre
+         IF (.NOT. LVIBC) THEN
+
+            IMR=ICMODE(1)
+            CALL MUCHPO(IMR,WR**2,ICMR,1)
+            CALL MUCPRI(ICMR,IPMASS,ICMMR)
+            CALL DTCHPO(ICMR)
+            ICHRHS(1)=ICMMR
+
+*        Cas complexe : attention a l algebre !!!
+*        Partie reelle     : C*[wI*phiR-wR*phiI] - M*[(wR**2-wI**2)*phiR+2*wR*wI*phiI]
+*        Partie imaginaire : C*[wI*phiI-wR*phiR] + M*[(wR**2-wI**2)*phiI+2*wR*wI*phiR]
+
+         ELSE
+
+            IMR=ICMODE(1)
+            IMI=ICMODE(2)
+
+            CALL ADCHPO(IMR,IMI,ICMR,WR**2-WI**2,    2*WR*WI) 
+            CALL ADCHPO(IMR,IMI,ICMI,    2*WR*WI,WR**2-WI**2)
+
+            CALL ADCHPO(IMR,IMI,ICAR, WI,-WR) 
+            CALL ADCHPO(IMR,IMI,ICAI,-WR, WI)
+
+            CALL MUCPRI(ICMR,IPMASS,ICMMR) 
+            CALL MUCPRI(ICMI,IPMASS,ICMMI)
+            CALL MUCPRI(ICAR,IPAMOR,ICAAR)
+            CALL MUCPRI(ICAI,IPAMOR,ICAAI)
+
+            CALL DTCHPO(ICMR)
+            CALL DTCHPO(ICMI)
+            CALL DTCHPO(ICAR)
+            CALL DTCHPO(ICAI)
+            
+            CALL ADCHPO(ICMMR,ICAAR,ICRHSR,-1D0, 1D0) 
+            CALL ADCHPO(ICMMI,ICAAI,ICRHSI, 1D0, 1D0) 
+
+            CALL DTCHPO(ICMMR)
+            CALL DTCHPO(ICMMI)
+            CALL DTCHPO(ICAAR)
+            CALL DTCHPO(ICAAI)
+
+            ICHRHS(1)=ICRHSR
+            ICHRHS(2)=ICRHSI
+
+         ENDIF
+
+         IZERO=IDEME0(1,IELIM)
+
+         DO IR=1,NVIBR
+
+C -------      WRite(6,*) ' ---------   KU - F   '
+            ichp5=ICMOD1(IR)
+            ichp6=ICHRHS(IR)
+            call adchpo(IZERO,ichp6,IRHS,1D0,1D0)
+            call adchpo(ichp5,IRHS,iret,1D0,-1D0)
+            CALL DTCHPO(ichp5)
+            CALL DTCHPO(ichp6)
+            CALL DTCHPO(IRHS)
+
+            call remplx(ri1,iret,ichp7)
+**  verif on a bien l'equilibre
+*            if (IELIM.eq.1.and.iverif.eq.1) then
+*            call mucpri(ichp7,ri1,ichp3)
+*            call adchpo(iret,ichp3,ichp4,1D0,1D0)
+*            call dtchpo(iret)
+*            iptt=0
+*            if(noen.eq.1) iptt=ipt8
+*            call vechpo(ichp5,ichp6,ichp4,ipt8,isouci)
+*            call dtchpo(ichp3)
+*            call dtchpo(ichp4)
+*            endif
+*            call dtchpo(ichp5)
+*            call dtchpo(ichp6)
+            if (ierr.ne.0) return
+            ichp8=ICMODE(IR)
+            call fuchpo(ichp7,ichp8,iret)  
+            CALL DTCHPO(ichp8)
+            mchpoi=iret
+*  supression des multiplicateurs dedoubles
+            lagdua=imlag
+            if (lagdua.gt.0) then
+*               WRite(6,*) ' appel a dbbcf lagdua ',lagdua
+               call dbbcf(mchpoi,lagdua)
+               ipt1=lagdua
+            endif
+*     WRite (6,*) ' mchpoi en fi de resour'
+*         segact mchpoi
+*     call ecchpo(mchpoi,0)
+*     les champs de points qui sortent sont de nature diffuse
+            SEGACT MCHPOI
+            NAT = MAX(1,JATTRI(/1))
+            NSOUPO=IPCHP(/1)
+            SEGADJ MCHPOI
+            JATTRI(1)=1
+            IRET = MCHPOI
+*            idemem(i)=iret
+
+            ICMODE(IR)=IRET
+
+         END DO
+
+         IELIM=IELIM-1
+
+      ENDDO
+
+999   CONTINUE
+
+      ICMODR=ICMODE(1)
+      IF (NVIBR.EQ.2) THEN
+         ICMODI=ICMODE(2)
+      ENDIF
+
+      END
+
+
+ 

@@ -1,0 +1,98 @@
+C NOMC3     SOURCE    OF166741  23/07/05    21:15:05     11699          
+
+*-----------------------------------------------------------------------
+* Renommer certaines composantes d'un MCHAML
+*
+* IPCH1 (e)     pointeur sur un champ par element (type MCHAML)
+* IPLM1 (e)     liste des composantes a remplacer (type LISTMOTS)
+* IPLM2 (e)     liste des nouvelles composantes   (type LISTMOTS)
+* IPCH2 (s)     objet resultat                    (type MCHAML)
+* MOT           nouveau nom de composante
+*
+* kich 01/99
+* nouveau paradigme sans segdes SG 2019/12/10
+*-----------------------------------------------------------------------
+      SUBROUTINE NOMC3(IPCH1,IPLM1,IPLM2,IPCH2,MOT)
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+
+-INC SMCHAML
+-INC SMLMOTS
+
+      CHARACTER*(*) MOT
+
+      IPCH2 = 0
+
+      mchel1 = IPCH1
+      SEGINI,mchelm = mchel1
+      n1 = mchelm.ichaml(/1)
+
+* Le MCHAML ne doit avoir qu un constituant
+*      n3 = mchelm.infche(/2)
+*      do icha = 2, n1
+*        if (mchelm.conche(icha).ne.mchelm.conche(1)) then
+*          call erreur(716)
+*          return
+*        endif
+*      enddo
+
+* 1 - Cas MOT : MCHAML a une composante
+      IF (IPLM1.EQ.-1) THEN
+        DO icha = 1, n1
+          mcham1 = mchelm.ichaml(icha)
+          segini,mchaml = mcham1
+          mchelm.ichaml(icha) = mchaml
+          n2 = mchaml.ielval(/1)
+          if (n2.ne.1) then
+            moterr(1: 8) = mot
+            moterr(9:16) = 'MCHAML  '
+            call erreur(784)
+            return
+          endif
+          mchaml.nomche(1) = mot
+*new-paradigm       segdes mchaml
+        ENDDO
+
+* 2 - Cas Liste de composantes a renommer :
+*      ELSE IF (IPLM1.NE.-1) THEN
+      ELSE
+* Verification des listes des composantes si fournies
+        MLMOT1 = IPLM1
+        MLMOT2 = IPLM2
+        SEGACT MLMOT1,MLMOT2
+        JGM1 = MLMOT1.MOTS(/2)
+        JGM2 = MLMOT2.MOTS(/2)
+        IF (JGM1.NE.JGM2) THEN
+          CALL ERREUR(217)
+*new-paradigm         SEGDES MLMOT1,MLMOT2
+          RETURN
+        ENDIF
+
+        DO icha = 1, n1
+          mcham1 = mchelm.ichaml(icha)
+          segini,mchaml = mcham1
+          mchelm.ichaml(icha) = mchaml
+          n2 = mchaml.ielval(/1)
+          DO k = 1, n2
+            CALL PLACE(MLMOT1.MOTS,JGM1,IMO,mchaml.nomche(k))
+            IF (IMO.NE.0) THEN
+              mchaml.nomche(k) = MLMOT2.MOTS(IMO)
+            ELSE
+C             Deja fait par le segini,mchaml = mcham1
+            ENDIF
+          ENDDO
+*new-paradigm       segdes mchaml
+        ENDDO
+      ENDIF
+
+*new-paradigm       segdes mchelm
+      IPCH2 = MCHELM
+
+c      RETURN
+      END
+
+ 

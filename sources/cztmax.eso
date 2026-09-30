@@ -1,0 +1,133 @@
+C CZTMAX    SOURCE    JK148537  23/08/21    21:15:11     11723          
+      SUBROUTINE CZTMAX(iwrk52,iwrk53,iele,igau)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+C
+
+-INC PPARAM
+-INC CCREEL
+-INC CCOPTIO
+-INC CCHAMP
+-INC DECHE
+
+
+       wrk52 = iwrk52
+       wrk53 = iwrk53
+       t0 = ture0(1)
+       TF = turef(1)
+
+       pha10 = rhas0(1)
+         z2 = pha10
+       pha20 = rhas0(2)
+         z1 = pha20
+       viph0 = valma0(1)
+
+       AC1 = valma0(2)
+       AC2 = valma0(3)
+       AC3 = valma0(4)
+       AC4 = valma0(5)
+c       if (iele.eq.1.and.igau.eq.1) 
+c     &write(6,*) 'enzt',pha10,pha20,viph0, ac3,ac4,t0,TF
+
+       if ((z1.le.xpetit.and.TF.le.AC1).or.
+     & (z2.le.xpetit.and.TF.ge.AC3)) then
+        viph = viph0
+        pha1f = pha10
+        pha2f = pha20
+        goto 1000
+       endif
+
+       if (viph0.le.AC1) then
+         if (TF.gt.AC1) then
+           if (ac2 .ne. ac1) then
+             z1 = (TF - ac1) / (ac2 - ac1)
+           else if (ac2.eq.ac1) then
+            z1 = TF - ac1
+           endif
+           viph = AC1
+       if (z1.ge.1.) then
+         pha2f = 1.d0
+         pha1f = 0.d0
+         viph = AC3
+       else if (z1.lt.1.) then
+        if (z1.ge.0.and.z1.lt.1) then
+           pha2f = z1
+           pha1f = 1.d0 - z1
+        else
+           pha2f = 0.d0
+           pha1f = 1.d0
+        endif
+       endif
+           goto 1000
+         else
+        viph = viph0
+        pha1f = pha10
+        pha2f = pha20
+        goto 1000
+         endif 
+       endif
+
+       if (viph0.ge.AC3) then
+         if(TF.lt.AC3) then
+           if (ac4.ne.ac3) then
+             z2 = (tf - ac3)/(ac4 - ac3)
+           else if (ac3.eq.ac4) then
+             if (ac3.ge.0.) then
+              z2 = ac3 - TF
+             else
+              z2 = TF - ac3
+             endif
+           endif
+           viph = AC3
+c       if (iele.eq.1.and.igau.eq.1) 
+c     &write(6,*) 'cz2',z2
+          if (z2.ge.1.) then
+           pha2f = 0.d0
+           pha1f = 1.d0
+           VIPH = AC1
+          else if(z2.lt.1.and.z2.ge.0) then
+           pha2f = 1.d0 - z2
+           pha1f = z2
+          else
+           pha2f = 1.d0
+           pha1f = 0.d0
+          endif
+          goto 1000
+         else
+        viph = viph0
+        pha1f = pha10
+        pha2f = pha20
+        goto 1000         
+         endif
+       endif
+
+
+
+
+
+ 1000  continue
+       rhasf(1) = pha1f
+       rhasf(2) = pha2f
+       xmatf(1) = viph
+       xmatf(2) = AC1
+       xmatf(3) = AC2
+       xmatf(4) = AC3
+       xmatf(5) = AC4
+       xmatf(6) = valma0(6)
+       xmatf(7) = valma0(7)
+       
+c       if (iele.eq.1.and.igau.eq.1) write(6,*) 'sorzt',pha1f,pha2f,viph
+
+        RETURN
+        END
+
+
+
+
+
+
+
+ 
+ 
+ 
+ 

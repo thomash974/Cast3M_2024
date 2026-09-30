@@ -1,0 +1,308 @@
+$$$$ USINIB
+* USINIB    PROCEDUR  MB234859  24/02/06    21:15:04     11833          
+***********************************************************************
+*                         PROCEDURE USINIB
+*
+* Procedure appelee en debut de calcul et qui verifie certaines des 
+* informations transmises.
+* La table INFOS est creee et renseignee. Elle contient les informations 
+* communes aux zones d'usure.
+* La table POST contiendra les resultats de calcul a conserver.
+*
+* Entrees :
+*   T1    : Table de PASAPAS
+*
+* Appelee par USURE
+*
+***********************************************************************
+'DEBP' USINIB T1*'TABLE' ;
+*
+* Indicateur a mettre a VRAI pour quitter PASAPAS
+  T1.'ARRET' = FAUX ;
+  BOITE_US = T1.'BOITES_USURE' ;
+*-----------------------------------------------------------------------
+* - VERIFICATIONS ET REMPLISSAGE DE 'INFOS'
+*-----------------------------------------------------------------------
+* Nombre de surface a user
+  IBUSUR = 'INDE' BOITE_US ;
+  NBBOX = 0 ;
+  'REPE' BI ('DIME' IBUSUR) ;
+    INDZ = IBUSUR. &BI ;
+    OBJZ = BOITE_US. INDZ ;
+    'SI' ('EGA' ('TYPE' INDZ) 'ENTIER') ;
+      'SI' ('EXIS' OBJZ 'SURFACE_APPLICATION') ;
+        NBBOX = NBBOX '+' 1; 
+      'FINSI' ;
+    'FINSI' ;
+  'FIN' BI ;
+  'SI' ('EGA' NBBOX 0) ;
+    'MESS' 'Aucune zone usee n est definie' ;
+    'ERRE' 21 ;
+  'FINSI' ;
+  BOITE_US.'INFOS' = 'TABLE' ;
+  BOITE_US.'INFOS'.'N_BOITES' = NBBOX ;
+* --------------------------------------------------------------------
+* Compteur cycle, increment par cycle
+  NbIncCy = 'ENTI' BOITE_US.'DONNEES'.'INCREMENTS_CYCLE' ;
+  Periode = BOITE_US.'DONNEES'.'PERIODE' ;
+  NCyctot = BOITE_US.'DONNEES'.'NB_CYCLES' ;
+  BOITE_US.'INFOS'.'INDICE_CYCLE_ACTUEL'     = 1 ;
+  BOITE_US.'INFOS'.'INDICE_INCREMENT_ACTUEL' = 1 ;
+  BOITE_US.'INFOS'.'NB_INCREMENTS_PAR_CYCLE' = NbIncCy ;
+  BOITE_US.'INFOS'.'NB_CYCLES_RESTANTS'      = NCyctot ;
+* --------------------------------------------------------------------
+* Dimension, trace
+  BOITE_US.'INFOS'.'ITRID'  = 'EGA' ('VALE' 'DIME') 3 ;
+  BOITE_US.'INFOS'.'UNSURT' = 1. '/' Periode ;
+  BOITE_US.'INFOS'.'TRACE_DEBUG' = FAUX ;
+* --------------------------------------------------------------------
+* Noms de composantes et listes de valeurs (pour USCALC)
+  MODEME = 'EXTR' T1.'MODELE' 'FORM' 'MECANIQUE' ;
+  LCOMPF = 'EXTR' MODEME 'FORC' ;
+  BOITE_US.'INFOS'.'LFORCE' = LCOMPF ;
+  BOITE_US.'INFOS'.'LDEPLA' = 'EXTR' MODEME 'DEPL' ;
+  BOITE_US.'INFOS'.'LVALE0' = 'PROG' ('DIME' LCOMPF) '*' 0. ;
+  BOITE_US.'INFOS'.'LVALE1' = 'PROG' ('DIME' LCOMPF) '*' 1. ;
+  BOITE_US.'INFOS'.'LSCAL'  = 'MOTS' ('DIME' LCOMPF) '*' 'SCAL' ;
+* --------------------------------------------------------------------
+* Informations sur le chargement en deplacement impose
+  CGDEPI = 'EXTR' TAB1.'CHARGEMENT' 'DIMP' ;
+  CHDEPI = 'EXTR' CGDEPI 'CHAM' ;
+  EVDEPI = 'EXTR' CGDEPI 'EVOL' ;
+  xEVDEP = 'EXTR' EVDEPI 'ABSC' ;
+  yEVDEP = 'EXTR' EVDEPI 'ORDO' ;
+* --- Instant de debut du chargement
+* -> il s'agit du point precedent la premiere valeur non nulle
+  MASQUZ = 'MASQ' yEVDEP 'DIFFERENT' 0. ;
+  POSIT0 = ('POSI' 1. 'DANS' MASQUZ) '-' 1 ;
+  TDEDEP = 'EXTR' xEVDEP POSIT0 ;
+  BOITE_US.'INFOS'.'T_DEBUT_DEPI' = TDEDEP ;
+* --- Valeur du deplacement impose
+  ORDMAX = 'MAXI' yEVDEP ;
+  FLXVAL = 'EXTR' ('EXTR' CHDEPI 'VALE') 1 ;
+  BOITE_US.'INFOS'.'DEPLA_IMPOSE' = ORDMAX '*' FLXVAL ;
+* --- Composante concernee
+  MDEP = 'EXTR' CHDEPI 'MAIL' ;
+  MBLO = 'EXTR' TAB1.'BLOCAGES_MECANIQUES' 'MAIL' ;
+  ELTR = MBLO 'ELEM' 'CONTENANT' (MDEP 'POIN' 1) ;
+  RIGD = 'REDU' TAB1.'BLOCAGES_MECANIQUES' ELTR ;
+  BOITE_US.'INFOS'.'COMP_DEPI' = 'EXTR' ('EXTR' RIGD 'COMP') 2 ;
+  BOITE_US.'INFOS'.'PTSZ_DEPI' = ('EXTR' RIGD 'MAIL' 'NOMU') 'POIN' 1 ;
+* --------------------------------------------------------------------
+* Le facteur de saut de cycle doit etre strictement positif
+  xACCE = 1. ;
+  'SI' ('EXIS' BOITE_US.'DONNEES' 'ACCELERATION') ;
+    'SI' ('>EG' BOITE_US.'DONNEES'.'ACCELERATION' 0.) ;
+      xACCE = BOITE_US.'DONNEES'.'ACCELERATION' ;
+    'FINSI' ;
+  'FINSI' ;
+  BOITE_US.'INFOS'.'ACCELERATION' = xACCE ;
+* --------------------------------------------------------------------
+* Nb de cycles avant estimation du facteur de saut de cycle variable
+  nCycini = 10 ;
+  'SI' ('EXIS' BOITE_US.'DONNEES' 'DN_CYCLES_INIT') ;
+    nCyctmp = 'ENTI' BOITE_US.'DONNEES'.'DN_CYCLES_INIT' ;
+    'SI' ('>' nCyctmp 1) ;
+      nCycini = nCyctmp ;
+    'FINSI' ;
+  'FINSI' ;
+  BOITE_US.'INFOS'.'DN_CYCLES_INIT' = nCycini ;
+* --------------------------------------------------------------------
+* Faut-il construire la liste des pas de temps au cours du calcul
+  Tdebus = BOITE_US.'DONNEES'.'T_DEBUT_USURE' ;
+  Tfinal = (NCyctot '*' Periode '/' xACCE) '+' Tdebus ;
+  iTfin  = 'MASQ' T1.'TEMPS_CALCULES' 'EGSUPE' 'SOMM' Tfinal ;
+  BOITE_US.'INFOS'.'CALCUL_PAS' = 'EGA' iTfin 0 ;
+*
+* Verifications et infos necessaires au recalcul des pas de temps
+  'SI' BOITE_US.'INFOS'.'CALCUL_PAS' ;
+* 
+*   Verification qu'il y a un nombre pair d'increments a calculer
+    'SI' ('NEG' (@MOD NbIncCy 2) 0) ;
+      'MESS' 'INCREMENTS_CYCLE doit etre un nombre pair' ;
+      'ERRE' 21 ;
+    'FINSI' ;
+*
+*   Coherence entre T_DEBUT_USURE et T_DEBUT_DEPI
+    Tdebdep = BOITE_US.'INFOS'.'T_DEBUT_DEPI' ;
+    Woffset = Tdebus '-' Tdebdep ;
+    'SI' ('<' Woffset 0.) ;
+      'MESS' 'Incoherence entre T_DEBUT_USURE et T_DEBUT_DEPI' ;
+      'MESS' 'Il faut que T_DEBUT_USURE >= T_DEBUT_DEPI' ;
+      'ERRE' 21 ;
+    'FINSI' ;
+*
+*   T_DEBUT_USURE multiple de PERIODE
+    'SI' ('NEG' (@MOD Woffset Periode) 0.) ;
+      'MESS' 'Incoherence entre T_DEBUT_USURE et PERIODE' ;
+      'MESS' 'Il faut que (T_DEBUT_USURE - T_DEBUT_DEPI) = n[PERIODE]' ;
+      'ERRE' 21 ;
+    'FINSI' ;
+    BOITE_US.'INFOS'.'PRE_USURE' = 'ENTI' (Woffset '/' Periode) ;
+*
+*   Informations pour construire le CHAR DIMP en cours de calcul
+*   -> evol temporelle du deplacement entre 0 et T
+    MASQUZ = 'MASQ' xEVDEP 'EGSUPE' (Tdedep '+' Periode) ;
+    POSITF = 'POSI' 1. 'DANS' MASQUZ ;
+    LEXTR = 'LECT' POSIT0 'PAS' 1 POSITF ;
+    BOITE_US.'INFOS'.'TEMPS_DEPI' = ('EXTR' xEVDEP LEXTR) '-' Tdebdep ;
+    BOITE_US.'INFOS'.'COEFF_DEPI' =  'EXTR' yEVDEP LEXTR ;
+    BOITE_US.'INFOS'.'CHPT_DEPI'  = CHDEPI ;
+    BOITE_US.'INFOS'.'CHGMTS'     = 'ENLE' TAB1.'CHARGEMENT' 'DIMP' ;
+  'FINSI' ;
+* --------------------------------------------------------------------
+* Effectuer des sauvegardes intermediaires
+  BOITE_US.'INFOS'.'SAUV_CYCLE' = FAUX ;
+  'SI' ('EXIS' BOITE_US.'DONNEES' 'SAUV_AUTO') ;
+    BOITE_US.'INFOS'.'SAUV_CYCLE' = BOITE_US.'DONNEES'.'SAUV_AUTO' ;
+*
+*   Si sauvegarde, utiliser l'option ECONOMIQUE de PASAPAS
+    'SI' BOITE_US.'INFOS'.'SAUV_CYCLE' ;
+      T1.'WTABLE'.'LECONOMI' = VRAI ;
+    'FINSI' ;
+  'FINSI' ;
+* --------------------------------------------------------------------
+* Indices et temps des cycles
+  BOITE_US.'POST' = 'TABLE' ;
+  BOITE_US.'POST'.'INDICES_CYCLE'        = 'TABLE' ; 
+  BOITE_US.'POST'.'CYCLES_CALCULES'      = 'PROG' ;
+  BOITE_US.'POST'.'CYCLES_REELS'         = 'PROG' ; 
+  BOITE_US.'POST'.'FACTEUR_ACCELERATION' = 'TABLE' 'ESCLAVE' ;
+* --------------------------------------------------------------------
+* Schema de resolution pour le profil d'usure
+  BOITE_US.'INFOS'.'SCH_EXPL' = VRAI ;
+  BOITE_US.'INFOS'.'SCH_CONV' = FAUX ;
+  'SI' ('EXIS' BOITE_US.'DONNEES' 'SCHEMA') ;
+    LSCHEMA = 'MOTS' 'EXPLICITE' 'IMPLICITE' ;
+    MSCHEMA = 'CHAN' 'MAJU' BOITE_US.'DONNEES'.'SCHEMA' ;
+    ITYPSCH = 'POSI' MSCHEMA 'DANS' LSCHEMA ;
+    'SI' ('EGA' ITYPSCH 2) ;
+      BOITE_US.'INFOS'.'SCH_EXPL'          = FAUX ;
+      BOITE_US.'INFOS'.'ITERATION_NEWTON'  = 1;
+      BOITE_US.'INFOS'.'CRITERE_CONV'      = 0.;
+      BOITE_US.'INFOS'.'RELAX_COMPTEUR'    = 1;
+      BOITE_US.'INFOS'.'RELAX_EXPOSANT'    = 0;
+      BOITE_US.'POST' .'NITER_CONV_NEWTON' = 'TABLE' 'ESCLAVE' ;
+    'SINON' ;
+      'SI' ('EGA' ITYPSCH 0) ;
+        'MESS' 'Indice SCHEMA : choix entre IMPLICITE et EXPLICITE';
+        'ERRE' 21 ;
+      'FINSI' ;
+    'FINSI' ;
+  'FINSI' ;
+*-----------------------------------------------------------------------
+* - INFORMATIONS PROPRES A CHAQUE SURFACE D'USURE
+*-----------------------------------------------------------------------
+  Ldl0 = 'PROG' ;
+  'REPE' BU BOITE_US.'INFOS'.'N_BOITES' ;
+*
+    SUR_APPL = BOITE_US. &BU .'SURFACE_APPLICATION' ;
+    Ldl0  = Ldl0 'ET' ('MINI' ('MESU' SUR_APPL 'DENS')) ;
+    CZERO = 'MANU' 'CHPO' SUR_APPL 1 'SCAL' 0. 'NATURE' 'DISCRET' ;
+    BOITE_US. &BU .'CZERO' = CZERO;
+*   --------------------------------------------------------------------
+*   Indices renseignes dans USCALC
+    BOITE_US. &BU .'DENS_ENER_DISS_TOTALE' = 'CHAN' 'COMP' CZERO 'ED';
+    BOITE_US. &BU .'DELTAS'                = 'PROG' ; 
+    BOITE_US. &BU .'FORCES_TANGENTIELLES'  = 'PROG' ;
+    BOITE_US. &BU .'CYCLE_DE_FRETTING'     = 'TABLE' ;  
+*   --------------------------------------------------------------------
+*   Indices renseignes dans USPOST
+    BOITE_US. &BU .'PRESSION_MAX_CYCLE'       = 'PROG' ;
+    BOITE_US. &BU .'CISAILLEMENT_MAX_CYCLE'   = 'PROG' ;
+    BOITE_US. &BU .'DELTA_G'                  = 'PROG' ;
+    BOITE_US. &BU .'DELTA_T'                  = 'PROG' ;
+    BOITE_US. &BU .'ENERGIE_DISSIPEE_CYCLE'   = 'PROG' ;
+    BOITE_US. &BU .'ENERGIE_DISSIPEE_TOTALE'  = 'PROG' 0. ;
+    BOITE_US. &BU .'VOLUME_USE_CYCLE'         = 'PROG' ;
+    BOITE_US. &BU .'VOLUME_USE_TOTAL'         = 'PROG' 0. ;
+    BOITE_US. &BU .'PROF_USEE_MAX_CYCLE'      = 'PROG' ;
+    BOITE_US. &BU .'PROF_USEE_MAX_TOTALE'     = 'PROG' ;
+    BOITE_US. &BU .'LARGEUR_CONTACT_CYCLE'    = 'PROG' ;
+    BOITE_US. &BU .'PRESSION_MOYENNE_CYCLE'   = 'TABLE' ;
+    BOITE_US. &BU .'CISAILLEMENT_MOYEN_CYCLE' = 'TABLE' ;
+    BOITE_US. &BU .'GLISSEMENT_CYCLE'         = 'TABLE' ;    
+*
+*   Modele utilise pour les calculs avec INTG
+    BOITE_US. &BU .'MODINTG' = 'MODE' SUR_APPL 'MECANIQUE' 'ELASTIQUE' ;
+*   --------------------------------------------------------------------
+*   Informations utilisees dans USDEPL
+    'SI' BOITE_US.'INFOS'.'ITRID' ;
+      TATMP = 'PART' 'SEPA' ('CONT' SUR_APPL) 'ANGL' 10. ;
+      MESHZ = TATMP. 1 ;
+    'SINON' ;
+      MESHZ = SUR_APPL 'POIN' 'INIT' ;
+    'FINSI' ;
+    BOITE_US. &BU .'MAIL_PSIP' = MESHZ ;
+*
+*   Direction suivant laquelle appliquer l'usure    
+    MODREPA = 'REDU' T1.'MODELE' BOITE_US. &BU .'VOLUME_REPARTITION';
+    CHVNINT = 'PRES' 'MASS' SUR_APPL MODREPA 1. ; 
+    LCOMPF  = BOITE_US.'INFOS'.'LFORCE' ;
+    NORVINT = 'PSCA' CHVNINT CHVNINT LCOMPF LCOMPF ;
+    NORVINT = NORVINT '**' 0.5 ;
+    CHVNINT = CHVNINT '/' NORVINT ;
+    CHVNINT = 'CHAN' 'ATTRIBUT' CHVNINT 'NATURE' 'DISCRET' ;
+    BOITE_US. &BU .'VNORM_INTE' = CHVNINT ;
+*
+*   Direction(s) tangentielle(s) pour le cycle d'usure
+*   VTANGENT n'est pas utilise mais on le conserve pour le moment
+    'SI' BOITE_US.'INFOS'.'ITRID' ;
+      CHPTTMP = 'MANU' 'CHPO' SUR_APPL LCOMPF ('PROG' 0. 0. 1.) ;
+      CHVTGT1 = 'PVEC' CHVNINT CHPTTMP LCOMPF LCOMPF LCOMPF ;
+      NORVTG1 = 'PSCA' CHVTGT1 CHVTGT1 LCOMPF LCOMPF ;
+      NORMAXI = ('MAXI' NORVTG1) '**' 0.5 ;
+      NORMINI = ('MINI' NORVTG1) '**' 0.5 ;
+      'SI' (('<EG' NORMAXI 1.E-6) 'OU' ('<EG' NORMINI 1.E-6)) ; 
+        CHPTTMP = 'MANU' 'CHPO' SUR_APPL LCOMPF ('PROG' 0. 1. 0.) ;
+        CHVTGT1 = 'PVEC' CHVNINT CHPTTMP LCOMPF LCOMPF LCOMPF ;
+        NORVTG1 = 'PSCA' CHVTGT1 CHVTGT1 LCOMPF LCOMPF ;
+      'FINSI' ;
+      NORVTG1 = NORVTG1 '**' 0.5 ;
+      CHVTGT1 = CHVTGT1 '/' NORVTG1 ;
+      CHVTGT1 = 'CHAN' 'ATTRIBUT' CHVTGT1 'NATURE' 'DISCRET' ;
+      CHVTGT2 = 'PVEC' CHVNINT CHVTGT1 LCOMPF LCOMPF LCOMPF ; 
+      NORVTG2 = 'PSCA' CHVTGT2 CHVTGT2 LCOMPF LCOMPF ;
+      NORVTG2 = NORVTG2 '**' 0.5 ;
+      CHVTGT2 = CHVTGT2 '/' NORVTG2 ;
+      CHVTGT2 = 'CHAN' 'ATTRIBUT' CHVTGT2 'NATURE' 'DISCRET' ;
+      BOITE_US. &BU .'VTANGEN1' = CHVTGT1 ;
+      BOITE_US. &BU .'VTANGEN2' = CHVTGT2 ;
+    'SINON' ;
+      CHTANGT = 'PVEC' CHVNINT LCOMPF LCOMPF ;
+      BOITE_US. &BU .'VTANGENT' = CHTANGT ;
+    'FINSI' ;
+*
+*   Direction pour calculer la reaction tangentielle
+    LCOMPU = BOITE_US.'INFOS'.'LDEPLA' ;
+    POSIND = 'POSI' BOITE_US.'INFOS'.'COMP_DEPI' 'DANS' LCOMPU ;
+    LVALEU = 'PROG' ('DIME' LCMPF) 0. ;
+    'REMP' LVALEU POSIND 1. ;
+    CHREACT = 'MANU' 'CHPO' SUR_APPL LCOMPF LVALEU ;
+    BOITE_US. &BU .'DIRE_REACTION' = CHREACT ;
+*   --------------------------------------------------------------------
+*   Indices renseignes dans USEXPL ou USIMPL
+    BOITE_US. &BU .'EVO_USURE_TOT' = 'TABLE' ;    
+    BOITE_US. &BU .'USURE_TOT'     = 'TABLE';
+    BOITE_US. &BU .'USURE_TOT'. 0  = CZERO ;
+    BOITE_US. &BU .'INC_USURE'     = 'TABLE';
+    BOITE_US. &BU .'INC_USURE'. 0  = CZERO ;
+    'SI' ('NON' BOITE_US.'INFOS'.'SCH_EXPL') ;
+      BOITE_US. &BU .'VIT_USURE_K'    = 'TABLE';
+      BOITE_US. &BU .'INC_USURE_K'    = 'TABLE';
+      BOITE_US. &BU .'USURE_TOT_K'    = 'TABLE';
+      BOITE_US. &BU .'USURE_TOT_K'. 1 = CZERO ;
+    'FINSI' ;
+  'FIN' BU ;
+*-----------------------------------------------------------------------
+* Elargissement de la zone usee souhaitee en saut de cycle variable
+  dltal0 = 'MINI' Ldl0 ;
+  'SI' ('EXIS' BOITE_US.'DONNEES' 'DELTA_L0') ;
+    'SI' ('>EG' BOITE_US.'DONNEES'.'DELTA_L0' 0) ;
+      dltal0 = BOITE_US.'DONNEES'.'DELTA_L0' ;
+    'FINSI' ;
+  'FINSI' ;
+  BOITE_US.'INFOS'.'DELTA_L0' = dltal0 ;
+* --------------------------------------------------------------------
+'FINP' ;
+ 

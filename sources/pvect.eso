@@ -1,0 +1,153 @@
+C PVECT     SOURCE    PV        20/03/24    21:21:06     10554          
+C=======================================================================
+C
+C   CALCULE LE PRODUIT VECTORIEL DE n-1 : - POINTS 
+C                                         - CHPOINTS
+C                                         - CHAMELEMS
+c   avec n : dimension (2D/3D)
+C
+C   REM : pour les CHPOINT et CHAMELEM, il faut fournir le nom 
+C         des n composantes !
+C
+C=======================================================================
+C
+      SUBROUTINE PVECT
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC CCGEOME
+-INC SMCOORD
+C
+C     erreur : Fonction indisponible en dimension %i1.
+      IF (IDIM.NE.2.AND.IDIM.NE.3) THEN
+         INTERR(1)=IDIM
+         CALL ERREUR(709)
+         RETURN
+      ENDIF
+C
+c     Lecture d'1 point ?
+      CALL LIROBJ('POINT ',IP1,0,IRETOU)
+      IF(IRETOU.EQ.0) GO TO 10
+C
+C=======================================================================
+C     CAS DE 1 POINT (en 2D) ou 2 POINTS (3D)
+C=======================================================================
+C
+      SEGACT MCOORD*mod
+      IREF1=(IDIM+1)*(IP1-1)
+      X1=XCOOR(IREF1+1)
+      Y1=XCOOR(IREF1+2)
+      IF (IDIM.EQ.2) THEN
+c       2D : 1 POINT (implicitement on calcule le prod vect avec Z)
+        NBPTS=nbpts+1
+        SEGADJ MCOORD
+        XCOOR((NBPTS-1)*3+1)=-Y1
+        XCOOR((NBPTS-1)*3+2)=X1
+        XCOOR((NBPTS-1)*3+3)=DENSIT
+      ELSE
+c       3D : 2 POINTS
+        CALL LIROBJ('POINT ',IP2,1,IRETOU)
+        IF (IERR.NE.0) RETURN
+        IREF2=(IDIM+1)*(IP2-1)
+        Z1=XCOOR(IREF1+3)
+        X2=XCOOR(IREF2+1)
+        Y2=XCOOR(IREF2+2)
+        Z2=XCOOR(IREF2+3)
+        NBPTS=nbpts+1
+        SEGADJ MCOORD
+        XCOOR((NBPTS-1)*4+1)=Y1*Z2-Z1*Y2
+        XCOOR((NBPTS-1)*4+2)=Z1*X2-X1*Z2
+        XCOOR((NBPTS-1)*4+3)=X1*Y2-Y1*X2
+        XCOOR((NBPTS-1)*4+4)=DENSIT
+      ENDIF
+      IR=NBPTS
+      CALL ECROBJ('POINT ',IR)
+      RETURN
+C
+C=======================================================================
+C     CAS CHPOINT
+C=======================================================================
+C
+ 10   CONTINUE
+      CALL LIROBJ('CHPOINT ',MCHPO1,0,IRETOU)
+      IF(IRETOU.EQ.0) GOTO 20
+      CALL ACTOBJ('CHPOINT ',MCHPO1,1)
+      IF (IERR.NE.0) RETURN
+      CALL LIROBJ('LISTMOTS',MLMOT1,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      IF (IDIM.EQ.3) THEN
+         CALL LIROBJ('CHPOINT ',MCHPO2,1,IRETOU)
+         CALL ACTOBJ('CHPOINT ',MCHPO2,1)
+         IF (IERR.NE.0) RETURN
+         CALL LIROBJ('LISTMOTS',MLMOT2,1,IRETOU)
+         CALL ACTOBJ('LISTMOTS',MLMOT2,1)
+         IF (IERR.NE.0) RETURN
+      ELSE
+        MCHPO2=0
+        MLMOT2=0
+      ENDIF
+      CALL LIROBJ('LISTMOTS',MLMOT3,1,IRETOU)
+      IF (IERR.NE.0) RETURN
+      CALL PROVCC(MCHPO1,MCHPO2,MLMOT1,MLMOT2,MLMOT3,MCHPO3)
+      IF (IERR.NE.0) RETURN
+      CALL ACTOBJ('CHPOINT ',MCHPO3,1)
+      CALL ECROBJ('CHPOINT ',MCHPO3)
+      RETURN
+      
+  20  CONTINUE
+C
+C=======================================================================
+C     CAS CHAMELEM
+C=======================================================================
+C
+      CALL LIROBJ('MCHAML  ',IPCHE1,0,IRETOU)
+      IF(IRETOU.EQ.0) GOTO 99
+      CALL ACTOBJ('MCHAML  ',IPCHE1,1)
+      CALL LIROBJ('LISTMOTS',MLMOT1,1,IRETOU)
+      CALL ACTOBJ('LISTMOTS',MLMOT1,1)
+      IF (IERR.NE.0) RETURN
+c     cas 2D
+      IF (IDIM.EQ.2) THEN   
+        CALL LIROBJ('LISTMOTS',MLMOT3,1,IRETOU)
+        CALL ACTOBJ('LISTMOTS',MLMOT3,1)
+        IF(IERR.NE.0) RETURN
+c         write(*,*) 'appel a PROVC2',IPCHE1,MLMOT1,MLMOT3
+        CALL PROVC2(IPCHE1,MLMOT1,MLMOT3,IPCHE3)
+c     cas 3D
+      ELSE
+        CALL LIROBJ('MCHAML  ',IPCHE2,1,IRETOU)
+        CALL ACTOBJ('MCHAML  ',IPCHE2,1)
+        IF(IERR.NE.0) RETURN
+        CALL LIROBJ('LISTMOTS',MLMOT2,1,IRETOU)
+        CALL ACTOBJ('LISTMOTS',MLMOT2,1)
+        IF(IERR.NE.0) RETURN
+        CALL LIROBJ('LISTMOTS',MLMOT3,1,IRETOU)
+        CALL ACTOBJ('LISTMOTS',MLMOT3,1)
+        IF(IERR.NE.0) RETURN
+c         write(*,*) 'appel a PROVC3',IPCHE1,IPCHE2,MLMOT1,MLMOT2,MLMOT3
+        CALL PROVC3(IPCHE1,IPCHE2,MLMOT1,MLMOT2,MLMOT3,IPCHE3)
+      ENDIF
+c       write(*,*) 'PVECT: on va ecrire',IPCHE3
+      CALL ACTOBJ('MCHAML  ',IPCHE3,1)
+      CALL ECROBJ('MCHAML  ',IPCHE3)
+      RETURN
+      
+
+C=======================================================================
+C    PAS D OPERANDE CORRECTE TROUVE
+C=======================================================================
+C
+ 99   CALL QUETYP(MOTERR(1:8),0,IRETOU)
+      IF(IRETOU.NE.0) THEN
+         CALL ERREUR (39)
+      ELSE
+         CALL ERREUR(533)
+      ENDIF
+      
+      END
+
+ 
+ 
+ 

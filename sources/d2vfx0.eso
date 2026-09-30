@@ -1,0 +1,256 @@
+C D2VFX0    SOURCE    BP208322  22/09/21    21:15:01     11463          
+C DEVFX0    SOURCE    KK2000    97/09/08    21:16:59     2809
+      SUBROUTINE D2VFX0(ITCHAR,KTNUM,KPREF,KTFEX,REPRIS,RIGIDE)
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+*--------------------------------------------------------------------*
+*                                                                    *
+*     Operateur DYNE : algorithme de Fu - de Vogelaere               *
+*     ________________________________________________               *
+*                                                                    *
+*     Remplissage des tableaux representant les chargements, en      *
+*     faisant les interpolations necessaires.                        *
+*                                                                    *
+*     Parametres:                                                    *
+*                                                                    *
+* e   ITCHAR  Table representant les chargements                     *
+* e   ITINIT  Table representant les conditions initiales            *
+* e   KTNUM   Segment contenant les parametres numeriques            *
+* e   KPREF   Segment des points de reference                        *
+* es  KTFEX   Segment contenant les chargements libres               *
+*                                                                    *
+*     Auteur, date de creation:                                      *
+*     Denis ROBERT-MOUGIN, le 25 mai 1989.                           *
+*                                                                    *
+*     Parallélisation : BP, 2022-09-19                               *
+*                                                                    *
+*--------------------------------------------------------------------*
+*
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHARG
+-INC SMCHPOI
+-INC SMELEME
+-INC SMLREEL
+* Declarations pour le travail en parallele
+-INC CCASSIS
+      COMMON/dyneco/IPARAL
+c     SPARAL : pour la parallelisation
+C     + NBTHRD  : nombre de threads demandes
+C     + ...     : pointeur vers segments utiles
+      SEGMENT SPARAL
+        INTEGER NBTHRD
+        INTEGER IERROR(NBTHR)
+        INTEGER KMTRAV
+        INTEGER KMTFEX
+        INTEGER NDIM1,NDIM2,NDIM3
+      ENDSEGMENT
+
+      EXTERNAL MATMUi
+      LOGICAL  BTHRD
+
+*     IL S'AGIT DE REMPLIR :
+*     FEXA(.,.,1)  valeur au pas  m
+*     FEXA(.,.,2)  valeur au pas  m - 1
+*
+      SEGMENT,MTNUM
+         REAL*8 XDT(NPC1),XTEMPS(NPC1)
+      ENDSEGMENT
+      SEGMENT,MTFEX
+         REAL*8  FEXA(NPFEXA,NPC1,2)
+         REAL*8  FEXPSM(NPLB,NPC1,2,IDIMB)
+         REAL*8  FTEXB(NPLB,NPC1,2,IDIM)
+*         INTEGER IFEXA(NPFEXA),IFEXB(NPFEXB)
+      ENDSEGMENT
+      SEGMENT,MTRAV
+         REAL*8 FTCHG(NCHAR,NPC1)
+         REAL*8 XFORCA(NPREF,NCHAR)
+      ENDSEGMENT
+      SEGMENT,MPREF
+         INTEGER IPOREF(NPREF)
+      ENDSEGMENT
+      LOGICAL L0,L1,REPRIS,RIGIDE
+      CHARACTER*8 TYPRET,CHARRE
+*
+      MTNUM = KTNUM
+      MTFEX = KTFEX
+      MPREF = KPREF
+      NPREF = IPOREF(/1)
+      NPC1 = XDT(/1)
+  
+      
+**********************************************************************************
+*
+*     CAS CHARGEMENTS EN BASE_A
+*
+**********************************************************************************
+
+      TYPRET = ' '
+      CALL ACCTAB(ITCHAR,'MOT',I0,X0,'BASE_A',L0,IP0,
+     &                  TYPRET,I1,X1,CHARRE,L1,ICHAR1)
+      IF (ICHAR1.EQ.0 .OR. TYPRET.NE.'CHARGEME') GOTO 9000
+
+      MCHARG = ICHAR1
+      SEGACT,MCHARG
+      NCHAR = KCHARG(/1)
+*     creation du tableau de travail receptacle des chargements interpoles      
+      SEGINI,MTRAV
+      KTRAV = MTRAV
+
+**********************************************************************************
+*     Remplissage de MTRAV :
+*     Boucle sur les chargements elementaires
+**********************************************************************************
+
+      DO 10 ICHAR=1,NCHAR
+
+            ICHARG = KCHARG(ICHAR)
+            SEGACT,ICHARG
+            IF(CHATYP.NE.'CHPOINT '.OR.CHAMOB(ICHAR).NE.'STAT'
+     &      .OR.CHALIE(ICHAR).NE.'LIE ') THEN
+               SEGDES ICHARG
+               SEGDES MCHARG
+               CALL ERREUR(696)
+               RETURN
+            ENDIF
+            MLR1 = ICHPO2
+            MLR2 = ICHPO3
+*           Interpolation temporelle des chargements vers MTRAV.FTCHG
+*           FTCHG(ichar,n+1) = Fext^ichar(t_n)  avec n={0...nombre de pas}
+            CALL D2VINT(MLR1,MLR2,KTNUM,KTRAV,ICHAR)
+            MTRAV = KTRAV
+
+ 10   CONTINUE
+
+      DO 11 ICHAR=1,NCHAR
+
+            ICHARG = KCHARG(ICHAR)   
+*           copie du chpoint vers MTRAV.XFORCA
+            MCHPOI = ICHPO1
+            SEGACT,MCHPOI
+            NSOUPO = IPCHP(/1)
+            DO 20 I=1,NSOUPO
+               MSOUPO = IPCHP(I)
+               SEGACT,MSOUPO
+               MELEME = IGEOC
+               SEGACT,MELEME
+               NC = NOCOMP(/2)
+               MPOVAL = IPOVAL
+               SEGACT,MPOVAL
+               N = VPOCHA(/1)
+               DO 30 J=1,N
+                  DO 35 K=1,NC
+                     KNOE = NUM(1,J)
+                     CALL PLACE2(IPOREF,NPREF,IPOS,KNOE)
+                     IF (IPOS.EQ.0) GOTO 35
+                     XFORCA(IPOS,ICHAR) = VPOCHA(J,K)
+ 35               CONTINUE
+ 30            CONTINUE
+               SEGDES,MPOVAL,MELEME,MSOUPO
+ 20         CONTINUE
+            SEGDES,MCHPOI,ICHARG
+
+ 11   CONTINUE
+      SEGDES,MCHARG
+
+
+**********************************************************************************
+*     Remplissage de FEXA :
+*     Triple boucle sur les modes x chargements x pas de temps
+**********************************************************************************
+*
+*     rappel : FTCHG(ichar,n+1) = Fext^ichar(t_n)  avec n={0...nombre de pas}
+*                      pas n
+*              -----+--------+----->t
+*                 t_n-1     t_n
+*
+*     Ainsi, dans d2vini : Fext_i(t_0) = FEXA(I,n=1   ,2 <=> debut de pas) 
+*            dans d2vfxa : Fext_i(t_0) = FEXA(I,n=NPAS,1 <=> fin de pas  ) 
+*
+*     rem : ce double tableau (initialement pour devogelaere) est ici bien inutile
+*
+
+*     Version parallélisée (par mode = NPREF)
+*     --------------------
+
+C     FAUT-IL PASSER EN // ? (valeur mise au pif)
+      if ((NPREF*NCHAR*NPC1).le.1.E4) then
+        NBTHR = 1
+        BTHRD=.false.
+      else
+        NBTHR = MIN(NBTHRS,NPREF)
+        BTHRD = .TRUE.
+        CALL THREADII
+      endif
+*     CREATION ET REMPLISSAGE DU SEGMENT POUR LA //iSATION
+      SEGINI,SPARAL
+      SPARAL.NBTHRD = NBTHR
+      SPARAL.KMTRAV = MTRAV
+      SPARAL.KMTFEX = MTFEX
+      SPARAL.NDIM1  = NPREF
+      SPARAL.NDIM2  = NCHAR
+      SPARAL.NDIM3  = NPC1
+      IPARAL=SPARAL  
+
+*    -CALCUL PARALLELE-
+      IF (BTHRD) THEN
+         DO ith=2,NBTHR
+           CALL THREADID(ith,MATMUi)
+         ENDDO
+         CALL MATMUi(1)  
+C        Attente de la fin de tous les threads en cours de travail
+         DO ith=2,NBTHR
+           CALL THREADIF(ith)
+         ENDDO  
+C        On libere les Threads
+         CALL THREADIS  
+C        Verification de l'erreur (Apres liberation des THREADS)
+         DO ith=1,NBTHR
+           IRETOU=SPARAL.IERROR(ith)
+           IF (IRETOU .GT. 0) THEN
+             CALL ERREUR(IRETOU)
+             RETURN
+           ENDIF
+         ENDDO
+
+*    -CALCUL SEQUENTIEL-
+      ELSE
+C        Appel a la SUBROUTINE qui fait le travail
+         IPOINT=IPARAL
+         CALL MATMU0(1,IPOINT)
+C        Verification de l'erreur
+         IRETOU=SPARAL.IERROR(1)
+         IF (IRETOU .GT. 0) THEN
+           CALL ERREUR(IRETOU)
+           RETURN
+         ENDIF
+ 
+      ENDIF
+
+      SEGSUP,MTRAV,SPARAL
+      RETURN
+
+      
+
+ 9000 CONTINUE  
+**********************************************************************************
+*
+*     CAS CHARGEMENTS EN BASE_B
+*
+**********************************************************************************
+
+      TYPRET = ' '
+      CALL ACCTAB(ITCHAR,'MOT',I0,X0,'BASE_B',L0,IP0,
+     &                  TYPRET,I1,X1,CHARRE,L1,ICHAR2)
+      IF ((ICHAR2.EQ.0).OR.(.NOT.RIGIDE)) THEN
+         CALL ERREUR(486)
+         RETURN
+      ENDIF
+
+      END
+
+ 
+ 
+ 
+ 

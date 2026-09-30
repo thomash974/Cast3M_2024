@@ -1,0 +1,169 @@
+C CREN3D    SOURCE    PV090527  23/02/13    21:15:05     11592          
+      SUBROUTINE CREN3D(sigef3,precision3d,Rt,Rc,ref,ept3,
+     # sigdp3,Cdp,delta,M,pt,pc,ncr,actif,fcr,ppcc,pfcc,poro,eplccv)
+c     test des criteres pour endo3d 
+
+c     1: rankine direction 1
+c     2: rankine direction 2
+c     3: rankine direction 3
+c     4: Drucker Prager
+c     5: CamClay
+c     (A.Sellier 2021/04/26)
+
+      implicit real*8 (a-h,o-z)
+      implicit integer (i-n)  
+
+      real*8 sigef3(3),precision3d,Rt,Rc,sigdp3(3),M,pt,pc,ref,Cdp,delta
+      integer ncr      
+      real*8 fcr(ncr)
+      logical actif(ncr)
+      real*8 taueq,press,sigd3(3),ept3(3),cg,Ptran,ppcc,pfcc
+      real*8 poro,eplccv
+
+      
+      integer i
+      
+c     ******** criteres de Rankine *************************************
+
+      do i=1,3
+        if(sigef3(i).ge.0.) then
+            fcr(i)=sigef3(i)-Rt
+            if(fcr(i).gt.(precision3d*Rt)) then
+c             le critere est actif
+              actif(i)=.true. 
+            else
+              actif(i)=.false.
+            end if
+        else if (ept3(i).gt.precision3d) then
+c           refermeture de fissure possible
+            fcr(i)=sigef3(i)+ref
+            if(fcr(i).lt.(-precision3d*ref)) then
+c              refermeture
+               actif(i)=.true.
+            else
+               actif(i)=.false.
+               fcr(i)=0.d0
+            end if
+        else
+            actif(i)=.false.
+            fcr(i)=0.d0
+        end if
+      end do
+
+c     ********* citere de Drucker Prager *******************************  
+   
+      if(.not.(actif(1).and.actif(2).and.actif(3))) then      
+c       pression
+        press=0.d0
+        do i=1,3 
+            sigdp3(i)=sigef3(i)
+            press=press-sigdp3(i)
+        end do
+        press=press/3.d0
+c       cisaillement      
+        taueq=0.d0
+        do i=1,3
+            sigd3(i)=sigdp3(i)+press
+            taueq=taueq+(sigd3(i))**2
+        end do
+        taueq=sqrt(taueq/2.d0)
+        fcr(4)=taueq-(Cdp+delta*press)
+        if(fcr(4).ge.(precision3d*Cdp)) then
+            actif(4)=.true.
+        else
+            actif(4)=.false.
+c           ne pas mettre le critere a zero car il sera utilise
+c           pour l endo pre pic            
+        end if
+      else
+c        les trois rankine sont actifs      
+c        on desactive les autres criteres pour cette iteration      
+         actif(4)=.false. 
+c        ne pas mettre le critere a zero car il sera utilise
+c        pour l endo pre pic          
+      end if
+      
+
+      
+c     ****** critere de CamClay **************************************** 
+   
+      if(((.not.actif(1)).and.(.not.actif(2)).and.(.not.actif(3))).and.
+     #   ((poro+eplccv).gt.(3.d0*poro*precision3d)))  then 
+c       calcul du critere de Camclay
+      t4 = M ** 2
+      t6 = taueq ** 2
+      t9 = (pc - pt) ** 2
+      cg = t9 * (t4 * (press - pc) * (press - pt) + t6) / 0.4D1
+
+        if(cg.ge.precision3d*M*rt) then
+c           CamClay est actif        
+            actif(5)=.true.
+            fcr(5)=cg     
+c     calcul de la pression de transition entre DP et CC
+      t1 = M ** 2
+      t2 = Rt * t1
+      t6 = sqrt(0.3D1)
+      t10 = delta ** 2
+      t13 = t1 ** 2
+      t14 = Rt ** 2
+      t20 = pc ** 2
+      t23 = t6 * t1
+      t24 = Rc ** 2
+      t36 = t24 * t1
+      t39 = Rc * t1
+      t43 = pc * t10
+      t49 = 0.36D2 * Rc * Rt * delta * t23 - 0.36D2 * Rc * delta * pc * 
+     #t23 + 0.18D2 * pc * Rt * t13 - 0.36D2 * t10 * Rt * t39 + 0.24D2 * 
+     #delta * t24 * t23 - 0.12D2 * t10 * t36 + 0.9D1 * t14 * t13 + 0.9D1
+     # * t20 * t13 + 0.108D3 * t43 * t2 + 0.36D2 * t43 * t39 - 0.36D2 * 
+     #t36
+      t50 = sqrt(t49)
+      Ptran = -0.1D1 / (t1 + 0.3D1 * t10) * (0.6D1 * delta * Rc * t6 - 0
+     #.6D1 * t10 * Rc - 0.3D1 * pc * t1 + 0.3D1 * t2 - t50) / 0.6D1
+
+
+*       if(.not.(isnan(ptran))) then
+        if(.not.(ptran.ne.ptran)) then
+c        il existe une pression de transition
+         if(press.lt.ptran) then
+c           desactivation de CamClay
+            actif(5)=.false.
+            fcr(5)=0.d0
+         end if            
+        end if
+c       on vient tester le depassement des pression limites
+        if((pc.ge.(PFCC*(1.d0+precision3d))) .or.
+     #     (pc.le.(PPCC*(1.d0-precision3d)))) then
+c          on doit rester dans la zone de consolidation possible
+c          donc on empeche l ecoulement
+           actif(5)=.false.
+           fcr(5)=0.d0
+        else
+c         on autorise pas la deconsolidation
+          if(press.lt.((pc+pt)*(1.d0+precision3d)*0.5d0)) then
+            actif(5)=.false.
+            fcr(5)=0.d0
+          end if
+        end if         
+       else
+c        cc pas actif
+         actif(5)=.false.
+         fcr(5)=0.d0 
+       end if 
+      else
+c        au moins un des rankine est actif on enleve CamClay       
+         actif(5)=.false.
+         fcr(5)=0.d0      
+      end if
+c***********************************************************************      
+      
+      return
+      end
+      
+      
+
+           
+                     
+                          
+ 
+ 

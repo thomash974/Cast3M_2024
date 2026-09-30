@@ -1,0 +1,285 @@
+C CALPAQ    SOURCE    OF166741  24/03/14    21:15:01     11868          
+
+      SUBROUTINE CALPAQ(IPCHE1,IPCHE2,KMUL,TITC,NUMCHA,IRET)
+
+*______________________________________________________________________
+*
+*     GESTION DE LA MULTIPLICATION DES CHAMELEMS
+*     __________________________________________
+*
+*   Cette SUBROUTINE permet de determiner quel type de multiplication
+*   ou division va être faite.
+*
+*
+*   ENTREES :
+*   ---------
+*
+*      IPCHE1     POINTEUR SUR UN 1IER MCHAML
+*      IPCHE2     POINTEUR SUR UN 2EME MCHAML
+*
+*      Ces segments sont suposes ACTIFs en ENTREE et en SORTIE
+*      Ils ne sont en rien modifies dans le present sous-programme.
+*
+*   SORTIES :
+*   ---------
+*      IPCHE1     <-|
+*                   |-- POINTEURS EVENTUELLEMENT PERMUTES
+*      IPCHE2     <-|
+*
+*      KMUL       TYPE DE MULTIPLICATION 1 SCALAIRE   PAR SCALAIRE
+*                                        2 COMPOSANTE PAR SCALAIRE
+*                                        3 COMPOSANTE PAR COMPOSANTE
+*                                        4 MATRICE    PAR COMPOSANTE
+*                                        5 GRADIENT   PAR GRADIENT
+*
+*      TITC       contient le TITCHE DU MCHAML A CREER
+*                 Par defaut TITC = ' '
+*      NUMCHA     LONGUEUR DU TITCHE DU CHAMP (=TITC(1:NUMCHA))
+*                 Par defaut NUMCHA = 1
+*
+*      LPERM      Logique a VRAI(.TRUE.) si les champs ont ete permutes
+*                         a FAUX(.FALSE.) sinon
+*
+*      IRET       = 1 SI OK
+*                 = 0 SINON AVEC GESTION ERREUR
+*
+*   NOTA :  Le logique LPERM peut etre sorti pour utilisation par le 
+*   ------  sous-programme appelant.
+*      SUBROUTINE CALPAQ(IPCHE1,IPCHE2,KMUL,TITC,NUMCHA,LPERM,IRET)
+*_______________________________________________________________________
+
+      IMPLICIT INTEGER(I-N)
+      IMPLICIT REAL*8(A-H,O-Z)
+
+-INC PPARAM
+-INC CCOPTIO
+-INC SMCHAML
+
+      CHARACTER*(*) TITC
+      LOGICAL LPERM
+
+      PARAMETER (NTIT=22)
+      CHARACTER*(72) TIT1,TIT2, TITNOU(NTIT)
+
+      DATA TITNOU / 'NOEUD', 'GRAVITE', 'RIGIDITE', 'MASSE',
+     &              'STRESSES', 'DEPLACEMENTS',   'FORCES',
+     &              'REACTUALISATION',      'FORCES VOLUMIQUES',
+     &              'GRADIENT', 'CONTRAINTES', 'DEFORMATIONS',
+     &              'CARACTERISTIQUES', 'BIDON',
+     &              'TEMPERATURES', 'CONTRAINTES PRINCIPALES',
+     &              'MATRICE DE HOOKE', 'MATRICE DE HOOKE TANGENTE',
+     &              'DILATATIONS', 'VARIABLES INTERNES',
+     &              'GRADIENT DE FLEXION','VON MISES'/
+
+      MCHEL1 = IPCHE1
+      MCHEL2 = IPCHE2
+*      segact,MCHEL1,MCHEL2    <- supposes ACTIFs en E/S
+
+* Analyse du champ 1 (IPCHE1)
+      TIT1  = MCHEL1.TITCHE
+      INU1  = 0
+      INUK1 = 0
+      IF (TIT1.EQ.'SCALAIRE') THEN
+        INU1 = 1
+        IF (MCHEL1.INFCHE(/2).GE.6) THEN
+          INU1 = MCHEL1.INFCHE(1,6)
+          IF (INU1.EQ.0) INU1=1
+        ENDIF
+        GOTO 1
+      ENDIF
+      CALL PLACE(TITNOU,NTIT,INU1,TIT1)
+      IF (INU1.EQ.0) THEN
+* y a-t'il une unique composante scalaire ?
+        nc = MCHEL1.ICHAML(/1)
+        DO ic = 1, nc
+          MCHAM1 = MCHEL1.ICHAML(ic)
+          SEGACT,MCHAM1
+          IF (MCHAM1.NOMCHE(/2).NE.1) THEN
+            INUK1 = 2
+          ELSE
+            IF (MCHAM1.NOMCHE(1).NE.'SCAL') INUK1 = 2
+          ENDIF
+        ENDDO
+      ENDIF
+ 1    CONTINUE
+*      write(ioimp,*) 'CHE1',ipche1,'TIT1',tit1,INU1,INUK1
+
+* Analyse du champ 2 (IPCHE2)
+      TIT2  = MCHEL2.TITCHE
+      INU2  = 0
+      INUK2 = 0
+      IF (TIT2.EQ.'SCALAIRE') THEN
+        INU2 = 1
+        IF (MCHEL2.INFCHE(/2).GE.6) THEN
+          INU2 = MCHEL2.INFCHE(1,6)
+          IF (INU2.EQ.0) INU2 = 1
+        ENDIF
+        GOTO 2
+      ENDIF
+      CALL PLACE(TITNOU,NTIT,INU2,TIT2)
+      IF (INU2.EQ.0) THEN
+        nc = MCHEL2.ICHAML(/1)
+* y a-t'il une unique composante scalaire ?
+        DO ic = 1, nc
+          MCHAM2 = MCHEL2.ICHAML(ic)
+          SEGACT,MCHAM2
+          IF (MCHAM2.NOMCHE(/2).NE.1) THEN
+            INUK2 = 2
+          ELSE
+            IF (MCHAM2.NOMCHE(1).NE.'SCAL') INUK2 = 2
+          ENDIF
+        ENDDO
+      ENDIF
+ 2    CONTINUE
+*      write(ioimp,*) 'CHE2',ipche2,'TIT2',tit2,INU2,INUK2
+
+* S. PASCAL
+* Traitement particulier dans le cas d'un produit de 2 MCHAMLs
+* a plusieurs composantes dont certaines sont de type EVOLUTIOn.
+* Je cherche dans le MCHEL1 les composantes de type EVOL.
+*    Si aucune EVOL, INUJ1=0
+*    Si toute EVOL,  INUJ1>0
+*    Sinon,          INUJ1<0
+* Idem pour MCHEL2 avec INUJ2
+* Je me place dans le cas d'un produit composante par composante :
+      INUJ1 = 0
+      INUJ2 = 0
+      IF (INU1.EQ.INU2 .AND. INU1.GT.5) THEN
+        nc = MCHEL1.ICHAML(/1)
+        NJ1 = 0
+        DO ic = 1, nc
+          MCHAM1 = MCHEL1.ICHAML(ic)
+          SEGACT,MCHAM1
+          NJ = MCHAM1.IELVAL(/1)
+          DO JELV = 1, NJ
+            IF (MCHAM1.TYPCHE(JELV).EQ.'POINTEUREVOLUTIO') THEN
+              INUJ1 = INUJ1 + 1
+            ENDIF
+          ENDDO
+          NJ1 = NJ1 + NJ
+        ENDDO
+*       IF (INUJ1.GT.0) THEN
+          IF (INUJ1.NE.NJ1) INUJ1 = 0 - INUJ1
+*       ENDIF
+        nc = MCHEL2.ICHAML(/1)
+        NJ2 = 0
+        DO ic = 1, nc
+          MCHAM2 = MCHEL2.ICHAML(ic)
+          SEGACT,MCHAM2
+          NJ = MCHAM2.IELVAL(/1)
+          DO JELV = 1, NJ
+            IF (MCHAM2.TYPCHE(JELV).EQ.'POINTEUREVOLUTIO') THEN
+              INUJ2 = INUJ2 + 1
+            ENDIF
+          ENDDO
+          NJ2 = NJ2 + NJ
+        ENDDO
+*       IF (INUJ2.GT.0) THEN
+          IF (INUJ2.NE.NJ2) INUJ2 = 0 - INUJ2
+*       ENDIF
+      ENDIF
+*      write(ioimp,*) ' inuj1,inuj2 ',inuj1,inuj2
+
+      TITC   = ' '
+      NUMCHA = 1
+      LPERM  = .FALSE.
+      IRET   = 1
+
+      IF (INU1.EQ.0.AND.INUK1.EQ.0) THEN
+         IF (INU2.LE.1.AND.INUK2.EQ.0) THEN
+           KMUL = 1
+         ELSE
+           KMUL = 2
+           LPERM = .TRUE.
+         ENDIF
+      ELSEIF(INU2.EQ.0.AND.INUK2.EQ.0) THEN
+         KMUL = 2
+      ELSEIF(INU1.EQ.0.OR.INU2.EQ.0) THEN
+         KMUL = 3
+      ELSEIF(INU1.EQ.INU2.AND.INU1.LE.5.AND.INU1.GE.1) THEN
+         KMUL = 1
+      ELSEIF(INU1.EQ.10.AND.INU2.EQ.10) THEN
+         TITC   = 'GRADIENT'
+         NUMCHA = 8
+         KMUL = 5
+      ELSEIF(INU1.EQ.10.AND.INU2.EQ.21) THEN
+         TITC   = 'GRADIENT'
+         NUMCHA = 8
+         KMUL = 5
+      ELSEIF(INU1.EQ.21.AND.INU2.EQ.10) THEN
+         TITC   = 'GRADIENT DE FLEXION'
+         NUMCHA = 19
+         KMUL = 5
+      ELSEIF(INU1.EQ.21.AND.INU2.EQ.21) THEN
+         TITC   = 'GRADIENT DE FLEXION'
+         NUMCHA = 19
+         KMUL = 5
+      ELSEIF(INU1.EQ.INU2.AND.INU1.GT.5) THEN
+         KMUL = 3
+         IF ( (INUJ1.EQ.0.AND.INUJ2.NE.0) .OR.
+     &        (INUJ1.LT.0.AND.INUJ2.GT.0) ) THEN
+           LPERM = .TRUE.
+         ENDIF
+      ELSEIF(INU1.EQ.1.AND. INU2.GT.5) THEN
+         KMUL = 2
+         LPERM = .TRUE.
+      ELSEIF(INU2.EQ.1.AND. INU1.GT.5) THEN
+         KMUL = 2
+      ELSEIF((INU1.EQ.3 .OR. INU1.EQ.6).AND.
+     &       (INU2.EQ.13.OR.INU2.EQ.14.OR.INU2.EQ.17)) THEN
+         KMUL = 2
+         LPERM = .TRUE.
+      ELSEIF((INU2.EQ.3 .OR. INU2.EQ.6).AND.
+     &       (INU1.EQ.13.OR.INU1.EQ.14.OR.INU1.EQ.17)) THEN
+         KMUL = 2
+      ELSEIF(INU1.EQ.5 .AND.
+     &       (INU2.EQ.11.OR.INU2.EQ.12.OR.
+     &        INU2.EQ.15.OR.INU2.EQ.16.OR.INU2.EQ.18)) THEN
+         KMUL = 2
+         LPERM = .TRUE.
+      ELSEIF(INU2.EQ.5 .AND.
+     &       (INU1.EQ.11.OR.INU1.EQ.12.OR.
+     &        INU1.EQ.15.OR.INU1.EQ.16.OR.INU1.EQ.18)) THEN
+         KMUL = 2
+      ELSEIF(INU1.EQ.11 .AND. (INU2.EQ.17.OR.INU2.EQ.18)) THEN
+         TITC   = 'DEFORMATIONS'
+         NUMCHA = 12
+         KMUL = 4
+      ELSEIF(INU2.EQ.11 .AND. (INU1.EQ.17.OR.INU1.EQ.18)) THEN
+         TITC   = 'DEFORMATIONS'
+         NUMCHA = 12
+         KMUL = 4
+         LPERM = .TRUE.
+      ELSEIF(INU1.EQ.12 .AND. (INU2.EQ.17.OR.INU2.EQ.18)) THEN
+         TITC   = 'CONTRAINTES'
+         NUMCHA = 11
+         KMUL = 4
+      ELSEIF(INU2.EQ.12 .AND. (INU1.EQ.17.OR.INU1.EQ.18)) THEN
+         TITC   = 'CONTRAINTES'
+         NUMCHA = 11
+         KMUL = 4
+         LPERM = .TRUE.
+      ELSE
+         IRET  = 0
+         KMUL  = 0
+      ENDIF
+
+* Permutation des 2 champs :
+      IF (LPERM) THEN
+        iii    = IPCHE2
+        IPCHE2 = IPCHE1
+        IPCHE1 = iii
+      ENDIF
+
+*     ERREUR SI LES MCHAMLS QUE L ON TENTE DE MULTIPLIER
+*              OU DIVISER SONT INCOMPATIBLES
+      IF (IRET.NE.1) THEN
+        MOTERR( 1:16) = TIT1(1:16)
+        MOTERR(17:32) = TIT2(1:16)
+        CALL ERREUR(993)
+      ENDIF
+
+*      return
+      END
+
+ 

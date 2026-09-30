@@ -1,0 +1,35 @@
+C TABESC    SOURCE    PV        19/10/17    21:15:28     10339          
+       SUBROUTINE TABESC(MTABLE,IND,MESRES)
+
+      IMPLICIT INTEGER(I-N)
+
+-INC PPARAM
+-INC SMTABLE
+-INC CCASSIS
+-INC CCNOYAU
+
+           external long
+           character*(LOCHAI) motass
+           logical esrell
+
+              segdes mtable
+              segact mtable*mod
+              MTABTV(ind)=esrety
+              if (esrety.eq.'MOT     ') then
+                  motass=esrech
+                  ncar=long(motass)
+                  CALL POSCHA(MOTASS(1:NCAR),INCHA)
+                  mtabiv(ind)=incha
+              elseif (esrety.eq.'FLOTTANT') then
+                  rmtabv(ind)=esrere
+              elseif (esrety.eq.'LOGIQUE ') then
+                  esrell=esrelo
+                  call poslog(esrell,iree)
+                  mtabiv(ind)=iree
+              else
+                 mtabiv(ind)=esreva
+              endif
+          end
+
+ 
+ 
