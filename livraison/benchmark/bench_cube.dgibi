@@ -268,7 +268,7 @@ REPETER BREP NREP0 ;
         TPAS1 . 'PRECISION' = PREC0 / ((FLOT NDIV0) ** 2) ;
         TPAS1 . 'PERF_RAID' = VPRF ;
         TPAS1 . 'PERF_RAID_NIVEAU' = VNIV ;
-        SI ('NON' (MPROC0 EGA 'DEFAUT')) ;
+        SI ('NON' (EGA MPROC0 'DEFAUT')) ;
             TPAS1 . 'PROCESSEURS' = MOT MPROC0 ;
         FINSI ;
         MENAGE 'OBLI' ;
