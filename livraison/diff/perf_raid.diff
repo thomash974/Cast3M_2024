@@ -283,7 +283,7 @@
      'FINSI';
  *
    'SINON';
-@@ -1755,6 +1991,44 @@
+@@ -1755,6 +1991,73 @@
       CORREC=0;
       PASREINI=VRAI;
       coefmt=1.;
@@ -325,10 +325,39 @@
 +         ISTGOK = FAUX ;
 +       'FINSI' ;
 +     'FINSI' ;
++*   diagnostic (une fois par table) : etat du rafraichissement et motifs
++     'SI' (IPERFSTG 'ET' ('NON' ('EXIS' WTAB 'STAG_MSG'))) ;
++       WTAB . 'STAG_MSG' = VRAI ;
++       'SI' ISTGOK ;
++         'MESS' ' PERF-RAID niveau 3 : rafraichissement de la raideur actif' ;
++       'SINON' ;
++         'MESS' ' PERF-RAID niveau 3 : rafraichissement inactif, motifs :' ;
++         'SI' ('NON' IPLAVI) ; 'MESS' '    IPLAVI faux' ; 'FINSI' ;
++         'SI' ('NON' ('OU' IENDOM IVIDOM ICERAM)) ;
++           'MESS' '    ni endommagement, ni viscoendommagement, ni ceramique' ;
++         'FINSI' ;
++         'SI' IGRD ; 'MESS' '    grands deplacements' ; 'FINSI' ;
++         'SI' IDYN ; 'MESS' '    dynamique' ; 'FINSI' ;
++         'SI' IKTAN ; 'MESS' '    K_TANGENT' ; 'FINSI' ;
++         'SI' IFEFP ; 'MESS' '    FEFP' ; 'FINSI' ;
++         'SI' IRCON ; 'MESS' '    rigidite constante' ; 'FINSI' ;
++         'SI' IRAUG ; 'MESS' '    rigidite augmentee' ; 'FINSI' ;
++         'SI' AUTAUG ; 'MESS' '    augmentation automatique' ; 'FINSI' ;
++         'SI' LOGPIL ; 'MESS' '    pilotage' ; 'FINSI' ;
++         'SI' WTAB . 'CONTACT' ; 'MESS' '    contact' ; 'FINSI' ;
++         'SI' WTAB . 'CONSOLIDATION' ; 'MESS' '    consolidation' ; 'FINSI' ;
++         'SI' WTAB . 'FREQUENTIEL' ; 'MESS' '    frequentiel' ; 'FINSI' ;
++         'SI' WTAB . 'NVSTNL' ; 'MESS' '    NVSTNL' ; 'FINSI' ;
++         'SI' WTAB . 'ADHERENCE' ; 'MESS' '    adherence' ; 'FINSI' ;
++         'SI' WTAB . 'CAFROTTE' ; 'MESS' '    frottement' ; 'FINSI' ;
++         'SI' WTAB . 'MAN' ; 'MESS' '    MAN' ; 'FINSI' ;
++         'SI' WTAB . 'CHAR_BLOM' ; 'MESS' '    blocages variables' ; 'FINSI' ;
++       'FINSI' ;
++     'FINSI' ;
  **
  *
  * initialisation des messages pour l'iteration en cours ****************
-@@ -2573,9 +2847,15 @@
+@@ -2573,9 +2876,15 @@
        ZMATTEMP = ZMAT05;
      'FINS';
      'SI' ('OU' IENDOM IVIDOM ICERAM);
@@ -347,7 +376,7 @@
      'SINON';
          DEPST            = 'EPSI' 'LINE' 'NOER' ZMODL ZDEPT ZMATTEMP ;
      'FINS';
-@@ -2625,10 +2905,16 @@
+@@ -2625,10 +2934,16 @@
      'SI' IGRD;
        'FORM' GEOM1;
      'FINSI';
@@ -368,7 +397,7 @@
      'SINON';
         DEPST = 'EPSI' 'LINE' ZMODL ZDEPT ZMAT05;
      'FINSI';
-@@ -4174,6 +4460,37 @@
+@@ -4174,6 +4489,37 @@
  
  'SI' IFEFP ; 'DETR' ZRIKTA ; 'DETR' GEOM2;  'FINS' ;
  *
@@ -406,7 +435,7 @@
  IPREM = FAUX;      IAFAIR=VRAI; RECA_K = FAUX;
  *
  dpsmaxp = dpsmax;
-@@ -4219,6 +4536,11 @@
+@@ -4219,6 +4565,11 @@
  *
                 STAB12.'RESIDU' = RESIDC;
  ***            'SI' ('NEG' ('TYPE' ZRAIDNA) 'RIGIDITE'); ZRAIDNA = ZRAID; 'FINSI';

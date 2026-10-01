@@ -2029,6 +2029,35 @@ resmul = 1;
          ISTGOK = FAUX ;
        'FINSI' ;
      'FINSI' ;
+*   diagnostic (une fois par table) : etat du rafraichissement et motifs
+     'SI' (IPERFSTG 'ET' ('NON' ('EXIS' WTAB 'STAG_MSG'))) ;
+       WTAB . 'STAG_MSG' = VRAI ;
+       'SI' ISTGOK ;
+         'MESS' ' PERF-RAID niveau 3 : rafraichissement de la raideur actif' ;
+       'SINON' ;
+         'MESS' ' PERF-RAID niveau 3 : rafraichissement inactif, motifs :' ;
+         'SI' ('NON' IPLAVI) ; 'MESS' '    IPLAVI faux' ; 'FINSI' ;
+         'SI' ('NON' ('OU' IENDOM IVIDOM ICERAM)) ;
+           'MESS' '    ni endommagement, ni viscoendommagement, ni ceramique' ;
+         'FINSI' ;
+         'SI' IGRD ; 'MESS' '    grands deplacements' ; 'FINSI' ;
+         'SI' IDYN ; 'MESS' '    dynamique' ; 'FINSI' ;
+         'SI' IKTAN ; 'MESS' '    K_TANGENT' ; 'FINSI' ;
+         'SI' IFEFP ; 'MESS' '    FEFP' ; 'FINSI' ;
+         'SI' IRCON ; 'MESS' '    rigidite constante' ; 'FINSI' ;
+         'SI' IRAUG ; 'MESS' '    rigidite augmentee' ; 'FINSI' ;
+         'SI' AUTAUG ; 'MESS' '    augmentation automatique' ; 'FINSI' ;
+         'SI' LOGPIL ; 'MESS' '    pilotage' ; 'FINSI' ;
+         'SI' WTAB . 'CONTACT' ; 'MESS' '    contact' ; 'FINSI' ;
+         'SI' WTAB . 'CONSOLIDATION' ; 'MESS' '    consolidation' ; 'FINSI' ;
+         'SI' WTAB . 'FREQUENTIEL' ; 'MESS' '    frequentiel' ; 'FINSI' ;
+         'SI' WTAB . 'NVSTNL' ; 'MESS' '    NVSTNL' ; 'FINSI' ;
+         'SI' WTAB . 'ADHERENCE' ; 'MESS' '    adherence' ; 'FINSI' ;
+         'SI' WTAB . 'CAFROTTE' ; 'MESS' '    frottement' ; 'FINSI' ;
+         'SI' WTAB . 'MAN' ; 'MESS' '    MAN' ; 'FINSI' ;
+         'SI' WTAB . 'CHAR_BLOM' ; 'MESS' '    blocages variables' ; 'FINSI' ;
+       'FINSI' ;
+     'FINSI' ;
 **
 *
 * initialisation des messages pour l'iteration en cours ****************
