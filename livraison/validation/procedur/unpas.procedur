@@ -4513,7 +4513,7 @@ XCONVMIN = XCONV; DPSMREF=DPSMAX/10;
   'FINSI' ;
   'SI' ((IT '>EG' 5) 'ET' ((IT - ITRFR) '>EG' 4) 'ET' (NBRFR '<' 3) 'ET'
         ('NON' PASTEST) 'ET' ('NON' NONCONV) 'ET'
-        ('EGA' ('TYPE' ZVARF) 'MCHAML  ') 'ET'
+        (('EGA' ('TYPE' ZVARF) 'MCHAML  ') 'OU' ('EGA' ('TYPE' ZVARF) 'TABLE')) 'ET'
         (XCONV '>' (10. * ZPREC)) 'ET' (XCONV '>' (0.7 * XSTG3))) ;
     'MESS' ' PERF-RAID : stagnation a l''iteration' ' ' IT
            ' : raideur reconstruite avec l''endommagement courant' ;
