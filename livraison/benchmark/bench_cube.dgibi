@@ -56,6 +56,10 @@ EMAXB0 = 1.E-3 ;
 * TEMP 'IMPR' 'PROC' (procedures) sont affiches a la console. A utiliser
 * avec un seul scenario (ex. LSCE = LECT 9 ; ou LECT 2 ;) et NREP0 = 1.
 IPROF0 = 0 ;
+* Mode de parallelisme impose a PASAPAS (indice 'PROCESSEURS') :
+* 'DEFAUT' (choix automatique de PAS_DEFA), 'MONO_PROCESSEUR',
+* 'COMPORTEMENT' ou 'AUTOMATIQUE'.
+MPROC0 = 'DEFAUT' ;
 * Tolerances de comparaison des courbes force/section avec la variante
 * orig : niveau 1 (doit etre identique) et niveau 2 (approche)
 TOLN1 = 1.E-8 ;
@@ -66,15 +70,21 @@ DEBPROC CHRONO ;
     TH1 = TEMP 'HORL' ;
 FINPROC TH1 ;
 *
-* Temps horloge cumule d'un operateur (somme sur les assistants, ms)
-* depuis le dernier TEMP 'ZERO', lu dans la table de TEMP 'NOEC'
+* Temps horloge d'un operateur (maximum sur les assistants, ms) depuis le
+* dernier TEMP 'ZERO', lu dans la table de TEMP 'NOEC'. Le maximum (et non
+* la somme) est le temps ecoule : avec la parallelisation automatique les
+* assistants travaillent en meme temps (la somme comptait COMP deux fois
+* a 1 000 elements, 2 assistants).
 DEBPROC TOPER TNO1*'TABLE' NOM1*'MOT' ;
     TOT1 = 0 ;
     TH1 = TNO1 . 'TEMPS_HORLOGE' ;
     SI (EXIS TH1 NOM1) ;
         L1 = TH1 . NOM1 ;
         REPETER B1 (DIME L1) ;
-            TOT1 = TOT1 + (EXTR L1 &B1) ;
+            V1 = EXTR L1 &B1 ;
+            SI (V1 > TOT1) ;
+                TOT1 = V1 ;
+            FINSI ;
         FIN B1 ;
     FINSI ;
 FINPROC TOT1 ;
@@ -258,6 +268,9 @@ REPETER BREP NREP0 ;
         TPAS1 . 'PRECISION' = PREC0 / ((FLOT NDIV0) ** 2) ;
         TPAS1 . 'PERF_RAID' = VPRF ;
         TPAS1 . 'PERF_RAID_NIVEAU' = VNIV ;
+        SI ('NON' (MPROC0 EGA 'DEFAUT')) ;
+            TPAS1 . 'PROCESSEURS' = MOT MPROC0 ;
+        FINSI ;
         MENAGE 'OBLI' ;
         TEMP 'ZERO' ;
         PASAPAS TPAS1 ;
