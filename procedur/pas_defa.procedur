@@ -494,6 +494,29 @@ WTAB.'NOUVEAU'=INOUV;
   WTAB.'RECAOP'  = VRAI;
   WTAB.'RECADET' = FAUX;
   WTAB.'RECARI'  = FAUX;
+* PERF-RAID : optimisations de UNPAS / PAS_MATE / PASAPAS
+*  perf_raid        : interrupteur general (FAUX = comportement d'origine)
+*  tol_raideur_mat  : tolerance relative sur les parametres externes pour
+*                     reutiliser la raideur (< 0 : desactive)
+*  tol_raideur_endo : tolerance relative sur la diagonale de la raideur endommagee
+*                     (0 : strictement identique, < 0 : desactive)
+*  tol_raideur_diag : tolerance relative sur la diagonale de la raideur
+*                     (reutilisation approchee, > 0 : active ; niveau 2
+*                     de 'PERF_RAID_NIVEAU' : 1E-3)
+*  perf_struct      : reutilisation admise pour les elements de structure
+*  tol_materiau     : tolerance relative sur les parametres externes pour
+*                     reutiliser les caracteristiques (< 0 : desactive)
+*  nb_*_reut        : compteurs de reutilisations (diagnostic)
+  WTAB . 'PERF_RAID' = VRAI ;
+  WTAB . 'TOL_RAIDEUR_MAT' = 1.E-12 ;
+  WTAB . 'TOL_RAIDEUR_ENDO' = 0. ;
+  WTAB . 'TOL_MATERIAU' = 1.E-12 ;
+  WTAB . 'NB_RAIDEUR_REUT' = 0 ;
+  WTAB . 'NB_RAIDEUR_CALC' = 0 ;
+  WTAB . 'NB_HOOK_EVITE' = 0 ;
+  WTAB . 'NB_MAT_REUT' = 0 ;
+  WTAB . 'PERF_STRUCT' = VRAI ;
+  WTAB . 'TOL_RAIDEUR_DIAG' = 0. ;
 * relaxation_dupont2 coeff de relaxation pour dupont2  :  pas_defa
   WTAB.'RELAXATION_DUPONT'=0.25;
 * parametre de relaxation du pas de temps en non convergence
@@ -1410,6 +1433,33 @@ LOGERR2=VRAI;
 * Precision demandee par l'utilisateur :
 'SI' ('EXISTE' PRECED 'PRECISION') ;
   WTAB.'PRECISION' = PRECED.'PRECISION' ;
+'FINS' ;
+* PERF-RAID : options utilisateur
+'SI' ('EXISTE' PRECED 'PERF_RAID') ;
+  WTAB . 'PERF_RAID' = PRECED . 'PERF_RAID' ;
+'FINS' ;
+* niveau 2 : reutilisation approchee de la raideur (tolerances 1E-3 sur
+* la diagonale de la raideur, fixees ici avant les options explicites)
+'SI' ('EXISTE' PRECED 'PERF_RAID_NIVEAU') ;
+  'SI' (PRECED . 'PERF_RAID_NIVEAU' '>EG' 2) ;
+    WTAB . 'TOL_RAIDEUR_DIAG' = 1.E-3 ;
+    WTAB . 'TOL_RAIDEUR_ENDO' = 1.E-3 ;
+  'FINSI' ;
+'FINS' ;
+'SI' ('EXISTE' PRECED 'TOLERANCE_RAIDEUR_DIAG') ;
+  WTAB . 'TOL_RAIDEUR_DIAG' = PRECED . 'TOLERANCE_RAIDEUR_DIAG' ;
+'FINS' ;
+'SI' ('EXISTE' PRECED 'PERF_STRUCTURES') ;
+  WTAB . 'PERF_STRUCT' = PRECED . 'PERF_STRUCTURES' ;
+'FINS' ;
+'SI' ('EXISTE' PRECED 'TOLERANCE_RAIDEUR') ;
+  WTAB . 'TOL_RAIDEUR_MAT' = PRECED . 'TOLERANCE_RAIDEUR' ;
+'FINS' ;
+'SI' ('EXISTE' PRECED 'TOLERANCE_RAIDEUR_ENDO') ;
+  WTAB . 'TOL_RAIDEUR_ENDO' = PRECED . 'TOLERANCE_RAIDEUR_ENDO' ;
+'FINS' ;
+'SI' ('EXISTE' PRECED 'TOLERANCE_MATERIAU') ;
+  WTAB . 'TOL_MATERIAU' = PRECED . 'TOLERANCE_MATERIAU' ;
 'FINS' ;
 *                                                                      *
 *--------  Existe-t-il des procedure utilisateur perso?

@@ -98,7 +98,99 @@ MA = WTAB.'CARACTERISTIQUES';
   'FINSI';
 'FINSI';
 
-   MMM  = 'VARI' 'NUAG' MO MA ETAT 'RIGIDITE' ;
+*  PERF-RAID : reutilisation des caracteristiques d'un appel a l'autre
+*  tant que les parametres externes dont elles dependent (WTAB . 'LDEVA')
+*  sont inchanges (tolerance relative WTAB . 'TOL_MATERIAU', indice
+*  PASAPAS 'TOLERANCE_MATERIAU', < 0 : desactive). Le champ renvoye est
+*  alors le meme objet, ce qu'UNPAS exploite pour conserver la raideur.
+*  Desactive de lui-meme si le modele est recompose a chaque appel
+*  (MO different), en modal / frequentiel et pour le beton HT.
+   IPERFMA = VRAI ;
+   'SI' ('EXIS' WTAB 'PERF_RAID') ;
+      IPERFMA = WTAB . 'PERF_RAID' ;
+   'FINSI' ;
+   XTOLMA = 1.E-12 ;
+   'SI' ('EXIS' WTAB 'TOL_MATERIAU') ;
+      XTOLMA = WTAB . 'TOL_MATERIAU' ;
+   'FINSI' ;
+   IMCACHE = IPERFMA 'ET' WTAB . 'MATVAR' ;
+   'SI' IMCACHE ;
+      'SI' (WTAB . 'MODAL' 'OU' WTAB . 'FREQUENTIEL') ;
+         IMCACHE = FAUX ;
+      'FINSI' ;
+      'SI' (XTOLMA '<' 0.) ;
+         IMCACHE = FAUX ;
+      'FINSI' ;
+      'SI' IBET ;
+         'SI' WTAB . 'BETON_HT' ;
+            IMCACHE = FAUX ;
+         'FINSI' ;
+      'FINSI' ;
+*     liste des parametres externes absente ou vide : pas de cache
+      NDVAMA = 0 ;
+      'SI' ('EGA' ('TYPE' (WTAB . 'LDEVA')) 'LISTMOTS') ;
+         NDVAMA = 'DIME' (WTAB . 'LDEVA') ;
+      'FINSI' ;
+      'SI' (NDVAMA 'EGA' 0) ;
+         IMCACHE = FAUX ;
+      'FINSI' ;
+   'FINSI' ;
+   IMHIT = FAUX ;
+   'SI' IMCACHE ;
+      'SI' ('EXIS' WTAB 'PMAT_MMM') ;
+         'SI' (('EGA' MA (WTAB . 'PMAT_MA')) 'ET'
+               ('EGA' MO (WTAB . 'PMAT_MO'))) ;
+            LCPMAT = 'EXTR' ETAT 'COMP' ;
+            IMHIT = VRAI ;
+            'REPETER' BMAT ('DIME' WTAB . 'LDEVA') ;
+               NOMDVA = 'EXTR' WTAB . 'LDEVA' &BMAT ;
+               'SI' ('EXISTE' LCPMAT NOMDVA) ;
+                  'SI' ('EXIS' (WTAB . 'PMAT_ETAT') NOMDVA) ;
+                     CHA1 = 'EXCO' ETAT NOMDVA ;
+                     CHA2 = WTAB . 'PMAT_ETAT' . NOMDVA ;
+                     XD = 'MAXI' 'ABS' (CHA1 '-' CHA2) ;
+                     XR = 'MAXI' 'ABS' CHA2 ;
+                     'SI' (XR '<' 1.) ;
+                        XR = 1. ;
+                     'FINSI' ;
+                     'SI' (XD '>' (XTOLMA '*' XR)) ;
+                        IMHIT = FAUX ;
+                        'QUITTER' BMAT ;
+                     'FINSI' ;
+                  'SINON' ;
+                     IMHIT = FAUX ;
+                     'QUITTER' BMAT ;
+                  'FINSI' ;
+               'SINON' ;
+                  IMHIT = FAUX ;
+                  'QUITTER' BMAT ;
+               'FINSI' ;
+            'FIN' BMAT ;
+         'FINSI' ;
+      'FINSI' ;
+   'FINSI' ;
+   'SI' IMHIT ;
+      MMM = WTAB . 'PMAT_MMM' ;
+      'SI' ('EXIS' WTAB 'NB_MAT_REUT') ;
+         WTAB . 'NB_MAT_REUT' = WTAB . 'NB_MAT_REUT' + 1 ;
+      'FINSI' ;
+   'SINON' ;
+      MMM  = 'VARI' 'NUAG' MO MA ETAT 'RIGIDITE' ;
+      'SI' IMCACHE ;
+         TMETAT = 'TABL' ;
+         LCPMAT = 'EXTR' ETAT 'COMP' ;
+         'REPETER' BMAT2 ('DIME' WTAB . 'LDEVA') ;
+            NOMDVA = 'EXTR' WTAB . 'LDEVA' &BMAT2 ;
+            'SI' ('EXISTE' LCPMAT NOMDVA) ;
+               TMETAT . NOMDVA = 'EXCO' ETAT NOMDVA ;
+            'FINSI' ;
+         'FIN' BMAT2 ;
+         WTAB . 'PMAT_MMM' = MMM ;
+         WTAB . 'PMAT_MA' = MA ;
+         WTAB . 'PMAT_MO' = MO ;
+         WTAB . 'PMAT_ETAT' = TMETAT ;
+      'FINSI' ;
+   'FINSI' ;
 
 'SI' ISTA;
 *   MMM  =           'VARI' 'NUAG' MOD_STA MAT_STA ETAT 'RIGIDITE' ;

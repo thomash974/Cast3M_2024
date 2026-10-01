@@ -116,6 +116,25 @@ MLDEPL = MLDEPL 'ET' MNPRIM_HHO ;
 *  definition de variables locales
 PASUNIL = FAUX;
 *'SI' ( 'EXIS' PRECED 'ECRIT' ) ; list wtab; 'FINS';
+* PERF-RAID : interrupteur general des optimisations (indice PASAPAS
+* 'PERF_RAID', VRAI par defaut) et indicateur "matrice de Hooke inutile"
+IPERFRD = VRAI ;
+'SI' ('EXIS' WTAB 'PERF_RAID') ;
+  IPERFRD = WTAB . 'PERF_RAID' ;
+'FINSI' ;
+IHKSKIP = FAUX ;
+'SI' ('NON' ('EXIS' WTAB 'NB_HOOK_EVITE')) ;
+  WTAB . 'NB_HOOK_EVITE' = 0 ;
+'FINSI' ;
+'SI' ('NON' ('EXIS' WTAB 'NB_RAIDEUR_CALC')) ;
+  WTAB . 'NB_RAIDEUR_CALC' = 0 ;
+'FINSI' ;
+'SI' ('NON' ('EXIS' WTAB 'PERF_STRUCT')) ;
+  WTAB . 'PERF_STRUCT' = VRAI ;
+'FINSI' ;
+'SI' ('NON' ('EXIS' WTAB 'TOL_RAIDEUR_DIAG')) ;
+  WTAB . 'TOL_RAIDEUR_DIAG' = 0. ;
+'FINSI' ;
 ICERAM = WTAB.'CERAMIQUE' ;
 IDYN   = WTAB.'DYNAMIQUE';
 IELANL = WTAB.'NON_LINEAIRE';
@@ -407,6 +426,29 @@ NBPART = WTAB.'NBPART'     ;
 PARALLEL = FAUX ;
 PARTLOCA = FAUX ;
 ZMODL  = ZMODLI ;
+*  PERF-RAID : la matrice de Hooke passee a EPSI n'est lue que par
+*  l'element de coque DST (sources epsi1.eso et epsi3.eso : IMAT = 2 ne
+*  sert que pour MELE = 93). Pour tout modele sans element de coque, elle
+*  est ignoree : on evite alors un HOOK par iteration. Le test est mis en
+*  cache pour le modele courant ; il se desactive de lui-meme des qu'un
+*  element de coque est present.
+'SI' IPERFRD ;
+  IMASREU = FAUX ;
+  'SI' ('EXIS' WTAB 'HOOK_MOD') ;
+    'SI' ('EGA' ZMODLI (WTAB . 'HOOK_MOD')) ;
+      IMASREU = VRAI ;
+    'FINSI' ;
+  'FINSI' ;
+  'SI' ('NON' IMASREU) ;
+    WTAB . 'HOOK_MOD' = ZMODLI ;
+    WTAB . 'HOOK_INUTILE' = VRAI ;
+    'SI' ('EXISTE' ZMODLI 'ELEM' 'DST' 'DSQ' 'DKT' 'DKQ' 'COQ2' 'COQ3'
+          'COQ4' 'COQ8') ;
+      WTAB . 'HOOK_INUTILE' = FAUX ;
+    'FINSI' ;
+  'FINSI' ;
+  IHKSKIP = WTAB . 'HOOK_INUTILE' ;
+'FINSI' ;
 *  jacobien du modele pour ponderer les champs de act3
 CH1 = 'MANU' 'CHML' zmodl  'SCAL' 1. 'GRAVITE';
 zjac= 'INTG' 'ELEM' CH1 zmodl;
@@ -783,8 +825,11 @@ resmul = 1;
   'SI' (knoconv '>' 1) ;
      MCHC = PAS_ETAT PRECED TI  ;
      MMMM = PAS_MATE PRECED MCHC;
+*    PERF-RAID : etat ayant servi a evaluer le materiau
+     ETATRI = MCHC ;
   'SINON' ;
      MMMM = ZMAT22              ;
+     ETATRI = ZETAT2 ;
   'FINS' ;
    MMMM = 'REDU' MMMM ZMODL;
 
@@ -816,8 +861,162 @@ resmul = 1;
    AA2 ='EXTR' ZCLIM0 'MAIL' ;
    AA3 ='DIFF' AA1 AA2       ;
    AA4 = NBNO  AA3           ;
-  'SI' ( (WTAB.'RECARI' 'OU' IRAUG      ) 'OU'
+*  PERF-RAID : reutilisation de la raideur deja factorisee.
+*  A geometrie et blocages fixes, la raideur d'iteration ne depend que
+*   - du champ de caracteristiques MMMM (parametres externes : T, ...) ;
+*   - pour les lois a endommagement (ENDOMMAGEMENT, VISCODOMMAGE), de la
+*     raideur elastique endommagee RIGI(ZMODL,HOOK(ZMODL,MMMM,ZVAR0),MMMM),
+*     comparee par sa diagonale.
+*  Elle est donc conservee tant que ces champs sont inchanges depuis son
+*  calcul. Comme elle n'est qu'une matrice d'iteration, la solution est
+*  imposee par le residu. Exclus : grands deplacements, FEFP, charges
+*  suiveuses, PICA (LAG_TOT), ceramique, rigidite augmentee (y compris
+*  automatique), blocages
+*  variables (BLOM). Reglages : indices PASAPAS 'PERF_RAID' (interrupteur
+*  general), 'TOLERANCE_RAIDEUR' (materiau, relatif, defaut 1E-12, < 0 :
+*  desactive), 'TOLERANCE_RAIDEUR_ENDO' (diagonale endommagee, relatif, defaut
+*  0 : matrice strictement identique, < 0 : desactive).
+  'SI' ('NON' ('EXIS' WTAB 'TOL_RAIDEUR_MAT')) ;
+    WTAB . 'TOL_RAIDEUR_MAT' = 1.E-12 ;
+  'FINSI' ;
+  'SI' ('NON' ('EXIS' WTAB 'TOL_RAIDEUR_ENDO')) ;
+    WTAB . 'TOL_RAIDEUR_ENDO' = 0. ;
+  'FINSI' ;
+  'SI' ('NON' ('EXIS' WTAB 'NB_RAIDEUR_REUT')) ;
+    WTAB . 'NB_RAIDEUR_REUT' = 0 ;
+  'FINSI' ;
+  IRIGREU = FAUX ;
+  'SI' (IPERFRD 'ET' WTAB . 'RECARI' 'ET' ('EXIS' WTAB 'RRRR_MAT')) ;
+    IEXCREU = WTAB . 'GRANDS_DEPLACEMENTS' 'OU' WTAB . 'FEFP_FORMULATION' ;
+    'SI' ('NON' (WTAB . 'PERF_STRUCT')) ;
+      IEXCREU = IEXCREU 'OU' ITCAR ;
+    'FINSI' ;
+    IEXCREU = IEXCREU 'OU' (LAG_TOT 'EGA' 1) ;
+    IEXCREU = IEXCREU 'OU' ICERAM ;
+    IEXCREU = IEXCREU 'OU' IRAUG ;
+    IEXCREU = IEXCREU 'OU' AUTAUG ;
+    IEXCREU = IEXCREU 'OU' WTAB . 'CHAR_BLOM' ;
+    'SI' ('NON' IEXCREU) ;
+      IRIGREU = VRAI ;
+*     -- materiau : meme objet renvoye par PAS_MATE (cache), sinon
+*        comparaison des parametres externes (WTAB . 'LDEVA')
+      'SI' ('NON' ('EGA' MMMM (WTAB . 'MAT_RRRR'))) ;
+        'SI' WTAB . 'MATVAR' ;
+          'SI' (WTAB . 'TOL_RAIDEUR_MAT' '<' 0.) ;
+            IRIGREU = FAUX ;
+          'SINON' ;
+            NDEVTOT = 0 ;
+            'SI' ('EGA' ('TYPE' (WTAB . 'LDEVA')) 'LISTMOTS') ;
+              NDEVTOT = 'DIME' (WTAB . 'LDEVA') ;
+            'FINSI' ;
+            LCOREU = 'EXTR' ETATRI 'COMP' ;
+            LCOREF = 'EXTR' WTAB . 'ETAT_RRRR' 'COMP' ;
+            NDEVREU = 0 ;
+            'SI' (NDEVTOT '>' 0) ;
+            'REPETER' BDEVREU NDEVTOT ;
+              NOMREU = 'EXTR' WTAB . 'LDEVA' &BDEVREU ;
+              'SI' (('EXISTE' LCOREU NOMREU) 'ET'
+                    ('EXISTE' LCOREF NOMREU)) ;
+                NDEVREU = NDEVREU + 1 ;
+                CH1REU = 'EXCO' ETATRI NOMREU ;
+                CH2REU = 'EXCO' WTAB . 'ETAT_RRRR' NOMREU ;
+                XDETREU = 'MAXI' 'ABS' (CH1REU '-' CH2REU) ;
+                XREFREU = 'MAXI' 'ABS' CH2REU ;
+                'SI' (XREFREU '<' 1.) ;
+                  XREFREU = 1. ;
+                'FINSI' ;
+                'SI' (XDETREU '>'
+                      (WTAB . 'TOL_RAIDEUR_MAT' '*' XREFREU)) ;
+                  IRIGREU = FAUX ;
+                  'QUITTER' BDEVREU ;
+                'FINSI' ;
+              'FINSI' ;
+            'FIN' BDEVREU ;
+            'FINSI' ;
+*           aucune composante comparable : prudence, on recalcule
+            'SI' ('EGA' NDEVREU 0) ;
+              IRIGREU = FAUX ;
+            'FINSI' ;
+          'FINSI' ;
+        'SINON' ;
+*         materiau modifie sans parametre externe declare : on recalcule
+          IRIGREU = FAUX ;
+        'FINSI' ;
+      'FINSI' ;
+*     -- lois a endommagement : comparaison de la diagonale de la raideur
+*        elastique endommagee reconstruite avec l'etat courant (la
+*        matrice de Hooke n'est pas comparable par MAXI : composante
+*        MAHO de type matrice). Cout : un HOOK et un RIGI par pas.
+      'SI' (IRIGREU 'ET' ('OU' IENDOM IVIDOM)) ;
+        'SI' (WTAB . 'TOL_RAIDEUR_ENDO' '<' 0.) ;
+          IRIGREU = FAUX ;
+        'SINON' ;
+          'SI' ('EXIS' WTAB 'DIAG_RRRR') ;
+            HKNREU = 'HOOK' ZMODL MMMM ZVAR0 ;
+            RHNREU = 'RIGI' ZMODL HKNREU MMMM ;
+            DGNREU = 'EXTR' RHNREU 'DIAG' ;
+            XDVAREU = 'MAXI' 'ABS' (DGNREU '-' (WTAB . 'DIAG_RRRR')) ;
+            XRVAREU = 'MAXI' 'ABS' (WTAB . 'DIAG_RRRR') ;
+            'SI' (XRVAREU '<' 1.E-300) ;
+              XRVAREU = 1. ;
+            'FINSI' ;
+            'SI' (XDVAREU '>'
+                  (WTAB . 'TOL_RAIDEUR_ENDO' '*' XRVAREU)) ;
+              IRIGREU = FAUX ;
+            'FINSI' ;
+            'DETR' HKNREU ;
+            'DETR' RHNREU ;
+          'SINON' ;
+            IRIGREU = FAUX ;
+          'FINSI' ;
+        'FINSI' ;
+      'FINSI' ;
+*     -- reutilisation approchee (indice PASAPAS 'PERF_RAID_NIVEAU' = 2 ou
+*        'TOLERANCE_RAIDEUR_DIAG' > 0) : quelle que soit la cause du
+*        changement (T, endommagement, ...), la raideur est conservee si
+*        la diagonale de la raideur elastique reconstruite avec les
+*        caracteristiques et l'etat courants ne differe de celle de la
+*        raideur factorisee que de moins de la tolerance (relative).
+      'SI' ('NON' IRIGREU) ;
+        'SI' ((WTAB . 'TOL_RAIDEUR_DIAG' '>' 0.) 'ET'
+              (KNOCONV '<EG' 1) 'ET' ('EXIS' WTAB 'DIAG_RRRR')) ;
+          'SI' ('OU' IENDOM IVIDOM) ;
+            HKNREU = 'HOOK' ZMODL MMMM ZVAR0 ;
+            RHNREU = 'RIGI' ZMODL HKNREU MMMM ;
+            'DETR' HKNREU ;
+          'SINON' ;
+            RHNREU = 'RIGI' ZMODL MMMM ;
+          'FINSI' ;
+          DGNREU = 'EXTR' RHNREU 'DIAG' ;
+          XDVAREU = 'MAXI' 'ABS' (DGNREU '-' (WTAB . 'DIAG_RRRR')) ;
+          XRVAREU = 'MAXI' 'ABS' (WTAB . 'DIAG_RRRR') ;
+          'SI' (XRVAREU '<' 1.E-300) ;
+            XRVAREU = 1. ;
+          'FINSI' ;
+          'SI' (XDVAREU '<EG'
+                (WTAB . 'TOL_RAIDEUR_DIAG' '*' XRVAREU)) ;
+            IRIGREU = VRAI ;
+          'FINSI' ;
+          'DETR' RHNREU ;
+        'FINSI' ;
+      'FINSI' ;
+*     -- apres une non-convergence (sous-pas), une raideur approchee est
+*        toujours reconstruite exactement
+      IAPREU = (WTAB . 'TOL_RAIDEUR_DIAG' '>' 0.) 'OU'
+               (WTAB . 'TOL_RAIDEUR_ENDO' '>' 0.) 'OU'
+               (WTAB . 'TOL_RAIDEUR_MAT' '>' 1.E-9) ;
+      'SI' (IAPREU 'ET' (KNOCONV '>' 1)) ;
+        IRIGREU = FAUX ;
+      'FINSI' ;
+      'SI' IRIGREU ;
+        WTAB . 'RRRR' = WTAB . 'RRRR_MAT' ;
+        WTAB . 'NB_RAIDEUR_REUT' = WTAB . 'NB_RAIDEUR_REUT' + 1 ;
+      'FINSI' ;
+    'FINSI' ;
+  'FINSI' ;
+  'SI' ( ((WTAB.'RECARI' 'ET' ('NON' IRIGREU)) 'OU' IRAUG ) 'OU'
          ('NON' ('EXIS' WTAB 'RRRR')    ) 'OU' ('NEG' AA4 0));
+    WTAB . 'NB_RAIDEUR_CALC' = WTAB . 'NB_RAIDEUR_CALC' + 1 ;
     'SI' ('OU' IENDOM  IVIDOM ICERAM);
        HOOKENDO ='HOOK' ZMODL MMMM     ZVAR0;
        RH       ='RIGI' ZMODL HOOKENDO MMMM ;
@@ -870,6 +1069,19 @@ resmul = 1;
     'SI' ('EGA' ('DIME' ZCL) 0) ;
 *   Stockage de la rigidite pour eviter de la recalculer
     WTAB.'RRRR'=RRRR;
+*   PERF-RAID : copie conservee d'un pas a l'autre (PASAPAS detruit
+*   WTAB . 'RRRR' en fin de pas quand RECARI est vrai) avec le materiau,
+*   l'etat et la diagonale de la raideur qui ont servi a la construire
+      'SI' (IPERFRD 'ET' (WTAB . 'MATVAR' 'OU' IENDOM 'OU' IVIDOM)) ;
+        WTAB . 'RRRR_MAT' = RRRR ;
+        WTAB . 'ETAT_RRRR' = ETATRI ;
+        WTAB . 'MAT_RRRR' = MMMM ;
+        'SI' ((('OU' IENDOM IVIDOM) 'ET'
+               (WTAB . 'TOL_RAIDEUR_ENDO' '>EG' 0.)) 'OU'
+              (WTAB . 'TOL_RAIDEUR_DIAG' '>' 0.)) ;
+          WTAB . 'DIAG_RRRR' = 'EXTR' RH 'DIAG' ;
+        'FINSI' ;
+      'FINSI' ;
     'FINSI';
 *
   'SINON';
@@ -2573,9 +2785,15 @@ ZMATT = ZMAT    ;
       ZMATTEMP = ZMAT05;
     'FINS';
     'SI' ('OU' IENDOM IVIDOM ICERAM);
-        HOOKENDO = 'HOOK'          ZMODL ZMAT05 ZVAR0          ;
-        DEPST    = 'EPSI' 'LINE' ZMODL ZDEPT  HOOKENDO ZMAT05;
-        'DETR' HOOKENDO;
+      'SI' IHKSKIP ;
+*   PERF-RAID : matrice de Hooke inutile pour EPSI (modele sans coque DST)
+    WTAB . 'NB_HOOK_EVITE' = WTAB . 'NB_HOOK_EVITE' + 1 ;
+        DEPST    = 'EPSI' 'LINE' ZMODL ZDEPT ZMAT05 ;
+      'SINON' ;
+        HOOKENDO = 'HOOK' ZMODL ZMAT05 ZVAR0 ;
+        DEPST    = 'EPSI' 'LINE' ZMODL ZDEPT HOOKENDO ZMAT05 ;
+        'DETR' HOOKENDO ;
+      'FINSI' ;
     'SINON';
         DEPST            = 'EPSI' 'LINE' 'NOER' ZMODL ZDEPT ZMATTEMP ;
     'FINS';
@@ -2625,10 +2843,16 @@ ZMATT = ZMAT    ;
     'SI' IGRD;
       'FORM' GEOM1;
     'FINSI';
-    'SI' ('OU' IENDOM IVIDOM  ICERAM);
-      HOOKENDO = 'HOOK'          ZMODL ZMAT05 ZVAR0          ;
-      DEPST    = 'EPSI' 'LINE' ZMODL ZDEPT  HOOKENDO ZMAT05;
-      'DETR' HOOKENDO;
+    'SI' ('OU' IENDOM IVIDOM ICERAM);
+      'SI' IHKSKIP ;
+*   PERF-RAID : matrice de Hooke inutile pour EPSI (modele sans coque DST)
+    WTAB . 'NB_HOOK_EVITE' = WTAB . 'NB_HOOK_EVITE' + 1 ;
+        DEPST    = 'EPSI' 'LINE' ZMODL ZDEPT ZMAT05 ;
+      'SINON' ;
+        HOOKENDO = 'HOOK' ZMODL ZMAT05 ZVAR0 ;
+        DEPST    = 'EPSI' 'LINE' ZMODL ZDEPT HOOKENDO ZMAT05 ;
+        'DETR' HOOKENDO ;
+      'FINSI' ;
     'SINON';
        DEPST = 'EPSI' 'LINE' ZMODL ZDEPT ZMAT05;
     'FINSI';

@@ -961,6 +961,41 @@ WTAB.'MAT1' = 'MOT' 'INCONNU';
   WTAB1= 'ENLEVER' WTAB 'RRRR';
   PRECED .'WTABLE'= WTAB1;
 'FINSI';
+* PERF-RAID : idem pour les objets conserves par UNPAS et PAS_MATE (les
+* donnees materiau ou le modele peuvent changer avant un nouvel appel)
+WTAB2 = PRECED . 'WTABLE' ;
+LPURGE = 'MOTS' 'RRRR_MAT' 'ETAT_RRRR' 'MAT_RRRR' 'DIAG_RRRR' 'PMAT_MMM'
+         'PMAT_MA' 'PMAT_MO' 'PMAT_ETAT' 'HOOK_MOD' 'HOOK_INUTILE' ;
+'REPETER' BPURGE ('DIME' LPURGE) ;
+  NOMPURGE = 'EXTR' LPURGE &BPURGE ;
+  'SI' ('EXIS' WTAB2 NOMPURGE) ;
+    WTAB2 = 'ENLEVER' WTAB2 NOMPURGE ;
+  'FINSI' ;
+'FIN' BPURGE ;
+PRECED . 'WTABLE' = WTAB2 ;
+* PERF-RAID : diagnostic des reutilisations
+'SI' ('EXIS' WTAB2 'NB_RAIDEUR_REUT') ;
+  'SI' ('>' WTAB2 . 'NB_RAIDEUR_REUT' 0) ;
+    'MESS' 'PASAPAS : raideur reutilisee' WTAB2 . 'NB_RAIDEUR_REUT'
+           'fois (PERF-RAID)' ;
+  'FINSI';
+'FINSI';
+'SI' ('EXIS' WTAB2 'NB_RAIDEUR_CALC') ;
+  'MESS' 'PASAPAS : raideur recalculee' WTAB2 . 'NB_RAIDEUR_CALC'
+         'fois (PERF-RAID)' ;
+'FINSI';
+'SI' ('EXIS' WTAB2 'NB_HOOK_EVITE') ;
+  'SI' ('>' WTAB2 . 'NB_HOOK_EVITE' 0) ;
+    'MESS' 'PASAPAS : HOOK evite' WTAB2 . 'NB_HOOK_EVITE'
+           'fois (PERF-RAID)' ;
+  'FINSI';
+'FINSI';
+'SI' ('EXIS' WTAB2 'NB_MAT_REUT') ;
+  'SI' ('>' WTAB2 . 'NB_MAT_REUT' 0) ;
+    'MESS' 'PASAPAS : caracteristiques reutilisees'
+           WTAB2 . 'NB_MAT_REUT' 'fois (PERF-RAID)' ;
+  'FINSI';
+'FINSI';
 
 * Typage de la table en sortie de PASAPAS ;
 PRECED.'SOUSTYPE' = 'MOT' 'PASAPAS' ;
