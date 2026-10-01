@@ -4502,6 +4502,15 @@ XCONVMIN = XCONV; DPSMREF=DPSMAX/10;
   'SI' ('EXIS' TSTG ISTG3) ;
     XSTG3 = TSTG . ISTG3 ;
   'FINSI' ;
+*   trace PERF-RAID (une seule fois par table, a l'iteration 6)
+  'SI' ((IT '>EG' 6) 'ET' ('NON' ('EXIS' WTAB 'STAG_TRACE'))) ;
+    WTAB . 'STAG_TRACE' = VRAI ;
+    'MESS' ' PERF-RAID trace it=' IT ' XCONV=' XCONV ' XSTG3=' XSTG3 ' ZPREC=' ZPREC ;
+    'MESS' ' PERF-RAID trace NBRFR=' NBRFR ' ITRFR=' ITRFR ;
+    'SI' PASTEST ; 'MESS' ' PERF-RAID trace PASTEST vrai' ; 'FINSI' ;
+    'SI' NONCONV ; 'MESS' ' PERF-RAID trace NONCONV vrai' ; 'FINSI' ;
+    'MESS' ' PERF-RAID trace type ZVARF=' ('TYPE' ZVARF) ;
+  'FINSI' ;
   'SI' ((IT '>EG' 5) 'ET' ((IT - ITRFR) '>EG' 4) 'ET' (NBRFR '<' 3) 'ET'
         ('NON' PASTEST) 'ET' ('NON' NONCONV) 'ET'
         ('EGA' ('TYPE' ZVARF) 'MCHAML  ') 'ET'
