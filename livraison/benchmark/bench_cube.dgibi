@@ -57,9 +57,10 @@ EMAXB0 = 1.E-3 ;
 * avec un seul scenario (ex. LSCE = LECT 9 ; ou LECT 2 ;) et NREP0 = 1.
 IPROF0 = 0 ;
 * Mode de parallelisme impose a PASAPAS (indice 'PROCESSEURS') :
-* 'DEFAUT' (choix automatique de PAS_DEFA), 'MONO_PROCESSEUR',
-* 'COMPORTEMENT' ou 'AUTOMATIQUE'.
-MPROC0 = 'DEFAUT' ;
+*   0 : choix automatique de PAS_DEFA (defaut)   1 : mono processeur
+*   2 : seul le comportement (COMP) est reparti  3 : parallelisation totale
+* (un entier evite d'ecrire le mot COMPORTEMENT, lu comme l'operateur COMP)
+IPROC0 = 0 ;
 * Tolerances de comparaison des courbes force/section avec la variante
 * orig : niveau 1 (doit etre identique) et niveau 2 (approche)
 TOLN1 = 1.E-8 ;
@@ -268,8 +269,14 @@ REPETER BREP NREP0 ;
         TPAS1 . 'PRECISION' = PREC0 / ((FLOT NDIV0) ** 2) ;
         TPAS1 . 'PERF_RAID' = VPRF ;
         TPAS1 . 'PERF_RAID_NIVEAU' = VNIV ;
-        SI ('NON' (EGA MPROC0 'DEFAUT')) ;
-            TPAS1 . 'PROCESSEURS' = MOT MPROC0 ;
+        SI (IPROC0 EGA 1) ;
+            TPAS1 . 'PROCESSEURS' = 'MOT' 'MONO_PROCESSEUR' ;
+        FINSI ;
+        SI (IPROC0 EGA 2) ;
+            TPAS1 . 'PROCESSEURS' = 'MOT' 'COMPORTEMENT' ;
+        FINSI ;
+        SI (IPROC0 EGA 3) ;
+            TPAS1 . 'PROCESSEURS' = 'MOT' 'AUTOMATIQUE' ;
         FINSI ;
         MENAGE 'OBLI' ;
         TEMP 'ZERO' ;
