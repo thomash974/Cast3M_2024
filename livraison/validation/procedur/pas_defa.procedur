@@ -1461,6 +1461,14 @@ LOGERR2=VRAI;
 'SI' ('EXISTE' PRECED 'RAFRAICHISSEMENT_RAIDEUR') ;
   WTAB . 'PERF_STAG' = PRECED . 'RAFRAICHISSEMENT_RAIDEUR' ;
 'FINS' ;
+* PERF-RAID : rappel des options retenues (permet de verifier la version
+* des procedures chargees)
+'SI' ('EXISTE' PRECED 'PERF_RAID_NIVEAU') ;
+  'MESS' ' PERF-RAID : niveau demande' ' ' (PRECED . 'PERF_RAID_NIVEAU') ;
+'FINS' ;
+'SI' WTAB . 'PERF_STAG' ;
+  'MESS' ' PERF-RAID : rafraichissement de la raideur en cas de stagnation demande' ;
+'FINS' ;
 'SI' ('EXISTE' PRECED 'TOLERANCE_RAIDEUR_DIAG') ;
   WTAB . 'TOL_RAIDEUR_DIAG' = PRECED . 'TOLERANCE_RAIDEUR_DIAG' ;
 'FINS' ;
