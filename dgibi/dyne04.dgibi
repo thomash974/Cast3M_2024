@@ -1,0 +1,214 @@
+************************************************************************
+*
+*       VALIDATION DE L'OPTION LIAISON CONDITIONNELLE DE DYNE
+*                       DYNE04.DGIBI
+*
+*  ref : test1 du Rapport DMT/94.483 de De Langre
+*  reimporte dans la base des cas-test par BP en 2019
+*
+*  chute d'une grappe :
+*  oscillateur selon x 
+*  contact pour z \in [-1 -2] 
+*         z 
+*          |
+*          |---k---m    
+*          |_________x
+*
+*     -|    |- z=-1
+*     -|    |- 
+*     -|    |- z=-2
+*
+*
+************************************************************************
+
+OPTI DIME 3 ELEM SEG2;
+
+  GRAPH = FAUX;
+* GRAPH = VRAI; OPTI TRAC PSC POTR HELVETICA_16 EPTR 6;
+ 
+
+* POINT MATERIEL
+  A1 = 0. 0. 0.;
+* LIAISON SELON Z : orientation de la normale au plan, raideur de choc
+  v_z      = 0. 0. -1.;
+  k_z      = 1.E-2;
+  jeu_z1   = 1.;
+  jeu_z2   = 2.;
+* CHOC : orientation de la normale au plan, raideur de choc
+  v_x      = 1. 0. 0.;
+  kchoc    = 1.E4;
+  jeu_x    = 1.E-5;
+  typ_lia = mot 'POINT_PLAN';
+* typ_lia = mot 'POINT_PLAN_FROTTEMENT';
+
+
+************************************************************************
+*                           BASE MODALE 
+************************************************************************
+
+* MODE RIGIDE SELON Z
+  PSOL0 = 0. 0. 0.;
+  MSOL0 = 1.;
+  KSOL0 = 0.;
+  WSOL0 = (KSOL0/MSOL0)**0.5;
+  FREQSOL0 = WSOL0 / (2 * PI);
+  DEFSOL0  = MANU CHPO A1 UX 0. UZ 1. ;
+
+* MODE SELON X
+  PSOL1 = 0. 0. 0.;
+  MSOL1 = 1.;
+  KSOL1 = 200.;
+  WSOL1 = (KSOL1/MSOL1)**0.5;
+  FREQSOL1 = WSOL1 / (2 * PI);
+  DEFSOL1  = MANU CHPO A1 UX 1. UZ 0. ;
+
+* BASE MODALE
+  TBAS = TABL 'BASE_MODALE';
+  TBAS . 'MODES' = TABL 'BASE_DE_MODES';
+
+  TABSOL0 = TABL 'MODES';
+  TABSOL0 . 'POINT_REPERE'      = PSOL0;
+  TABSOL0 . 'FREQUENCE'         = FREQSOL0;
+  TABSOL0 . 'MASSE_GENERALISEE' = MSOL0;
+  TABSOL0 . 'DEFORMEE_MODALE'   = DEFSOL0;
+  TBAS . 'MODES' . 1 = TABSOL0;
+
+  TABSOL1 = TABL 'MODES';
+  TABSOL1 . 'POINT_REPERE'      = PSOL1;
+  TABSOL1 . 'FREQUENCE'         = FREQSOL1;
+  TABSOL1 . 'MASSE_GENERALISEE' = MSOL1;
+  TABSOL1 . 'DEFORMEE_MODALE'   = DEFSOL1;
+  TBAS . 'MODES' . 2 = TABSOL1;
+
+
+************************************************************************
+*                           LIAISONS
+************************************************************************
+
+  TLIA = TABL 'LIAISON';
+
+  TLB  = TABL 'LIAISON_B';
+  TLIA . 'LIAISON_B' = TLB;
+
+* LIAISONS UTILES UNIQUEMENT POUR IMPOSER DES CONDITIONS SUR Z
+  TLZ1 = TABL 'LIAISON_ELEMENTAIRE';
+  TLZ1 . 'TYPE_LIAISON' = mot typ_lia;
+  TLZ1 . 'SUPPORT'      = A1;
+  TLZ1 . 'NORMALE'      = v_z;
+  TLZ1 . 'RAIDEUR'      = k_z;
+  TLZ1 . 'JEU'          = jeu_z1;
+
+  TLZ2 = TABL 'LIAISON_ELEMENTAIRE';
+  TLZ2 . 'TYPE_LIAISON' = mot typ_lia;
+  TLZ2 . 'SUPPORT'      = A1;
+  TLZ2 . 'NORMALE'      = v_z;
+  TLZ2 . 'RAIDEUR'      = k_z;
+  TLZ2 . 'JEU'          = jeu_z2;
+
+* VRAIE LIAISON CONDITIONNELLE SELON X
+  TLX = TABL 'LIAISON_ELEMENTAIRE';
+  TLX . 'TYPE_LIAISON' = mot typ_lia;
+  TLX . 'SUPPORT'      = A1;
+  TLX . 'NORMALE'      = v_x;
+  TLX . 'RAIDEUR'      = kchoc;
+  TLX . 'JEU'          = jeu_x;
+  TLX .   TLZ1  = VRAI ;
+  TLX .   TLZ2  = FAUX ;
+
+* STOCKAGE  
+  TLB . 1 = TLZ1;
+  TLB . 2 = TLZ2;
+  TLB . 3 = TLX;
+
+  
+************************************************************************
+*                           SORTIES
+************************************************************************
+ 
+  TSORT = TABLE 'SORTIE'; 
+  
+  TSORV = TABLE 'VARIABLE';
+  TSORV . 'TYPE_SORTIE' = MOT 'LISTREEL';
+  
+  TSORT . 'VARIABLE' = TSORV;
+  
+  TSORLB = TABLE 'LIAISON_B';
+  TSORLB . TLZ1 = VRAI;
+*   TSORLB . TLZ2 = VRAI;
+  TSORLB . TLX  = VRAI;
+  TSORT . 'LIAISON_B' = TSORLB;
+
+  
+************************************************************************
+*                      PARAMETRES TEMPORELS
+************************************************************************
+
+* PAS DE TEMPS, NOMBRE DE PAS, SORTIE TOUS LES NSORT
+  DT    = 1.E-3;
+  NPAS  = 3000;
+  NSORT = 2;
+ 
+  
+************************************************************************
+*                      CONDITIONS INITIALES
+************************************************************************
+ 
+  X0 = -1;
+  VZ0 = -1.;
+  
+  TINIT = TABL 'INITIAL';
+  TINIT . 'DEPLACEMENT' = MANU CHPO PSOL1 1 'ALFA'  X0;
+  TINIT . 'VITESSE'     = MANU CHPO PSOL0 1 'ALFA' VZ0;
+  
+  
+************************************************************************
+*                      INTEGRATION TEMPORELLE                               
+************************************************************************
+*   opti impi 333;
+  TDYNE = DYNE 'DE_VOGELAERE' TBAS TLIA TSORT TINIT 
+                              NPAS DT   NSORT ;
+*   opti impi 0;
+ 
+  
+************************************************************************
+*                           POST TRAITEMENT
+************************************************************************
+ 
+pr_time = TDYNE . 'TEMPS_DE_SORTIE'; 
+
+ev_z = EVOL 'MARI' MANU  'LEGE' 'u_{z}'  't' pr_time 'u' (TDYNE . TLZ1 . 'UZ');
+ev_x = EVOL 'ROUG' MANU  'LEGE' 'u_{x}'  't' pr_time 'u' (TDYNE . TLZ1 . 'UX');
+
+ev_FX = EVOL 'ROUG' MANU  'LEGE' 'F_{x}'  't' pr_time 'u' (TDYNE . TLX . 'FORCE_DE_CHOC');
+ 
+si GRAPH;
+  DESS (ev_z ET ev_x) LEGE ;
+  DESS  ev_FX;
+finsi;
+
+ 
+************************************************************************
+*                        TESTs DE NON REGRESSION
+************************************************************************
+
+ux1 = MAXI (EXTR (EXTR ev_x 'COMP' 2.5 2.7) 'ORDO') ;
+err_ux1 = ABS (ux1 - 1.); 
+
+fx1 = MAXI 'ABS' (EXTR ev_FX 'ORDO') ;
+err_fx1 = ABS (fx1 - 1400.) / 1400.; 
+
+mess err_ux1 err_fx1;
+si ((err_ux1 > 1.E-3) OU (err_fx1 > 1.E-3));
+  ERRE 5;
+finsi;
+ 
+FIN ; 
+ 
+
+ 
+ 
+ 
+ 
+ 
+ 
+

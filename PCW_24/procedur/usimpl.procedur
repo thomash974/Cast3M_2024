@@ -1,0 +1,131 @@
+$$$$ USIMPL
+* USIMPL    PROCEDUR  MB234859  24/02/06    21:15:04     11833          
+***********************************************************************
+*                         PROCEDURE USIMPL 
+*
+* Procedure pour appliquer l'usure en utilisant un schema implicite :
+* - le facteur de saut de cycle est determine (USACCE)
+* - un increment d'usure relaxe est calcule
+* - Si le critere de convergence est satisfaisant :
+*   - des post-traitements intermediaires sont realises (USPOST)
+*   - les maillages sont actualises (USDEPL) et passage au cycle 
+*     suivant
+* - Sinon
+*   - les maillages sont actualises (USDEPL) et le cycle est 
+*     recalcule
+*
+* Il s'agit du schema developpe par Q.Caradec lors de sa these.
+*
+* Entrees :
+*   T1    : Table de PASAPAS
+*
+* Appelee par USURE
+*
+************************************************************************
+'DEBP' USIMPL T1*'TABLE' ;
+*
+  'MESS' ; 'MESS' '[Schema implicite] Cycle' ' 'CycActu;
+*
+  LMSCAL   = 'MOTS' 'SCAL' ;
+  BOITE_US = T1.'BOITES_USURE' ; 
+  nNewton  = BOITE_US.'INFOS'.'ITERATION_NEWTON';
+  CycActu  = BOITE_US.'INFOS'.'INDICE_CYCLE_ACTUEL';
+  NbCycRe  = BOITE_US.'INFOS'.'NB_CYCLES_RESTANTS' ;
+*-----------------------------------------------------------------------
+* - FACTEUR D'ACCELERATION
+*-----------------------------------------------------------------------
+  deltaN = USACCE T1 ;
+*-----------------------------------------------------------------------
+* - FACTEUR DE RELAXATION (APPLIQUE A L INCREMENT D'USURE)
+*-----------------------------------------------------------------------
+  xcompt = BOITE_US.'INFOS'.'RELAX_COMPTEUR' ;
+  xpower = BOITE_US.'INFOS'.'RELAX_EXPOSANT' ;
+  'SI' (xcompt '>' (2 '**' xpower));
+    xpower = xpower '+' 1 ;
+    BOITE_US.'INFOS'.'RELAX_COMPTEUR' = 1;
+    BOITE_US.'INFOS'.'RELAX_EXPOSANT' = xpower ;
+  'SINON';
+    BOITE_US.'INFOS'.'RELAX_COMPTEUR' = xcompt '+' 1; 
+  'FINSI';
+  xrelfa = 0.5 '**' xpower ;
+*-----------------------------------------------------------------------
+* - PROFIL D'USURE POUR LE CYCLE CALCULE ET CRITERE DE CONVERGENCE
+*-----------------------------------------------------------------------
+  critConv = 0. ; crit0 = 0. ;
+  'REPE' BU BOITE_US.'INFOS'.'N_BOITES';
+*  
+    UsureIni = BOITE_US. &BU .'USURE_TOT'. (CycActu '-' 1) ;
+    UsurePre = BOITE_US. &BU .'USURE_TOT_K'. nNewton ;
+    VitUsure = BOITE_US. &BU .'VITESSE_USURE' ;
+*
+    IncUsure = UsureIni '+' (deltaN '*' VitUsure) '-' UsurePre ;
+    IncUsRel = xrelfa '*' IncUsure ;
+    zcrit    = 'PSCA' IncUsure IncUsure LMSCAL LMSCAL ;
+    critConv = critConv '+' (('SOMT' zcrit) '**' 0.5) ;
+    'SI' (('EGA' CycActu 1) 'ET' ('EGA' nNewton 1)) ;
+      critt = 'PSCA' VitUsure VitUsure LMSCAL LMSCAL ;
+      crit0 = crit0 '+' (('SOMT' critt) ** 0.5);
+    'FINSI';
+*
+    BOITE_US. &BU .'VIT_USURE_K'. nNewton    = VitUsure ;
+    BOITE_US. &BU .'INC_USURE_K'. nNewton    = IncUsRel ;
+    BOITE_US. &BU .'USURE_TOT_K'.(nNewton+1) = UsurePre '+' IncUsRel;
+  'FIN' BU;
+  'SI' (('EGA' CycActu 1) 'ET' ('EGA' nNewton 1)) ;
+    BOITE_US.'INFOS'.'CRITERE_CONV' = crit0 ;
+  'FINSI';
+  MSGZ = 'CHAI' ' Iteration' ' 'nNewton' Critere ='critConv;
+*-----------------------------------------------------------------------
+* - PROFIL D'USURE A APPLIQUER ET TEST DE CONVERGENCE
+*-----------------------------------------------------------------------
+  'SI' ((critConv '<' (0.001 '*' deltaN '*' BOITE_US.'INFOS'.'CRITERE_CONV'))
+        'OU' (nNewton '>' 40));
+*
+    MSGZ = 'CHAI' MSGZ ' ==> Convergence';
+*
+    BOITE_US.'INFOS'.'SCH_CONV' = VRAI ;
+    BOITE_US.'INFOS'.'NB_CYCLES_RESTANTS' = NbCycRe '-' deltaN ;
+*
+    critConvRef = 0. ;
+    'REPE' BU BOITE_US.'INFOS'.'N_BOITES';
+*
+      UsureFin = BOITE_US. &BU .'USURE_TOT_K'. nNewton ;
+      VitUsFin = BOITE_US. &BU .'VIT_USURE_K'. nNewton ;
+      IncUsFin = deltaN '*' VitUsFin ;
+*
+      zcritRef = 'PSCA' VitUsFin VitUsFin LMSCAL LMSCAL ;
+      critConvRef = critConvRef '+' (('SOMT' zcritRef) '**' 0.5) ;
+*
+      BOITE_US. &BU .'USURE_TOT'. CycActu = UsureFin ;
+      BOITE_US. &BU .'INC_USURE'. CycActu = IncUsFin ;
+      BOITE_US. &BU .'VIT_USURE_K'        = 'TABLE';
+      BOITE_US. &BU .'INC_USURE_K'        = 'TABLE';
+      BOITE_US. &BU .'USURE_TOT_K'        = 'TABLE';
+      BOITE_US. &BU .'USURE_TOT_K'. 1     = UsureFin '+' IncUsFin ;
+*
+*     Post-traitement supplementaire    
+      USPOST T1 &BU; 
+*     Application du profil d'usure au maillage
+      BOITE_US. &BU .'USURE_CYCLE' = IncUsFin ;
+      USDEPL T1 &BU;
+*
+    'FIN' BU;
+    BOITE_US.'INFOS'.'ITERATION_NEWTON' = 1;
+    BOITE_US.'INFOS'.'CRITERE_CONV'     = critConvRef;
+    BOITE_US.'INFOS'.'RELAX_COMPTEUR'   = 1;
+    BOITE_US.'INFOS'.'RELAX_EXPOSANT'   = 1;
+    BOITE_US.'POST'.'NITER_CONV_NEWTON'. CycActu = nNewton;
+*
+  'SINON';
+*
+    'REPE' BU BOITE_US.'INFOS'.'N_BOITES';
+      BOITE_US. &BU .'USURE_CYCLE' = BOITE_US. &BU .'INC_USURE_K'. nNewton;
+      USDEPL T1 &BU;
+    'FIN' BU;
+    BOITE_US.'INFOS'.'ITERATION_NEWTON' = nNewton '+' 1 ;
+  'FINSI';
+*-----------------------------------------------------------------------
+  'MESS' MSGZ ;
+*-----------------------------------------------------------------------
+'FINP' ;
+ 

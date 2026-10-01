@@ -1,0 +1,50 @@
+$$$$ POINTCYL NOTICE  FD218221  20/06/17    21:15:08     10629          
+                                             DATE     20/06/17
+
+    Procedure POINTCYL                       Voir aussi : POINTSPH
+    ------------------
+
+    POIN1 = POINTCYL  RAY1 FLOT1 (FLOT2) ;
+
+
+Section : Maillage Points
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    La procedure POINTCYL permet de definir un point (ou un maillage de points)
+par des coordonnees cylindriques.
+
+    Commentaire :
+    _____________
+
+    RAY1  : rayon (type FLOTTANT ou LISTREEL)
+
+    FLOT1 : angle en degres (type FLOTTANT ou LISTREEL)
+
+    FLOT2 : cote (en 3D) (type FLOTTANT ou LISTREEL)
+
+    POIN1 : point, ou MAILLAGE de points si l'on utilise des LISTREEL
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The POINTCYL operator makes it possible to define a point (or a group of points)
+ by cylindrical coordinates.
+
+    Contents :
+    __________
+
+    RAY1  : radius (FLOTTANT or LISTREEL type)
+
+    FLOT1 : angle in degrees (FLOTTANT or LISTREEL type)
+
+    FLOT2 : side (in 3D) (FLOTTANT or LISTREEL type)
+
+    POIN1 : point, or group of points (MAILLAGE type object) if LISTREELs
+            are given
+
+$$$$
+ 

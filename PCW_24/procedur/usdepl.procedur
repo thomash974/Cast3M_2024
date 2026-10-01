@@ -1,0 +1,105 @@
+$$$$ USDEPL
+* USDEPL    PROCEDUR  MB234859  24/02/06    21:15:03     11833          
+************************************************************************
+*                         PROCEDURE USDEPL
+*
+* Procedure qui applique le profil d'usure au maillage.
+*
+* Entrees :
+*   T1    : Table de PASAPAS
+*   ID_BU : Entier donnant le numero de la BOITE D'USURE a considerer
+*
+* Appelee par USEXPL ou USIMPL
+*
+************************************************************************
+'DEBP' USDEPL T1*'TABLE' ID_BU*'ENTIER'; 
+*
+  BOITE_US = T1.'BOITES_USURE' ; 
+  BUSURE   = BOITE_US. ID_BU ;
+  VOL_REPA = BUSURE.'VOLUME_REPARTITION' ; 
+  SUR_APPL = BUSURE.'SURFACE_APPLICATION' ;
+  LF       = BOITE_US.'INFOS'.'LFORCE' ;
+  LU       = BOITE_US.'INFOS'.'LDEPLA' ;
+  LS       = BOITE_US.'INFOS'.'LSCAL' ;
+*-----------------------------------------------------------------------
+* - FACTEUR MULTIPLICATIF POUR APPLIQUER L'USURE DANS VOL_REPA
+*-----------------------------------------------------------------------
+  MAIL3 = BUSURE.'MAIL_PSIP' ;
+  'SI' BOITE_US.'INFOS'.'ITRID' ;
+    CDIST CDISN CDISP = 'PSIP' VOL_REPA SUR_APPL 'TROIS' MAIL3 ;
+  'SINON' ;
+    CDIST CDISN = 'PSIP' VOL_REPA SUR_APPL 'DEUX' MAIL3 ;
+  'FINSI' ; 
+* CDIST = 'ABS' CDIST ;
+  CDISN = 'ABS' CDISN ;
+  NOMDISN = 'EXTR' ('EXTR' CDISN 'COMP') 1;
+  NOMDIST = 'EXTR' ('EXTR' CDIST 'COMP') 1;
+  EPBOX = -1. * ('MAXI' CDISN) ;
+  CHPUN = 'MANU' 'CHPO' VOL_REPA 1 NOMDISN 1. ;
+  TauxU = (CDISN / EPBOX) '+' CHPUN ;
+  TauxU = 'CHAN' TauxU 'COMP' 'SCAL' ;
+*-----------------------------------------------------------------------
+* - PROFIL D USURE A APPLIQUER EN CHAQUE NOEUD DE VOL_REPA
+*-----------------------------------------------------------------------
+  CHUSURE = BUSURE.'USURE_CYCLE' '*' BUSURE.'VNORM_INTE' LS LF LU ;
+  ChProf = 'VIDE' 'CHPOINT' ;
+*
+  CDISTS = 'REDU' CDIST SUR_APPL ;
+  CUSURE = 'REDU' ('CHAN' 'ATTRIBUT' CHUSURE 'NATURE' 'DIFFUS') SUR_APPL ;
+  CHPTMP0 = CDIST ;
+  CHPTMP1 = CDISTS 'ET' CUSURE ;
+  'SI' BOITE_US.'INFOS'.'ITRID' ;
+    CDISPS = 'REDU' CDISP SUR_APPL ;
+    CHPTMP0 = CHPTMP0 'ET'  CDISP ;
+    CHPTMP1 = CDISPS 'ET' CHPTMP1 ;
+*** NUAGTMP = 'NUAG' (CDISTS 'ET' CDISPS 'ET' CUSURE) ;
+*** CHPOTMP = 'IPOL' (CDIST 'ET' CDISP) NUAGTMP 'PID' ;
+*** ChProf  = ChProf 'ET' CHPOTMP ;
+*
+  'SINON' ;
+*
+  SI FAUX ;
+    VALDIST = 'REDU' CDIST SUR_APPL ;
+    VALDIST = ('CHAN' 'COMP' BUSURE.'CZERO' NOMDIST) 'ET' 
+      ('CHAN' 'ATTRIBUT' VALDIST 'NATURE' 'DISCRET')  ;
+    ABSDIST = 'EXTR' VALDIST 'VALE' ; 
+    'REPE' BCOMP ('DIME' LU) ;
+      NOMCOMP = 'EXTR' LU &BCOMP ; 
+      VALCOMP = 'EXCO' CHUSURE NOMCOMP NOMCOMP ;
+      VALETMP = 'EXTR' VALCOMP 'VALE' ;
+****  EVOLTMP = 'EVOL' 'MANU' ABSDIST VALETMP ;
+**
+***   LABSC = 'PROG' ; LORDO = 'PROG' ;
+***   'REPE' BNOEUD ('NBNO' SUR_APPL) ;
+***     NODE = SUR_APPL 'POIN' &BNOEUD ;
+***     LABSC = LABSC 'ET' ('EXTR' VALDIST 'VALE' NODE) ; 
+***     LORDO = LORDO 'ET' ('EXTR' VALCOMP 'VALE' NODE) ; 
+***   'FIN' BNOEUD ;
+***   EVOLTMP = 'EVOL' 'MANU' LABSC LORDO ;
+**
+****  CHPOTMP = 'IPOL' CDIST EVOLTMP ;
+****  ChProf  = ChProf 'ET' ('CHAN' 'COMP' CHPOTMP NOMCOMP) ;
+**
+      NUAGTMP = 'NUAG' 'COMP' NOMDIST ABSDIST 'COMP' NOMCOMP VALETMP ;
+      CHPOTMP = 'IPOL' NUAGTMP CDIST 'GRILL' ;
+      ChProf  = ChProf 'ET' CHPOTMP ;
+**  
+    'FIN' BCOMP ;
+  'FINSI' ;
+  'FINSI' ;
+  NUAGTMP = 'NUAG' CHPTMP1 ;
+  CHPTMP2 = 'IPOL' CHPTMP0 NUAGTMP 'PID' ;
+  CHPO_Dep = TauxU * CHPTMP2 ;
+*-----------------------------------------------------------------------
+* - MODIFICATIONS DU CHAMP DE DEPLACEMENTS ET DE LA CONFIGURATION
+*-----------------------------------------------------------------------
+  T1.'ESTIMATION'.'DEPLACEMENTS' = 
+    (T1.'ESTIMATION'.'DEPLACEMENTS') + CHPO_Dep ;
+*  
+* Deplacement des noeuds dans la configuration deformee
+  'FORM' T1.'WTABLE'.'GE0_DEB' ;
+  'DEPL' VOL_REPA 'PLUS' CHPO_Dep ;
+  'FORM' T1.'WTABLE'.'FOR0' ;
+*-----------------------------------------------------------------------
+'FINP' ; 
+ 

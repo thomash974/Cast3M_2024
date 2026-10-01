@@ -1,0 +1,77 @@
+$$$$ TAN      NOTICE  PASCAL    22/07/13    21:15:09     11409          
+                                             DATE     22/07/13
+
+      RESU1 = 'TAN'   OBJET1 (MOT1) ;
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur TAN                            Voir aussi : COS  SIN
+    --------------                                        ACOS ASIN ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH ATAH
+                                                          
+    Objet :
+    _______
+
+    L'operateur TAN calcule la tangente de l'objet OBJET1.
+    Les valeurs de OBJET1 doivent etre exprimees en degres.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remarque :
+    __________
+      
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+
+ANGL====================================================================
+
+    Operator  TAN                            See also :   COS  SIN
+    -------------                                         ACOS ASIN ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH ATAH
+                                                          
+    Description :
+    ____________
+
+    The TAN operator calculates the tangent of the OBJET1 object.
+    The values of OBJET1 must be expressed in degrees.
+    
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remark :
+    _______
+      
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$ 
+ 

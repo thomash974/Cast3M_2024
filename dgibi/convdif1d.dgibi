@@ -1,0 +1,135 @@
+* fichier : convdif1d.dgibi
+************************************************************************
+* Section : Fluides Permanent
+* Section : Fluides Diffusion
+* Section : Fluides Convection
+************************************************************************
+* NOM         : CONVDIF1D
+* DESCRIPTION : 1D convection-diffusion equation
+*               
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 03/10/2008, version initiale
+* HISTORIQUE : v1, 03/10/2008, création
+************************************************************************
+*
+'OPTION' 'DIME' 2 'ELEM' 'QUA8' ;
+graph = FAUX ;
+*
+* Exact Solution : (1 - exp (2 Pe x)) / (1 - exp (2 Pe))
+* 
+'DEBPROC' solex ;
+'ARGUMENT' pe*'FLOTTANT' ;
+pe2 = '*' pe 2 ;
+lx = 'PROG' 0. 'PAS' 1.D-3 1. ;
+l1 = 'PROG' ('DIME' lx) * 1. ;
+num = '-' l1 ('EXP' ('*' lx pe2)) ;
+den = '-' 1. ('EXP' pe2) ;
+ly  = '/' num den ;
+evex = 'EVOL' 'MANU' lx ly ;
+'RESPRO' evex ;
+'FINPROC' ;
+*
+Peclet  = 10. ;
+*
+*
+* nmail    : number of mesh elements
+* dmail    : refinement factor at the right boundary (>= 1)
+* idecent = 1 : centered discretization for the convective term
+* idecent = 2 : SUPG numerical diffusion
+* cmd      : multiplicative coefficient for the SUPG numerical diffusion
+*            term 
+
+
+nmail = 6  ;
+dmail = 1. ;
+idecent = 1 ;
+cmd = 0.5 ; 
+* Densities
+dmoy = '/' 1. ('FLOTTANT' nmail) ;
+dini = '*' dmoy dmail ;
+dfin = '/' dmoy dmail ;
+* Upwinding
+'SI' ('EGA' idecent 1) ;
+   typdec = 'CENTREE' ;
+   niter  = 1 ;
+'FINSI' ;   
+'SI' ('EGA' idecent 2) ;
+   typdec = 'SUPG' ;
+   niter  = 1 ;
+'FINSI' ;
+*
+* Mesh
+*
+p0 = 0. 0. ; p1 = 1. 0. ;
+lt = 'DROIT' ('*' nmail -1) p0 p1 'DINI' dini 'DFIN' dfin ;
+bas = lt ;
+mt  = 'TRANSLATION' lt 1 (0. 1.) ;
+gau = 'COTE' 4 mt ;
+dro = 'COTE' 2 mt ;
+_bas = 'CHANGER' bas 'QUAF' ;
+_gau = 'CHANGER' gau 'QUAF' ;
+_dro = 'CHANGER' dro 'QUAF' ;
+_mt  = 'CHANGER' mt 'QUAF' ;
+'ELIMINATION' (_mt 'ET' _bas 'ET' _gau 'ET' _dro) 1.D-6 ;
+$mt = 'MODE' _mt 'NAVIER_STOKES' 'LINE' ;
+$bas = 'MODE' _bas 'NAVIER_STOKES' 'LINE' ;
+$gau = 'MODE' _gau 'NAVIER_STOKES' 'LINE' ;
+$dro = 'MODE' _dro 'NAVIER_STOKES' 'LINE' ;
+mt = 'DOMA' $mt 'MAILLAGE' ;
+bas = 'DOMA' $bas 'MAILLAGE' ;
+gau = 'DOMA' $gau 'MAILLAGE' ;
+dro = 'DOMA' $dro 'MAILLAGE' ;
+*
+* Problem description 
+*
+rv = 'EQEX' 'NITER' niter 
+     'OPTI' 'EF' 'IMPL' typdec 'CMD' cmd 
+     'ZONE' $mt 'OPER' 'KONV' 1. 'UN' 'ALF' 'INCO' 'TN'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $mt 'OPER' 'LAPN' 'ALF' 'INCO' 'TN'
+     'CLIM' gau 'TN' 'TIMP' 0.
+     'CLIM' dro 'TN' 'TIMP' 1.
+      ;
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' (1. 0.) ;
+rv . 'INCO' . 'ALF' = 'KCHT' $mt 'SCAL' 'CENTRE' ('/' 0.5 Peclet) ;
+rv . 'INCO' . 'TN'  = 'KCHT' $mt 'SCAL' 'SOMMET' 0. ;
+*
+EXEC rv ;
+*
+* Post treatment
+*
+tn = rv . 'INCO' . 'TN' ;
+evt = 'EVOL' 'CHPO' tn 'SCAL' bas ;
+evx = SOLEX Peclet ;
+evtot = evt 'ET' evx ;
+*
+tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+tabt . 'TITRE' . 1 = 'CHAINE' 'Sol. App.' ;
+tabt . 'TITRE' . 2 = 'CHAINE' 'Sol. Exa.' ;
+'SI' graph ;
+   'DESSIN' evtot 'TITX' 'X' 'TITY' 'T'
+          'TITR' ('CHAINE' 'Peclet=' Peclet)
+          'LEGE' tabt ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;
+*
+* End of dgibi file CONVDIF1D
+*
+'FIN' ;
+
+ 
+

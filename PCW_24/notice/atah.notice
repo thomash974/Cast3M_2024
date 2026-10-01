@@ -1,0 +1,77 @@
+$$$$ ATAH     NOTICE  PASCAL    22/07/13    21:15:03     11409          
+                                             DATE     22/07/13
+
+      RESU1 = 'ATAH'  OBJET1 (MOT1) ;
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur ATAH                           Voir aussi : COS  SIN  TAN
+    --------------                                        ACOS ASIN ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH
+
+    Objet :
+    _______
+
+    L'operateur ATAH calcule l'arc tangente hyperbolique de l'objet 
+    OBJET1.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remarque :
+    __________
+    
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+
+ANGL====================================================================
+
+    Operator ATAH                            See also :   COS  SIN  TAN
+    -------------                                         ACOS ASIN ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH
+
+    Description :
+    ____________
+
+    The ACOH operator calculates the reverse function of the hyperbolic 
+    tangent of the OBJET1 object.    
+    
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remark :
+    _______
+      
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$ 
+ 

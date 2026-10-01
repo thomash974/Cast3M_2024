@@ -1,0 +1,36 @@
+$$$$ REPIX    NOTICE  GOUNAND   22/11/22    21:15:03     11504          
+                                             DATE     22/11/22
+
+    Procedure REPIX                          Voir aussi : EQEX EXEC
+    ---------------
+
+    REPIX TAB1 ;
+
+
+Section : Fluides Resolution
+
+FRAN====================================================================
+    Objet :
+    _______
+
+    Cette procedure "nettoie" les objets encombrants en memoire
+    (matrices) de la table TAB1 de sous type EQEX utilisee
+    en mecanique des fluides.
+
+    Commentaires :
+    ______________
+
+    TAB1 : Table de sous type EQEX creee par l'operateur EQEX.
+
+ANGL====================================================================
+    Description :
+    _____________
+
+    This procedure deletes memory consuming objects (matrices) in the
+    table TAB1 of subtype EQEX (used in fluid mechanics framework).
+
+    Contents :
+    __________
+
+    TAB1 : Table type, EQEX subtype ; created by EQEX operator.
+ 

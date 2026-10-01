@@ -1,0 +1,66 @@
+* fichier mfil.dgibi
+************************************************************************
+************************************************************************
+
+************************************************************************
+** Filtering of a field using a rigidity matrix genrated by MFIL.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 1.0 2021/01/04 Original version compatible with MFIL V1.0
+** 1.1 2021/01/07 Version compatible with MFIL V1.1
+************************************************************************
+
+* General options
+OPTI 'DIME' 2 'MODE' 'PLAN' 'CONT' 'ELEM' QUA4 ;
+graph0 = FAUX ;
+
+* Filtering radius
+r0 = 5.0 ;
+
+* Mesh
+p0 = 0.0 0.0 ;
+p1 = 0.0 100.0 ;
+p2 = 100.0 0.0 ;
+lgn0 = DROI 100 p1 p0 ;
+msh0 = TRAN lgn0 100 p2 ;
+
+* Model
+mod0 = MODE msh0 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' ;
+* Material
+mat0 = MATE mod0 'YOUN' 200.0e9 'NU' 0.3 'RHO' 1.0 ;
+
+* Volume node field (as rho = 1)
+vol0 = EXCO 'FX' ((MASS mod0 mat0) * (MANU 'CHPO' msh0 1 'UX' 1.0)) ;
+* Rigidity matrix for filtering
+filter0 = MFIL vol0 r0 ;
+
+* Create a node field to be filtered
+pnt0 = ((msh0 POIN 'DROI' (100.0 0.0) (60.0 100.0) 10.0) 
+              POIN 'DROI' (0.0  60.0) (100.0 60.0) 30.0)
+     ET (msh0 POIN 'SPHE' (40.0 30.0) (40.0 50.0) 5.0)
+     ET (msh0 POIN 'SPHE' (-50.0 150.0) (50.0 150.0) 15.0) ;
+field0 = (MANU 'CHPO' msh0 1 'SCAL' 0.0 'NATURE' 'DIFFUS')
+       + (MANU 'CHPO' pnt0 1 'SCAL' 1.0 'NATURE' 'DIFFUS') ;
+
+* Filter the node field
+field1 = field0 * filter0 ;
+
+* Plot the field to screen before filtering
+SI graph0 ;
+    TRAC field0 (msh0 CHAN 'POI1') ;
+    TRAC field0 msh0 ;
+FINS ;
+
+* Plot the field to screen after filtering
+SI graph0 ;
+    TRAC field1 (msh0 CHAN 'POI1') ;
+    TRAC field1 msh0 ;
+FINS ;
+
+FIN ;
+
+ 
+

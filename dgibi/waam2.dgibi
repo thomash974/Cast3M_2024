@@ -1,0 +1,614 @@
+opti debu 1 ;
+* fichier waam2.dgibi
+* section : thermique conduction convection mecanique plastique
+*----------------------------------------------------------------------*
+*                         W A A M 2 . D G I B I                        *
+*----------------------------------------------------------------------*
+* Objet :
+* -------
+*
+*    Exemple de simulation thermomecanique d'un depot de matiere WAAM.
+* L'exemple simule la realisation d'un "mur" sur la tranche d'une tole
+* en acier inox (donnees 316L issues de la litterature, ref. fournie).
+*
+*    On modelise la conduction, la convection avec le milieu ambiant
+* et la source de chaleur selon une distribution gaussienne.
+*
+*     Le comportement mecanique est elastoplastique avec un ecrouissage
+* isotrope.
+*
+*    L'apport de matiere est defini a l'aide d'un chargement de nom MODE
+* qui decrit l'evolution du modele au cours du temps. Un chargement de
+* nom MATE definit celle de ses caracteristiques.
+*
+*    La modelisation fait appel aux procedures SOUDAGE et WAAM pour
+* definir la sequence de soudage et la mailler.
+*
+*    On resout la thermique et la mecanique separemment, par deux appels
+* distincts a la procedure PASAPAS.
+*
+*    Enfin, ce cas-test sert de validation a la prise en compte de la
+* FUSION du materiau dans le calcul du comportement. Pour cela, on verifie
+* que les def. inelastiques et variables internes sont nulles aux pts
+* d'integration ou T > Tfusion a l'aide de la procedure PERSO1.
+* 
+* Description :
+* -------------
+*
+* Type de calcul : Thermique, Mecanique
+* Mode de calcul : 3D
+* Type d'element : CUB8
+* Chargement     : Source de chaleur, Convection, Apport de matiere
+*
+*----------------------------------------------------------------------*
+*
+opti dime 3 elem cub8 ;
+
+* icomplet = vrai : simulation de 10 passes de couches WAAM
+* icomplet = faux : 10 premiers pas de temps 
+* ivalid : mettre a vrai pour verifier mise a zero EPIN et VARINT avec PERSO1
+icomplet = faux ;
+ivalid   = vrai ;
+
+* ig1    : mettre a vrai pour affichages
+ig1      = faux ;
+*opti trac psc eptr 5 ;
+ig1      = ig1 ou (ega (vale trac) 'PSC') ;
+
+*----------------------- Parametres du probleme -----------------------*
+
+* Parametres geometrie :
+* lw1    : longueur faite en WAAM
+* ls1    : longueur support
+* hs1    : hauteur support
+* e1     : epaisseur de la plaque 
+lw1      =  80.e-3 ;
+ls1      = 124.e-3 ;
+hs1      =  50.e-3 ;
+e1       =   6.e-3 ;
+
+* Position thermocouples :
+* Bord deport WAAM initial en (0 0 0) :
+TC1      = 40.e-3 0  -3.e-3 ;
+TC2      = 40.e-3 0  -5.e-3 ;
+TC3      =  0.e-3 0 -25.e-3 ;
+TC4      = 80.e-3 0 -10.e-3 ;
+
+* Parametres apport de chaleur :
+* Us1    : tension electrique de soudage (V) 1ere couche
+* Us2    : tension electrique de soudage (V) couches suivantes 
+* Is1    : intensite electrique soudage (A) 1ere couche
+* Is2    : intensite electrique soudage (A) couches suivantes
+* Vs1    : vitesse de soudage (m/s)
+* Eta1   : rendement de la source
+* R0     : rayon de la distribution Gaussienne
+Us1      =  15.0 ;
+Us2      =  13.0 ;
+Is1      = 120. ;
+Is2      = 100. ;
+Vs1      = 0.30 / 60. ;
+Eta1     = 0.8 ;
+R0       = 3.e-3 ;
+
+* Parametres apport de matiere :
+* dfil1  : diametre file (m)
+* vfil1  : vitesse defilement fil (m/s) 1ere passe
+* vfil2  : vitesse defilement fil (m/s) autres passes
+dfil1    =  1.2e-3 ;
+vfil1    =  3.2 / 60. ;
+vfil2    =  2.5 / 60. ;
+
+* Parametres sequence soudage :
+* dtini1 : delai initial avant debut deplacement torche
+* delai1 : delai entre 2 passes de WAAM
+* nbpass1: nombre de passes 
+dtini1   =  0.8 ;
+delai1   = 30. ;
+nbpass1  = 10 ;
+
+* Parametres conditions thermiques initiales et aux limites :
+* Tini1  : temperature initiale (degC)
+* Te1    : temperature de convection (degC)
+* h1     : coefficient d'echange convectif (W/m2)
+Tini1    = 20. ;
+Te1      = 20. ;
+h1       = 20. ;
+
+*-------------------------- Proprietes 316 L --------------------------*
+* Ref. : 
+* Camille Cambon, Issam Bendaoud, Sebastien Rouquette, Fabien Soulie.
+* "Influence of the first weld bead on strain and stress states in wire+arc additive manufacturing”.
+* The 12th International Seminar ”Numerical Analysis of Weldability",
+* Institute for Materials Science, Joining and Forming (IMAT),Sep 2018, Seggau, Austria.
+* hal-01954354 https://hal.archives-ouvertes.fr/hal-01954354 
+*
+* rho1   : masse volumique (kg/m3)
+* Tfus1  : temperature de changement de phase solide-liquide (degC)
+* Qlat1  : chaleur latente de fusion de l'acier (J/m3)
+rho1     = 7760. ;
+Tfus1    = 1450. ;
+Qlat1    =  2.e9 ;
+
+* k1     : conductivite thermique (W/m/K) en fonction de la temperature
+lt1      = prog 20. 100. pas 100. 1500. ;
+lk1      = prog 14. 15.2 16.6 17.9 19. 20.6 21.8 23.1 24.3 26. 27.3 28.6 29.9 45. 60. 60. ;
+k1       = evol vert manu 'T' lt1 'K' lk1 ;
+si ig1 ;
+  dess k1 titr 'Conductivite thermique 316L (W/m/K)' ;
+fins ;
+
+* Cp1    : capacite thermique massique (J/m3) en fonction de la temperature
+* On derive l'enthalpie :
+lt1      = prog 0. pas 100. 1500. ;
+lh1      = prog 0.983 1.36 1.76 2.19 2.62 3.06 3.51 3.96 4.43 4.92 5.42 5.92 6.44 6.97 9.51 ;
+lh2      = prog 1.36 1.76 2.19 2.62 3.06 3.51 3.96 4.43 4.92 5.42 5.92 6.44 6.97 9.51 10.1 ;
+dhdt1    = (lh2 - lh1) / 100. ;
+lc0      = dhdt1 * 1.e9 / rho1 ;
+lt0      = prog 50. pas 100. 1450. ;
+cp0      = evol manu 'T' lt0 'C' lc0 ;
+idx0     = posi (maxi lc0) dans lc0 ;
+lc2      = lc0 enle idx0 ;
+lt2      = lt0 enle idx0 ;
+cp2      = evol oran manu 'T' lt2 'C' lc2 ;
+cp1      = cp2 ;
+si ig1 ;
+  tleg1    = table ;
+  tleg1 . titre = table ;
+  tleg1 . titre . 1 = mot 'Cp derivee publi.' ;
+  tleg1 . titre . 2 = mot 'Cp utilisee' ;
+  dess (cp0 et cp1) lege tleg1 titr ' Capacite thermique massique 316L (J/m3)' ;
+fins ;
+
+* Proprietes mecaniques 316L (dependantes de T) :
+* nu1   : coefficient de Poisson
+nu1      = 0.3 ;
+
+* Ym1    : module de Young (Pa)
+lt1      = prog 20. 100. pas 100. 1200. ;
+lym1     = prog 197000. 191500. 184000. 176500. 168000. 160000. 151500. 142500. 130000. 108000. 81500. 32000. 7400. ;
+lym1     = 1.e6 * lym1 ;
+ym1      = evol vert manu T lt1 youn lym1 ;
+
+* Sy1    : limite d'elasticite (Pa)
+lt1      = prog 20. pas 100. 1400. ;
+lsy1     = prog 287. 237. 198. 172. 157. 151. 145. 136. 127. 115. 79. 38. 24. 18. 2. ;
+lsy1     = 1.e6 * lsy1 ;
+sy1      = evol vert manu T lt1 SIGY lsy1 ;
+
+* Alph1  : dilatation thermique (/K)
+lt1      = prog 20. 100. 300. 400. 600. 700. 800. 1000. 1400. ;
+lalph1   = prog 1.55 1.60 1.71 1.75 1.84 1.87 1.90 1.94 1.96 ;
+lalph1   = 1.e-5 * lalph1 ;
+alph1    = evol vert manu T lt1 ALPH lalph1 ;
+
+* Hx     : module d'ecrouissage cinematique (Pa)
+lt1      = prog 20. 700. pas 100. 1300. ;
+lh1      = prog 2400. 2400. 2350. 1500. 800. 725. 150. 10. ;
+lh1      = 1.e6 * lh1 ;
+Hx1      = evol vert manu T lt1 H lh1 ;
+
+* Courbes d'ecrouissage :
+nb1      = dime lt1 ;
+lep1     = prog 0. 1. ;
+nua1     = vide nuage ;
+repe b1 nb1 ;
+  ti1      = extr lt1 &b1 ;
+  syi1     = ipol sy1 ti1 ;
+  hi1      = ipol Hx1  ti1 ;
+  lmsi1    = prog syi1 (syi1+hi1) ;
+  ecroi1   = evol oran manu eps lep1 sig lmsi1 ;
+  ecroi1   = ecroi1 coul &b1 ;
+  nua1     = nua1 et (nuag comp T ti1 comp ECRO ecroi1) ;
+fin b1 ;
+
+tleg1    = legende nua1 T format '(F6.0)' ;
+si ig1 ;
+  dess ym1 titr ' Module de Young (Pa)' ;
+  dess sy1 titr ' Limite elastique (Pa)' ;
+  dess alph1 titr ' Coef. dilatation thermique (/K)' ;
+  dess (nua1 * 1.e-6 ecro) xbor 0. 0.2 ybor 0. 500. 
+    titr 'Courbes d ecrouissage a differentes temperatures (MPa)' lege tleg1 ;
+fins ;
+
+*------------------- Sequence de soudage / Maillage -------------------*
+
+* Parametres discretisation apport de matiere :
+* xp1    : "pas" de discetisation de l'apport de matiere en espace (m)
+* dz1    : increment WAAM selon (O,z) / hauteur cordon
+* debi1  : debit volumique de fil 1ere passe 
+* debi2  : debit volumique de fil autres passes
+xp1      = e1 / 2. ;
+debi1    = 0.25 * dfil1 * dfil1 * pi * vfil1 ;
+debi2    = 0.25 * dfil1 * dfil1 * pi * vfil2 ;
+dz1      = debi1 / e1 / Vs1 ;
+dz2      = debi2 / e1 / Vs1 ;
+
+* Parametres modele source Gaussienne 3D :
+Qtot1    = Eta1 * Us1 * Is1 ;
+Qtot2    = Eta1 * Us2 * Is2 ;
+*Qtot1    = Qtot1 - (Qlat1 * e1 * dz1 * Vs1) ;
+*Qtot2    = Qtot2 - (Qlat1 * e1 * dz2 * Vs1) ;
+*list Qtot1 ;
+*list Qtot2 ;
+Rg1      = ((2. / 3.) ** 0.5) * R0 ;
+
+* Parametre geometrie / trajectoire :
+e1s2     = 0.5 * e1 ;
+dz1s2    = 0.5 * dz1 ;
+
+* table SOUDAGE :
+tso1                        = tabl ;
+tso1.vitesse_de_soudage     = Vs1 ;
+tso1.puissance_de_soudage   = Qtot2 ;
+tso1.diametre_de_fil        = dfil1 ;
+tso1.vitesse_de_fil         = vfil2 ;
+tso1.point_de_depart        = (0 e1s2 dz1) ;
+tso1.largeur_de_passe       = e1 ;
+
+* Défintion de la sequence de soudage :
+* Repetition sequence de 2 passes en AR :
+si (nbpass1 mult 2) ;
+  nb1      = nbpass1 / 2 ;
+sino ;
+  nb1      = (nbpass1 - 1) / 2 ;
+fins ;
+soudage tso1 point dtini1 puis Qtot1 debi debi1 ;
+repe b1 nb1 ;
+  si (&b1 ega 1) ;
+    soudage tso1 passe droi (lw1 0 0) puis Qtot1 debi debi1 ;
+    soudage tso1 depla couche debi debi2 pause delai1 ;
+  sino ;
+    soudage tso1 passe droi (lw1 0 0) ;
+    soudage tso1 depla couche pause delai1 ;
+  fins ;
+  soudage tso1 passe droi ((-1.*lw1) 0 0) ;
+  soudage tso1 depla couche pause delai1 ;
+fin b1 ;
+si ((nbpass1-1) mult 2) ;
+  soudage tso1 passe droi (lw1 0 0) ;
+fins ;
+soudage tso1 point 60. puis 0. debi 0. ;
+
+si ig1 ;
+  trac tso1.trajectoire           titr 'trajectoire depot WAAM mur' ;
+  dess tso1.evolution_deplacement titr 'evolution deplacement depot WAAM mur' ;
+  dess tso1.evolution_puissance   titr 'evolution puissance thermique depot WAAM mur' ;
+  dess tso1.evolution_debit       titr 'evolution debit apport de matiere depot WAAM mur' ;
+fins ;
+
+* Maillage du Mur :
+* On teste la donnee d'un LISTREEL pour la discretisation en espcace
+ne1      = 5 ;
+twa1     = waam tso1 mail pas (prog 2.e-3 xp1 4.e-3 xp1 2.e-3 xp1) dens 1.e-3 'TEMP' 0.1 ;
+elim twa1.maillage 1.e-6 ;
+mur1     = twa1.maillage coul vert ;
+
+si ig1 ;
+  trac cach mur1 titr ' Maillage global du mur' ;
+  tmai1    = twa1.evolution_maillage.maillage ;
+  waam twa1 visu cach ((tso1.trajectoire) plus (0 0 1.e-5)) ;
+fins ;
+
+* Maillage du support sous-jacent :
+me1      = -1. * e1 ;
+mdz1     = -1. * dz1 ;
+zmin1    = (mur1 coor 3) mini ;
+pz0      = (mur1 coor 3) poin infe (zmin1 + 1.e-5) ;
+sz0      =   (enve mur1) elem appu stri pz0 ;
+sup1     = sz0 volu tran ne1 (0 0 me1) ;
+
+xmin1    = (sup1 coor 1) mini ;
+px0      = (sup1 coor 1) poin infe (xmin1 + 1.e-5) ;
+px1      = (sup1 coor 1) poin supe (xmin1 + lw1 - 1.e-5) ;
+sx0      = (enve sup1) elem appu stri px0 ;
+sx1      = (enve sup1) elem appu stri px1 ;
+sup1     = sup1 et (sx0 volu tran ne1 (me1 0 0)) et (sx1 volu tran ne1 (e1 0 0)) ;
+sup1     = sup1 coul gris ;
+
+dx1      = (ls1 - lw1) * 0.5 - e1 ;
+me1      = -1. * e1 ;
+xmin2    = xmin1 + me1 ;
+zmin2    = zmin1 + me1 ;
+p1       = sup1 poin proc (xmin2 0 zmin1) ;
+p2       = sup1 poin proc (xmin2 0 zmin2) ;
+p3       = sup1 poin proc ((xmin1 + lw1 + e1) 0 zmin2) ;
+p4       = sup1 poin proc ((xmin1 + lw1 + e1) 0 zmin1) ;
+p5       = p4 plus (dx1 0 0) ;
+p6       = p5 moin (0 0 hs1) ;
+p7       = p6 moin (ls1 0 0) ;
+p8       = p7 plus (0 0 hs1) ;
+de1      =  0.5 * e1 ;
+de2      =  6.2e-3   ;
+cs2      = (p5 droi p6 dini de1 dfin de2) et
+           (p6 droi p7 dini de2 dfin de2) et 
+           (p7 droi p8 dini de2 dfin de1) et 
+           (p8 droi p1 dini de1 dfin de1) et 
+           (p1 droi p2 dini de1 dfin de1) et
+           (p2 droi p3 dini de1 dfin de1) et 
+           (p3 droi p4 dini de1 dfin de1) et 
+           (p4 droi p5 dini de1 dfin de1) ;
+fs2      = surf cs2 plan ;
+sup2     = fs2 volu tran (0 e1 0) 2 ;
+sup2     = sup2 coul turq ;
+
+sup0     = sup1 et sup2 ;
+
+mail1    = sup0 et mur1 ;
+si ig1 ;
+  mot1     = chai 'Maillage total "Mur WAAM" et support :' (nbno mail1) ;
+  mot1     = chai mot1 ' /' (nbel mail1) ' noeuds/elem.' ;
+  trac face mail1 titr mot1 ;
+fins ;
+
+*------------- Accrochage DDL thermique maillage support --------------*
+
+* Relation cinematique DDL mecanique entre maillages non conformes :
+clu1     = sup1 rela accro sup2 ;
+
+* Encastrement bord plaque support :
+ptx0     = (sup0 coor 1) poin infe ((sup0 coor 1 mini) + 1.e-5) ;
+clu2     = bloq depl ptx0 ;
+
+* Relation cinematique DDL thermique entre maillages non conformes :
+clt1     = sup1 rela accro sup2 (mots 'T') ;
+clt2     = (TC1 et TC2 et TC3 et TC4) rela accro sup0 (mots 'T') ;
+
+* Surface interface maillages support non-conformes :
+pinte1   = clt1 extr mail nomu ;
+sinte1   = (enve sup0) elem appu stri pinte1 ;
+
+si ig1 ;
+  trac cach (-1 -1 0.5) ((ptx0 coul roug) et mail1) titr 'Points encastrement support (rouge)' ;
+fins ;
+
+*--------------------- Modele / Caracteristique -----------------------*
+
+* Conduction / Convection :
+mod1     = mode  sup0 thermique ;
+mat1     = mate  mod1 rho rho1 k k1 'C' cp1 'TINI' Tini1 ;
+mod1b    = mode  mur1 thermique ;
+mat1b    = mate mod1b rho rho1 k k1 'C' cp1 'TINI' Tini1 ;
+mod1     = mod1 et mod1b ;
+mat1     = mat1 et mat1b ;
+
+* Source thermique :
+evqt1    = tso1.evolution_puissance ;
+evxs1    = tso1.evolution_deplacement ;
+chxs1    = tso1.trajectoire coor curv ;
+cgxs1    = char traj chxs1 evxs1 ;
+mod3     = mode mail1 thermique source gaussienne ;
+mat3     = mate mod3 qtot evqt1 orig cgxs1 rgau Rg1 ;
+
+* Mecanique :
+mod4     = mode mail1 mecanique elastique plastique isotrope fusion cons 316L ;
+mat4     = mate  mod4 youn ym1 nu nu1 alph alph1 ecro nua1 tref tini1 talp tini1 tfus tfus1 ;
+
+* Tables d'evolution des modeles et caracteristiques :
+ttps1    = twa1.evolution_maillage.temps ;
+tmai1    = twa1.evolution_maillage.maillage ;
+nb1      = dime ttps1 ;
+ltps1    = prog ;
+lmod1    = enum ;
+lmod2    = enum ;
+lmod3    = enum ;
+lmod4    = enum ;
+lmat1    = enum ;
+lmat2    = enum ;
+lmat3    = enum ;
+lmat4    = enum ;
+repe b1 nb1 ;
+  tps1     = ttps1 . (&b1 - 1) ;
+  ltps1    = ltps1 et tps1 ;
+  geoi1    = tmai1 . (&b1 - 1) ;
+  geoi1    = geoi1 et sup0 ;
+  modi1    = redu mod1 geoi1 ;
+  mati1    = redu mat1 modi1 ;
+  lmod1    = lmod1 et modi1 ;
+  lmat1    = lmat1 et mati1 ;
+  sconv1   = (enve geoi1) diff sinte1 ;
+  modi2    = mode sconv1 thermique convection ;
+  mati2    = mate modi2 'H' h1 'TC' Te1 ;
+  lmod2    = lmod2 et modi2 ;
+  lmat2    = lmat2 et mati2 ;
+  modi3    = redu mod3 geoi1 ;
+  mati3    = redu mat3 modi3 ;
+  lmod3    = lmod3 et modi3 ;
+  lmat3    = lmat3 et mati3 ;
+  modi4    = redu mod4 geoi1 ;
+  mati4    = redu mat4 modi4 ;
+  lmod4    = lmod4 et modi4 ;
+  lmat4    = lmat4 et mati4 ;
+fin b1 ;
+
+
+* Chargements MODE / MATE :
+cgmod1   = char mode ltps1 lmod1 ;
+cgmod2   = char mode ltps1 lmod2 ;
+cgmod3   = char mode ltps1 lmod3 ;
+cgmod4   = char mode ltps1 lmod4 ;
+cgmod0   = cgmod1 et cgmod2 et cgmod3 ;
+
+cgmat1   = char mate ltps1 lmat1 ;
+cgmat2   = char mate ltps1 lmat2 ;
+cgmat3   = char mate ltps1 lmat3 ;
+cgmat4   = char mate ltps1 lmat4 ;
+cgmat0   = cgmat1 et cgmat2 et cgmat3 ;
+
+*----------------------------------------------------------------------*
+*                               THERMIQUE                              *
+*----------------------------------------------------------------------*
+*
+* Liste des temps de calcul :
+ltca0    = twa1.temps_calcules ;
+si (non icomplet) ;
+  ltca1    = ltca0 extr (lect 1 pas 1 15) ;
+sino ;
+  ltca1    = ltca0 ;
+fins ;
+
+*-------------------- Resolution Thermique PASAPAS --------------------*
+
+* Table PASAPAS :
+tab1                     = table ;
+tab1.modele              = cgmod0 ;
+tab1.caracteristiques    = cgmat0 ;
+tab1.blocages_thermiques = clt1 et clt2 ;
+tab1.temps_calcules      = ltca1 ;
+
+temp zero ;
+
+pasapas tab1 ;
+
+* Affichage temps de calcul : 
+duree1   = temp horl ;
+duree1   = (duree1 / 1000) ;
+dmin1    = (duree1  / 60) ;
+dsec1    = duree1  - (60 * dmin1) ;
+mot1     = chai '*****  DUREE DU CALCUL THERMIQUE (s) :' dmin1 ' min' dsec1 ' s' ;
+mess mot1 ;
+
+*----------------------------------------------------------------------*
+*                               MECANIQUE                              *
+*----------------------------------------------------------------------*
+*
+*-------------------------- Procedure PERSO1 --------------------------*
+* Verification mise a zero variables internes et def. plastique si T>Tfusion :
+debp perso1 tu1*table ;
+
+si (tu1.perso1_appel ega 1) ;
+  quit perso1 ;
+fins ;
+
+tfus1    = tu1.data_perso1.tfusio ;
+cht2     = (tu1.wtable.tet2) exco 'T' 'T' ;
+mod1     = tu1.wtable.modele extr form mecanique ;
+chamt2   = chan cham mod1 cht2 stresses ;
+si ((maxi chamt2) >EG tfus1) ;
+  mess ' ******  PERSO1 : verif. option FUSION modele' ;
+  masq1    = chamt2 masq supe tfus1 ;
+  masq1    = masq1 nomc 'SCAL' ;
+* Var. Internes :
+  var0     = tu1.estimation.variables_internes redu mod1 ;
+  lmc0     = extr var0 comp ;
+  lmc1     = mots (dime lmc0) * 'SCAL' ;
+  var1     = masq1 * var0 lmc1 lmc0 lmc0 ;
+  err1     = 0. ;
+  err1     = (maxi abs var1) + err1 ;
+  si (err1 > ((vale prec)*10.)) ; erre 308 ; fins ;
+*trac (0 1 1) 13 var1 mod1 titr ' MAJ var. inter.' ;
+fins ;
+
+finp ;
+*-------------------- Resolution Mecanique PASAPAS --------------------*
+
+* Chargement thermique :
+cgt1     = char 'T'    (tab1.temps) (tab1.temperatures) ;
+
+* Chargement TAPP (uniquement si modele de type chargement).
+* temperature apport de matiere a chaque pas d'apport pour calcul def. thermique initiale :
+cgt2     = char 'TAPP' (tab1.temps) (tab1.temperatures_apport) ;
+
+* Table PASAPAS :
+tab2                     = table ;
+tab2.modele              = cgmod4 ;
+tab2.caracteristiques    = cgmat4 ;
+tab2.chargement          = cgt1 et cgt2 ;
+tab2.blocages_mecaniques = clu1 et clu2 ;
+tab2.temps_calcules      = ltca1 ;
+tab2.processeurs         = mot comportement ;
+tab2.mes_sauvegardes     = table ;
+tab2.mes_sauvegardes.defin = vrai ;
+tab2.mes_sauvegardes.defap = vrai ;
+
+si icomplet ;
+  ntca1    = dime ltca1 ;
+  tab2.temps_sauvegardes   = ltca1 extr (lect 50 pas 50 (ntca1 / 50 * 50) ntca1) ;
+  opti sauv 'waam2.sauv' ;
+fins ;
+
+tab2.procedure_perso1    = ivalid ;
+tab2.data_perso1         = table ;
+tab2.data_perso1.tfusio  = tfus1 ;
+
+temp zero ;
+
+pasapas tab2 ;
+
+* Affichage temps de calcul : 
+duree1   = temp horl ;
+duree1   = (duree1 / 1000) ;
+dmin1    = (duree1  / 60) ;
+dsec1    = duree1  - (60 * dmin1) ;
+mot1     = chai '*****  DUREE DU CALCUL MECANIQUE (s) :' dmin1 ' min' dsec1 ' s' ;
+mess mot1 ;
+
+*------------------------ Petit post-traitement -----------------------*
+
+* Animation contrainte de von Mises :
+
+si ig1 ;
+  vtra1    = vale trac ;
+  si (ega vtra1 'PSC') ;
+    opti ftra 'Contrainte_Waam2_Anim.ps' ;
+  fins ;
+
+  if1      = dime tab2.temps ;
+  def1     = vide deforme ;
+  liso1    = prog 25. pas 25. 350. ;
+  mbox1    = boite mail1 ;
+  repe b1 if1 ;
+    i1       = &b1-1 ;
+    modi1    = tab2.modeles.i1 ;
+    maili1   = (extr modi1 form mecanique) extr mail ;
+    depi1    = tab2.deplacements.i1 ;
+    sigi1    = tab2.contraintes.i1 ;
+    sigi1    = 1.e-6 * sigi1 ;
+    sigi1    = vmis modi1 sigi1 ;
+    defoi1   = defo maili1 depi1 5. sigi1 modi1 ;
+    def1     = def1 et defoi1 ;
+    si (ega vtra1 'PSC') ;
+      mot1     = chai format '(F6.1)' 'Contrainte de von Mises (MPa) au temps (s) :' (tab2.temps.i1) ;
+      trac (1 -1.2 1) defoi1 liso1 titr mot1 boit mbox1 ;
+    fins ;
+  fin b1 ;
+  si (neg vtra1 'PSC') ;
+    trac (1 -1.2 1) anim def1 liso1 ;
+  fins ;
+fins ;
+
+si icomplet ; sauv ; fins ;
+
+*------------- Verif. comportement avec apport de matiere -------------*
+si (non ig1) ; i1 = 14 ; fins ;
+modi1    = tab2.modeles.i1 ;
+sigi1    = tab2.contraintes.i1 ;
+depi1    = tab2.deplacements.i1 ;
+epsi1    = epsi modi1 depi1 ;
+eini1    = tab2.deformations_inelastiques.i1 ;
+
+tpsi1    = tab2.temps.i1 ;
+chti1    = tire cgt1 t tpsi1 ;
+mati1    = tire cgmat4 mate tpsi1 ;
+mati1    = vari nuag modi1 mati1 chti1 ;
+ethi1    = epth modi1 mati1 chti1 ;
+
+epli1    = tab2.DEFORMATIONS_APPORT.i1 ;
+
+epei1    = epsi1 - (eini1 exco (extr modi1 dein) (extr modi1 defo)) - ethi1 - epli1 ;
+sigxx = elas mati1 modi1 epei1 ;
+sigerr1  = (sigxx - sigi1) / (maxi abs sigi1) ;
+
+si ig1 ;
+  trac sigerr1 modi1 titr 'Erreur relative calcul champ de contrainte / ref.' ;
+fins ;
+
+* Test calcul comportement avec apport de matiere :
+si ((maxi abs sigerr1) > 1.e-10) ;
+  erre 5 ;
+fins ;
+
+*------------------   F I N   W A A M 2 . D G I B I   -----------------*
+fin ;
+
+ 
+

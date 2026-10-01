@@ -1,0 +1,90 @@
+$$$$ RENDSOUR NOTICE  SP204843  23/10/23    21:15:11     11770          
+                                             DATE     23/10/23
+
+    Procedure RENDSOUR                        Voir aussi : MODE
+    ------------------
+
+Section : thermique, mathematiques
+===============================================================
+    RESU1  =  RENDSOUR  CGMOD1  CGMAT1  (LREE1)  ('MOYE') ;
+
+FRAN===========================================================
+    Objet :
+    _______
+
+       La procedure RENDSOUR calcule le rendement d'une source
+    de chaleur mobile definie par les CHARGEMENTs de modeles
+    (CGMOD1) et de materiaux (CGMAT1). Plus precisement, RENDSOUR
+    determine la quantite de chaleur reellement integree dans
+    le calcul par rapport a celle specifiee dans le modele, le
+    support geometrique de la source (maillage) ne couvrant pas
+    necessairement tout le domaine spatial du modele analytique.
+
+       On peut fournir une discretisation temporelle (LREE1) avec
+    laquelle calculer le rendement. Par defaut, RENDSOUR utilise
+    la liste des temps contenue dans le chargement CGMOD1. Les
+    piquets de temps ou l'intensite de la source est nulle ne sont
+    pas comptes. En sortie, RESU1 est un objet EVOLUTION contenant
+    l'evolution du rendement de la source en fonction des piquets
+    de temps ou il est compte.
+
+       Le mot-cle 'MOYE' permet de calculer le rendement moyen de
+    la source de chaleur sur l'ensemble des piquets de temps ou son
+    intensite est non nulle. Dans ce cas, RESU1 est un FLOTTANT.
+
+
+    Commentaire :
+    _____________
+    
+       CGMOD1 :  objet CHARGEMENT de nom MODE, decrivant l'evolution
+                 temporelle du modele de source de chaleur,
+
+       CGMAT1 :  objet CHARGEMENT de nom MATE, decrivant l'evolution
+                 temporelle des caracteristiques du modele,
+
+       LREE1  :  objet LISTREEL, instants de mesure du rendement,
+
+       RESU1  :  objet FLOTTANT ou EVOLUTION, rendement de la source
+                 de chaleur.
+
+
+ANGL===========================================================
+    Description :
+    _____________
+
+
+        The RENDSOUR procedure computes the efficiency of a mobile
+    heat source defined by the CHARGEMENTs of models (CGMOD1) and
+    materials (CGMAT1). More precisely, RENDSOUR determines the
+    quantity of heat actually integrated into the calculation over
+    that specified in the model, the geometric support of the source
+    (mesh) not necessarily covering the entire spatial domain of the
+    analytical model.
+
+        We can provide a temporal discretization (LREE1) to calculate
+    the efficiency. By default, RENDSOUR uses the list of times
+    contained in CGMOD1. Time stakes at which the intensity of the
+    source is zero are not counted. As an output, RESU1 is an EVOLUTION
+    object containing the evolution of the source's efficiency as a
+    function of the time points where it is counted.
+
+        The keyword 'MOYE' makes it possible to calculate the average
+    efficiency of the heat source over all the time stakes where its
+    intensity is non-zero. In this case, RESU1 is a FLOTTANT.
+
+    Contents :
+    __________
+   
+       CGMOD1 :  CHARGEMENT type object of name MODE, describes the
+                 time evolution of the heat source model,
+
+       CGMAT1 :  CHARGEMENT type object of name MATE, describes the
+                 time evolution of the characteristics of the model,
+
+       LREE1  :  LISTREEL object, instants of the measurements,
+
+       RESU1  :  FLOTTANT or EVOLUTION object, efficiency of the
+                 heat source model.
+ 
+$$$$
+ 

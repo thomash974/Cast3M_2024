@@ -1,0 +1,218 @@
+* fichier :  melange.dgibi
+************************************************************************
+* Section : Mecanique Plastique
+************************************************************************
+opti dime 3 elem cub8 echo 1 ;
+ 
+p0 = 0. 0. 0. ; 
+e1 = 1. 0. 0. ; e2 = 0. 1. 0. ; e3 = 0. 0. 1. ; 
+
+l1 = d 1 P0  (p0 plus e1) ;
+*l2 = l1 d 2 (p0 plus e2) d 3 p0 ;
+s1 = l1 tran 1 e2 ;
+*s1 = surf plan l2 ;
+v1 = s1 volu 1 tran e3 ;
+s11 = changer s1 tri3 ;
+v11 = s11 volu 1 tran e3 ;
+v12 = v1 et (v1 plus e1) ;
+
+mth1 = mode v1 thermique isotrope ;
+
+ me1 = mode v1 mecanique elastique plastique parfait phase pha1;
+ me2 = mode v1 mecanique elastique fluage norton phase pha2; 
+   
+mefa1 =  mode v1 mecanique elastique plastique parfait phase fa1;
+mefa2 =  mode v1 mecanique elastique plastique parfait phase fa2;
+
+me12 =  mode v12 mecanique elastique plastique parfait phase fa1;
+
+* cohérence noms des phases mecaniques et noms phases modele ztmax
+mm1 = mode v1 melange ztmax ;
+
+mm2 = mode v1 melange parallele (me1 et me2) ;
+
+mmfa = mode v1 melange parallele (mefa1 et mefa2) ;
+
+mm4 = mode v1 melange parallele me1  ;
+
+*
+*
+v2 = v1 plus e2 ;
+ms1 =  mode v2 mecanique elastique plastique parfait phase pha1
+                  statio me1 ;
+ms2 =  mode v2 mecanique  elastique fluage norton phase pha2 
+                 statio me2 ;
+                 
+mms1 = mode v2 melange ztmax statio mm1 ; 
+mms2 = mode v2 melange parallele (ms1 et ms2) statio mm2 ;
+*
+* 
+
+t_sta = table 'STATIONNAIRE' ;
+t_sta . maillage = table ;
+t_sta . maillage . 1  = v1 ;
+t_sta . maillage . 2 = v2 ;
+
+mstae1 = mode t_sta mecanique elastique plastique parfait phase pha1;
+mstae2 = mode t_sta mecanique elastique fluage norton phase pha2; 
+
+mstam1 = mode t_sta melange ztmax ;
+mstam2 = mode t_sta melange parallele (mstae1 et mstae2) ;
+
+mstam11 = redu mstam1 v1 ;
+mstam21 = redu mstam2 v1 ;
+
+ 
+ca1= mate me1 youn 2.e11 nu 0.3 sigy 200.e6 ; 
+ca2 = mate me2 young 150.e9 nu 0.3 rho 7.8e9 alpha 1.5e-5
+  af1 ((exp (-8.56 * (log 10.)))*(1.e-6 ** 5.9)*1.e-6/3600.)
+  af2 5.90 af3 1.  smax 0.e6 ;
+
+cam1 = mate mm1   AC1 300. AC2 750.  'AC3' 800. 'AC4' 250. 
+       VIPH 1000. VDEH 1000. VPAR 1000. ;
+
+cafa1= mate mefa1 youn 2.e11 nu 0.3 sigy 200.e6 ; 
+cafa2= mate mefa2 youn 3.e11 nu 0.4 sigy 300.e6 ; 
+
+cas1= mate ms1 youn 2.e11 nu 0.3 sigy 200.e6 ; 
+cas2 = mate ms2 young 150.e9 nu 0.3 rho 7.8e9 alpha 1.5e-5
+  af1 ((exp (-8.56 * (log 10.)))*(1.e-6 ** 5.9)*1.e-6/3600.)
+  af2 5.90 af3 1.  smax 0.e6 ;
+
+casm1 = mate mms1   AC1 300. AC2 750.  'AC3' 800. 'AC4' 250. 
+       VIPH 1000. VDEH 1000. VPAR 1000. ;
+       
+castam1 = mate mstam1   AC1 300. AC2 750.  'AC3' 800. 'AC4' 250. 
+       VIPH 1000. VDEH 1000. VPAR 1000. ;
+
+castae1 = mate mstae1 youn 2.e11 nu 0.3 sigy 200.e6 ;
+castae2 = mate mstae2 young 150.e9 nu 0.3 rho 7.8e9 alpha 1.5e-5
+  af1 ((exp (-8.56 * (log 10.)))*(1.e-6 ** 5.9)*1.e-6/3600.)
+  af2 5.90 af3 1.  smax 0.e6 ;
+
+************************************************************
+
+ chpha21 = manu chml mm2 pha1 0.8 pha2 0.2 'RIGIDITE' ;
+ chpha20 = manu chml mm2 pha1 0. pha2 1. 'RIGIDITE' ;
+ chpha10 = manu chml mm1 pha1 0.1 pha2 .9 'RIGIDITE' ;
+
+
+chfa12 = manu chml mmfa  fa1 0.5 fa2 -.6 'RIGIDITE' ;
+chpha4 = manu chml mm4  pha1 0.5  ;
+
+ri20 = rigi mm2 (chpha20 et ca1 et ca2) ;
+ri21 = rigi mm2 (chpha21 et ca1 et ca2) ;
+ri4 = rigi mm4 (chpha4 et ca1 ) ;
+
+rifa1 = rigi mmfa (chfa12 et cafa1 et cafa2) ; 
+
+chp1 = manu chpo s1 3 ux 0. uy 0.  uz -0.01 nature diffuse ;
+ chg1 = epsi (me1 et me2)  chp1 ;
+
+cho3 = comp mm2 (chg1 * 0.) (chg1 et chpha21 et ca1 et ca2) ;
+ sig2 = exco cho3 (extr me1 contraintes) ;
+ sig3 = redu stric sig2 mm2 ;
+ sig5 = redu sig2 (me1 et me2) ;
+ 
+fi3 = bsig mm2 sig3 ; 
+* fi4 = fi44
+fi4 = bsig (extr mm2 form mecanique) sig2 ;
+fi44 = bsig (extr mm2 form mecanique) sig5 ;
+
+* CB215821 : fi5 ne peut pas fonctionner comme ca, komcha ne trouve pas les contraintes du MODELE de melange / oui  fi5 = fi3 
+fi5 = bsig mm2  sig5 chpha21 ;
+err1 = maxi (abs ( fi3 - fi5)) ; mess err1 ;
+si (err1 < 1.e-6) ;
+  erre 0 ; 
+sinon ;
+  erre 5 ;
+finsi ;
+
+ chg41 = epsi me1  chp1 ;
+cho43 = comp mm4 (chg41 * 0.) (chg41 et chpha4 et ca1) ;
+ sig42 = exco cho43 (extr me1 contraintes) ;
+ sig43 = redu stric sig42 mm4 ;
+fi43 = bsig mm4 sig43 ; 
+fi44 = bsig (extr mm4 form mecanique) sig42 ;
+
+
+
+cht0 = manu chml v1 'T' 1000. ;
+cht1 = manu chml v1 'T' 200. ;
+
+ chg2 = epsi mm2  chp1 ;
+
+cho4 = comp (mm1 et mm4) (cht0 et cam1 et chpha10 et (chg41*0.)) 
+    (cht1 et ca1 et ca2 et chg41);
+
+
+cht0 = manu chml v1 'T' 1000. ;
+cht1 = manu chml v1 'T' 350. ;
+cho5 = comp (mm1 et mm2) (cht0 et cam1 et chpha10 et (chg2*0.)) 
+    (cht1 et ca1 et ca2 et chg2);
+
+
+chpha5 = redu cho5 mm2 ;
+sigs5 = exco cho5 (extr me1 contraintes) ;
+sigs12 = redu sigs5 (me1 et me2) ;
+sig5m2 = redu stric sigs5 mm2 ;
+fi5m2 = bsig mm2 sig5m2 ;
+fi5s12 = bsig mm2 sigs12 chpha5 ;
+
+err2 = maxi (abs ( fi5s12 - fi5m2)) ; mess err2 ;
+si (err1 < 1.e-6) ;
+  erre 0 ; 
+sinon ;
+  erre 5 ;
+finsi ;
+************************************************************
+
+chts0 = manu chml v2 'T' 1000. ;
+chts1 = manu chml v2 'T' 500. ;
+
+s2 = face 2 v2 ;
+chp2 = manu chpo s2 3 ux 0. uy 0.  uz -0.02 nature diffuse ;
+ chgs2 = epsi (ms1 et ms2)  chp2 ;
+ 
+cho6 = comp (mm1 et mm2 et mms1 et mms2)
+      (cht0 et cam1 et chpha10 et (chg2*0.))
+      (cht1 et chts1 et ca1 et cas1 et ca2 et cas2 et chg2 et chgs2); 
+
+sig6m2s = redu stric (exco cho6 (extr me1 contraintes)) (mm2 et mms2) ;
+fi6m2s = bsig (mm2 et mms2) sig6m2s ;
+
+
+ chpha11 = manu chml mstam11 pha1 0.1 pha2 .9 'RIGIDITE' ;
+ chg3 = epsi mstam21  chp1 ;
+ chgs3 = epsi (redu mstam2 v2) chp2 ;
+
+cho8 = comp (mstam1 et mstam2)
+      (cht0 et castam1 et chpha11 et (chg3*0.))
+      (cht1 et chts1 et castae1 et castae2 et chg3 et chgs3); 
+sig8m2 = redu stric (exco cho8 (extr me1 contraintes)) mstam2 ;
+fi8m2 = bsig mstam2 sig8m2 ;
+
+err3 = maxi (abs ( fi6m2s - fi8m2)) ; mess err3 ;
+mx82 = maxi fi8m2 ; mess 'maxi fi8m2 ' mx82 ;
+             
+si ((err3 < 1.e-6) et (mx82 > 1.e8)) ;
+  erre 0 ; 
+sinon ;
+  erre 5 ;
+finsi ;
+*opti donn 5 ;
+
+fin ;
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+

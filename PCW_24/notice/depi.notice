@@ -1,0 +1,122 @@
+$$$$ DEPI     NOTICE  BP208322  21/01/08    21:15:02     10844          
+                                             DATE     21/01/08
+
+    Operateur DEPIMPOSE                      Voir aussi : BLOQ  RELA
+    -------------------                                   SYMT  ANTI
+                                                          JEU
+                                                          
+    CHPO1 =  DEPI  RIG1 | FLOT1        ;
+                        | CHPO2        ;
+                        | 'RELA' CHPO3 ;
+
+    DEPI TAB1 ;
+
+
+Section : Mecanique Limites
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur DEPI specifie la valeur de certains blocages ou
+    relations.
+
+    Commentaires :
+    ______________
+
+    RIG1   : objet de type RIGIDITE, de sous-type BLOCAGE, definissant
+             les conditions imposees a des degres de liberte.
+
+    FLOT1  : valeur (type FLOTTANT) a imposer a tous les blocages 
+             uniformement.
+
+    CHPO2  : champ (type CHPOINT) permettant d'imposer des valeurs 
+             aux inconnues bloquees lorsque les blocages ne portent que 
+             sur une inconnue.
+             
+             Les composantes doivent etre les memes que celles des 
+             blocages de RIG1. Par exemple :
+
+                 BLO1 = BLOQUE LI1 'UX'  ;
+                 CCX  = COOR 1 LI1     ;
+                 CCXX = NOMC 'UX' CCX    ;
+                 FO1  = DEPI BLO1 CCXX ;
+
+    CHPO3  : champ (type CHPOINT) permettant d'imposer des valeurs aux 
+             relations entre differents degres de liberte ('option 'RELA'). 
+             Cette option n'est possible que si les relations impliquent 
+             les degres de liberte d'un meme noeud. 
+             
+             Le champ CHPO3 ne doit contenir qu'une seule zone et 
+             n'avoir qu'une seule composante nommee 'SCAL'.
+
+    CHPO1  : resultat (type CHPOINT), qu'il convient d'additionner
+             au second membre (forces en mecanique) avant d'effectuer
+             la resolution.
+
+    TAB1 : type TABLE, sous-type 'LIAISONS_STATIQUES'. Les indices de
+           TAB1 sont des entiers pointant sur des objets de type TABLE.
+           Pour chacun l'indice 'FORCE' est cree : CHPOINT exprimant au
+          'POINT_LIAISON', de type POINT, une force d'amplitude unite 
+           duale du 'DDL_LIASON', de type MOT, compatible avec  le 
+           'BLOCAGE', de type RIGIDITE.
+       
+ Remarque : Les degres de liberte de rotation sont exprimes en radians,
+            il convient donc de donner les valeurs qui leurs sont
+            imposees en cette unite.
+
+ANGL==========================================================
+    Description :
+    ___________
+
+    The DEPI operator specifies the value of some constraints or 
+    kinematics relations.
+
+    Contents :
+    __________
+
+    RIG1   : RIGIDITE type object, of BLOCAGE subtype, defining
+             the conditions imposed on the degrees of freedom
+
+    FLOT1  : value to be imposed on all the constraints (FLOTTANT type)
+
+    CHPO2  : field (CHPOINT type) enabling the user to impose different 
+             values on constrained unknowns when each constraint 
+             concerns a single unknown.
+
+             CHPO2 must have the same component names than that of the 
+             constraint matrix RIG1. For instance: 
+             
+                 BLO1 = BLOQUE LI1 UX  ;
+                 CCX  = COOR 1 LI1     ;
+                 CCXX = NOMC UX CCX    ;
+                 FO1  = DEPI BLO1 CCXX ;
+
+    CHPO3  : field (CHPOINT type) enabling the user to impose values
+             to relationship ('RELA' option).
+             This option is allowed if all of the unknowns involved
+             in a single relationship are supported by the same node.
+             
+             CHPO3 field must contain only one zone and one component
+             named 'SCAL'.
+
+    CHPO1  : result (CHPOINT type) which should be added to the 
+             second member (forces in mechanics) before carrying
+             out the solution.
+
+    TAB1 : TABLE type, labelled 'LIAISONS_STATIQUES'. The indices of
+           TAB1 are integers associated with objects of TABLE type.
+           For each, the indice 'FORCE' is created : CHPOINT type
+           describing a unit force at 'POINT_LIAISON', POINT type,
+           dual to the 'DDL_LIAISON' (degree_of-freedom), MOT type,
+           consistant with the 'BLOCAGE', RIGIDITE type.  
+
+ Remark : The rotational degrees of freedom are considerer to be in
+          radians, so the prescribed values should also be given in
+          radians.
+ 
+ 
+ 
+ 
+ 
+ 

@@ -1,0 +1,68 @@
+* fichier : remp_motifs.dgibi
+
+CHA1_I = 'Hello QUI' ;
+CHA1_O = REMP CHA1_I 'QUI' 'World' ;
+MESS CHA1_O ;
+
+SI ((((POSI 'World' 'DANS' CHA1_O)) EGA 0) OU ((DIME CHA1_O) NEG 11)) ;
+    ERRE 5 ;
+FINS ;
+
+************************************************************************
+
+CHA2_I = 'Voici la liste de quelques operateurs de %NOM : %1, %2, %3, %4, %5' ;
+CHA2_O = REMP CHA2_I (MOTS '%NOM' '%1'   '%2'   '%3'   '%4'   '%5'  )
+                     (MOTS 'GIBI' 'EXTR' 'RESO' 'MANU' 'DROI' 'SOMM') ;
+MESS CHA2_O ;
+
+SI ((((POSI 'SOMM' 'DANS' CHA2_O)) EGA 0) OU ((DIME CHA2_O) NEG 76)) ;
+    ERRE 5 ;
+FINS ;
+
+************************************************************************
+
+CHA3_I = 'Titre des $NOM_AXE : $V ($U)' ;
+TAB3 = TABL ;
+TAB3.'$NOM_AXE' = 'abscisses' ;
+TAB3.'$V' = 'Vitesse' ;
+TAB3.'$U' = 'm/s' ;
+CHA3_O = REMP CHA3_I TAB3 ;
+MESS CHA3_O ;
+
+SI ((((POSI 'm/s' 'DANS' CHA3_O)) EGA 0) OU ((DIME CHA3_O) NEG 35)) ;
+    ERRE 5 ;
+FINS ;
+
+************************************************************************
+
+CHA4_I = 'uuuuuuuuuuuuuuuuuuuuuuuu' ;
+CHA4_O = REMP CHA4_I 'u' '*' ;
+MESS CHA4_O ;
+
+SI ((((POSI '*' 'DANS' CHA4_O)) EGA 0) OU ((DIME CHA4_O) NEG (DIME CHA4_I))) ;
+    ERRE 5 ;
+FINS ;
+
+************************************************************************
+
+CHA5_I = 'Ce remplacement n est pas * recursif' ;
+CHA5_O = REMP CHA5_I '*' 'du tout *' ;
+MESS CHA5_O ;
+
+SI ((((POSI 'tout' 'DANS' CHA5_O)) EGA 0) OU ((DIME CHA5_O) NEG 44)) ;
+    ERRE 5 ;
+FINS ;
+
+************************************************************************
+
+* CET EXEMPLE DECLENCHE UNE ERREUR 1111
+* (CHAINE TROP LONGUE APRES REMPLACEMENTS)
+* CHA6_I = 'oooooooooooooooooooooooooooooooooooooooooooooooooooo' ;
+* CHA6_O = REMP CHA6_I 'o' 'ooooooooooooooooooooooooooooooooooooooooooo' ;
+* MESS CHA6_O ;
+ 
+FIN ;
+ 
+
+ 
+

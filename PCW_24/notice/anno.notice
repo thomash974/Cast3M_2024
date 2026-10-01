@@ -1,0 +1,94 @@
+$$$$ ANNO     NOTICE  JC220346  20/01/07    21:15:01     10490          
+                                             DATE     20/01/07
+
+    Operateur ANNO                         Voir aussi : TRAC
+
+
+Section : Post-traitement Affichage
+
+
+FRAN===========================================================
+    Objet :
+    _______
+
+    L'opérateur ANNO permet de créer un objet ANNOTATION. Ces objets
+    peuvent etre regroupes a l'aide de l'operateur ET et transmis
+    a TRAC pour enrichir l'affichage graphique.
+
+    Plusieurs syntaxes sont disponibles pour creer differents types
+    d'annotations :
+    
+
+    Syntaxes :
+    __________
+
+
+    1) Affichage d'une legende discrete (categories)
+
+       ANNO1 = ANNO 'CATE' COUL1 TITR1 ;
+
+
+    2) Affichage d'etiquettes localisees
+
+       ANNO1 = ANNO 'ETIQ' POIN1 (COUL1) (POSI1) (DIST1) (LIEN1) MSG1 ;
+
+
+
+   Commentaires :
+   ______________
+
+   1) Une legende de type "categorie" est un rectangle de couleur COUL1
+      couple a un texte TITR1 affiche sur le bandeau de droite, a la
+      place des isovaleurs.
+
+   2) Une etiquette est un message MSG1 affiche en un point POIN1 du
+      domaine. La couleur COUL1 peut etre specifiee, ainsi que la
+      position de l'etiquette par rapport a POIN1 (mot-cle 'SO', 'S',
+      'SE', 'O', 'C', 'E', 'NO', 'N', 'NE') et sa distance DIST1. Enfin,
+      LIEN1 (type LOGIQUE) indique s'il faut dessiner une ligne entre
+      POIN1 et l'etiquette (par defaut : VRAI)
+      
+
+ANGL===========================================================
+    Description :
+    _____________
+
+    The ANNO operator creates an object of type ANNOTATION. These
+    objects can be grouped with the ET operator and given to TRAC
+    to enhance the graphical display.
+    
+    Several syntaxes are available to create different types of
+    annotations:
+
+
+
+    Syntaxes :
+    __________
+
+    1) Discrete colormap (categories)
+
+       ANNO1 = ANNO 'CATE' COUL1 TITR1 ;
+
+
+    2) Positioned labels
+
+       ANNO1 = ANNO 'ETIQ' POIN1 (COUL1) (POSI1) (DIST1) (LIEN1) MSG1 ;
+
+
+
+   Comments :
+   __________
+
+   1) A discrete colormap item is a rectangle of color COUL1 associated
+      to a label TITR1 displayed on the right panel, instead of a
+      continuous colormap (field values).
+      
+   2) A positioned label is a message MSG1 displayed at point POIN1.
+      The color COUL1 can be specified, as well as the label position
+      relatively to POIN1 (keyword 'SO', ie French for South-West, 'S',
+      'SE', 'O', 'C', 'E', 'NO', 'N', NE') and the distance DIST1. Also,
+      LIEN1 (LOGIQUE type) indicates whether a line must be drawn
+      between POIN1 and the label (true by default).
+      
+      
+ 

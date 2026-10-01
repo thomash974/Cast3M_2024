@@ -1,0 +1,181 @@
+* fichier : fluage_fibre_lemaitre_1.dgibi
+*
+************************************************************************
+* Test du modele de fluage de Lemaitre pour les modeles de section     *
+* (appeles aussi modeles de poutre a fibre)                            *
+* --> chargement uniaxial en traction                                  *
+* --> comparaison a la solution analytique                             *
+************************************************************************
+
+
+
+** Options generales
+OPTI 'DIME' 3 'ELEM' 'QUA4' 'ECHO' 0 ;
+itrac = FAUX ;
+
+
+** Parametres geometrie (poutre a section rectangulaire)
+a = 0.05 ;
+b = 0.02 ;
+l = 1. ;
+se = a * b ;
+
+
+** Nombres d'elements
+nea = 5 ;
+neb = 5 ;
+nel = 10 ;
+
+
+** Parametres materiau
+yo = 1.E8 ;
+nu = 0.3 ;
+af1 = 1.E-4 ;
+af2 = 2. ;
+af3 = 1. ;
+af4 = 1.E-3 ;
+kxf = 15.E6 ;
+kyf = 3.E6 ;
+
+
+** Parametres chargement
+ftrac = 10000. ;
+tl = 1000. ;
+
+
+** Maillage et modele de section
+lig1 = DROI nea ((-0.5 * a) (-0.5 * b) 0.) ((0.5 * a) (-0.5 * b) 0.) ;
+s1 = lig1 TRAN neb (0. b 0.) ;
+s1 = SURF (CONT s1) 'PLAN' ;
+mos = MODE s1 'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'LEMAITRE' 'QUAS' 'TRIS' ;
+mas = MATE mos 'YOUN' yo 'NU' nu 'AF1' af1 'AF2' af2 'AF3' af3 'AF4' af4 'KXF' kxf 'KYF' kyf
+                                 'SMAX' (yo / 1000.)  'ALPY' 0.66 'ALPZ' 0.66 ;
+
+
+** Maillage et modele de poutre TIMO
+p0 = 0. 0. 0. ;
+p1 = l 0. 0. ;
+lf = DROI nel p0 p1 ;
+mop = MODE lf 'MECANIQUE' 'ELASTIQUE' 'SECTION' 'PLASTIQUE' 'SECTION' 'TIMO' ;
+map = MATE mop 'MODS' mos 'MATS' mas 'VECT' (0. 1. 0.) ;
+
+
+** Conditions aux limites
+tl0 = 1.E-5 ;
+evcha = EVOL 'MANU' (PROG 0. tl0 tl) (PROG 0. 1. 1.) ;
+bl1p  = BLOQ 'DEPL' 'ROTA' p0 ;
+ftp = FORC (ftrac 0. 0.) p1 ;
+chaftp = CHAR 'MECA' ftp evcha ;
+
+
+** Resolution
+xpas = tl / 50. ;
+ltc  = PROG tl0 'PAS' xpas tl ;
+tp = TABL ;
+tp . 'MODELE' = mop ;
+tp . 'CARACTERISTIQUES' = map ;
+chmsg0 = ZERO mos 'CONTRAIN' ;
+chmvi0 = ZERO mos 'VARINTER' ;
+tp . 'VARIABLES_INTERNES' = TABL ;
+tp . 'VARIABLES_INTERNES' . 0 = MANU 'CHML' mop 'VONS' chmsg0 'VAIS' chmvi0 'TYPE' 'VARIABLES INTERNES' 'STRESSES' ;
+tp . 'BLOCAGES_MECANIQUES' = bl1p ;
+tp . 'CHARGEMENT' = chaftp ;
+tp . 'TEMPS_CALCULES'  = ltc ;
+TEMP 'ZERO' ;
+PASAPAS tp ;
+itp1 = TEMP 'HORL' ;
+MESS 'Temps horloge :' ' ' itp1 ;
+MESS ;
+
+
+** Post traitement
+n1 = DIME (tp . 'TEMPS') ;
+* deplacements de l'extremite
+lup = EXTR (EVOL 'TEMP' tp 'DEPLACEMENTS' 'UX' p1) 'ORDO' ;
+* force de reaction a l'encastrement
+lfp = EXTR (EVOL 'TEMP' tp 'REACTIONS' 'FX' p0) 'ORDO' ;
+* defomration inelastique moyenne dans la poutre
+ltps = PROG ;
+lep = PROG 0. ;
+REPE b1 (n1 - 1) ;
+  tps1 = tp . 'TEMPS' . &b1 ;
+  ltps = ltps ET tps1 ;
+  up = tp . 'DEPLACEMENTS' . &b1 ;
+  tabv = TABL ;
+  tabv . 'DEPLACEMENTS' = TABL ;
+  tabv . 'DEPLACEMENTS' . 1 = up ;
+  tabv . 'VONS' = TABL ;
+  tabv . 'VONS' . 1 = EXCO (tp . 'VARIABLES_INTERNES' . &b1) 'VONS' ;
+  tabv . 'VAIS' = TABL ;
+  tabv . 'VAIS' . 1 = EXCO (tp . 'VARIABLES_INTERNES' . &b1) 'VAIS' ;
+  mail1 = POUT2MAS mop map 'GAUSS' tabv ;
+  vips = tabv . 'VAIS_3D' . 1 ;
+  mobid = MODE mail1 'MECANIQUE' ;
+  cham1 = CHAN 'CHAM' mobid vips ;
+  epsep = (INTG mobid cham1 'EPSE') * l / nel / se ;
+  lep = lep ET epsep ;
+FIN b1 ;
+
+
+** Solutions analytiques
+sigt = (ABS ftrac) / se ;
+xp = ((sigt / kxf) ** (af3 / af2)) * (af4 ** (1. / af2)) ;
+yp = ((sigt / kyf) ** af3) * af4 ;
+let = af1 * (((xp * ltps) ** af2) + (yp * ltps)) ;
+lut = (let + (sigt / yo)) / l ;
+lft = PROG 0. (n1 - 1)*(-1. * ftrac) ;
+let = (PROG 0.) ET let ;
+lut = (PROG 0.) ET lut ;
+ltps = (PROG 0.) ET ltps ;
+evut = EVOL 'MANU' 'DEFA' ltps lut ;
+evft = EVOL 'MANU' 'DEFA' ltps lft ;
+evet = EVOL 'MANU' 'DEFA' ltps let ;
+
+
+** Analyse/trace des resultats
+tleg = TABL ;
+tleg . 2 = MOT 'MARQ ROND NOLI' ;
+tleg . 'TITRE' = TABL ;
+tleg . 'TITRE' . 1 = 'Soluce analytique' ;
+tleg . 'TITRE' . 2 = 'Modele poutre fibre' ;
+MESS 'Ecart relatif max.' ;
+evup = EVOL 'ROUG' 'MANU' 'Temps' ltps 'Deplacement' lup ;
+difu = (MAXI (ABS (lup - lut))) / (MAXI (ABS lut)) ;
+MESS '-- deplacement :' difu ;
+SI itrac ;
+  DESS (evut ET evup) 'TITR' 'Deplacement vs. Temps' 'LEGE' tleg ;
+FINSI ;
+evfp = EVOL 'ROUG' 'MANU' 'Temps' ltps 'Force' lfp ;
+diff = (MAXI (ABS (lfp - lft))) / (MAXI (ABS lft)) ;
+MESS '-- effort      :' diff ;
+SI itrac ;
+  DESS (evft ET evfp) 'TITR' 'Force vs. Temps' 'LEGE' tleg ;
+FINSI ;
+evep = EVOL 'ROUG' 'MANU' 'TEMPS' ltps 'ESPE' lep ;
+dife = (MAXI (ABS (lep - let))) / (MAXI (ABS let)) ;
+MESS '-- def. fluage :' dife ;
+SI itrac ;
+  DESS (evet ET evep) 'TITR' 'Deformation non lin. (EPSE) vs Temps' 'LEGE' tleg ;
+FINSI ;
+
+
+** Erreur si l'ecart relatif est trop eleve
+lerr = PROG difu diff dife ;
+errmax = MAXI lerr ;
+MESS ;
+SI (errmax > 5.E-3) ;
+  MESS 'Echec du cas test !' ;
+  ERRE 5 ;
+SINON ;
+  MESS 'Succes du cas test !' ;
+FINSI ;
+
+
+FIN ;
+
+ 
+
+ 
+
+ 
+

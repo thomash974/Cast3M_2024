@@ -1,0 +1,6 @@
+=== Scenario 10 : mazT_orig (MAZARS_T, PERF_RAID inactif, niveau 1) ===
+Elements : 1000 ; pas de temps : 76 ; repetitions : 2
+Temps horloge minimal (ms) : 34539 ; acceleration par rapport a orig :   1.00
+Temps par operateur (ms, calcul le plus rapide) : RESO 9104 ; RIGI 1356 ; HOOK 4333 ; VARI 1049 ; COMP 9922
+Raideur : reutilisee 0 fois, recalculee 81 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif de la courbe F/S avec orig :  0.000E+00 : OK

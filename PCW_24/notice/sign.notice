@@ -1,0 +1,71 @@
+$$$$ SIGN     NOTICE  PASCAL    22/07/13    21:15:09     11409          
+                                             DATE     22/07/13
+
+      RESU1 =  'SIGN'  OBJET1 (MOT1) ;
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur SIGN                           Voir aussi : ABS MASQ
+    --------------
+
+    Objet :
+    _______
+
+    L'operateur SIGN calcule le signe d'OBJET1.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    ENTIER       |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTENTI     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+
+
+    Remarque :
+    __________
+
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+ANGL====================================================================
+
+    Operator SIGN                            See also : ABS MASQ
+    -------------
+
+    Description :
+    ____________
+
+    The SIGN operator calculates the sign of OBJET1 values.
+
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    ENTIER       |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTENTI     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+
+
+    Remark :
+    _______
+
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$
+ 
+ 

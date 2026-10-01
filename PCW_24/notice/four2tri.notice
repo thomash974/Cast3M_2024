@@ -1,0 +1,144 @@
+$$$$ FOUR2TRI NOTICE  BP208322  21/01/28    21:15:07     10868          
+                                             DATE     21/01/28
+
+Procedure FOUR2TRI:            Voir aussi : POUT2MAS, CREER3D
+-------------------
+      FOUR2TRI TAB1 (NUMFOUR);
+
+
+Section : Maillage Volumes
+
+FRAN===========================================================
+
+Objet :
+------
+
+     FOUR2TRI genere un maillage 3D a partir d'un modele ou d'un 
+     maillage 2D Fourier.
+     Si des champs (deplacements, forces ou scalaire) 2D Fourier sont 
+     fournis, alors les champs 3D correspondant sont crees sur le 
+     maillage 3D.
+     La table TAB1 peut etre reutilisees pour des appels successifs
+     a FOUR2TRI. Les infos utiles (maillages, etc.) sont conservees. 
+     Ceci permet par exemple de recombiner les champs definis sur 
+     plusieurs harmoniques de Fourier.
+     
+
+Entree :
+-------
+
+     NUMFOUR : (ENTIER) Numero d'harmonique de Fourier sur lequel
+               sont definis les champs 2D a recombiner en 3D.
+               
+     TAB1    : (TABLE) avec les indices suivants :
+     
+       . 'MODELE' : (MMODEL) modele 2D Fourier 
+     ou
+       . 'MAILLAGE' : (MAILLAGE) maillage 2D 
+       
+       . 'ANGLES'   : (LISTREEL facultatif) discretisation angulaire du 
+                       maillage 3D (= prog 0. 15. 360. par defaut)
+       
+       . 'REDRESSE' : (LOGIQUE facultatif) changement de repere pour 
+                      aligner z et Z (FAUX par defaut) tel que :
+                       = | FAUX --> (r,\theta,z)_{2D} = (X,-Z,Y)_{3D}
+                         | VRAI --> (r,\theta,z)_{2D} = (X,Y,Z)_{3D}
+                        
+       . 'ELIM' : (FLOTTANT facultatif) tolerance pour l'appel aux
+                   operateurs ELIM, MASQ et IPOL (=1.E-12 par defaut)
+       
+       . |'DEPLACEMENTS' | : (TABLE facultative) indicee par i=1..n
+         |'EFFORTS'      |
+         |'CHPO_SYME'    |
+         |'CHPO_ANTI'    |
+                     . i : (CHPOINT) champ 2D Fourier a reconstruire
+             
+
+Sortie:
+-------
+     Les indices ajoutes a TAB1 sont :
+
+       . 'MAILLAGE_3D' : (MAILLAGE) maillage 3D obtenu par rotation 
+                         (via ROTA ou VOLU 'ROTA')
+                         
+       . 'ANGLE_3D'    : (CHPOINT) angle \theta sur le maillage 3D
+       
+       . 'COORDONNEES_2D' : (CHPOINT) coordonnees (r,z) du maillage 2D
+       
+       . 'COORDONNEES_3D' : (CHPOINT) coordonnees (r,z) du maillage 3D
+       
+       . |'DEPLACEMENTS_3D' | : (TABLE) indicee par i=1..n
+         |'EFFORTS_3D'      |
+         |'CHPO_SYME_3D'    |
+         |'CHPO_ANTI_3D'    |
+                     . i : (CHPOINT) champ 3D reconstruit
+     
+ 
+
+ANGL===========================================================
+
+Description:
+------------
+
+      FOUR2TRI generates a 3D mesh correponding to a 2D Fourier model
+      or a 2D mesh.
+      If 2D Fourier fields (displacements, forces, scalar) are given,
+      then equivalent 3D fields are built on the 3D mesh.
+      The table TAB1 can be used for successive calls to FOUR2TRI.
+      This way of doing may be useful to recombine several Fourier
+      harmonics contribution.
+
+      
+Input:
+------
+
+     NUMFOUR : (ENTIER) Fourier harmonic number on which are defined the 
+               2D fields to transfer toward 3D mesh.
+               
+     TAB1    : (TABLE) with the following index:
+     
+       . 'MODELE' : (MMODEL) 2D Fourier model
+     ou
+       . 'MAILLAGE' : (MAILLAGE) 2D mesh
+       
+       . 'ANGLES'   : (LISTREEL optional) angular discretisation for  
+                       the 3D mesh (= prog 0. 15. 360. by default)
+       
+       . 'REDRESSE' : (LOGIQUE optional) change of frame to align the
+                      z et Z axes (FAUX by default) so that :
+                       = | FAUX --> (r,\theta,z)_{2D} = (X,-Z,Y)_{3D}
+                         | VRAI --> (r,\theta,z)_{2D} = (X,Y,Z)_{3D}
+                        
+       . 'ELIM' : (FLOTTANT optional) tolerance for the callings to the
+                   operators ELIM, MASQ et IPOL (=1.E-12 by default)
+       
+       . |'DEPLACEMENTS' | : (TABLE optional) indexed with i=1..n
+         |'EFFORTS'      |
+         |'CHPO_SYME'    |
+         |'CHPO_ANTI'    |
+                     . i : (CHPOINT) 2D Fourier field to transfer
+
+
+Output:
+-------
+     The indexes added to TAB1 are:
+
+       . 'MAILLAGE_3D' : (MAILLAGE) 3D mesh obtained by rotation 
+                         (via ROTA or VOLU 'ROTA')
+                         
+       . 'ANGLE_3D'    : (CHPOINT) \theta angle on the 3D mesh
+       
+       . 'COORDONNEES_2D' : (CHPOINT) coordinates (r,z) of the 2D mesh
+       
+       . 'COORDONNEES_3D' : (CHPOINT) coordinates (r,z) of the 3D mesh
+       
+       . |'DEPLACEMENTS_3D' | : (TABLE) indexed with i=1..n
+         |'EFFORTS_3D'      |
+         |'CHPO_SYME_3D'    |
+         |'CHPO_ANTI_3D'    |
+                     . i : (CHPOINT) 3D field 
+
+
+$$$$
+
+ 

@@ -1,0 +1,28 @@
+$$$$ DIST     NOTICE  FANDEUR   22/06/02    21:15:04     11371          
+                                             DATE     22/06/02
+
+                                             Voir aussi :
+    Operateur DIST
+    --------------
+
+    FLOT1  =  'DIST'  POIN1  POIN2  ;
+
+
+Section : Mathematiques Autres
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur DIST calcule la distance euclidienne FLOT1 (type 
+ FLOTTANT) entre les deux points POIN1 et POIN2 (type POINT).
+
+ANGL==========================================================
+    Description:
+    ____________
+
+    The DIST operator calculates the euclidean distance FLOT1 
+ (FLOTTANT type) between the two points POIN1 and POIN2 (POINT type).
+
+
+ 

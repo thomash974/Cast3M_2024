@@ -1,0 +1,6 @@
+=== Scenario 9 : maz_perf2 (MAZARS, PERF_RAID actif, niveau 2) ===
+Elements : 1000 ; pas de temps : 76 ; repetitions : 2
+Temps horloge minimal (ms) : 20981 ; acceleration par rapport a orig :   1.45
+Temps par operateur (ms, calcul le plus rapide) : RESO 4829 ; RIGI 1507 ; HOOK 590 ; VARI 0 ; COMP 8545
+Raideur : reutilisee 59 fois, recalculee 22 fois ; HOOK evite 447 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif de la courbe F/S avec orig :  2.500E-04 : OK

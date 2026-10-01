@@ -1,0 +1,252 @@
+* fichier : fluendo3d_fluage_biaxial.dgibi
+************************************************************************
+* Section : Mecanique Viscoplastique
+************************************************************************
+*
+* test de la formulation fluage du mdele fluendo3d
+* ----------------------------------------------------------------------
+*
+* Alain Sellier, Thierry Vidal, Laurie Lacarriere, Stephane Multon
+* mercredi 4 janvier 2023
+*
+*-----------------------------------------------------------------------
+* Exemple de calcul d un element charge par un etat biaxial de 
+* le cas test est inspire des essais de Gopalakrisnan. 
+*-----------------------------------------------------------------------
+graph1=FAUX;
+*maillage 1/8 eprouvette 11*22 
+opti dime 3 elem cub8;  
+nh1=1;
+nl1=1;
+np1=1;                                                           
+p1=0. 0. 0.; 
+p2=1. 0. 0.;
+p3=1. 1. 0.;
+p4=0. 1. 0.;
+p5=0. 0. 1.;   
+d12=droi nl1 p1 p2;
+d23=droi np1 p2 p3;
+d34=droi nl1 p3 p4;
+d41=droi np1 p4 p1;
+d15=droi nh1 p1 p5;
+*surface inferieuer
+s3=daller d12 d23 d34 d41;                                                        
+v1=s3 volu nh1 tran p5;
+elim (v1 et d15) 0.0005;                                                   
+*surface superieure                                          
+s4=(s3 plus p5) coul roug ;                                            
+elim (v1 et s3) 0.0001;                                  
+elim (v1 et s4) 0.0001; 
+*axe                                              
+d3=d15;
+elim (v1 et d3) 0.0001;                                                                                                              
+*surface de coupe avant
+s11=d12 tran nh1 p5;
+s10=s11;
+elim (s10 et v1) 0.0001;
+*surface de coupe laterale gauche
+s41=d41 tran nh1 p5;
+s40=s41;
+elim (s40 et v1) 0.0001;
+oeil1=-0.25 -0.5 2.; 
+*surface de droite
+s23=d23 tran nh1 p5;
+*surface arriere
+s34=d34 tran nh1 p5;
+elime (v1 et s23 et s34) 0.0001;
+*trac v1 cach oeil1 qual; 
+*opti donn 5;
+
+*modele et materiau
+mod1=mode v1 mecanique elastique 
+viscoplastique fluendo3d;
+
+*materiau
+rc1=29.;
+youn1=31000.;
+nu1=0.15;
+
+*evolution du module elastique en fonction du temps (EC2 20°C)
+liste1=prog 0. pas 1. 200.;
+liste2=prog (dime liste1)*1.;
+liste3=0.3*(liste2-((28.*((8*liste2+liste1)**-1))**0.5));
+liste4=0.7*((exp(liste3))**0.33);
+evole4=evol manu 'temps' liste1 'HYD1' liste4;
+*dess evole4 titr 'Evolution Hydratation';
+evole=evol manu 'HYD1' (prog -1. 1.) 'HYDR' (prog -1. 1.);
+
+*elasticity, plasticity and damage
+matd1=MATE mod1 YOUN youn1 NU nu1 RHO 2400. ALPH 1.0e-5  HYDR 1. YORF 
+ youn1 NURF nu1 HREF 1. HYDS 0.2 RT 3. EPT 1.1e-4 GFT 1.0e-4 RC 29. 
+ EPC 2.0e-3 DELT 1.0 BETA 0.15 EKDC 2.0e-3 REF 5. GFR 1.0e-4 TSTH 45.
+ DT80 0.15  NREN 0. ;
+
+*visco elasticity and visco plasticity (creep)
+matf1=MATE mod1 TTRF 20. TAUK 0.7 YKSY 4.5 TAUM 10. EKFL 1.1e-4 
+ XFLU 2. NRJM 17000. DFMX 0. MDTT 15000. TDTT 1.0 WDTT 0.02 PDTT 20.;
+ 
+*early age behavior
+matja=MATE mod1 YOJA 3. NUJA 0.495 SSJA 0.0001 TMJA 0.01;
+
+*water
+matgw1=mate mod1 VW 0.12 PORO 0.12 BSHR 0.5 MSHR 60. MVGN 0.5 TTKW 40.
+ DCDW 0.5  SKDW 17. CSHR 2.  KWRT 1. KWRC 1.;
+
+*rag
+matgr1=MATE mod1 VRAG 0.0e-3  VVRG 0. KRAG 4000. CRAG 0.5 HRAG 1500. 
+EKDG 0.3e-2  TRAG 120. NRJR 40000. SRSR 0.5 DCDG 0.15;
+
+*def
+matgd1=MATE mod1  VDEF 1.0e-2  SSAD 0.6 NALD 0.3 TPRD 30. TTKD 80.
+NAKD 0.28 NRJP 40000. TTRP 20. SRSD 0.95  NABD 0.92   TDID (65./24.) 
+NRJD 70000. TTKF 70. TFID (30./24.) NRJF 180000.  EXND 0.18 EXMD 3. 
+VVDF 1.0e-3 KDEF 4000. CDEF 0.5 HDEF 1500. EKDS 3.0e-2 DCDS 0.15;
+
+*material chracteristics assemblage
+mat1=matd1 ET matf1   ET matgr1 ET matgd1 ET matgw1 et matja;
+                   
+
+*champ constant pour l evolution du module d Young
+chun1=manu 'CHML' mod1 'HYD1' 1.0 'RIGIDITE';
+char4=char 'HYD1' chun1 evole4;   
+ 
+*conditions aux limites et chargement
+cl1=bloq s3 UZ;
+cl4=bloq s10 UY;
+cl5=bloq s40 UX;
+cl6=bloq s4 UX UY;
+cl0=cl1 et cl4 et cl5;
+pres1=PRES 'MASS' MOD1 12.54 s23;
+pres2=PRES 'MASS' MOD1  7.25 s34;
+lp1=prog 1. 1. 1. 0.001 0.001;               
+lt1=prog 0. 0.1 28. 28.1 200.;
+evol1=evol manu 'TEMPS' lt1 'PRES1' lp1;
+char1=char 'MECA' (pres1 et pres2) evol1;
+
+*difinitions pour le calcul pas a pas du cahrgement initial
+tab1=table;
+ltc1=prog 0. pas 0.5 2. pas 2. 28. pas 0.5 30. pas 2. 50.;
+tab1.temps_calcules=ltc1;
+tab1.caracteristiques=mat1;
+tab1.modele=mod1;
+tab1.blocages_mecaniques=cl0;
+tab1.mova='DFLU';
+tab1.chargement=char1 et char4;
+tab1.precision=1.0e-4;
+tab1.maxiteration=100;
+pasapas tab1;
+
+************************************************************************
+*post traitement
+************************************************************************
+
+*courbe de deplacement au centre de l eprouvette
+*et variables internes
+n1=dime (tab1.temps);
+i1=0;
+dp5=prog;
+e1s=prog;
+e2s=prog;
+e2d1=prog;
+e1d1=prog;
+lt5=prog;
+epx1=prog;
+epy1=prog;
+epz1=prog;
+eel00=prog;
+eelt0=prog;
+youn0=youn1;
+repeter bloc0 n1;
+ z5=extr tab1.deplacements.i1 UZ p5;
+ vari1=tab1.variables_internes.i1;
+ depi1=tab1.deplacements.i1;
+ epsi1=epsi depi1 mod1;
+ sig1=tab1.contraintes.i1;
+ epxx1=extr ( exco epsi1 'EPXX') 'EPXX' 1 1 1;
+ dc1=extr (exco dcom tab1.variables_internes.i1) dcom 1 1 1 ;
+* dc1=0.;
+ youn1=youn0*(1.-dc1);
+ sxx1=extr ( exco sig1 'SMXX') 'SMXX' 1 1 1;
+ epyy1=extr(exco epsi1 'EPYY') 'EPYY' 1 1 1;
+ syy1=extr ( exco sig1 'SMYY') 'SMYY' 1 1 1;
+ epzz1=extr(exco epsi1 'EPZZ') 'EPZZ' 1 1 1;
+ szz1=extr ( exco sig1 'SMZZ') 'SMZZ' 1 1 1;
+ epxe1=((sxx1)-(nu1*(syy1+szz1)))/youn1;
+ epye1=((syy1)-(nu1*(sxx1+szz1)))/youn1;
+ epze1=((szz1)-(nu1*(sxx1+syy1)))/youn1;
+ dp5=dp5 et (prog z5);
+ epx1=epx1 et (prog (epxx1-epxe1));
+ epy1=epy1 et (prog (epyy1-epye1));
+ epz1=epz1 et (prog (epzz1-epze1));
+ lt5=lt5 et (prog (tab1.temps.i1));
+ i1=i1+1;
+fin bloc0;
+
+edp5=evol manu 'TEMPS' lt5 'DP5' dp5;
+epx1=1.e6*epx1;
+eepx1=evol manu 'TEMPS' lt5 'EPXX' epx1;
+eepx1=eepx1 coul roug;
+epy1=1.e6*epy1;
+eepy1=evol manu 'TEMPS' lt5 'EPYY' epy1;
+eepy1=eepy1 coul vert;
+epz1=1.e6*epz1;
+eepz1=evol manu 'TEMPS' lt5 'EPZZ' epz1;
+
+tab2=table;
+tab2.1 = 'MARQ CROI ' ;
+tab2.'TITRE' = 'TABLE' ;
+tab2.'TITRE'. 1 = MOT 'DEPLACEMENT P5' ;
+si (graph1);
+    dess (edp5 ) lege tab2;
+finsi;
+*opti donn 5;
+
+*points experimentaux
+lt6= prog 0. 1. 4. 10. 20. 28. 29. 30. 34. 40. 50.;
+exx0=prog 0. 50. 125. 180. 230. 250. 190. 180. 175.
+ 175. 175.;
+exx0=-1.*exx0;
+evx0=evol manu 'TEMPS' lt6 'EPXX exp' exx0;
+evx0=evx0 coul roug;
+eyy0=prog 0. 25. 55. 95. 110. 120. 100. 95. 90. 90. 
+90.;
+eyy0=-1.*eyy0;
+evy0=evol manu 'TEMPS' lt6 'EPYY exp' eyy0;
+evy0=evy0 coul vert;
+ezz0=prog 0. -10. -30. -50. -60. -65. -55. -50. -40.
+-30. -30;
+ezz0=-1.*ezz0;
+evz0=evol manu 'TEMPS' lt6 'EPZZ exp' ezz0;
+tab3=table;
+tab3.1 = 'MARQ CROI NOLI' ;
+tab3.2 = 'MARQ PLUS NOLI' ;
+tab3.3 = 'MARQ ETOI NOLI' ;
+tab3.'TITRE' = 'TABLE' ;
+tab3.'TITRE'. 1 = MOT 'EPXX exp' ;
+tab3.'TITRE'. 2 = MOT 'EPYY exp' ;
+tab3.'TITRE'. 3=  MOT 'EPZZ exp' ;
+tab3.'TITRE'. 4 = MOT 'EPXX th' ;
+tab3.'TITRE'. 5 = MOT 'EPYY th' ;
+tab3.'TITRE'. 6=  MOT 'EPZZ th' ;
+si (graph1);
+    dess (evx0 et evy0 et evz0 et eepx1 
+    et eepy1 et eepz1) lege tab3;
+finsi;
+
+n1=17; fref1 = -121.70;
+n2=31; fref2 = -83.627;
+LISTF1='EXTR' eepy1 'ORDO';
+fcal1='EXTR' LISTF1 (n1+1);
+fcal2='EXTR' LISTF1 (n2+1);
+err1 = abs ((fref1 - fcal1)/fref1) ; 
+err2 = abs ((fref2 - fcal2)/fref2) ;
+si ((err1 < 1.0e-3) et (err2 < 1.0e-3)) ;
+    erre 0 ;
+sinon ;
+    erre 5 ;
+finsi ;
+fin;
+ 
+
+ 
+

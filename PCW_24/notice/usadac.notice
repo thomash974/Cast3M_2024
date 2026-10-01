@@ -1,0 +1,83 @@
+$$$$ USADAC   NOTICE  MB234859  24/02/06    21:15:02     11833          
+                                             DATE     24/02/06
+
+ Procedure USADAC                        Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USEXPL USIMPL USINIB
+                                        USPOST USTMPS USURE
+
+         PROG1 REE1 = USADAC PROG2 PROG3 ; 
+
+  [Q. Caradec thesis]
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui determine, a un cycle donne, le facteur de saut de 
+    cycle. La largeur de la zone usee, notee L, en fonction du nombre de 
+    cycle, note N, est supposee s'exprimer sous la forme :
+    
+                        L(N) = L0 + [L1 '*' N '**' L2]
+    
+    L1 et L2 sont reevalues a chaque nouveau cycle via l'operateur LEVM.
+    Cette procedure calcule les valeurs de L(N) et de ses derivees 
+    partielles pour chaque cycle. Il s'agit de la procedure transmise 
+    a LEVM. 
+ 
+  Commentaires :
+  --------------
+
+    PROG1 : Objet de type LISTREEL donnant les valeurs des parametres 
+            L1 et L2 proposes par l'operateur LEVM.
+
+    REE1  : Objet de type REEL donnant la valeur final du critere de 
+            l'operateur LEVM.
+
+    PROG2 : Objet de type LISTREEL donnant les cycles d'usure calcules
+            (abscisses de la suite de points a approximer).
+
+    PROG3 : Objet de type LISTREEL donnant les largeurs de zone usee a 
+            chaque cycle (ordonnees de la suite de points a approximer)
+
+  Cette procedure est appelee par USACCE.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which calculates, for a given cycle, the cycle jump 
+    coefficient. The wear profile enlargement, denoted L, with respect 
+    to the number of cycle, denoted N, is expressed as :
+    
+                        L(N) = L0 + [L1 '*' N '**' L2]
+
+    The L1 and L2 values are computed at each cycle thanks to the 
+    LEVM operator.
+    This procedur computes the ordinates and partial derivatives of 
+    L(N) for each cycle.
+ 
+  Comments :
+  ----------
+
+    PROG1 : LISTREEL type object which contains the values of L1 and L2 
+            proposed by LEVM operator.
+
+    REE1  : REEL type object which is the final criteria value of 
+            LEVM operator.
+
+    PROG2 : LISTREEL type object which gives the abscissas.
+
+    PROG3 : LISTREEL type object which gives the ordinates.
+
+  This procedure is called by USACCE.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+ 

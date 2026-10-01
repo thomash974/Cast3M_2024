@@ -1,0 +1,120 @@
+$$$$ COUT     NOTICE  GOUNAND   21/03/31    21:15:00     10931          
+                                             DATE     21/03/31
+                                             
+     Operateur COUTURE                       Voir aussi :
+     -----------------
+Section : Maillage Lignes
+Section : Maillage Surfaces
+Section : Maillage Volumes
+
+FRAN==========================================================
+    ----------------------
+    |  1ere possibilite  |
+    ----------------------
+ANGL==========================================================
+    ---------------------
+    |  1st possibility  |
+    ---------------------
+==========================================================
+
+     SURF1 =  COUT LIG1 LIG2  ;
+
+FRAN===========================================================
+     Objet :
+     _______
+
+     L'operateur COUTURE construit une surface qui relie deux lignes
+     a l'aide de triangles.
+
+     Commentaire :
+     _____________
+
+     LIG1  | : lignes entre lesquelles la surface est generee
+     LIG2  |   (type MAILLAGE)
+
+     SURF1   : surface creee (type MAILLAGE)
+
+     Remarque :
+     __________
+
+     Les deux lignes sont supposees decrites dans le meme sens.
+
+
+ANGL===========================================================
+     Description :
+     _____________
+
+     The COUTURE operator constructs a surface which connects two 
+     lines by means of triangles.
+
+     Contents :
+     __________
+
+     LIG1  | : lines between which the surface is generated
+     LIG2  |   (MAILLAGE type)
+ 
+     SURF1   : created surface (MAILLAGE type)
+
+     Note :
+     ________
+
+     Both lines should have the same orientation.
+
+
+FRAN==========================================================
+    ----------------------
+    |  2eme possibilite  |
+    ----------------------
+ANGL==========================================================
+    ---------------------
+    |  2nd possibility  |
+    ---------------------
+==========================================================
+
+     MAIL2 =  COUT MAIL1 POIN1 ;
+
+FRAN===========================================================
+     Objet :
+     _______
+
+     L'operateur COUTURE cree un etoilement du maillage MAIL1 a partir
+     du point POIN1.
+     
+     Commentaire :
+     _____________
+
+     POIN1   : point (type POINT) a relier au maillage MAIL1
+     MAIL1   : maillage (type MAILLAGE) constitué d'elements POI1,
+               SEG2, TRI3 ou QUA4
+
+     MAIL2   : maillage resultat (type MAILLAGE) constitué d'elements
+               SEG2, TRI3, TET4 ou PYR5
+
+     Remarque :
+     __________
+
+     POIN1 peut appartenir a MAIL1 auquel cas les elements de MAIL1
+     touchant POIN1 ne sont pas etoiles.
+ANGL===========================================================
+     Description :
+     _____________
+
+     The COUTURE operator constructs a mesh which connects a mesh and
+     a point (star operator).
+
+     Contents :
+     __________
+
+     POIN1   : point (POINT type) to be connected to mesh MAIL1
+     MAIL1   : mesh (MAILLAGE type) made of POI1, SEG2, TRI3 or QUA4
+               elements
+
+     MAIL2   : output mesh (MAILLAGE type) made of SEG2, TRI3, TET4 or
+               PYR5 elements
+
+     Note :
+     ________
+
+     POIN1 can be part of MAIL1. In this case, the elements of MAIL1
+     connected to POIN1 are not starred.
+ 

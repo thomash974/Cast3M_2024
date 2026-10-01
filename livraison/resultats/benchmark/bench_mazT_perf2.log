@@ -1,0 +1,6 @@
+=== Scenario 12 : mazT_perf2 (MAZARS_T, PERF_RAID actif, niveau 2) ===
+Elements : 1000 ; pas de temps : 76 ; repetitions : 2
+Temps horloge minimal (ms) : 27063 ; acceleration par rapport a orig :   1.28
+Temps par operateur (ms, calcul le plus rapide) : RESO 6935 ; RIGI 1352 ; HOOK 554 ; VARI 969 ; COMP 9281
+Raideur : reutilisee 29 fois, recalculee 52 fois ; HOOK evite 478 fois ; caracteristiques reutilisees 11 fois
+Ecart relatif de la courbe F/S avec orig :  1.796E-03 : OK

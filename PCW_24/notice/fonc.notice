@@ -1,0 +1,64 @@
+$$$$ FONC     NOTICE  CB215821  23/10/18    21:15:05     11760          
+                                             DATE     23/10/18
+
+    Operateur FONC                           Voir aussi :
+    ---------------
+
+      LREEL1 = FONC | 'FRESNEL' | 'CX' | LREEL2 ;
+                    |           | 'SX' |
+
+
+Section : Mathematiques Fonctions
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur FONC permet le calcul des integrales de Fresnel 
+    par la methode de Lanczos :
+    separation de l'espace d'integration en deux domaines (x<4 et x>4)
+
+    Commentaire :
+    -----------
+
+   'CX'    : integrale en cosinus
+                               / x
+             F = 1/sqrt(2.PI) /    cos(t)/sqrt(t) dt
+                             / 0
+
+   'SX'    : integrale en sinus
+                               / x
+             F = 1/sqrt(2.PI) /    sin(t)/sqrt(t) dt
+                             / 0
+
+    LREEL2 : les valeurs de la variable (type LISTREEL).
+
+    LREEL1 : les valeurs de la fonction (type LISTREEL).
+
+ANGL==========================================================
+    Description :
+    ____________
+
+    The FONC operator enables the calculation of Fresnel integrals 
+    using the Lanczos method :
+    splitting the space of integration into two domains (x<4 and x>4)
+
+    Contents :
+    ----------
+
+   'CX'    : cosine integral 
+                               / x
+             F = 1/sqrt(2.PI) /    cos(t)/sqrt(t) dt
+                             / 0
+
+   'SX'    : sine integral 
+                               / x
+             F = 1/sqrt(2.PI) /    sin(t)/sqrt(t) dt
+                             / 0
+
+    LREEL2 : variable values (LISTREEL type)
+
+    LREEL1 : function values (LISTREEL type)
+
+$$$$
+ 

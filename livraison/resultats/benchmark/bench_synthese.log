@@ -1,0 +1,17 @@
+BENCHMARK PERF-RAID - maillage 10 x 10 x 10 ; repetitions : 2
+Scen      ms   acc.    RESO   RIGI   HOOK   VARI      ecart reut calc hook mat niv resultat PERF famille scenario
+   1   16414   1.00    5621    356      0   1344  0.000E+00    0   60    0   0   1 OK inactif CHABOCHE chab_orig
+   2   10977   1.50    1646      6      0      0  0.000E+00   59    1    0  61   1 OK actif CHABOCHE chab_perf1
+   3    9775   1.68    1566      4      0      0  0.000E+00   59    1    0  61   2 OK actif CHABOCHE chab_perf2
+   4   15900   1.00    5715    371      0   1359  0.000E+00    0   60    0   0   1 OK inactif CHABOCHE_T chabT_orig
+   5   17482   0.91    6108    407      0   1547  0.000E+00    0   60    0   1   1 OK actif CHABOCHE_T chabT_perf1
+   6   13446   1.18    2920    388      0   1540  3.080E-05   40   20    0   1   2 OK actif CHABOCHE_T chabT_perf2
+   7   30458   1.00    9191   1517   4139      0  0.000E+00    0   85    0   0   1 OK inactif MAZARS maz_orig
+   8   24008   1.27    5746   1453    575      0  0.000E+00   54   31  494   0   1 OK actif MAZARS maz_perf1
+   9   20981   1.45    4829   1507    590      0  2.500E-04   59   22  447   0   2 OK actif MAZARS maz_perf2
+  10   34539   1.00    9104   1356   4333   1049  0.000E+00    0   81    0   0   1 OK inactif MAZARS_T mazT_orig
+  11   30704   1.12    9113   1403    579    904  0.000E+00    0   81  498  11   1 OK actif MAZARS_T mazT_perf1
+  12   27063   1.28    6935   1352    554    969  1.796E-03   29   52  478  11   2 OK actif MAZARS_T mazT_perf2
+ms : temps horloge minimal sur les repetitions ; acc. : temps de la variante orig / temps du scenario
+RESO, RIGI, HOOK, VARI : temps (ms) passes dans ces operateurs pendant le calcul le plus rapide
+reut./calc. : pas ou la raideur est reutilisee / recalculee ; hook : appels HOOK evites ; mat. : caracteristiques reutilisees

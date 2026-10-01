@@ -1,0 +1,414 @@
+* fichier : mato-2d2.dgibi
+************************************************************************
+* Section : Maillage Autres
+************************************************************************
+'OPTION' 'ECHO' 0 ; 
+************************************************************************
+* NOM         : MATO-2D2
+* DESCRIPTION : Test du MAilleur TOpologique pour mailler un carré avec
+*               raffinement isotrope dans un coin. 
+*               
+*               On teste la qualité des éléments obtenus dans la
+*               métrique voulue.
+*               On ne teste pas la r-adaptation (DEDU ADAP) car il
+*               manque les termes de dérivées en espace de la métrique.  
+*
+*               Repris de raft1.dgibi qui utilise TRIA
+*               et de 2d_1.dgibi+tests
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 04/04/2020, version initiale
+* HISTORIQUE : v1, 04/04/2020, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+interact = faux ;
+graph    = FAUX ;
+complet  = FAUX ; 
+*
+'OPTION' 'DIME' 2 'ELEM' 'TRI3' ;
+*
+'SI' ('NON' interact) ;
+  'OPTION' 'TRAC' 'PSC' ;
+'SINON' ;
+  'OPTION' 'TRAC' 'X' ;
+'FINSI' ;
+lqual = 'PROG' 0.5 'PAS' 0.025 1. ;
+*
+******************************************************************
+*                    P R O C E D U R E S
+*
+*                       MESUELEM
+*
+* Calcul d'une mesure de maille aux noeuds
+* Je sais le faire de trois manières (équivalentes pour les SEG2
+* mais pas pour les TRI3)
+* 1) Avec l'opérateur MESU (boucle sur les éléments en GIBIANE)
+*    + CHAN 'CHPO' 
+* 2) En intégrant (par éléments) un champ par élément valant 1
+*    + CHAN 'CHPO'
+* 3) Matrice de masse diagonalisée
+* Ici, c'est la méthode 3.
+*
+'DEBPROC' MESUELEM ;
+'ARGUMENT' mm*'MAILLAGE' ;
+'SI' faux ;
+* Méthode 2
+   mod = 'MODE' mm 'MECANIQUE' 'ELASTIQUE' ;
+   c1  = 'MANU' 'CHML' mod 'SCAL' 1. 'GRAVITE' ;
+   ctai = 'INTG' 'ELEM' mod c1 ;
+   cctai = 'CHANGER' 'CHPO' mod ctai 'MOYE' ;
+'FINSI' ;   
+* Méthode 3
+cctai = 'DOMA' ('MODE' ('CHANGER' mm 'QUAF') 'NAVIER_STOKES' 'LINE')
+               'XXDIAGSI' ;
+*
+'RESPRO' cctai ;
+'FINPROC' ;
+*
+*                       CALTAIL
+*
+* Calcul du champ de taille de maille voulue T par un problème de
+* thermique, on résout :
+*                        Laplacien T = 0
+*                   avec T_bord = taille des mailles du bord
+* 
+*
+'DEBPROC' CALTAIL ;
+'ARGUMENT' mt*'MAILLAGE' ;
+*
+cmt = 'CONTOUR' mt ;
+*
+cdt = MESUELEM cmt ;
+* En fait, on résout le problème au laplacien pour le log
+* des tailles de maille.
+lcdt = 'LOG' cdt ;
+modt = 'MODELISER' mt 'THERMIQUE' 'ISOTROPE' ;
+cart = 'MATERIAU' modt 'K' 1.D0 ;
+matt = 'COND' modt cart ;
+mcdt = 'EXTRAIRE' lcdt 'MAIL' ;
+matb = 'BLOQUE' 'T' mcdt ;
+fb   = 'DEPIMPOSE' matb ('NOMC' 'T' lcdt) ;
+clden = 'EXCO' 'T' ('RESOUD' ('ET' matt matb) fb) ;
+cden = 'EXP' clden ;
+*'TRACER' cden mt ;
+'RESPRO' cden ;
+'FINPROC' ;   
+*                    Fin des P R O C E D U R E S
+******************************************************************
+*
+* Création du contour
+*
+d1 = 0.01 ; d2 = 0.1 ;
+pA = 0. 0. ; pB = 1. 0. ; pC = 1. 1. ; pD = 0. 1. ;
+lAB = 'DROI' pA pB 'DINI' d1 'DFIN' d2 ;
+lBC = 'DROI' pB pC 'DINI' d2 'DFIN' d2 ;
+lCD = 'DROI' pC pD 'DINI' d2 'DFIN' d2 ;
+lDA = 'DROI' pD pA 'DINI' d2 'DFIN' d1 ;
+*
+cnt = lAB 'ET' lBC 'ET' lCD 'ET' lDA ;
+*
+tt = 'CHAI' 'Iteration ' itcou ;
+'SI' graph ;
+   tit = 'CHAI'  'Contour ' ;
+      'TRACER' 'CACH' cnt 'TITR' tit 'NOEU' ;
+'FINSI' ;   
+*
+*  Tests divers (consistance...)
+*
+lok = VRAI ;
+*
+* TEST 1  Création d'un maillage sans ajouter de noeuds 
+*
+   mail1 = 'TRIA' 'TOPO' cnt 'NOAJ' ;
+   'SI' graph ;
+      tit = 'CHAI'  'Maillage genere sans noeud supplémentaire' ;
+      'TRAC' mail1 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 1 : on vérifie que le nombre de noeuds est conservé
+nno1 = 'NBNO' cnt ;
+nno2 = 'NBNO' mail1 ;
+'SI' ('NEG' nno1 nno2) ;
+   'MESS' '!!! TEST 1 : nombre de noeuds non conserve' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 2  Création d'un maillage en ajoutant des noeuds interieurs 
+*
+   mail2 = 'TRIA' 'TOPO' cnt 'AJNO' ;
+   'SI' graph ;
+      tit = 'CHAI' 'Maillage genere en ajoutant des noeuds interieurs' ;
+      'TRAC' mail2 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 2 : on vérifie que les qualités mini, moyenne et maxi des éléments sont bonnes
+qmail2 = 'INDI' 'TOPO' mail2 ;
+miq = 'MINI' qmail2 ; moq = MATOUTIL 'MOYECHAM' qmail2 ;
+maq = 'MAXI' qmail2 ;
+'MESS'  'FORMAT' '(E9.2)' 'TEST 2 : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momail2 = 'MODE' mail2 'THERMIQUE' ;
+      tit = 'CHAI' 'Qualite maillage avec noeuds interieurs' ;
+      'TRAC' qmail2 momail2 lqual 'TITR' tit ;
+   'FINSI' ;
+* Sur mon linux64 au 02/04/2020 : qmin=0.63 qmoy=0.87 qmax=1.00
+miqref = 0.62 ; moqref = 0.86 ; maqref = 0.99 ;
+'SI' ('<EG' miq miqref) ;
+   'MESS' '!!! TEST 2 : miq=' miq ' < miqref=' miqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' moq moqref) ;
+   'MESS' '!!! TEST 2 : moq=' moq ' < moqref=' moqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' maq maqref) ;
+   'MESS' '!!! TEST 2 : maq=' maq ' < maqref=' maqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 2b  Une petite boucle avec de la r-adaptation (DEDU ADAP) permet
+* d'améliorer la régularité du maillage mail2 mais ce n'est pas nécessaire
+* pour la suite donc on saute.
+*
+* 2020/04/03 : On arrive à avoir Qmin= 0.74E+00 Qmax= 0.10E+01 Qmoy= 0.91E+00
+*              avec nopt = 2 ; thdedu = 1.0 ; rdepa =1. ; nitm = 1 ;
+*
+'SI' complet ;
+   nopt = 2 ; iopt = 0 ;
+* Paramètres de DEDUADAP
+   thdedu = 1. ; rdepa = 1. ; nitm = 1 ;
+   maili = mail2 ;
+   'REPE' bclopt nopt ;
+      iopt = iopt '+' 1 ;
+      tit = 'CHAI' 'i=' iopt ;
+* Partie DEDUADAP
+      maili1 = maili ;
+      depa = 'DEDU' 'ADAP' maili1 'THET' thdedu 'NITM' nitm ;
+      depa = '*' depa rdepa ;
+      mcdep = 'MAXI' depa 'ABS' ;
+      'MESS' tit ' dedu max. dep=' mcdep ;
+      'FORM' depa ;
+      qmaili1 = 'INDI' 'TOPO' maili1 ;
+      miq = 'MINI' qmaili1 ; moq = MATOUTIL 'MOYECHAM' qmaili1 ;
+      maq = 'MAXI' qmaili1 ;
+      'MESS'  'FORMAT' '(E9.2)' tit ' deduadap : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+      'SI' graph ;
+         momaili1 = 'MODE' maili1 'THERMIQUE' ;
+         vdep = 'VECT' depa -1. 'UX' 'UY' 'NOIR' ;
+         titg = 'CHAI' tit ' deduadap' ;
+         'TRAC' qmaili1 momaili1 vdep maili1 lqual 'TITR' titg ;
+      'FINS' ;
+* Partie MAILTOPO
+      maili2 = 'REMA' maili1 ('CONT' maili1) ;
+* Qualités
+      qmaili2 = 'INDI' 'TOPO' maili2 ;
+      miq = 'MINI' qmaili2 ; moq = MATOUTIL 'MOYECHAM' qmaili2 ;
+      maq = 'MAXI' qmaili2 ;
+      'MESS'  'FORMAT' '(E9.2)' tit ' mailtopo : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+      'SI' graph ;
+         momaili2 = 'MODE' maili2 'THERMIQUE' ;
+         titg = 'CHAI' tit ' mailtopo' ;
+         'TRAC' qmaili2 momaili2 lqual 'TITR' titg ;
+      'FINSI' ;
+      maili = maili2 ;
+   'FIN' bclopt ;   
+   mail2 = maili ;
+'FINS' ;
+*
+* TEST 3  Remaillage du précédent avec une métrique isotrope variable 
+*         en espace
+*
+   cden = 'NOMC' 'G' (caltail mail2) ;
+   cmet = cden '**' -2 ;
+   'SI' graph ;
+      tit = 'CHAI' 'Taille de maille voulue' ;
+      lcden = '/' ('LOG' cden) ('LOG' 10.) ;
+      'TRAC' cden mail2 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Facultatif : mettre tout ça dans la notice de ALGOMAIL
+*              ainsi que les valeurs par défaut
+*   tparam3 . 'debug' = 2 ;
+   mail3 cmetf2 = 'REMA' mail2 ('CONT' mail2) cmet 'IPOL' ;
+   'SI' graph ;
+      tit = 'CHAI' 'Maillage avec metrique isotrope variable en espace'
+      ;
+      'TRAC' mail3 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 3 : on vérifie que les qualités des éléments sont bonnes
+* On peut :
+* 1) recalculer la métrique voulue sur le nouveau maillage
+* 2) ou récupérer celle calculée sur l'ancien maillage mais interpolée
+*    par le mailleur
+*1 TEST 3 avec cmetf1 : Qmin= 0.58E+00 Qmoy= 0.85E+00 Qmax= 0.99E+00
+*2 TEST 3 avec cmetf2 : Qmin= 0.62E+00 Qmoy= 0.84E+00 Qmax= 0.10E+01
+*
+ cdenf1 = 'NOMC' 'G' (caltail mail3) ; cmetf1 = cdenf1 '**' -2 ;
+* 'TRAC' ('-' cmetf2 cmetf1) mail3 'TITR' 'Diff. metrique' ;
+qmail3 = 'INDI' 'TOPO' mail3 cmetf2 ;
+miq = 'MINI' qmail3 ; moq = MATOUTIL 'MOYECHAM' qmail3 ;
+maq = 'MAXI' qmail3 ;
+'MESS'  'FORMAT' '(E9.2)' 'TEST 3 : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momail3 = 'MODE' mail3 'THERMIQUE' ;
+      tit = 'CHAI' 'Qualite maillage avec noeuds interieurs' ;
+      'TRAC' qmail3 momail3 lqual 'TITR' tit ;
+   'FINSI' ;
+miqref = 0.61 ; moqref = 0.83 ; maqref = 0.99 ;
+'SI' ('<EG' miq miqref) ;
+   'MESS' '!!! TEST 3 : miq=' miq ' < miqref=' miqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' moq moqref) ;
+   'MESS' '!!! TEST 3 : moq=' moq ' < moqref=' moqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' maq maqref) ;
+   'MESS' '!!! TEST 3 : maq=' maq ' < maqref=' maqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 4  On vérifie qu'en remaillant le maillage précédent avec la même
+* métrique interpolée, on ne modifie pas le maillage
+*
+   mail4 = 'REMA' mail3 ('CONT' mail3) cmetf2 ;
+* Test 4 : on vérifie que mail4 et mail3 sont identiques ainsi que les
+* qualités
+dn34= 'NBEL' ('DIFF' mail3 mail4) ;
+'SI' ('NEG' dn34 0) ;
+   'MESS' '!!! TEST 4 : mail3 .NE. mail4' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+qmail4 = 'INDI' 'TOPO' mail4 cmetf2 ;
+dq34 = 'MAXI' ('-' qmail4 qmail3) 'ABS' ;
+* VALE prec un peu trop serré pour semt2
+'SI' ('>' dq34 ('*' ('VALE' 'PREC') 10.)) ;
+   'MESS' '!!! TEST 4 : qmail3 .NE. qmail4' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 5  On vérifie qu'en remaillant le maillage précédent avec la même
+* métrique isotrope donnée sous forme d'une métrique anisotrope, on ne
+* modifie pas le maillage
+* Cela serait vrai sauf que, pour les tenseurs anisotropes , on ne fait
+* pas encore la moyenne géométrique (c'est plus compliqué !) 
+*
+   cmet = ('NOMC' 'G11' cmetf2 'NATU' 'DIFFUS') 'ET'
+          ('NOMC' 'G22' cmetf2 'NATU' 'DIFFUS') 'ET'
+          ('NOMC' 'G21' ('*' cmetf2 0.) 'NATU' 'DIFFUS') ;
+   mail5 = 'REMA' mail3 ('CONT' mail3) cmet ;
+* Test 5 : on vérifie que mail5 et mail3 sont identiques ainsi que les
+* qualités
+dn35= 'NBEL' ('DIFF' mail3 mail5) ;
+'SI' ('NEG' dn35 0) ;
+   'MESS' '!!! TEST 5 : mail3 .NE. mail5' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+qmail5 = 'INDI' 'TOPO' mail5 cmet ;
+dq35 = 'MAXI' ('-' qmail5 qmail3) 'ABS' ;
+* VALE prec un peu trop serré pour semt2
+'SI' ('>' dq35 ('*' ('VALE' 'PREC') 10.)) ;
+   'MESS' '!!! TEST 5 : qmail3 .NE. qmail5' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 6  Une petite boucle avec de la r-adaptation (DEDU ADAP) pour voir si on peut
+* améliorer la qualité du maillage mail3.
+*
+* La réponse est oui, on peut effectivement avoir une amélioration mais
+* après quelque itérations la qualité oscille sans s'alméliorer entre
+* r-adaptation et remaillage car les critères optimisés ne sont pas les
+* mêmes aux deux étapes. 
+*
+*
+nopt = 2 ; iopt = 0 ;
+* Paramètres de DEDUADAP
+thdedu = 0.2 ; rdepa = 1. ; nitm = 1 ;
+maili = mail3 ;
+ldep = 'PROG' ; lqmin = 'PROG' ; lqmoy = 'PROG' ;
+'REPE' bclopt nopt ;
+   iopt = iopt '+' 1 ;
+   tit = 'CHAI' 'i=' iopt ;
+* Partie DEDUADAP
+   maili1 = maili ;
+   modi1 = 'MODE' maili1 'MECANIQUE' ;
+   cden = 'NOMC' 'G' (caltail maili1) ;
+   cmet = cden '**' -2 ;
+   cmet = ('NOMC' 'G11' cmet 'NATU' 'DIFFUS') 'ET'
+          ('NOMC' 'G22' cmet 'NATU' 'DIFFUS') 'ET'
+          ('NOMC' 'G21' ('*' cmet 0.) 'NATU' 'DIFFUS') ;
+   ccmet = 'CHAN' 'CHAM' cmet modi1 ; 
+   depa = 'DEDU' 'ADAP' maili1 'METR' ccmet modi1 'THET' thdedu 'NITM' nitm ;
+   depa = '*' depa rdepa ;
+   mcdep = 'MAXI' depa 'ABS' ; ldep = ldep 'ET' mcdep ;  
+   'MESS' tit ' dedu max. dep=' mcdep ;
+   'FORM' depa ;
+   cden = 'NOMC' 'G' (caltail maili1) ;
+   cmet = cden '**' -2 ;
+   qmaili1 = 'INDI' 'TOPO' maili1 cmet ;
+   miq = 'MINI' qmaili1 ; moq = MATOUTIL 'MOYECHAM' qmaili1 ;
+   maq = 'MAXI' qmaili1 ;
+   'MESS'  'FORMAT' '(E9.2)' tit ' deduadap : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momaili1 = 'MODE' maili1 'THERMIQUE' ;
+      vdep = 'VECT' depa -1. 'UX' 'UY' 'NOIR' ;
+      titg = 'CHAI' tit ' deduadap' ;
+      'TRAC' qmaili1 momaili1 vdep maili1 lqual 'TITR' titg ;
+   'FINS' ;
+* Partie MAILTOPO
+   maili2 = 'REMA' maili1 ('CONT' maili1) cmet ;
+* Qualités
+   cden = 'NOMC' 'G' (caltail maili2) ;
+   cmet = cden '**' -2 ;
+   qmaili2 = 'INDI' 'TOPO' maili2 cmet ;
+   miq = 'MINI' qmaili2 ; moq = MATOUTIL 'MOYECHAM' qmaili2 ;
+   maq = 'MAXI' qmaili2 ;
+   'MESS'  'FORMAT' '(E9.2)' tit ' mailtopo : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momaili2 = 'MODE' maili2 'THERMIQUE' ;
+      titg = 'CHAI' tit ' mailtopo' ;
+      'TRAC' qmaili2 momaili2 lqual 'TITR' titg ;
+   'FINSI' ;
+   maili = maili2 ;
+'FIN' bclopt ;   
+* Sur mon linux64 au 06/04/2020 : Qmin= 0.62E+00 Qmoy= 0.87E+00 Qmax= 0.99E+00
+miqref = 0.61 ; moqref = 0.86 ; maqref = 0.98 ;
+'SI' ('<EG' miq miqref) ;
+   'MESS' '!!! TEST 6 : miq=' miq ' < miqref=' miqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' moq moqref) ;
+   'MESS' '!!! TEST 6 : moq=' moq ' < moqref=' moqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' maq maqref) ;
+   'MESS' '!!! TEST 6 : maq=' maq ' < maqref=' maqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* Test final
+*
+'SI' ('NON' lok) ;
+   'ERREUR' 5 ;
+'SINON' ;   
+   'SAUT' 1 'LIGN' ;
+   'MESSAGE' ('CHAINE' 'Tout sest bien passe !') ;
+'FINSI' ;
+*
+'SI' interact ;
+   'OPTION' 'ECHO' 1 ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;
+*
+* End of dgibi file MATO-2D2
+*
+'FIN' ;
+
+
+ 
+
+ 
+

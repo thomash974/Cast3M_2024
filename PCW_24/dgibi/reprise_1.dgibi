@@ -1,0 +1,109 @@
+* fichier : reprise_1.dgibi
+OPTI 'ECHO' 0 ;
+************* Cas test d'une reprise de calcul avec PASAPAS ************
+*                                                                      *
+* Objectif : tester la reprise/poursuite de calcul avec PASAPAS.       *
+*                                                                      *
+* Il s'agit d'un calcul mecanique en elasticite lineaire avec          *
+* chargement thermique (dilatation d'une barre)                        *
+* Trois calculs sont effectues :                                       *
+* - Calcul 1 : calcul effectue en un seul appel a PASAPAS (reference)  *
+* - Calcul 2 : calcul effectue avec 2 appels a PASAPAS (poursuite)     *
+* - Calcul 3 : calcul effectue avec 2 appels a PASAPAS, en repartant   *
+*              d'un instant deja calcule (reprise)                     *
+*                                                                      *
+* Le deplacement de la barre est post-traite pour ces 3 calculs.       *
+* Une erreur est emise si ces resultats different.                     *
+*                                                                      *
+************************************************************************
+
+
+** Options generales
+OPTI 'DIME' 2 'ELEM' 'QUA4' ;
+logtrac = FAUX ;
+
+
+** Maillage
+p1 = 0. 0. ;
+p2 = 1. 0. ;
+l1 = DROI 5 p1 p2 ;
+s1 = l1 TRAN 1 (0. 0.2) ;
+l2 = s1 COTE 4 ;
+
+
+** Modele et materiau
+mo = MODE s1 'MECANIQUE' ;
+ma = MATE mo 'YOUN' 200.E9 'NU' 0.3 'ALPH' 1.E-4 'TALP' 0. 'TREF' 0.;
+
+
+** Blocages
+bl1 = BLOQ 'UX' l2 ;
+bl2 = BLOQ 'UY' p1 ;
+
+
+** Chargement de temperature impose
+cht = MANU 'CHPO' s1 1 'T' 1. ;
+ev1 = EVOL 'MANU' (PROG 0. 1.) (PROG 0. 1000.) ;
+cha1 = CHAR 'T' cht ev1 ;
+
+*----------------------------------------------------------------------
+*          Calcul 1 : avec 1 seul appel a PASAPAS (reference)
+*----------------------------------------------------------------------
+Linst = 'PROG'  0.1 'PAS' 0.1 0.5 0.6 'PAS' 0.1 1. ;
+*
+t1 = TABL ;
+t1 . MODELE = mo ;
+t1 . CARACTERISTIQUES = ma ;
+t1 . BLOCAGES_MECANIQUES = bl1 ET bl2 ;
+t1 . CHARGEMENT = cha1 ;
+t1 . TEMPS_CALCULES = Linst ;
+t2 = COPI t1 ;
+PASAPAS t1 ;
+t3 = COPI t1 ;
+*----------------------------------------------------------------------
+*          Calcul 2 : identique mais avec 2 appels a PASAPAS (poursuite)
+*----------------------------------------------------------------------
+t2 . TEMPS_CALCULES = 'EXTR' Linst ('LECT' 1 'PAS' 1 5) ;
+PASAPAS t2 ;
+t2 . TEMPS_CALCULES = 'EXTR' Linst ('LECT' 6 'PAS' 1 10) ;
+PASAPAS t2 ;
+*----------------------------------------------------------------------
+*          Calcul 3 : refaire le calcul a partir de l'instant t = 0.5
+*                     (reprise des resutats de t1)
+*----------------------------------------------------------------------
+t3.'REPRISE' = 0.5 ;
+PASAPAS t3 ;
+
+*----------------------------------------------------------------------
+* Post traitement : evolution temporelle du deplacement de l'extremite
+*                   libre du barreau
+*----------------------------------------------------------------------
+evt1 = EVOL 'ROUG' 'TEMP' t1 'DEPLACEMENTS' 'UX' p2 ;
+evt2 = EVOL 'VERT' 'TEMP' t2 'DEPLACEMENTS' 'UX' p2 ;
+evt3 = EVOL 'TURQ' 'TEMP' t3 'DEPLACEMENTS' 'UX' p2 ;
+SI logtrac ;
+  DESS (evt1 ET evt2 ET evt3) 'TITR' 'Deplacement du barreau vs Temps' ;
+FINSI ;
+
+*----------------------------------------------------------------------
+* Ecart relatif entre les calculs
+*----------------------------------------------------------------------
+umax = MAXI (EXTR evt1 'ORDO') ;
+evd1 = ABS ((evt1 - evt2) / umax) ;
+evd2 = ABS ((evt1 - evt3) / umax) ;
+SI logtrac ;
+  DESS (evd1 ET evd2) 'TITR' 'Ecart relatif vs Temps' ;
+FINSI ;
+
+* Test sur l'ecart relatif
+err1 = MAXI 'ABS' (EXTR evd1 'ORDO') ;
+err2 = MAXI 'ABS' (EXTR evd2 'ORDO') ;
+errt = MAXI err1 err2 ;
+SI (err1 > 1.E-15) ;
+  ERRE (CHAI 'Probleme avec la reprise : les calculs PASAPAS ne donnent pas'
+             ' des resultats identiques !') ;
+FINSI ;
+
+FIN ;
+ 
+

@@ -1,0 +1,29 @@
+$$$$ TOPOLOGY NOTICE  FD218221  23/11/29    21:15:09     11799          
+                                             DATE     23/11/29
+
+FRAN==========================================================
+
+    Procedure TOPOLOGY                       Voir aussi : TOPOPTIM
+    __________________
+
+
+Cette procedure est appelee par TOPOPTIM pour mettre a jour la
+topologie.
+
+Les utilisateurs avances peuvent definir leur propre version de
+TOPOLOGY, juste avant de faire appel a TOPOPTIM.
+
+
+ANGL==========================================================
+
+    Procedure TOPOLOGY                          See also: TOPOPTIM
+    __________________
+
+
+This procedure is called by TOPOPTIM for updating the topology.
+
+Advanced users can define their own version of TOPOLOGY, just before
+invoking TOPOPTIM.
+
+$$$$
+ 

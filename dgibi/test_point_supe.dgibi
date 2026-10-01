@@ -1,0 +1,179 @@
+* fichier :  test_point_supe.dgibi
+************************************************************************
+* Section : Langage Objets
+* Section : Maillage Autres
+************************************************************************
+
+*___________________________________________________________________
+*   TEST TEST_POINT_SUPE                                           *
+*                                                                  *
+*   Type        : Verification & Validation (solution analytique)  *
+*   Description : Ce JDD verifie et valide la syntaxe 3 de         *
+*                 l'operateur POIN qui permet d'extraire les POINTS*
+*                 d'un champ verifiant certains criteres           *
+*                                                                  *
+*                 Le test porte sur les MCHAML                     *
+*                  - CONSTANTS / VARIABLES                         *
+*                  - GRAVITE / STRESSES / NOEUD                    *
+*                  - 1 SOUS-ZONE / 2 SOUS-ZONES                    *
+*___________________________________________________________________
+
+
+OPTI DIME 2 ELEM 'QUA4' TRAC 'PSC';
+
+******************************
+* MAILLAGE DE QUA4 SEULEMENT *
+******************************
+P1  = 0. 0. ; 
+P2  = 1. 0. ;
+
+NBE1= 10 ;
+L1  = DROI NBE1 P1 P2 ;
+L2  = L1 PLUS (0. 1.) ;
+L3  = L2 PLUS (0. 1.) ;
+
+NBE2= 15 ;
+S1  = REGL L1 NBE2 L2 ;
+
+OPTI TRAC 'PSC';
+
+***************************
+* CHAMPS CONSTANT GRAVITE *
+***************************
+MOD1 = MODE S1 'MECANIQUE' 'ELASTIQUE' 'CONS' 'TOTO';
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'GRAVITE';
+MCH2 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'STRESSES';
+
+PTS1 = POIN MCH1 SUPE 0.5 'AVEC' (MOTS 'UX');
+PTS2 = POIN MCH1 SUPE 0.5 'SANS' (MOTS 'UX');
+
+* Test du nombre d'éléments du MAILLAGE
+NBE_SOL1=NBE1*NBE2;
+NBE_TES1=NBEL PTS1;
+SI (NBE_TES1 NEG NBE_SOL1);
+  MESS '### ERREUR Test 1 :' ' ' NBE_TES1 ' elements au lieu de' ' ' NBE_SOL1 ;
+  ERRE 5;
+FINS;
+
+NBE_SOL2=0;
+NBE_TES2=NBEL PTS2;
+SI (NBE_TES2 NEG NBE_SOL2);
+  MESS '### ERREUR Test 2 :' ' ' NBE_TES2 ' elements au lieu de' ' ' NBE_SOL2 ;
+  ERRE 5;
+FINS;
+TRAC (PTS1 ET S1);
+
+****************************
+* CHAMPS CONSTANT STRESSES *
+****************************
+MCH1 = MANU 'CHML' MOD1 'UX' 2. 'TYPE' 'SCALAIRE' 'STRESSES';
+
+PTS1 = POIN MCH1 SUPE 0.5 'AVEC' (MOTS 'UX');
+PTS2 = POIN MCH1 SUPE 0.5 'SANS' (MOTS 'UX');
+
+* Test du nombre d'éléments du MAILLAGE
+NBE_SOL1=NBE1*NBE2*4;
+NBE_TES1=NBEL PTS1;
+SI (NBE_TES1 NEG NBE_SOL1);
+  MESS '### ERREUR Test 3 :' ' ' NBE_TES1 ' elements au lieu de' ' ' NBE_SOL1 ;
+  ERRE 5;
+FINS;
+
+NBE_SOL2=0;
+NBE_TES2=NBEL PTS2;
+SI (NBE_TES2 NEG NBE_SOL2);
+  MESS '### ERREUR Test 4 :' ' ' NBE_TES2 ' elements au lieu de' ' ' NBE_SOL2 ;
+  ERRE 5;
+FINS;
+TRAC (PTS1 ET S1);
+
+****************************
+* CHAMPS CONSTANT NOEUD    *
+****************************
+MCH1 = MANU 'CHML' MOD1 'UX' 2. 'TYPE' 'SCALAIRE' 'NOEUD';
+
+PTS1 = POIN MCH1 SUPE 0.5 'AVEC' (MOTS 'UX');
+PTS2 = POIN MCH1 SUPE 0.5 'SANS' (MOTS 'UX');
+
+* Test du nombre d'éléments du MAILLAGE
+NBE_SOL1=NBE1*NBE2*4;
+NBE_TES1=NBEL PTS1;
+SI (NBE_TES1 NEG NBE_SOL1);
+  MESS '### ERREUR Test 5 :' ' ' NBE_TES1 ' elements au lieu de' ' ' NBE_SOL1 ;
+  ERRE 5;
+FINS;
+
+NBE_SOL2=0;
+NBE_TES2=NBEL PTS2;
+SI (NBE_TES2 NEG NBE_SOL2);
+  MESS '### ERREUR Test 6 :' ' ' NBE_TES2 ' elements au lieu de' ' ' NBE_SOL2 ;
+  ERRE 5;
+FINS;
+TRAC (PTS1 ET S1);
+
+
+********************************************************************************
+* Pour les champs VARIABLES je ne fais que de la verification, pas de validation
+********************************************************************************
+
+****************************
+* CHAMPS VARIABLE GRAVITE  *
+****************************
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'GRAVITE';
+MCH1 =((COOR 1 MCH1)**2) + ((COOR 2 MCH1)**2);
+PTS1 = POIN MCH1 SUPE 0.5;
+TRAC (PTS1 ET S1);
+
+****************************
+* CHAMPS VARIABLE STRESSES *
+****************************
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'STRESSES';
+MCH1 =((COOR 1 MCH1)**2) + ((COOR 2 MCH1)**2);
+PTS1 = POIN MCH1 SUPE 0.5;
+TRAC (PTS1 ET S1);
+
+****************************
+* CHAMPS VARIABLE NOEUD    *
+****************************
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'NOEUD';
+MCH1 =((COOR 1 MCH1)**2) + ((COOR 2 MCH1)**2);
+PTS1 = POIN MCH1 SUPE 0.5;
+TRAC (PTS1 ET S1);
+
+
+***********************************************
+* CREATION D'UNE DEUXIEME SOUS-ZONE DE 'TRI3' *
+***********************************************
+OPTI ELEM 'TRI3' ;
+NBE3 = 25 ;
+S2   = REGL L2 NBE3 L3 ;
+
+S1   = S1 ET S2 ;
+MOD1 = MODE S1 'MECANIQUE' 'ELASTIQUE' 'CONS' 'TOTO';
+
+*****************************************
+* CHAMPS VARIABLE GRAVITE 2 SOUS-ZONES  *
+*****************************************
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'GRAVITE';
+MCH1 =((COOR 1 MCH1)**2) + ((COOR 2 MCH1)**2);
+PTS1 = POIN MCH1 SUPE 0.5;
+TRAC (PTS1 ET S1);
+
+******************************************
+* CHAMPS VARIABLE STRESSES 2 SOUS-ZONES  *
+******************************************
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'STRESSES';
+MCH1 =((COOR 1 MCH1)**2) + ((COOR 2 MCH1)**2);
+PTS1 = POIN MCH1 SUPE 0.5;
+TRAC (PTS1 ET S1);
+
+***************************************
+* CHAMPS VARIABLE NOEUD 2 SOUS-ZONES  *
+***************************************
+MCH1 = MANU 'CHML' MOD1 'UX' 1. 'TYPE' 'SCALAIRE' 'NOEUD';
+MCH1 =((COOR 1 MCH1)**2) + ((COOR 2 MCH1)**2);
+PTS1 = POIN MCH1 SUPE 0.5;
+TRAC (PTS1 ET S1);
+
+FIN; 
+

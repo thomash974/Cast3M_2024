@@ -1,0 +1,83 @@
+$$$$ @RSCS    NOTICE  CB215821  19/11/18    21:15:01     10383          
+                                             DATE     19/11/18
+Section : Mathematiques Autres
+
+*----------------------------------------------------------------------
+*      CETTE METHODE A ETE MISE GRACIEUSEMENT
+*      A DISPOSITION DE  LA COMMUNAUTE CAST3M
+*      PAR TAMASKOVICS N.
+*     (Freiberg Institut für Geotechnik )
+*----------------------------------------------------------------------
+
+    Methode @RSCS                           Voir aussi:@RSTH @RRST @RRSV
+    -------------                                      @RRSR       @RSCV
+
+    LRE2 = RS%'SCS'  LRE1  DBG1;
+
+FRAN==============================================================
+
+    Objet :
+    _______
+
+    La methode @RSCS forme partie du objet @RSTH et est appelee avec
+    l'abbreviation %'SCS'.
+
+
+    Commentaire :
+    _____________
+
+    La methode @RSCS converte les donnees dans le liste LRE1 pour
+    les valeurs des probabilites cumules de un Random Set en un
+    format compatible avec une evolution.
+
+    LRE2 : liste des valeurs pour les probabilites cumules en format
+           compatible avec une evolution
+
+    LRE1 : liste des valeurs pour les probabilites cumules
+
+    DBG1 : Argument optionel de type ENTIER indiquant le niveau du 
+           deboggage (DBG1 manquant ouDBG1=0, pas de deboggage)
+
+
+    Exemple :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+ANGL==============================================================
+
+    Description :
+    _____________
+
+    The method @RSCS belongs to the object @RSTH and is called with
+    the abbreviation %'SCS'.
+
+
+    Contents :
+    __________
+
+    The method @RSCS converts the values in the list LRE1 for the
+    values of cumulative probabilities of a Random Set into a format
+    compatible with evolutions
+
+    LRE2 : list of values for the cumulated probabilities of a Random
+           Set in a format compatible with evolutions
+
+    LRE1 : list of values for the cumulated probabilities of a Random
+           Set
+
+    DBG1 : An optional argument with a value of type ENTIER indicating
+           the debugging level (DBG1 missing or DBG1=0, no debugging)
+
+
+    Example :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+$$$$
+ 

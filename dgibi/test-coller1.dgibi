@@ -1,0 +1,105 @@
+* fichier : test1_coller1.dgibi
+*---------------------------------------------------------------------*
+*                       CAS TEST DE VERIFICATION DE COLLER1
+*
+OPTI DIME 3 ELEM QUA4 ;
+
+*----------------------------- MAILLAGE ------------------------------*
+* Maillage poutre
+P1  = 0. 0. 0. ;
+PZ1 = 0. 0. 1. ; 
+POUT1 = DROI 1 P1 PZ1 ;
+
+* Maillage Coque
+VX = 2. ;
+PCOQ1 = P1 MOIN (VX 1. 0.) ;
+PCOQ2 = P1 PLUS (VX -1 0.) ;
+LCOQ1 = DROI 2 PCOQ1 PCOQ2 ;
+SCOQ1 = LCOQ1 TRAN 2 (0. 2. 0.) ;
+*
+P2 = P1 'PLUS' (VX 0. 0.) ;
+P2 = SCOQ1 'POIN' 'PROC' P2 ;
+V0 = P2 'MOINS' P1 ;
+N0 = 'NORME' V0 ;
+*
+ELIM POUT1 SCOQ1 1.E-9 ;
+REP1 = @REPERE P1 (PROG 3 * 0.2) VRAI TURQ ;
+*
+MTOT = POUT1 et SCOQ1 ;
+*
+*---------------------- CONDITIONS AUX LIMITES -----------------------*
+* Conditions aux limites
+BL1 = BLOQ UX UY UZ RX RY PZ1 ;
+BL2 = BLOQ RZ PZ1 ;
+BL3 = BLOQ UX UY P1 ;
+COL1 = COLLER1 SCOQ1 POUT1 ;
+BLOT = BL1 ET BL2 ET BL3 ET COL1 ;
+*
+*---------------------------- CHARGEMENT -----------------------------*
+* Chargement
+ANG_Z = 15. ;
+ROT1 = DEPI BL2 (ANG_Z*pi/180.) ;
+*
+SCOQ2 = SCOQ1 'TOUR' ANG_Z P1 PZ1 ;
+*
+*------------------------------ MODELES -------------------------------*
+* Modele
+e = 10. ;
+SECT5 = e*e ;
+INRY5 = SECT5*SECT5/12. ;
+INRZ5   = INRY5;
+TORS5   = INRY5 + INRZ5;
+Y_LOCAL = 0. 0. 0.;
+
+MOP = MODE POUT1 MECANIQUE ELASTIQUE POUT ;
+MAP = MATE MOP YOUN 200.E9 NU 0.3 ;
+MAP = MAP ET (CARA MOP 'INRY' INRY5 'INRZ' INRZ5 'SECT' SECT5
+                       'TORS' TORS5 'VECT' Y_LOCAL); 
+
+MOC = MODE SCOQ1 MECANIQUE ELASTIQUE COQ4 ;
+MAC = MATE MOC YOUN 200.E9 NU 0.3 EPAI 1.;
+
+MODTOT = MOC ET MOP ;
+MATTOT = MAC ET MAP ;
+RIGTOT = RIGI MODTOT MATTOT ;
+BLOTOT = RIGTOT ET BLOT ;
+*
+*---------------------------- RESOLUTION -----------------------------*
+*
+NBF = 10 ;
+L_TPS = PROG 0. PAS (ANG_Z/NBF) ANG_Z ;
+N_PAS = DIME L_TPS ;
+L_ANG = PROG 0. PAS (1./(N_PAS-1)) 1. ;
+EVOLC = EVOL MANU L_TPS L_ANG ;
+*
+TAB1 = TABLE ;
+TAB1 . 'MODELE'              = MODTOT ;
+TAB1 . 'CARACTERISTIQUES'    = MATTOT ;
+TAB1 . 'BLOCAGES_MECANIQUES' = BLOT ;
+TAB1 . 'CHARGEMENT'          = 'CHAR' 'DIMP' ROT1  EVOLC ;
+TAB1 . 'GRANDS_DEPLACEMENTS' = VRAI   ;
+TAB1 . 'TEMPS_CALCULES'      = L_TPS  ;
+TAB1 . 'HYPOTHESE_DEFORMATIONS' = 'LINEAIRE' ;
+PASAPAS TAB1 ;
+*
+CONF0 = 'FORM' ;
+FORM (TAB1.'DEPLACEMENTS'. NBF) ;
+V1 = P2 'MOINS' P1 ;
+FORM CONF0 ;
+N1 = 'NORME' V1 ;
+PSV01 = 'PSCA' V0 V1 ;
+COS01 = PSV01 / (N0*N1) ;
+ANG01 = ACOS COS01 ;
+MESS 'ANGLE IMPOSE  ' ANG_Z ;
+MESS 'ANGLE PASAPAS ' ANG01 ;
+ERRANG = (ABS (ANG_Z-ANG01)) / ANG_Z ;
+'SI' ('>' ERRANG 0.01) ;
+  'ERRE' 5 ;
+'FINSI' ; 
+
+FIN ;
+
+ 
+
+ 
+

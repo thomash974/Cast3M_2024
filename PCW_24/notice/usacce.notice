@@ -1,0 +1,57 @@
+$$$$ USACCE   NOTICE  MB234859  24/02/06    21:15:02     11833          
+                                             DATE     24/02/06
+
+ Procedure USACCE                        Voir aussi : USADAC USCALC 
+ ----------------                       USDEPL USEXPL USIMPL USINIB
+                                        USPOST USTMPS USURE
+
+         REE1 = USACCE TAB1 ; 
+
+  [Q. Caradec thesis]
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui determine le facteur de saut de cycle a appliquer au 
+    taux d'usure calcule pour un cycle. Ce facteur peut etre constant 
+    tout au long du calcul ou variable. Dans ce dernier cas, sa valeur 
+    depend de la vitesse d'elargissement de la zone usee.
+ 
+  Commentaires :
+  --------------
+
+    REE1 : Objet de type REEL donnant le facteur de saut de cycle.
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+  Cette procedure est appelee par USEXPL et USIMPL.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which calculates the cycle jump coefficient which will be 
+    applied to the wear rate. This coefficient could be constant during 
+    the computation or variable. In that case, it's value is related to 
+    the wear profile enlargement rate.
+ 
+  Comments :
+  ----------
+
+    REE1 : REEL type object which is the cycle jump coefficient.
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+  This procedure is called by USEXPL and USIMPL.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+ 

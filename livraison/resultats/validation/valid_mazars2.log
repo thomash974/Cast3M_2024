@@ -1,0 +1,10 @@
+=== Cas 2 : mazars2 (endommagement MAZARS, cycles) ===
+Valeurs comparees : 666
+Temps horloge (ms) : origine 1648 ; niveau 1 1658 ; niveau 2 1313
+Acceleration par rapport a l origine : niveau 1   0.99 ; niveau 2   1.26
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 10
+Niveau 1 : raideur reutilisee 7 fois, recalculee 104 fois ; HOOK evite 320 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 8 fois, recalculee 103 fois ; HOOK evite 320 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  4.443E-13
+RESULTAT : niveau 1 OK ; niveau 2 OK

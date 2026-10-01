@@ -1,0 +1,41 @@
+$$$$ G_CAS    NOTICE  JB251061  20/11/05    09:24:30     10771          
+                                             DATE     20/11/05
+
+    Procedure G_CAS                          Voir aussi : G_THETA
+    ---------------
+
+    OBJUTI = G_CAS SUPTAB BOOL ;
+
+
+Section : Mecanique Rupture
+
+FRAN==========================================================
+    Objet :
+    _______
+
+  Cette procedure analyse la table fournie a la procedure G_THETA, puis
+  determine et resume le cas que l'utilisateur souhaite traite. Si les
+  donnees sont incompatibles, ou si le cas n'est pas encore traitable par
+  la procedure G_THETA, une erreur est renvoyee.
+  L'information sur le cas de figure est enregistree dans la table BOOL
+  qui est constituee exclusivement de booleens. Cela facilite les tests
+  ulterieurs dans G_THETA.
+
+    En entree
+    ---------
+
+    SUPTAB = Objet de type TABLE dont les indices sont des              
+             objets de type MOT (a ecrire en toutes lettres).
+             Pour voir quels sont les indices obligatoires, voir
+                         la notice de la procedure G_THETA.
+                         
+        BOOL = Objet de type TABLE contenant les booleens utiles aux divers
+               tests effectues au cours du deroulement de G_THETA.
+
+
+    En sortie :
+    -----------
+
+    OBJUTI = Objet de type TABLE contenant des objets utiles a la procedure
+                 G_THETA crees pendant l'analyse de SUPTAB.
+                          

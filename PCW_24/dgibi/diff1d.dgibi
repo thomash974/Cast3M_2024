@@ -1,0 +1,155 @@
+* fichier : diff1d.dgibi
+************************************************************************
+* Section : Fluides Transitoire
+* Section : Fluides Diffusion
+************************************************************************
+* NOM         : DIFF1D
+* DESCRIPTION : Non stationary 1D diffusion equation
+*
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 03/10/2008, version initiale
+* HISTORIQUE : v1, 03/10/2008, création
+************************************************************************
+*
+'OPTION' 'DIME' 2 'ELEM' 'QUA8' ;
+graph = faux ;
+*
+* icini = 1 : initial condition which does not verify
+*             the left boundary condition
+* icini = 2 : initial condition which does verify
+*             the left boundary condition
+* dt : time-step
+* nmail    : number of mesh elements
+* nitma    : number of time steps
+*
+icini = 1 ;
+dt = 1.D-4 ;
+*
+nmail  = 10 ;
+nitma  = 10 ;
+*
+* Mesh
+*
+pA = 0. 0. ; pB = 1. 0. ;
+lt = 'DROIT' nmail pA pB ;
+bas = lt ;
+mt  = 'TRANSLATION' lt 1 (0. 1.) ;
+gau = 'COTE' 4 mt ;
+dro = 'COTE' 2 mt ;
+_bas = 'CHANGER' bas 'QUAF' ;
+_gau = 'CHANGER' gau 'QUAF' ;
+_dro = 'CHANGER' dro 'QUAF' ;
+_mt  = 'CHANGER' mt 'QUAF' ;
+'ELIMINATION' (_mt 'ET' _bas 'ET' _gau 'ET' _dro) 1.D-6 ;
+$mt = 'MODE' _mt 'NAVIER_STOKES' 'LINE' ;
+$bas = 'MODE' _bas 'NAVIER_STOKES' 'LINE' ;
+$gau = 'MODE' _gau 'NAVIER_STOKES' 'LINE' ;
+$dro = 'MODE' _dro 'NAVIER_STOKES' 'LINE' ;
+mt = 'DOMA' $mt 'MAILLAGE' ;
+bas = 'DOMA' $bas 'MAILLAGE' ;
+gau = 'DOMA' $gau 'MAILLAGE' ;
+dro = 'DOMA' $dro 'MAILLAGE' ;
+*
+* Initial condition
+*
+'SI' ('EGA' icini 1) ;
+   cini = 'MANUEL' 'CHPO' mt 'SCAL' 0. ;   
+'FINSI' ;
+*
+'SI' ('EGA' icini 2) ;
+   cini = '+' ('MANUEL' 'CHPO' mt 'SCAL' 0.)
+              ('MANUEL' 'CHPO' gau 'SCAL' 1.) ;   
+'FINSI' ;
+*
+* Problem definition
+*
+rv = 'EQEX' 'NITER' 1 'OMEGA' 1. 'ITMA' 1
+     'OPTI' 'EF' 'IMPL' 'CENTREE' 
+     'ZONE' $mt 'OPER' 'DFDT' 1. 'CNM1' dt 'INCO' 'CN'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $mt 'OPER' 'LAPN' 1. 'INCO' 'CN'
+     'CLIM' gau 'CN' 'TIMP' 1.
+     'CLIM' dro 'CN' 'TIMP' 0. ;
+*     
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'CN'  = 'KCHT' $mt 'SCAL' 'SOMMET' cini ;
+rv . 'INCO' . 'CNM1' = 'KCHT' $mt 'SCAL' 'SOMMET' cini ;
+*
+* Manual time stepping loop
+*
+res = 'TABLE' ;
+res . 'TPS' = 'TABLE' ;
+res . 'CN'  = 'TABLE' ;
+ires = 1 ;
+cn = rv . 'INCO' . 'CN' ;
+res . 'TPS' . ires = rv . 'PASDETPS' . 'TPS' ;
+res . 'CN'  . ires = 'COPIER' cn ;
+'REPETER' iitma nitma ;
+   EXEC rv ;
+   ires = '+' ires 1 ;
+   cn = rv . 'INCO' . 'CN' ;
+   res . 'TPS' . ires = rv . 'PASDETPS' . 'TPS' ;
+   res . 'CN'  . ires = 'COPIER' cn ;
+   evc = 'EVOL' 'CHPO' cn 'SCAL' bas ;
+   evtot = evc ;
+   tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+   tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+*tabt . 1 = 'CHAINE' 'TIRC NOLI' ;
+   tabt . 'TITRE' . 1 = 'CHAINE' 'Sol. App.' ;
+   cht = 'CHAINE' 'Pdt = ' &iitma ;
+   'SI' graph ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'C'
+                'TITR' cht 'LEGE' tabt 'NCLK' ;
+   'FINS' ;                
+'FIN' iitma ;
+*
+* Post treatment
+*
+'OPTI' 'DIME' 3 ;
+rt = res . 'TPS' ;
+rc = res . 'CN' ;
+tm = 'TABLE' 'ESCLAVE' ;
+lt = 'PROG' ;
+lm = 'PROG' ;
+'REPETER' it ('DIME' rt) ;
+   ti = rt . &it ;
+   ci = rc . &it ;
+   mail = bas 'PLUS' ('NOMC' 'UZ' ci)  ;
+   mail = mail 'PLUS' (0. ('*' &it 0.1) 0.) ;
+   tm . &it = mail ;
+   lt = 'ET' lt ('PROG' ti) ;
+   lm = 'ET' lm ('PROG' ('MINIMUM' ci)) ;
+'FIN' it ;
+oeil = '*' (1.2 -2.4 1.3) 2. ;
+mtp = 'ET' tm ;
+'SI' graph ;
+   'TRACER' oeil mtp ;
+   evtot = 'EVOL' 'MANU' lt lm ;
+   tabt = 'TABLE' ;
+   tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+   'DESSIN' evtot 'TITX' 't' 'TITY' 'Min c.'
+             'TITR' ('CHAINE' 'Minimum c(t)')
+             'LEGE' tabt ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;
+'OPTI' 'DIME' 2 ;
+*
+* End of dgibi file DIFF1D
+*
+'FIN' ;
+
+ 
+

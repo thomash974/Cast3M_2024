@@ -1,0 +1,66 @@
+$$$$ DIFF     NOTICE  PASCAL    20/12/02    21:15:00     10798          
+                                             DATE     20/12/02
+
+    -------------------------------
+
+    OBJ1 = DIFF  OBJ2 OBJ3 ;
+
+
+Section : Maillage Manipulation
+
+FRAN==========================================================
+    Operateur DIFFERENCE SYMETRIQUE           Voir aussi : ET INTE
+    
+    Objet :
+    _______
+
+    L'operateur DIFF construit la difference symetrique entre deux objets.
+
+
+    Commentaire :
+    _____________
+
+    OBJi : objets de type MAILLAGE, MMODEL ou RIGIDITE.
+
+
+    Remarque 1 : a DIFF b = ( a union b) - (a inter b)
+    ____________
+
+
+    Remarque 2 : pour les objets MMODEL, l'operation est faite
+    ____________ sur les sous-zones. Si l'operation est menee
+                 dans le but d'obtenir un modele portant sur les
+                 zones geometriques non communes aux deux modeles,
+                 alors il convient d'operer sur les maillages.
+           
+
+ANGL==========================================================
+    Operator DIFFERENCE SYMETRIQUE              See also : ET INTE
+    
+    Description :
+    _____________
+
+    The DIFF operator constructs an object which stems from the
+    symmetric difference of two objects.
+
+
+    Contents :
+    __________
+
+    GEOi : MAILLAGE, MMODEL or RIGIDITE type objects.
+
+
+    Note 1 :  a DIFF b = ( a union b) - (a inter b)
+    ________
+
+
+    Note 2 : for MMODEL type objects, DIFF operates on the MMODEL
+    ________ "sous-zones". If the operation aims at obtaining a model
+             applying on the mesh elements not common to the 2 given models,
+             then it should be carried out directly on the 2 model meshes.
+
+$$$$
+ 
+ 
+ 
+ 

@@ -1,0 +1,120 @@
+* fichier :  metallurgie_05.dgibi
+************************************************************************
+* Section : Metallurgie
+************************************************************************
+
+************************************************************************
+*   TEST METALLURGIE_05                                                *
+*                                                                      *
+*   CALCUL D'UN DIAGRAMME T.R.C. SUR UNE MISE EN DONNEES               *
+*   METALLURGIQUE COMPLETE : ACIER 16MND5                              *
+*   REF : A. Bonaventure, « Évaluation expérimentale et numérique des  *
+*         contraintes résiduelles dans des structures soudées en       *
+*         multipasse », PhD Theses, 2012                               *
+*                                                                      *
+*   Appel a la PROCEDURE TRC.PROCEDUR qui genere automatiquement le    *
+*   diagramme T.R.C.                                                   *
+************************************************************************
+
+'OPTI' 'TRAC' PSC 'EPTR'  10   ;
+'OPTI' 'DIME' 2   'ELEM' 'TRI3';
+
+* Temperatures initiales et finales
+TINI = 900.;
+TFIN = 20. ;
+
+*Calcul automatique de la liste des vitesses de refroidissement
+NBVI   = 30.       ;
+VIT1   = 250.      ;
+VIT2   = 1.        ;
+VLOG1  ='LOG' VIT1 ;
+VLOG2  ='LOG' VIT2 ;
+PASLOG =(VLOG2 - VLOG1) / (NBVI - 1);
+LRELOG ='PROG' VLOG1 'PAS' PASLOG VLOG2;
+LISTREF='EXP'  LRELOG;
+
+* MAILLAGE
+P1 = 0. 0. ;
+P2 = 1. 0. ;
+P3 = 0. 1. ;
+
+MAILT    ='MANU' 'TRI3' P1 P2 P3 ;
+
+* MODELE
+LISTPHA  ='MOTS' 'AUST' 'MART' 'BAIN' 'FERR' 'MB  '               ;
+LISTREAC ='MOTS' 'MB  ' 'MART' 'BAIN' 'FERR' 'AUST' 'AUST' 'AUST' ;
+LISTPROD ='MOTS' 'AUST' 'AUST' 'AUST' 'AUST' 'MART' 'BAIN' 'FERR' ;
+LISTTYPE ='MOTS' 'LEBL' 'LEBL' 'LEBL' 'LEBL' 'KOIS' 'LEBL' 'LEBL' ;
+NOMCONS  ='16MND5';
+
+MODCP1   ='MODE' MAILT 'METALLURGIE' 'PHASES'   LISTPHA
+                                     'REACTIFS' LISTREAC
+                                     'PRODUITS' LISTPROD
+                                     'TYPE'     LISTTYPE
+                                     'CONS'     NOMCONS ;
+
+* Materiaux - caracteristiques
+
+* 1ere transformation :
+PEQ1 ='EVOL' 'MANU' 'T'    ('PROG'  716.   802. )
+                    'PEQ1' ('PROG'  0.     1.   );
+F1   ='EVOL' 'MANU' 'TPOI' ('PROG' -1.D-6  0.   )
+                    'F1'   ('PROG'  0.     1.   );
+TAU1 ='EVOL' 'MANU' 'T'    ('PROG'  716.   802. )
+                    'TAU1' ('PROG'  12.    0.5  );
+
+* 2eme transformation : parametres identiques a la premiere
+PEQ2 ='CHAN' 'NOMORD' PEQ1 1 'PEQ2';
+F2   ='CHAN' 'NOMORD' F1   1 'F2'  ;
+TAU2 ='CHAN' 'NOMORD' TAU1 1 'TAU2';
+
+* 3eme transformation : parametres identiques a la premiere
+PEQ3 ='CHAN' 'NOMORD' PEQ1 1 'PEQ3';
+F3   ='CHAN' 'NOMORD' F1   1 'F3'  ;
+TAU3 ='CHAN' 'NOMORD' TAU1 1 'TAU3';
+
+* 4eme transformation : parametres identiques a la premiere
+PEQ4 ='CHAN' 'NOMORD' PEQ1 1 'PEQ4';
+F4   ='CHAN' 'NOMORD' F1   1 'F4'  ;
+TAU4 ='CHAN' 'NOMORD' TAU1 1 'TAU4';
+
+* 5eme transformation
+MS5 = 380.   ;
+KM5 = 0.0247 ;
+
+* 6eme transformation
+PEQ6 ='EVOL' 'MANU' 'T'    ('PROG' 375 380 405 600 )
+                    'PEQ6' ('PROG' 0.  1.  1.  0.  );
+
+F6   ='EVOL' 'MANU' 'TPOI' ('PROG' -100. -80. -60. -50. -40. -30. -25. -20. -18. -15. -12. -10. -9. -5. -1. -0.05 0.D0 1.D-6)
+                    'F6'   ('PROG' 0.005 1.573 2.857 3.417 3.982 4.583 4.833 5.26 5.472 6.033 7.675 11.4 18.45 17.1 0.328 0.00238 0.00238 0.) ;
+
+TAU6 ='EVOL' 'MANU' 'T'    ('PROG' 375  380)
+                    'TAU6' ('PROG' 1.D6 20 );
+
+* 7eme transformation
+PEQ7 ='EVOL' 'MANU' 'T'    ('PROG' 625 630 730 735 )
+                    'PEQ7' ('PROG' 0   1   1   0   );
+
+F7   ='EVOL' 'MANU' 'TPOI' ('PROG' -8.5  -6.2 -4.7  0.  1.D-6)
+                    'F7'   ('PROG'  0.001 0.13 1.5  1.5 0.   );
+
+TAU7 ='EVOL' 'MANU' 'T'    ('PROG' 625  630 )
+                    'TAU7' ('PROG' 1.D6 5   );
+
+MATCP1  ='MATE' MODCP1 'PEQ1' PEQ1 'TAU1' TAU1 'F1' F1
+                       'PEQ2' PEQ2 'TAU2' TAU2 'F2' F2
+                       'PEQ3' PEQ3 'TAU3' TAU3 'F3' F3
+                       'PEQ4' PEQ4 'TAU4' TAU4 'F4' F4
+                       'MS5'  MS5  'KM5'  KM5
+                       'PEQ6' PEQ6 'TAU6' TAU6 'F6' F6
+                       'PEQ7' PEQ7 'TAU7' TAU7 'F7' F7;
+
+* Appel a la procedure TRC.procedur
+TRC MODCP1 MATCP1 TINI TFIN LISTREF 'AUST' ;
+
+FIN ;
+ 
+
+ 
+

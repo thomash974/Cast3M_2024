@@ -1,0 +1,89 @@
+$$$$ TOPOFILT
+* TOPOFILT  PROCEDUR  FD218221  23/11/29    21:15:09     11799          
+
+************************************************************************
+** Procedure called by TOPOPTIM for filtering the sensitivity field.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 3.0 2021/04/19 Adding a second filtering function using a filtering
+**                matrix generated with the operator MFIL
+** 2.0 2017/11/11 Default Gibiane filter
+************************************************************************
+
+DEBP TOPOFILT tab0*'TABLE' ;
+
+* Input data
+* **********
+
+wtab0 = tab0.'WTABLE' ;
+bool0 = wtab0.'BOOL' ;
+
+* Matrix filtering
+* ****************
+
+SI (EGA tab0.'FILTRE' 'MATRICE') ;
+
+*   Build the filtering matrix
+*   **************************
+
+*   If the mesh has changed
+    SI (NEG (VALE 'POIN' wtab0.'MAILLAGE'.'GRAVITE') wtab0.'MFIL_POINTEUR') ;
+        SI bool0.'MECANIQUE' ;
+            volEl1 = wtab0.'MECANIQUE'.'VOLUME'.(1) ;
+        SINO ;
+            volEl1 = wtab0.'THERMIQUE'.'VOLUME'.(1) ;
+        FINS ;
+        wtab0.'MFIL_POINTEUR' = VALE 'POIN' wtab0.'MAILLAGE'.'GRAVITE' ;
+        MESS 'Mise à jour de la matrice de filtrage en cours...' ;
+        wtab0.'MFIL' = MFIL (PROI wtab0.'MAILLAGE'.'GRAVITE' volEl1)
+                            tab0.'FILTRE_RAYON' tab0.'FILTRE_EXPOSANT'
+                            tab0.'FILTRE_CRITERE' ;
+        MESS 'Fin de mise à jour de la matrice de filtrage.' ;
+    FINS ;
+
+*   Filter the sensibility field
+*   ****************************
+
+*   Node field to be filtered
+    field0 = PROI wtab0.'MAILLAGE'.'GRAVITE' (wtab0.'SENSIBILITE' * wtab0.'TOPOLOGIE') ;    
+*   Filter the node field and sort all its values in the same order of the elements (as the product with the rigidity filtering affects the order of the output values)
+    field0 = wtab0.'CHPO_ZERO'.(1) + (field0 * wtab0.'MFIL') ;
+*   Filtered element field
+    field0 = MANU 'CHML' wtab0.'MODELE'.(1) 'REPA' 'SCAL' (EXTR field0 'VALE') 'TYPE' 'SCALAIRE' 'GRAVITE' ;
+*   In thermal mode, 'GRAVITE' option is not respected
+*   This problem is solved by INTG 'ELEM'
+    SI (NON bool0.'MECANIQUE') ;
+        field0 = (INTG 'ELEM' field0 wtab0.'THERMIQUE'.'MODELE'.(1) wtab0.'THERMIQUE'.'CARACTERISTIQUES'.(1)) / wtab0.'THERMIQUE'.'VOLUME'.(1) ;
+    FINS ;
+*   Filtered sensitivity
+    wtab0.'SENSIBILITE' =  field0 / (BORN wtab0.'TOPOLOGIE' 'SCAL' 'MINI' tab0.'ZERO_DIVISION') ;   
+
+* Default Gibiane filtering
+* *************************
+
+SINO ;
+    SI (tab0.'FILTRE_TAUX' > 0) ;
+*       Field to be filtered
+        field0 = wtab0.'SENSIBILITE' * wtab0.'TOPOLOGIE' ;
+*       Filtering
+        REPE loop0 tab0.'FILTRE_TAUX' ;
+            field0 = CHAN 'CHAM' (CHAN 'CHPO' wtab0.'MODELE'.(1) field0 'MOYE') wtab0.'MODELE'.(1) 'GRAVITE' ;
+        FIN loop0 ;
+*       In thermal mode, 'GRAVITE' option is not respected
+*       This problem is solved by INTG 'ELEM'
+        SI (NON bool0.'MECANIQUE') ;
+            field0 = (INTG 'ELEM' field0 wtab0.'MODELE'.(1) wtab0.'THERMIQUE'.'CARACTERISTIQUES'.(1)) / wtab0.'THERMIQUE'.'VOLUME'.(1) ;
+        FINS ;
+        dc0 =  field0 / (BORN wtab0.'TOPOLOGIE' 'SCAL' 'MINI' tab0.'ZERO_DIVISION') ;
+*       Save the filtered sensibility
+        wtab0.'SENSIBILITE' = dc0 ;
+    FINS ;
+FINS ;
+
+FINP ;
+
+$$$$
+ 

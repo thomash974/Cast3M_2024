@@ -1,0 +1,197 @@
+* fichier : burgers1d.dgibi
+************************************************************************
+* Section : Fluides Transitoire
+* Section : Fluides Convection
+************************************************************************
+* NOM         : BURGERS1D.DGIBI
+* DESCRIPTION : 1D Burgers equation
+*
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 31/10/2008, version initiale
+* HISTORIQUE : v1, 31/10/2008, création
+************************************************************************
+*
+'OPTION' 'DIME' 2 'ELEM' 'QUA8' ;
+graph = FAUX ;
+*
+'DEBPROC' MAJUN ;
+'ARGUMENT' rvx*'TABLE' ;
+rv  = rvx . 'EQEX' ;
+$mt = rvx . 'DOMZ' ;
+cn = rv . 'INCO' . 'CN' ;
+un = '+' ('NOMC' 'UX' cn) ('NOMC' 'UY' ('*' cn 0.)) ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' un ;
+matvid chvid = 'KOPS' 'MATRIK' ;
+'RESPRO' matvid chvid ;
+'FINPROC' ;
+*
+* icini = 1 : initial condition leading to shock formation
+* icini = 2 : initial condition leading to an expansion wave
+* idecent = 1 : centered discretization for the convective term
+* idecent = 2 : SUPG discretization for the convective term
+* idecent = 3 : SUPGDC discretization for the convective term
+*
+icini = 1 ; idecent = 1 ;
+*
+nmail = 10 ;
+cfl = 0.5 ;
+dt = '/' cfl nmail ;
+tfinal = 2. ;
+nitma = 'ENTIER' ('/' tfinal dt) ;
+*
+'SI' ('EGA' idecent 1) ;
+   typdec = 'CENTREE' ;
+   niter  = 5 ;
+   difart = '/' ('/' 1. ('FLOTTANT' nmail)) 2.D5 ;
+'FINSI' ;   
+'SI' ('EGA' idecent 2) ;
+   typdec = 'SUPG' ;
+   niter  = 5 ;
+   difart = 0. ;
+'FINSI' ;   
+'SI' ('EGA' idecent 3) ;
+   typdec = 'SUPGDC' ;
+   niter  = 5 ;
+   difart = 0. ;
+'FINSI' ;
+omeg = 0.7 ;  
+*
+* Mesh
+*
+pA = -1. 0. ; pB = 0. 0. ; pC = 1. 0. ; pD = 3. 0. ;
+lt1 = 'DROIT' nmail pA pB ;
+lt2 = 'DROIT' nmail pB pC ;
+lt3 = 'DROIT' nmail pC pD ;
+lt = lt1 'ET' lt2 'ET' lt3 ;
+bas = lt ;
+mt  = 'TRANSLATION' lt 1 (0. 1.) ;
+gau = 'COTE' 4 mt ;
+dro = 'COTE' 2 mt ;
+_bas = 'CHANGER' bas 'QUAF' ;
+_gau = 'CHANGER' gau 'QUAF' ;
+_dro = 'CHANGER' dro 'QUAF' ;
+_mt  = 'CHANGER' mt 'QUAF' ;
+'ELIMINATION' (_mt 'ET' _bas 'ET' _gau 'ET' _dro) 1.D-6 ;
+$mt = 'MODE' _mt 'NAVIER_STOKES' 'LINE' ;
+$bas = 'MODE' _bas 'NAVIER_STOKES' 'LINE' ;
+$gau = 'MODE' _gau 'NAVIER_STOKES' 'LINE' ;
+$dro = 'MODE' _dro 'NAVIER_STOKES' 'LINE' ;
+mt = 'DOMA' $mt 'MAILLAGE' ;
+bas = 'DOMA' $bas 'MAILLAGE' ;
+gau = 'DOMA' $gau 'MAILLAGE' ;
+dro = 'DOMA' $dro 'MAILLAGE' ;
+*
+* Initial and boundary conditions
+*
+xmt  = 'COORDONNEE' 1 mt ;
+*
+'SI' ('EGA' icini 1) ;
+   pmt  = 'CHANGER' mt 'POI1' ;
+   pmt1 = 'POIN' xmt 'EGINFE' 0. ;
+   pmt3 = 'POIN' xmt 'EGSUPE' 1. ;
+   pmt2 = 'DIFF' pmt (pmt1 'ET' pmt3) ;
+   c1 = 'MANUEL' 'CHPO' pmt1 1 'SCAL' 0. ;
+   c2 = 'COORDONNEE' 1 pmt2 ;
+   c3 = 'MANUEL' 'CHPO' pmt3 1 'SCAL' 1. ;
+   umcini = c1 '+' c2 '+' c3 ;
+   cini   = '*' ('-' umcini 1.) -1. ;
+'FINSI' ;
+*
+'SI' ('EGA' icini 2) ;
+   cini = 'MASQUE' xmt 'SUPERIEUR' 0. ;
+'FINSI' ;
+uini   = '+' ('NOMC' 'UX' cini) ('NOMC' 'UY' ('*' cini 0.)) ; 
+cgau   = 'REDU' cini gau ;
+cdro   = 'REDU' cini dro ;
+*
+* Problem definition 
+*
+rv = 'EQEX' 'NITER' niter 'OMEGA' omeg 'ITMA' 1
+     'OPTI' 'EF' 'IMPL' 'CENTREE' 
+     'ZONE' $mt 'OPER' 'DFDT' 1. 'CNM1' dt 'INCO' 'CN' ;
+rv = 'EQEX' rv 
+     'ZONE' $mt 'OPER' 'MAJUN'
+     'OPTI' 'EF' 'IMPL' typdec 'CMD' 0.2
+     'ZONE' $mt 'OPER' 'KONV' 1. 'UN' 'ALF' 'INCO' 'CN'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $mt 'OPER' 'LAPN' 'ALF' 'INCO' 'CN'
+     'CLIM' gau 'CN' 'TIMP' cgau
+     'CLIM' dro 'CN' 'TIMP' cdro ;
+*     
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' uini ;
+rv . 'INCO' . 'ALF' = 'KCHT' $mt 'SCAL' 'CENTRE' difart ;
+rv . 'INCO' . 'CN'  = 'KCHT' $mt 'SCAL' 'SOMMET' cini ;
+rv . 'INCO' . 'CNM1' = 'KCHT' $mt 'SCAL' 'SOMMET' cini ;
+*
+* Manual time stepping loop
+*
+res = 'TABLE' ;
+res . 'TPS' = 'TABLE' ;
+res . 'CN'  = 'TABLE' ;
+ires = 1 ;
+cn = rv . 'INCO' . 'CN' ;
+res . 'TPS' . ires = rv . 'PASDETPS' . 'TPS' ;
+res . 'CN'  . ires = 'COPIER' cn ;
+'REPETER' iitma nitma ;
+   EXEC rv ;
+   ires = '+' ires 1 ;
+   cn = rv . 'INCO' . 'CN' ;
+   res . 'TPS' . ires = rv . 'PASDETPS' . 'TPS' ;
+   res . 'CN'  . ires = 'COPIER' cn ;
+   evc = 'EVOL' 'CHPO' cn 'SCAL' bas ;
+   evtot = evc ;
+   tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+   tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+   tabt . 'TITRE' . 1 = 'CHAINE' 'Sol. App.' ;
+   cht = 'CHAINE' 'Pdt = ' &iitma ;
+   'SI' graph ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'C'
+                'TITR' cht 'LEGE' tabt 'NCLK' ;
+   'FINSI' ;
+'FIN' iitma ;
+*
+* Post-treatment
+*
+'OPTI' 'DIME' 3 ;
+rt = res . 'TPS' ;
+rc = res . 'CN' ;
+tm = 'TABLE' 'ESCLAVE' ;
+'REPETER' it ('DIME' rt) ;
+   ti = rt . &it ;
+   ci = rc . &it ;
+   mail = bas 'PLUS' ('NOMC' 'UZ' ci)  ;
+   mail = mail 'PLUS' (0. ti 0.) ;
+   tm . &it = mail ;
+'FIN' it ;
+'SI' ('EGA' icini 1) ;
+   oeil = '*' (1.2 -2.4 1.3) 2. ;
+'FINSI' ;   
+'SI' ('EGA' icini 2) ;
+   oeil = '*' (-2.1 -2.4 1.3) 2. ;
+'FINSI' ;   
+mtp = 'ET' tm ;
+'SI' graph ;    
+   'TRACER' oeil mtp ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;
+*
+* End of dgibi file BURGERS1D.DGIBI
+*
+'FIN' ;
+
+ 
+

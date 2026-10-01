@@ -1,0 +1,89 @@
+$$$$ NEG      NOTICE  PV090527  24/02/10    21:15:03     11820          
+                                             DATE     24/02/10
+
+    Operateur NEG                            Voir aussi : EGA
+    -------------                                         <     >
+                                                          <EG   >EG
+                                                          ENTI FLOT
+
+    LOG1 =  OBJET1  NEG  OBJET2 (FLOT1) ;
+
+                                    OBJET1=ENTIER,FLOTTANT,LISTENTI
+                                           MOT,TEXTE,LOGIQUE
+
+Section : Mathematiques Logique
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur NEG compare les objets OBJET1 et OBJET2.
+
+    Dans le cas general, c'est leur identite qui est testee. 
+    Deux objets deduits l'un de l'autre par affectation (=) sont egaux.
+    Deux objets deduits l'un de l'autre par copie (COPI) sont differents.
+
+    Pour certains types d'objet, le test porte sur leur contenu.
+
+    Commentaire :
+    _____________
+
+    OBJETi   : objets a comparer.
+
+    FLOT1    : critere de comparaison (type FLOTTANT) entre deux
+               flottants. Le critere est egal a 0. par defaut.
+
+    LOG1     : resultat logique (type LOGIQUE) ayant pour valeur FAUX
+               si les deux objets sont egaux, VRAI sinon.
+
+    Remarque :
+    __________
+
+    Si les objets sont des MOTs, il faut respecter l'ordre suivant :
+    LOG1 = NEG  MOT1  MOT2  ;
+    Dans la comparaison on ne tiendra pas compte des blancs situes a
+    la fin des mots. (EGA 'AA' 'AA   ') est VRAI.
+
+    Si on compare des scalaires (ENTIERS ou FLOTTANTS),
+    OBJET2 sera converti au type de OBJET1.
+
+ANGL==========================================================
+    Description:
+    ____________
+
+    The NEG operator compares the OBJET1 and OBJET2 objects.
+
+    In the general case, the test is about identity.
+    Two objects built by affectation of a new name (=) are equals.
+    Two object built by copy (COPI) are differents.
+
+    For some object's types, the object's content is tested.
+
+
+    Contents:
+    _________
+
+    OBJETi   : objects to be compared
+
+    FLOT1    : comparison criterion (FLOTTANT type) between two
+               floatings. The criterion equals 0. by default
+
+    LOG1     : logical result (LOGIQUE type) ; its value is FAUX
+               (false) if the two objects are equal and VRAI (true)
+               if not
+
+    Note:
+    _____
+
+    For MOT type objects, it is required that the following order
+    be respected :
+    LOG1 = EGA  MOT1  MOT2  ;
+    Tailing white spaces will be ignored :
+    (EGA 'AA' 'AA   ') is VRAI
+
+    If scalars are compared (type ENTIER or FLOTTANT),
+    the second one will be converted to the type of the first one.
+ 
+ 
+ 
+ 

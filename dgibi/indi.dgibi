@@ -1,0 +1,316 @@
+* fichier : indi.dgibi
+************************************************************************
+*       Petit test de l'operateur INDI options 'ASPE' et 'SKEW'        *
+************************************************************************
+
+
+** Options generales
+OPTI 'ECHO' 0 'DENS' 0.16 ;
+itrac = FAUX ;
+a = 1. ;
+def = 0.01 ;
+
+MESS ;
+MESS '---------------------------------------------------------------' ;
+MESS '| Dim. |         Cas        |      ASPE      |      SKEW      |' ;
+MESS '|      |                    |  Aspect ratio  |    Skewness    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+
+
+
+
+
+
+**************************** Exemple en 2D *****************************
+
+** Options generales
+OPTI 'DIME' 2 'ELEM' 'TRI3' ;
+
+
+** Cas d'un triangle equilateral
+p1 = 0. 0. ;
+p2 = a  0. ;
+p3 = (0.5 * a) (0.5 * a * (3. ** 0.5)) ;
+s0 = MANU 'TRI3' p1 p2 p3 ;
+q0 = INDI s0 'ASPE' 'SKEW' ;
+as0 = EXTR q0 'ASPE' 1 1 1 ;
+sk0 = EXTR q0 'SKEW' 1 1 1 ;
+MESS '|  2   | triangle equilat.  |  ' as0 '    |' sk0 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un triangle "needle"
+s1 = s0 PLUS (0. 0.) ;
+DEPL (s1 POIN 'PROC' p3) 'PLUS' ((a / def) * (0. 1.)) ;
+q1 = INDI s1 'ASPE' 'SKEW' ;
+as1 = EXTR q1 'ASPE' 1 1 1 ;
+sk1 = EXTR q1 'SKEW' 1 1 1 ;
+MESS '|  2   | triangle needle    |' as1 '    |' sk1 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un triangle "cap"
+s2 = MANU 'TRI3' p1 p2 (0.5 def) ;
+q2 = INDI s2 'ASPE' 'SKEW' ;
+as2 = EXTR q2 'ASPE' 1 1 1 ;
+sk2 = EXTR q2 'SKEW' 1 1 1 ;
+MESS '|  2   | triangle cap       |' as2 '    |' sk2 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un triangle "sliver"
+s3 = s0 PLUS (0. 0.) ;
+DEPL (s3 POIN 'PROC' p3) 'PLUS' ((0.1 * a / def) * (1. 0.)) ;
+q3 = INDI s3 'ASPE' 'SKEW' ;
+as3 = EXTR q3 'ASPE' 1 1 1 ;
+sk3 = EXTR q3 'SKEW' 1 1 1 ;
+MESS '|  2   | triangle sliver    |' as3 '    |' sk3 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Maillage d'une bielle
+r1 = 1. ;
+r2 = 0.6 ;
+r3 = 0.2 ;
+ep = 0.25 ;
+c1 = LIGN (0. 0.) (r1 0.) 360. 'ROTA' ;
+c2 = LIGN (0. 0.) ((r1 + ep) 0.) 360. 'ROTA' ;
+p1 = c2 POIN 'PROC' ((r1 + ep) * ((COS  30.) (SIN  30.))) ;
+p2 = c2 POIN 'PROC' ((r1 + ep) * ((COS -30.) (SIN -30.))) ;
+c2 = c2 ELEM 'COMP' p1 p2 ;
+c3 = LIGN (0. 0.) ((-1. * r2) 0.) 360. 'ROTA' ;
+c4 = LIGN (0. 0.) ((-1. * r2 - ep) 0.) 360. 'ROTA' ;
+p3 = c4 POIN 'PROC' ((r2 + ep) * ((COS -160.) (SIN -160.))) ;
+p4 = c4 POIN 'PROC' ((r2 + ep) * ((COS  160.) (SIN  160.))) ;
+c4 = c4 ELEM 'COMP' p3 p4 ;
+DEPL (c3 ET c4) 'PLUS' (6. 0.) ;
+l41 = DROI p4 p1 ;
+l23 = DROI p2 p3 ;
+l41 con1 c2  = l41 CONG r3 c2 ;
+c2  con2 l23 = c2  CONG r3 l23 ;
+l23 con3 c4  = l23 CONG r3 c4 ;
+c4  con4 l41 = c4  CONG r3 l41 ;
+cint = c1 ET c3 ;
+cext = INVE (con1 ET c2 ET con2 ET l23 ET con3 ET c4 ET con4 ET l41) ;
+OPTI 'ECHO' -1 ;
+ELIM cint 1.E-10 ;
+OPTI 'ECHO' 0 ;
+ar = cint ET cext ;
+bielle = SURF ar ;
+q = INDI bielle 'ASPE' 'SKEW' ;
+* mini,maxi,moyenne
+asmin = MINI q 'AVEC' (MOTS 'ASPE') ;
+skmin = MINI q 'AVEC' (MOTS 'SKEW') ;
+asmax = MAXI q 'AVEC' (MOTS 'ASPE') ;
+skmax = MAXI q 'AVEC' (MOTS 'SKEW') ;
+air = MESU bielle ;
+mo = MODE bielle 'MECANIQUE' ;
+q = CHAN 'NOEUD' q mo ;
+asmoy = (INTG mo q 'ASPE') / air ;
+skmoy = (INTG mo q 'SKEW') / air ;
+MESS '|  2   | maillage surf.     |                |                |' ;
+MESS '|      | d''une bielle       |                |                |' ;
+MESS '|      |            minimum |' asmin '    |' skmin '    |' ;
+MESS '|      |            moyenne |' asmoy '    |' skmoy '    |' ;
+MESS '|      |            maximum |' asmax '    |' skmax '    |' ;
+MESS '---------------------------------------------------------------' ;
+* trace du champ
+SI itrac ;
+  TRAC (EXCO q 'ASPE') mo 'TITR' 'Maillage d''une bielle - Aspect Ratio' (PROG 1. 'PAS' 0.05 2.) ;
+  TRAC (EXCO q 'SKEW') mo 'TITR' 'Maillage d''une bielle - Skewness'     (PROG 0. 'PAS' 0.02 0.4) ;
+FINSI ;
+* distributions
+npas = 50 ;
+las = PROG asmin 'PAS' ((asmax - asmin) / npas) asmax ;
+ddas = HIST mo q las 'ASPE' ;
+evmoy = EVOL 'VERT' 'MANU' (PROG asmoy asmoy) (PROG 0. (MAXI (EXTR ddas 'ORDO'))) ;
+SI itrac ;
+  DESS (ddas ET evmoy) 'TITR' 'Triangles - Distribution de ASPE - Moyenne en VERT' ;
+FINSI ;
+lsk = PROG 0. 'PAS' (1. / npas) 1. ;
+ddsk = HIST mo q lsk 'SKEW' ;
+evmoy = EVOL 'VERT' 'MANU' (PROG skmoy skmoy) (PROG 0. (MAXI (EXTR ddsk 'ORDO'))) ;
+SI itrac ;
+  DESS (ddsk ET evmoy) 'TITR' 'Triangles - Distribution de SKEW - Moyenne en VERT' ;
+FINSI ;
+* trace des "mauvais" elements
+SI itrac ;
+  elas = q ELEM 'SUPE' 2.  'AVEC' (MOTS 'ASPE') COUL 'ORAN' ;
+  elsk = q ELEM 'SUPE' 0.4 'AVEC' (MOTS 'SKEW') COUL 'ROUG' ;
+  TRAC (ar ET elas) 'TITR' 'Mauvais triangles - Orange = ASPE > 2' ;
+  TRAC (ar ET elsk) 'TITR' 'Mauvais triangles - Rouge = SKEW > 0.4' ;
+FINSI ;
+
+
+
+
+**************************** Exemple en 3D *****************************
+
+** Options generales
+OPTI 'DIME' 3 'ELEM' 'TET4' ;
+
+
+** Cas de la bielle precedente (doit donner en 3D les memes resultats qu'en 2D)
+q = INDI bielle 'ASPE' 'SKEW' ;
+* mini,maxi,moyenne
+asmin = MINI q 'AVEC' (MOTS 'ASPE') ;
+skmin = MINI q 'AVEC' (MOTS 'SKEW') ;
+asmax = MAXI q 'AVEC' (MOTS 'ASPE') ;
+skmax = MAXI q 'AVEC' (MOTS 'SKEW') ;
+air = MESU bielle ;
+mo = MODE bielle 'MECANIQUE' ;
+q = CHAN 'NOEUD' q mo ;
+asmoy = (INTG mo q 'ASPE') / air ;
+skmoy = (INTG mo q 'SKEW') / air ;
+MESS '|  3   | maillage surf.     |                |                |' ;
+MESS '|      | d''une bielle       |                |                |' ;
+MESS '|      |            minimum |' asmin '    |' skmin '    |' ;
+MESS '|      |            moyenne |' asmoy '    |' skmoy '    |' ;
+MESS '|      |            maximum |' asmax '    |' skmax '    |' ;
+MESS '---------------------------------------------------------------' ;
+* trace du champ
+SI itrac ;
+  TRAC (EXCO q 'ASPE') mo 'TITR' 'Maillage d''une bielle - Aspect Ratio' (PROG 1. 'PAS' 0.05 2.) ;
+  TRAC (EXCO q 'SKEW') mo 'TITR' 'Maillage d''une bielle - Skewness'     (PROG 0. 'PAS' 0.02 0.4) ;
+* trace des "mauvais" elements
+  elas = q ELEM 'SUPE' 2.  'AVEC' (MOTS 'ASPE') COUL 'ORAN' ;
+  elsk = q ELEM 'SUPE' 0.4 'AVEC' (MOTS 'SKEW') COUL 'ROUG' ;
+  TRAC (ar ET elas) 'TITR' 'Mauvais triangles - Orange = ASPE > 2' ;
+  TRAC (ar ET elsk) 'TITR' 'Mauvais triangles - Rouge = SKEW > 0.4' ;
+FINSI ;
+
+
+** Cas d'un tetraedre regulier
+a = 1. ;
+b = a / (2 * (2. ** 0.5)) ;
+mb = -1. * b ;
+p1 =  b  b  b ;
+p2 =  b mb mb ;
+p3 = mb  b mb ;
+p4 = mb mb  b ;
+v0 = MANU 'TET4' p1 p2 p3 p4 ;
+q0 = INDI v0 'ASPE' 'SKEW' ;
+as0 = EXTR q0 'ASPE' 1 1 1 ;
+sk0 = EXTR q0 'SKEW' 1 1 1 ;
+MESS '|  3   | tetraedre regulier |' as0 '    |' sk0 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un tetraedre "needle"
+v1 = v0 PLUS (0. 0. 0.) ;
+DEPL (v1 POIN 'PROC' p1) 'PLUS' ((a / def) * (1. 1. 1.)) ;
+q1 = INDI v1 'ASPE' 'SKEW' ;
+as1 = EXTR q1 'ASPE' 1 1 1 ;
+sk1 = EXTR q1 'SKEW' 1 1 1 ;
+MESS '|  3   | tetraedre needle   |' as1 '    |' sk1 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un tetraedre "spindle"
+v2 = v0 PLUS (0. 0. 0.) ;
+DEPL ((v2 POIN 'PROC' p1) ET (v2 POIN 'PROC' p4)) 'PLUS' (0. 0. ((0.5 * def) - b)) ;
+DEPL ((v2 POIN 'PROC' p2) ET (v2 POIN 'PROC' p3)) 'PLUS' (0. 0. (b - (0.5 * def))) ;
+q2 = INDI v2 'ASPE' 'SKEW' ;
+as2 = EXTR q2 'ASPE' 1 1 1 ;
+sk2 = EXTR q2 'SKEW' 1 1 1 ;
+MESS '|  3   | tetraedre spindle  |' as2 '    |' sk2 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un tetraedre "wedge"
+v3 = v0 PLUS (0. 0. 0.) ;
+DEPL (v3 POIN 'PROC' p1) 'AFFI' (def / a) (0. 0. b) p1 ;
+DEPL (v3 POIN 'PROC' p4) 'AFFI' (def / a) (0. 0. b) p1 ;
+q3 = INDI v3 'ASPE' 'SKEW' ;
+as3 = EXTR q3 'ASPE' 1 1 1 ;
+sk3 = EXTR q3 'SKEW' 1 1 1 ;
+MESS '|  3   | tetraedre wedge    |' as3 '    |' sk3 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un tetraedre "cap"
+v4 = v0 PLUS (0. 0. 0.) ;
+p14 = v4 POIN 'PROC' p1 ;
+DEPL p14 'PROJ' 'CONI' (1. 1. 1.) 'PLAN' p2 p3 p4 ;
+DEPL p14 'PLUS' (def * (1. 1. 1.)) ;
+q4 = INDI v4 'ASPE' 'SKEW' ;
+as4 = EXTR q4 'ASPE' 1 1 1 ;
+sk4 = EXTR q4 'SKEW' 1 1 1 ;
+MESS '|  3   | tetraedre cap      |' as4 '    |' sk4 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Cas d'un tetraedre "sliver"
+p1 = 0. 0. 0. ;
+p2 = a  0. 0. ;
+p3 = 0. a  0. ;
+p4 = a  a  def ;
+v5 = MANU 'TET4' p1 p2 p3 p4 ;
+q5 = INDI v5 'ASPE' 'SKEW' ;
+as5 = EXTR q5 'ASPE' 1 1 1 ;
+sk5 = EXTR q5 'SKEW' 1 1 1 ;
+MESS '|  3   | tetraedre sliver   |' as5 '    |' sk5 '    |' ;
+MESS '---------------------------------------------------------------' ;
+
+
+** Maillage 3D de la bielle
+s1 = bielle ;
+arb = ar PLUS (0. 0. (2. * ep)) ;
+s2 = SURF arb 'PLAN' ;
+s3 = REGL ar arb ;
+bielle = VOLU (s1 ET s2 ET s3) ;
+ar = ARET bielle ;
+q = INDI bielle 'ASPE' 'SKEW' ;
+* mini,maxi,moyenne
+asmin = MINI q 'AVEC' (MOTS 'ASPE') ;
+skmin = MINI q 'AVEC' (MOTS 'SKEW') ;
+asmax = MAXI q 'AVEC' (MOTS 'ASPE') ;
+skmax = MAXI q 'AVEC' (MOTS 'SKEW') ;
+vol = MESU bielle ;
+mo = MODE bielle 'MECANIQUE' ;
+q = CHAN 'NOEUD' q mo ;
+asmoy = (INTG mo q 'ASPE') / vol ;
+skmoy = (INTG mo q 'SKEW') / vol ;
+MESS '|  3   | maillage volumique |                |                |' ;
+MESS '|      | d''une bielle       |                |                |' ;
+MESS '|      |            minimum |' asmin '    |' skmin '    |' ;
+MESS '|      |            moyenne |' asmoy '    |' skmoy '    |' ;
+MESS '|      |            maximum |' asmax '    |' skmax '    |' ;
+MESS '---------------------------------------------------------------' ;
+* trace du champ
+SI itrac ;
+  TRAC (EXCO q 'ASPE') mo 'TITR' 'Maillage d''une bielle - Aspect Ratio' (PROG 1. 'PAS' 0.2 4.) ;
+  TRAC (EXCO q 'SKEW') mo 'TITR' 'Maillage d''une bielle - Skewness'     (PROG 0. 'PAS' 0.04 0.8) ;
+FINSI ;
+* distributions
+npas = 50 ;
+las = PROG asmin 'PAS' ((asmax - asmin) / npas) asmax ;
+ddas = HIST mo q las 'ASPE' ;
+evmoy = EVOL 'VERT' 'MANU' (PROG asmoy asmoy) (PROG 0. (MAXI (EXTR ddas 'ORDO'))) ;
+SI itrac ;
+  DESS (ddas ET evmoy) 'TITR' 'Tetraedres - Distribution de ASPE - Moyenne en VERT' ;
+FINSI ;
+lsk = PROG 0. 'PAS' (1. / npas) 1. ;
+ddsk = HIST mo q lsk 'SKEW' ;
+evmoy = EVOL 'VERT' 'MANU' (PROG skmoy skmoy) (PROG 0. (MAXI (EXTR ddsk 'ORDO'))) ;
+SI itrac ;
+  DESS (ddsk ET evmoy) 'TITR' 'Tetraedres - Distribution de SKEW - Moyenne en VERT' ;
+FINSI ;
+* trace des "mauvais" elements
+SI itrac ;
+  elas = q ELEM 'SUPE' 4.  'AVEC' (MOTS 'ASPE') COUL 'ORAN' ;
+  elsk = q ELEM 'SUPE' 0.8 'AVEC' (MOTS 'SKEW') COUL 'ROUG' ;
+  TRAC (ar ET elas) 'TITR' 'Mauvais tetraedres - Orange = ASPE > 4' ;
+  TRAC (ar ET elsk) 'TITR' 'Mauvais tetraedres - Rouge = SKEW > 0.8' ;
+FINSI ;
+
+
+
+
+FIN ;
+ 
+
+ 
+

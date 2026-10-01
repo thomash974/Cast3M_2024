@@ -1,0 +1,292 @@
+optio norm auto;
+* fichier : g_c_etoile_coque_1.dgibi
+****************************************************
+* Section : Mecanique Rupture
+****************************************************
+*                                                  *
+*       VALIDATION DE LA PROCEDURE G_THETA         *
+*   POUR UN DEFAUT CIRCONFERENTIEL TRAVERSANT      *
+* DANS UN TUYAU MODELISE AVEC DES ELEMENTS COQUES  *
+*  SOLUTION DE REFERENCE : Ductile Fracture        *
+*  Handbook, A. Zahoor                             * 
+*                                                  *
+*                                                  *
+*  GEOMETRIE : tube                                *
+*                                                  *
+*  longueur du tube          : 3000. MM            *
+*  epaisseur du tube         :  17.5 MM            *
+*  rayon moyen du tube       :  350. MM            *
+*  longueur de la fissure    :   50. MM            *
+*                                                  *
+*  MATERIAU : loi de Norton                        *
+*                                                  *
+*  Module d'Young         : 2.E5 MPa               *
+*  Coefficient de poisson : 0.3                    *
+*  Coefficient N (Norton) : 7                      *
+*  Coefficient A (Norton) : 3.E-24 /h/MPa^7        *
+*                                                  *
+*  CHARGEMENT :                                    *
+*                                                  *
+*  Traction pure          : 240.78 MPa             *
+*                                                  *
+*  SOLUTION ANALYTIQUE (APPROCHEE) :               *
+*                                                  *
+*  Intégrale C*                                    *
+*                C* = 2.025 kJ/m^2/h               *
+*                                                  *
+****************************************************
+
+* VALIDATION COMPLETE OU JUSTE FONCTIONNEMENT
+VALIDATION = vrai ;
+
+* I - REALISATION DU CALCUL
+* -------------------------
+
+* OPTIONS
+OPTI 'DIME' 3 'ELEM' 'TRI3' ;
+
+* I.1 - MAILLAGE
+* **************
+
+* GEOMETRIE :
+* R = RAYON
+* E = EPAISSEUR
+* L = LONGUEUR
+* AN = ANGLE TOTAL DE LA FISSURE (15° < AN < 150°)
+
+R = 350. ;
+E = R/10. ;
+L = 3000. ;
+AN = 45. ;
+
+
+* MAILLAGE
+DENS1 = R/350. ;
+DENS (100.*DENS1) ;
+A = COS (AN/2.) ;
+B = SIN (AN/2.) ;
+VECT0 = (R/50.) 0. (B*R/(50.*A)) ;
+VECT1 = 10.*VECT0 ;
+C0 = 0. 0. 0. ;
+CI = 0. (L/10.) 0. ;
+CII = 0. (L/5.) 0. ;
+C1 = 0. L 0. ;
+P1 = R 0. 0. ;
+FF = (A*R) 0. (B*R) ;
+XCI = IPOL (PROG 15 20 60 90 120 150) (PROG 41 8 5 4 3 3) AN ;
+LIS1 = PROG 23. 40. 70. 120. XCI ;
+LEC1 = LECT 3 4 4 4 5 ;
+TF = TABL ;
+TL = TABL ;
+TP = TABL ;
+REPE I (DIME LIS1) ;
+        FAC = EXTR LIS1 &I ;
+        N1 = EXTR LEC1 &I ;
+        A1 = (-1*R/FAC) 0. 0. ;
+        A2 = 0. (R/FAC) 0. ;
+        A3 = (R/FAC) 0. 0. ;
+        TF.&I = ((CERC N1 A1 C0 A2 CERC N1 C0 A3) TOUR (90.-(AN/2.)) C0 CI)
+                DEPL PLUS VECT1 ;
+        TL.&I = TF.&I PROJ 'CYLI' VECT0 'CYLI' C0 CI P1 ;
+        TP.(&I + 1) = TL.&I POIN 'FINAL' ;
+        TP.(12 - &I) = TL.&I POIN 'INITIAL' ;
+FIN I ;
+P12 = (-1*R) 0. 0. ;
+P13 = (-1*R) (L/10.) 0. ;
+P14 = 0. (L/10.) R ;
+P15 = R (L/10.) 0. ;
+P16 = (-1*R) (L/5.) 0. ;
+P17 = 0. (L/5.) R ;
+P18 = R (L/5.) 0. ;
+P19 = (-1*R) L 0. ;
+P20 = 0. L R ;
+P21 = R L 0. ;
+XC5 = IPOL (PROG 15 20 60 90 120 150) (PROG 35 35 40 40 50 50) AN ;
+XC6 = IPOL (PROG 15 20 60 90 120 150) (PROG -1 -3 -4 -4 -5 -5) AN ;
+XC6 = ENTI XC6 ;
+LIMTF = (TP.(6) CERC XC6 C0 (INVE TL.(1)) 'DINI' (XC5*DENS1) 'DFIN' (30*DENS1))
+                        CERC XC6 C0 TL.(5) 'DINI' (30*DENS1) DFIN (XC5*DENS1) ;
+XC3 = IPOL (PROG 15 20 60 90 120 150) (PROG 2 2 4 5 5 5) AN ;
+LIMF = P1 CERC (ENTI XC3) C0 (INVE TL.(5)) ;
+XC4 = IPOL (PROG 15 20 60 90 120 150) (PROG 16 14 13 12 10 10) AN ;
+XC7 = IPOL (PROG 15 20 60 90 120 150) (PROG 3 20 20 30 30 33) AN ;
+LIMF = (LIMF  CERC (ENTI (0. - XC4)) C0 P12 'DINI' (XC7*DENS1)
+                'DFIN' (160*DENS1)) DROI P13 CERC CI P14 CERC CI P15 ;
+XC2 = IPOL (PROG 15 20 60 90 120 150) (PROG 15 25 50 70 80 80) AN ;
+LIMF = LIMF ET (DROI -5 P15 P1 'DINI' (120*DENS1) 'DFIN' (XC2*DENS1)) ;
+SUF = LIMF SURF 'CYLI' C0 CI 'COUL' 'TURQ' ;
+Z1 = COUT TL.(4) FF 'COUL' 'ROUG' ;
+Z2 = COUT TL.(4) TL.(3) 'COUL' 'VERT' ;
+Z3 = COUT TL.(3) TL.(2) 'COUL' 'ROSE' ;
+Z4 = COUT TL.(2) TL.(1) 'COUL' 'ROUG' ;
+Z5 = LIMTF SURF 'CYLI' C0 CI 'COUL' 'BLEU' ;
+ZF = Z1 ET Z2 ET Z3 ET Z4 ET Z5 ;
+SUF = SUF ET ZF ;
+MIN = ((P15 CERC CI P14 CERC CI P13) TRAN 2 (0. (L/10.) 0.))
+                TRAN 15 (0. (4.*(L/5.)) 0.) 'COUL' 'TURQ' ;
+TOUT = SUF ET MIN ;
+TOUT = ORIE TOUT 'POIN' (0. 0. 0.) ;
+LIG = COTE 3 MIN ;
+CONT1 = CONT TOUT ;
+LISY = ELEM CONT1 'COMP' FF P12 ;
+LIFI = ELEM CONT1 'COMP' FF P1 ;
+ELIM (TOUT ET LIG) 1.E-3 ;
+* TRAC 'QUAL' TOUT ;FIN ;
+
+
+* I.2 - MODELE ET MATERIAU
+* ************************
+
+* PROPRIETES :
+* MYOUN = MODULE D'YOUNG
+* NU1 = COEFFICIENT DE POISSON
+* AF1, AF2, AF3 = COEFFICIENTS DE NORTON
+
+MYOUN = 2.E5 ;
+NU1 = 0.3 ;
+AF1 = 3.E-23 ;
+AF2 = 7. ;
+AF3 = 1. ;
+
+* MODELE MULTICOUCHE
+* ELEMENT POUR LE MODELE MULTICOUCHE
+IELEM = 268 ;
+ELEFIS = TOUT ELEM 'TRI3' IELEM ;
+* EPAISSEUR TOTALE
+EPAI_T = E ;
+* NOMBRE DE COUCHES ET LEUR EPAISSEUR
+NB_COU = 13 ;
+EPAI_C = EPAI_T * 1.E-6 ;
+* CREATION DU MODELE MULTICOUCHE
+EPAI_I = (EPAI_T - (EPAI_C*NB_COU))/(NB_COU - 1) ;
+TBEPAI = TABL ;
+TBEXCE = TABLE ;
+MOD_MUL = VIDE 'MMODEL' ;
+MAT_MUL = VIDE 'MCHAML' ;
+REPE I ((2*NB_COU) - 1) ;
+        EX1 = (EPAI_I + EPAI_C)*(&I - NB_COU)/2. ;
+        SI (EGA ((&I/2)*2) &I) ;
+                EP1 = EPAI_I ;
+        SINON ;
+                EP1 = EPAI_C ;
+        FINSI;
+        MOD_MU1 = MODE ELEFIS 'MECANIQUE' 'ELASTIQUE' 'FLUAGE' 'NORTON' 'DKT'
+                                                                'CONS' (CHAI &I) ;
+        MAT_MU1 = MATE MOD_MU1 'YOUN' MYOUN 'NU' NU1 'AF1' AF1 'AF2' AF2 'AF3' AF3
+                                                    'SMAX' 0. 'EPAI' EP1 'EXCE' EX1 ;
+        MOD_MUL = MOD_MUL ET MOD_MU1 ;
+        MAT_MUL = MAT_MUL ET MAT_MU1 ;
+FIN I;
+
+* RESTE DU MODELE
+MOD0 = MODE (TOUT DIFF ELEFIS) 'MECANIQUE' 'ELASTIQUE' 'FLUAGE' 'NORTON' 'DKT' ;
+MAT0 = MATE MOD0 'YOUN' MYOUN 'NU' NU1 'AF1' AF1 'AF2' AF2 'AF3' AF3 
+    'SMAX' 0. 'EPAI' E ;
+
+* MODELE TOTAL
+MOD1 = MOD0 ET MOD_MUL ;
+MAT1 = MAT0 ET MAT_MUL ;
+
+
+* I.3 - CONDITIONS AUX LIMITES ET CHARGEMENT
+* ******************************************
+
+* CHARGE LIMITE
+SIG0 = 320. ;
+TETARAD = (AN/2.)*(PI/180.) ;
+V1 = 0.5*(SIN (AN/2.)) ;
+V2 = (PI/180.)*(ATG V1 ((1. - (V1**2))**0.5)) ;
+P0 = 2*SIG0*R*E*(PI - TETARAD - (2.*V2)) ;
+* MESS 'P0 = ' P0 ;FIN ;
+* CHARGEMENT
+PINI3 = POIN LIG 'INITIAL' ;
+PFIN3 = POIN LIG 'FINAL' ;
+PMIL3 = (CHAN 'POI1' LIG) DIFF (PINI3 ET PFIN3) ;
+MOEXT = (P0/2) / ((NBNO LIG) - 1) ;
+MOMIL = MOEXT*(NBNO PMIL3) ;
+F01 = (FORC 'FY' MOEXT (PINI3 ET PFIN3)) ET (FORC 'FY' MOMIL PMIL3) ;
+EVT = EVOL 'MANU' 'T' (PROG 0. 0.1 1.E20) 'F(T)' (PROG 0. 1. 1.) ;
+CHA1 = CHAR F01 EVT ;
+
+* CLS
+SXOZ = SYMT 'DEPL' 'ROTA' TP.(10) TP.(11) P12 LISY 1.E-8 ;
+SXOY = SYMT 'DEPL' P1 P12 P21 TOUT 1.E-8 ;
+CDL = BLOQ 'UX' (POIN LIG 'FINAL') ;
+COLIM = SXOZ ET SXOY ET CDL ;
+
+
+* I.4 - APPEL A PASAPAS
+* *********************
+
+TAB1 = TABL ;
+TAB1.'MODELE' = MOD1 ;
+TAB1.'CARACTERISTIQUES' = MAT1 ;
+TAB1.'BLOCAGES_MECANIQUES' = COLIM ;
+TAB1.'CHARGEMENT' = CHA1 ;
+LIS1 = PROG 0. PAS 0.02 0.2 PAS 0.05 1. PAS 0.5 10. PAS 5. 100. PAS 50. 350. ;
+SI VALIDATION ;
+        TAB1.'TEMPS_CALCULES' = LIS1 ;
+SINON ;
+        TAB1.'TEMPS_CALCULES' = EXTR LIS1 (LECT 1 PAS 1 20) ;
+FINSI ;
+MES_SAUV = TABL ;
+MES_SAUV.'DEFIN' = VRAI ;
+TAB1.'MES_SAUVEGARDES' = MES_SAUV ;
+PASAPAS TAB1 ;
+
+* COD
+* COD = 2.*(EVOL 'TEMP' TAB1 'DEPLACEMENTS' 'UY' P1) ;
+* DESS COD ;
+* DEF1 = DEFO TAB1.'DEPLACEMENTS'.((DIME TAB1.'TEMPS') - 1) TOUT ;
+* TRAC DEF1 ;
+
+
+* II - APPEL A G_THETA ET COMPARAISON A LA SOLUTION ANALYTIQUE
+* ------------------------------------------------------------
+
+* II.1 - APPEL A G_THETA
+* **********************
+
+* ON RECUPERE LA FISSURE
+LF = CONT1 ELEM 'COMPRIS' P1 FF ;
+* TRAC ((TOUT COUL 'BLAN') ET (LF COUL 'ROUG') ET (ELEFIS COUL 'BLEU')) ;
+
+* ON CREE LA TABLE SUPTAB
+SUPTAB = TABL ;
+SUPTAB.'SOLUTION_PASAPAS' = TAB1 ;
+SUPTAB.'OBJECTIF' = 'C*' ;
+SUPTAB.'LEVRE_SUPERIEURE' = LF ;
+SUPTAB.'FRONT_FISSURE' = FF ;
+SUPTAB.'COUCHE' = 4 ;
+SUPTAB.'ELEMENT_MULTICOUCHE' = ELEFIS ;
+SUPTAB.'POINT_1' = CI ;
+SUPTAB.'POINT_2' = C0 ;
+
+* ON APPELLE G_THETA
+G_THETA SUPTAB ;
+NDER = DIME SUPTAB.'RESULTATS' ;
+C_GT = SUPTAB.'RESULTATS'.(NDER-1).'GLOBAL' ;
+
+
+* II.2 - SOLUTION ANALYTIQUE
+* **************************
+
+SI VALIDATION ;
+        H1 = 0.638 ;
+        C_AN = SIG0*AF1*(SIG0**AF2)*R*PI*(1. - (AN/360.))*H1 ;
+        ERR1 = (ABS (C_AN - C_GT)) / C_AN ;
+        MESS  (CHAI 'ERREUR RELATIVE :' ' ' 'FORMAT' '(F4.1)' (100*ERR1) ' %') ;
+        SI (ERR1 > 3.E-2) ;
+                ERRE 5 ;
+        FINSI ;
+FINSI ;
+
+FIN ;
+ 
+
+ 
+
+ 
+
+ 
+

@@ -1,0 +1,87 @@
+$$$$ RENDSOUR
+* RENDSOUR  PROCEDUR  SP204843  23/10/23    21:15:11     11770          
+debp RENDSOUR CGMOD1*CHARGEMENT CGMAT1*CHARGEMENT LREE1/LISTREEL MOT1/MOT ;
+
+*-------------------------- ANALYSE ENTREES ---------------------------*
+
+* Lecture des arguments optionnels :
+si (non (exis LREE1)) ;
+  LREE1    = extr CGMOD1 'LREE' ;
+fins ;
+
+imoye1   = faux ;
+si (exis MOT1) ;
+  si (neg MOT1 'MOYE') ;
+    mess '*****  ERREUR : on attend le mot-clé ''MOYE'' ' ;
+    quit RENDSOUR ;
+  fins ;
+  imoye1   = vrai ;
+fins ;
+
+*----------------------------- TRAITEMENT -----------------------------*
+
+* Listobje :
+LMOD1    = extr CGMOD1 'LOBJ' ;
+LMAT1    = extr CGMAT1 'LOBJ' ;
+
+* Tolerance sur intensite source :
+MAT1     = extr LMAT1 1 ;
+qmax1    = ((mat1 extr qtot 1 1 1) extr ordo) maxi abs ;
+tolq1    = 1.e-6 * qmax1 ;
+
+* Initialisation des sorties :
+ltps1    = prog ;
+resu1    = prog ;
+lmoy1    = prog ;
+
+* Boucles sur instants fournis :
+nb1      = dime lree1 ;
+repe bmes1 nb1 ;
+  floti1   = extr lree1 &bmes1 ;
+  modi1    = tire CGMOD1 mode floti1 ;
+  chvari1  = manu chml modi1 temp floti1 ;
+  mati1    = tire CGMAT1 mate floti1 ;
+  mati1    = vari nuag modi1 mati1 chvari1 ;
+  qtoti1   = (exco mati1 qtot) maxi ;
+  si imoye1 ;
+    si ((abs qtoti1) < tolq1) ;
+      resui1   = qtoti1 ;
+    sino ;
+      chqi1    = sour modi1 mati1 ;
+      resui1   = (resu chqi1) maxi ;
+      resui1   = resui1 / qtoti1 ;
+    fins ;
+    si (&bmes1 > 1) ;
+      moyei1   = 0.5 * (resui0 + resui1) ;
+      si (moyei1 >EG tolq1) ;
+        lmoy1    = lmoy1 et moyei1 ;
+      fins ;
+    fins ;
+    qtoti0   = qtoti1 ;
+    resui0   = resui1 ;
+  sino ;
+    si ((abs qtoti1) < tolq1) ; iter bmes1 ; fins ;
+    chqi1    = sour modi1 mati1 ;
+    resui1   = (resu chqi1) maxi ;
+    resui1   = resui1 / qtoti1 ;
+    resu1    = resu1 et resui1 ;
+    ltps1    = ltps1 et floti1 ;
+  fins ;
+fin bmes1 ;
+
+* Mise en forme resultat :
+si imoye1 ;
+  resu1    = (somm lmoy1) / ((dime lmoy1) flot) ;
+sino ;
+  si (nb1 ega 1) ;
+    resu1  = resu1 extr 1 ;
+  sino ;
+    resu1  = evol manu 'TEMP' ltps1 resu1 ;
+  fins ;
+fins ;
+
+*------------------------------- SORTIE -------------------------------*
+
+finp RESU1 ;
+$$$$
+ 

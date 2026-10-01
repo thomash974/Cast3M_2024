@@ -1,0 +1,484 @@
+$$$$ FOUR2TRI
+* FOUR2TRI  PROCEDUR  BP208322  21/02/02    21:15:00     10876          
+
+*======================================================================
+*
+* FOUR2TRI (ou 4 2 3 pour les numericiens purs....) :
+* Genere un maillage 3D à partir d'un modele Fourier
+* Recombine les CHPO 2D Fourier sur ce maillage 3D
+* Creation : D. Combescure, SEMT/DYN, CEA Saclay, Decembre 2006
+* Modifs   : B. Prabel, 2013/02(#8575), 2017/04(#9396), 2019/03, ...
+*
+*======================================================================
+
+DEBPROC FOUR2TRI TAB1*'TABLE' NUMFOUR/'ENTIER' ;
+                
+                
+* opti debug 1;
+************************************************************************
+*           LECTURE DES DONNEES D'ENTREE
+************************************************************************
+*
+* On ne cree le MAILLAGE_3D que s'il n'existe pas dejà
+*
+SI (NON (EXIS TAB1 'MAILLAGE_3D'));
+  FLAGMAIL = VRAI;
+* il va falloir le creer -> a partir du modele ou d'un maillage 2d
+  SI (EXIS TAB1 'MAILLAGE');
+    MESH2D = TAB1 . 'MAILLAGE';
+  SINON;
+    SI (EXIS TAB1 'MODELE');
+*     recup du maillage depuis le modele
+      MESH2D = EXTR (TAB1 . 'MODELE') 'MAILLAGE';
+    SINON;
+      MESS 'Absence de MAILLAGE et de MODELE !';
+      ERRE 21; QUIT FOUR2TRI;
+    FINSI;
+  FINSI;
+SINON;
+  FLAGMAIL = FAUX;
+* le maillage existe deja -> on recupere tout
+  MESH3D =  TAB1 . 'MAILLAGE_3D'   ;
+  xy2D    = TAB1 . 'COORDONNEES_2D';
+  xy3D    = TAB1 . 'COORDONNEES_3D';
+  teta3D  = TAB1 . 'ANGLE_3D'      ;
+FINSI;
+*
+* On cree les champs de DEPLACEMENTS_3D si DEPLACEMENTS est fourni
+*
+FLAGDEPL = EXIS TAB1 'DEPLACEMENTS';
+*
+* On cree les champs de EFFORTS_3D si EFFORTS est fourni
+*
+FLAGFOR = EXIS TAB1 'EFFORTS';
+*
+* On cree les champs sclaires de EFFORTS_3D si EFFORTS est fourni
+*
+FLAGCHPS = EXIS TAB1 'CHPO_SYME';
+FLAGCHPA = EXIS TAB1 'CHPO_ANTI';
+*
+*
+* NUMFOUR = Harmonique de Fourier
+*
+*opti debug 1; list (TYPE NUMFOUR); list NUMFOUR;
+SI (NEG (TYPE NUMFOUR) 'ENTIER');
+* est-on bien en Fourier ?
+  SI (EGA (VALE 'MODE') (MOT 'FOUR'));
+    NUMFOUR = VALE 'MODE' 'FOUR';
+    MESS 'Harmonique de Fourier non fournie :'
+         ' on prend l harmonique courante' ' ' NUMFOUR ' !';
+  SINON;
+*   on n'est pas en Fourier -> on ne peut "que" faire le maillage 3D
+    SI (FLAGDEPL OU FLAGFOR OU FLAGCHPS OU FLAGCHPA); 
+      ERRE 287; QUIT FOUR2TRI; 
+    FINSI;
+  FINSI;
+FINSI;
+*mess 'four2tri: NUMFOUR='NUMFOUR;
+*
+* ANGLES
+*
+  SI (EXIS TAB1  'ANGLES');
+    PRANGL = TAB1 . 'ANGLES';
+  SINON;
+    MESS 'ANGLES non fourni : on prend tous les 15 degres par defaut !';
+    PRANGL = PROG 0. PAS 15. 360.;
+    TAB1 . 'ANGLES' = PRANGL;
+  FINSI;
+* recup
+  ANGL1 = EXTR PRANGL 1;
+  NANGL = DIME PRANGL;
+  ANGLN = EXTR PRANGL NANGL;
+* on impose la 1ere valeur a 0°
+  SI (NEG ANGL1 0.);
+    MESS 'Le premier angle doit etre 0. !';
+    ERRE 21; QUIT FOUR2TRI;
+  FINSI;
+* amplitude de l'angle de rotation  
+  ANG_ROTA = ANGLN - ANGL1;
+* on impose une progression constante et croissante
+  DELTA_ANG = (ENLE PRANGL 1) - (ENLE PRANGL NANGL);
+  MIN_D_ANG = MINI DELTA_ANG;
+  MAX_D_ANG = MAXI DELTA_ANG;
+  SI (MIN_D_ANG <EG 0.);
+    MESS 'Les angles doivent suivre une progression croissante stricte !';
+    ERRE 21; QUIT FOUR2TRI;
+  FINSI;
+  SI ((MAX_D_ANG - MIN_D_ANG) > 0.1);
+    MESS 'Les angles doivent suivre une progression arithmetique !';
+    ERRE 21; QUIT FOUR2TRI;
+  FINSI; 
+* revolution ?
+  ZREVOLUTION = EGA ANG_ROTA 360.;
+  SI (ZREVOLUTION); NROTA = NANGL - 1;
+  SINON;            NROTA = NANGL;
+  FINSI;
+
+*
+* Faut-il redresser le maillage et les champs tq (r,\theta,z) = (X,Y,Z)
+* ou laisse t'on (r,\theta,z) = (X,-Z,Y) ?
+*
+  SI (EXIS TAB1  'REDRESSE');
+    REDRESS = TAB1 . 'REDRESSE';
+  SINON;
+    REDRESS = FAUX;
+    TAB1 . 'REDRESSE' = REDRESS;
+  FINSI;
+
+* points central, vecteur de rotation
+ OPTI DIME 3 ;
+ pcentre = 0. 0. 0.;
+SI REDRESS;
+   vrota1 = 0. 0. 1.;
+   vrota2 = 1. 0. 0.;
+SINON;
+   vrota1 = 0. 1. 0.;
+FINSI;
+
+* tolerance pour ELIM 
+* rem : si xELIM = 0., alors pas d'ELIM, ce qui peut etre souhaitable 
+* en cas de noeuds doubles volontaires par ex.)
+  SI (EXIS TAB1  'ELIM');
+    xELIM = TAB1 . 'ELIM';
+  SINON;
+    xELIM = 1.E-12 ;
+    MESS 'Tolerance de ELIM non fourni : on prend' ' 'xELIM' par defaut !';
+    TAB1 . 'ELIM' = xELIM;
+  FINSI;
+  FLAGELIM = xELIM '>' 0.;
+* xELIM etant utilise par ELIM et par MASQ et IPOL, 
+* on met une autre valeur si nul
+  SI (NON FLAGELIM); xELIM = VALE 'PETIT'; FINSI;
+  
+
+************************************************************************
+*
+*                  CREATION DU MAILLAGE 3D
+*
+************************************************************************
+
+SI FLAGMAIL;
+
+* recup du maillage depuis le modele
+* fait+haut!  MESH2D = EXTR MOD1 'MAILLAGE';
+  
+* on supprime les eventuels doublons (pour coque multicouche par ex.)  
+  MESH2D = UNIQ MESH2D;
+  
+* coordonnees 2D (R,Z) (logiquement, z2D = 0) avant redress !
+  x2D y2D z2D = COOR MESH2D;
+  xy2D = (NOMC 'R' x2d 'NATURE' 'DIFFUS') 
+      ET (NOMC 'Z' y2d 'NATURE' 'DIFFUS');
+  
+* on redresse si besoin
+  SI REDRESS;
+    DEPL MESH2D 'TOUR' 90. pcentre vrota2;
+  FINSI;
+*
+* elements geometriques surfaciques, lineaires et quadratiques
+  TYPSURF_LIN  = MOTS 'TRI3' 'QUA4';
+  TYPSURF_QUAD = MOTS 'TRI6' 'QUA8' 'TRI7' 'QUA9';
+  TYPSURF      = TYPSURF_LIN et TYPSURF_QUAD;
+  TYPSEG       = MOTS 'SEG2' 'SEG3';
+* split de MESH2D en MESH2D_1 et MESH2D_2 selon le type d'element
+  TYP2D = ELEM MESH2D 'TYPE';
+  MESH2D_1 = VIDE 'MAILLAGE'; 
+  MESH2D_2 = VIDE 'MAILLAGE'; 
+  REPE Bj (DIME TYP2D);
+    DONE = FAUX;
+    TYP2Dj = EXTR TYP2D &Bj;
+    SI (EXIS TYPSURF TYP2Dj);
+      MESH2D_1 = MESH2D_1 ET (ELEM MESH2D TYP2Dj);
+      DONE = VRAI;
+    FINSI;
+    SI (EXIS TYPSEG TYP2Dj);
+      MESH2D_2 = MESH2D_2 ET (ELEM MESH2D TYP2Dj);
+      DONE = VRAI;
+    FINSI;
+    SI (NON DONE);
+      MESS 'Elements de type' ' ' TYP2Dj ' non traite ...';
+*     par exemple, les elements de type RACCORD ne sont pas taites ici
+*     (tant mieux car ils ont des noeuds confondus)
+   FINSI;
+  FIN  Bj;
+  NEL_1 = NBEL MESH2D_1;
+  NEL_2 = NBEL MESH2D_2;
+
+* TODO: a ameliorer si ef quadratique ? pas sur que ce soit utile ...
+  OPTI DIME 3 ELEM 'CUB8';
+
+* infos utiles en cas d'appels successifs a FOUR2TRI
+  TAB1 . 'COORDONNEES_2D' = xy2D;
+  
+* creation effective du maillage 3D  
+  MESH3D = VIDE 'MAILLAGE'; 
+
+* VOLU ROTA pour les elements massifs
+  SI (NEL_1 > 0);  
+    MESH3D_1 = VOLU 'ROTA' MESH2D_1 NROTA ANG_ROTA pcentre vrota1;
+    SI FLAGELIM; 
+      ELIM MESH3D_1 xELIM;
+      MESH3D_1 = REGE MESH3D_1;
+    FINSI;
+    MESH3D   = MESH3D  ET  MESH3D_1;
+  FINSI;
+  
+* ROTA pour les elements surfaciques
+  SI (NEL_2 > 0);  
+    MESH3D_2 = ROTA MESH2D_2 NROTA ANG_ROTA pcentre vrota1;
+    SI FLAGELIM; 
+      ELIM MESH3D_2 xELIM;
+      MESH3D_2 = REGE MESH3D_2;
+    FINSI;
+    MESH3D   = MESH3D  ET  MESH3D_2;
+  FINSI;
+
+* les 1ers ELIM servaient aux noeuds en r=0 et en theta=0=360 degres
+* celui-ci aux noeuds communs a MESH3D_1 et MESH3D_2
+  SI FLAGELIM; 
+  SI ((NEL_1 * NEL_2) > 0);
+    ELIM MESH3D_1 MESH3D_2 xELIM;
+  FINSI;
+  FINSI;
+  
+* On range le(s) nouveau(x) maillage(s) 3D
+  TAB1 . 'MAILLAGE_3D_MASSIF' = MESH3D_1;
+  TAB1 . 'MAILLAGE_3D_COQUE'  = MESH3D_2;
+  TAB1 . 'MAILLAGE_3D'        = MESH3D;
+  
+* Reste a calculer les coordonnees 3D
+* pour teta, on evite les pb en r=0 avec un masque    
+  x3D y3D z3D = COOR MESH3D;
+  SI REDRESS;
+    r3D    = ((x3D**2) + (y3D**2))**0.5;
+    xy3D   = (NOMC 'R' r3D) ET (NOMC 'Z' z3d);
+    mask0  = MASQ r3D 'EGINFE' xELIM;
+    teta3D = ATG  y3D  (x3D + mask0);
+  SINON;
+    r3D    = ((x3D**2) + (z3D**2))**0.5;
+    xy3D   = (NOMC 'R' r3D) ET (NOMC 'Z' y3d);
+    mask0  = MASQ r3D 'EGINFE' xELIM;
+    teta3D = ATG (-1.*z3D) (x3D + mask0);
+  FINSI;
+  TAB1 . 'COORDONNEES_3D' = xy3D;
+  TAB1 . 'ANGLE_3D'       = teta3D;  
+
+FINSI;
+
+
+************************************************************************
+*
+*  CHPO VECTEURS : CHAMPS DE | DEPLACEMENTS
+*                            | EFFORTS    
+*
+************************************************************************
+
+* on evite du copier-coller en introduisant la boucle BITER
+NITER =0;
+SI (FLAGDEPL ET FLAGFOR); 
+  NITER = 2;
+  FLAGDEPL = VRAI;
+  FLAGFOR  = FAUX;
+SINON; 
+  SI (FLAGDEPL OU FLAGFOR);
+    NITER =1;
+  FINSI;
+FINSI;
+
+REPE BITER NITER;
+
+  OPTI DIME 3 MODE TRID;
+  SI FLAGDEPL; 
+    ind2D   = mot 'DEPLACEMENTS'; 
+    ind3D   = mot 'DEPLACEMENTS_3D'; 
+    monature= mot 'DIFFUS';
+    mo2d_1  = mot  'UR';
+    mo2d_2  = mot  'UT';
+    mo2d_3  = mot  'UZ';
+    mo2d_4  = mot 'IUR';
+    mo2d_5  = mot 'IUT';
+    mo2d_6  = mot 'IUZ';
+    mo3d_1  = mot  'UX';
+    mo3d_2  = mot  'UY';
+    mo3d_3  = mot  'UZ';
+  FINSI;
+  SI FLAGFOR;
+    ind2D   = mot 'EFFORTS'; 
+    ind3D   = mot 'EFFORTS_3D'; 
+    monature= mot 'DISCRET';
+    mo2d_1  = mot  'FR';
+    mo2d_2  = mot  'FT';
+    mo2d_3  = mot  'FZ';
+    mo2d_4  = mot 'IFR';
+    mo2d_5  = mot 'IFT';
+    mo2d_6  = mot 'IFZ';
+    mo3d_1  = mot  'FX';
+    mo3d_2  = mot  'FY';
+    mo3d_3  = mot  'FZ';
+  FINSI;
+  SI (EXIS TAB1  ind3D); 
+    MESS 'L indice . ' ind3D 'existe deja : on l ecrase !';
+  SINON;
+    TAB1 . ind3D = TABL;  
+  FINSI;
+  
+* il nous faut les cos() et sin() de \theta et n*\theta    
+  cosA1 = cos teta3D;
+  sinA1 = sin teta3D;
+  cosNA = cos (NUMFOUR * teta3D);
+  sinNA = sin (NUMFOUR * teta3D);
+  
+*-----------------------------> BOUCLE SUR LES DEPLACEMENTS
+  NDEP = DIME (TAB1 . ind2D);
+  REPETER LAB2 NDEP; i2 = &lab2;
+  
+    DEP2D = TAB1 . ind2D . i2;
+    NUA2D = NUAG ((CHAN 'ATTRIBUT' xy2D 'NATURE' monature) ET DEP2D);
+    DEP3DFOU = IPOL NUA2D xy3D 'PID' 1. 'ELIM' xELIM;    
+    
+*  serie de Fourier
+   si (ega NUMFOUR 0);
+*     ici, on considere seulement les ddls symetriques pour n=0
+      DEP3D0 = (EXCO DEP3DFOU  mo2D_1 'NOID' mo2D_1)
+             + (EXCO DEP3DFOU  mo2D_2 'NOID' mo2D_2)
+             + (EXCO DEP3DFOU  mo2d_3 'NOID' mo2d_3);
+   sinon;
+      DEP3D0 = ((EXCO DEP3DFOU mo2D_1 'NOID' mo2D_1)*cosNA)
+             + ((EXCO DEP3DFOU mo2D_2 'NOID' mo2D_2)*sinNA)
+             + ((EXCO DEP3DFOU mo2d_3 'NOID' mo2d_3)*cosNA)
+             + ((EXCO DEP3DFOU mo2D_4 'NOID' mo2D_4)*sinNA)
+             + ((EXCO DEP3DFOU mo2D_5 'NOID' mo2D_5)*cosNA)
+             + ((EXCO DEP3DFOU mo2D_6 'NOID' mo2D_6)*sinNA);
+   finsi;
+*  changement de repere
+   si REDRESS;
+      DEP3D1 = ((EXCO DEP3D0 mo2D_1 'NOID' mo3D_1)*cosA1)
+             + ((EXCO DEP3D0 mo2D_1 'NOID' mo3D_2)*sinA1)
+             - ((EXCO DEP3D0 mo2D_2 'NOID' mo3D_1)*sinA1)
+             + ((EXCO DEP3D0 mo2D_2 'NOID' mo3D_2)*cosA1)
+             +  (EXCO DEP3D0 mo2d_3 'NOID' mo3d_3);
+      DEP3D1 = DEP3D1
+             + ((EXCO DEP3D0 mo2D_4 'NOID' mo3D_1)*cosA1)
+             + ((EXCO DEP3D0 mo2D_4 'NOID' mo3D_2)*sinA1)
+             - ((EXCO DEP3D0 mo2D_5 'NOID' mo3D_1)*sinA1)
+             + ((EXCO DEP3D0 mo2D_5 'NOID' mo3D_2)*cosA1)
+             +  (EXCO DEP3D0 mo2D_6 'NOID' mo3d_3);
+   sinon;
+      DEP3D1 = ((EXCO DEP3D0 mo2D_1 'NOID' mo3D_1)*cosA1)
+             - ((EXCO DEP3D0 mo2D_1 'NOID' mo3d_3)*sinA1)
+             - ((EXCO DEP3D0 mo2D_2 'NOID' mo3D_1)*sinA1)
+             - ((EXCO DEP3D0 mo2D_2 'NOID' mo3d_3)*cosA1)
+             +  (EXCO DEP3D0 mo2d_3 'NOID' mo3D_2);
+      DEP3D1 = DEP3D1
+             + ((EXCO DEP3D0 mo2D_4 'NOID' mo3D_1)*cosA1)
+             - ((EXCO DEP3D0 mo2D_4 'NOID' mo3d_3)*sinA1)
+             - ((EXCO DEP3D0 mo2D_5 'NOID' mo3D_1)*sinA1)
+             - ((EXCO DEP3D0 mo2D_5 'NOID' mo3d_3)*cosA1)
+             +  (EXCO DEP3D0 mo2D_6 'NOID' mo3D_2);
+   finsi;
+   
+*  on stocke le nouveau deplacement 3D   
+   TAB1 . ind3D . i2 = CHAN 'ATTRIBUT' DEP3D1 'NATURE' monature;
+
+  FIN LAB2;
+*-----------------------------> FIN DE BOUCLE SUR LES DEPLACEMENTS
+*
+  SI (EGA NITER 2);
+    SI (EGA &BITER 1);
+*     pour la prochaine ITER
+      FLAGDEPL=FAUX;
+      FLAGFOR =VRAI;
+    SINON;
+*     on sort en remettant les valeurs par acquis de conscience
+      FLAGDEPL=VRAI;
+      FLAGFOR =VRAI;
+    FINSI;  
+  FINSI;
+
+FIN BITER;
+
+
+
+************************************************************************
+*
+* CHPO SCALAIRE (ex : PRESSION, EPAISSEUR ...) : CAS |SYMETRIQUE
+*                                                    |ANTI-SYMETRIQUE
+*
+************************************************************************
+
+* on evite du copier-coller en introduisant la boucle BITER
+NITER =0;
+SI (FLAGCHPS ET FLAGCHPA); 
+  NITER = 2;
+  FLAGCHPS = VRAI;
+  FLAGCHPA  = FAUX;
+SINON; 
+  SI (FLAGCHPS OU FLAGCHPA);
+    NITER =1;
+  FINSI;
+FINSI;
+
+REPE BITER NITER;
+
+  OPTI DIME 3 MODE TRID;
+* il nous faut les cos() ou sin() de n*\theta    
+  SI FLAGCHPS;
+    ind2D   = mot 'CHPO_SYME';
+    ind3D   = mot 'CHPO_SYME_3D';
+    cosinNA = cos (NUMFOUR * teta3D);
+  FINSI;
+  SI FLAGCHPA;
+    ind2D   = mot 'CHPO_ANTI';
+    ind3D   = mot 'CHPO_ANTI_3D';
+    cosinNA = sin (NUMFOUR * teta3D);
+  FINSI; 
+  SI (EXIS TAB1  ind3D); 
+    MESS 'L indice . ' ind3D 'existe deja : on l ecrase !';
+  SINON;
+    TAB1 . ind3D = TABL;  
+  FINSI;
+
+*-----------------------------> BOUCLE SUR LES CHPO
+  NCHPS = DIME (TAB1 . ind2D);
+  REPETER LAB3 NCHPS; i3 = &lab3;
+
+    CHP2D  = TAB1 . ind2D . i3 ;
+    LCOMPU = EXTR CHP2D 'COMP';
+    CHP2D  = EXCO CHP2D LCOMPU NUMFOUR;
+    NUA2D  = NUAG (xy2D ET CHP2D);
+    CHP3D  = IPOL NUA2D xy3D 'PID' 1. 'ELIM' xELIM;    
+
+*   serie de Fourier
+    CHP3D = CHP3D * cosinNA;
+    CHP3D = CHAN 'ATTRIBUT' CHP3D 'NATURE' 'DIFFUS';
+*   pas de changement de repere pour des champs scalaires
+
+*   on stocke le champs 3D   
+    TAB1 . ind3D . i3 = CHP3D;
+    
+  FIN LAB3;
+*-----------------------------> FIN DE BOUCLE SUR LES CHPO
+
+  SI (EGA NITER 2);
+    SI (EGA &BITER 1);
+*     pour la prochaine ITER
+      FLAGCHPS=FAUX;
+      FLAGCHPA=VRAI;
+    SINON;
+*     on sort en remettant les valeurs par acquis de conscience
+      FLAGCHPS=VRAI;
+      FLAGCHPA=VRAI;
+    FINSI;  
+  FINSI;
+
+FIN BITER;
+
+
+
+************************************************************************
+* TODO : IL MANQUE LES CHAMPS DE CONTRAINTES ET DE DEFORMATIONS.....
+************************************************************************
+
+
+'FINPROC';
+*

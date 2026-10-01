@@ -1,0 +1,219 @@
+* fichier :  phase_01.dgibi
+optio norm auto;
+************************************************************************
+* Section : Changement_De_Phase Changement_De_Phase
+* Section : Thermique Conduction
+************************************************************************
+
+************************************************************************
+*  Cas test :  phase01.dgibi
+*  --------
+*
+*  Categorie : Verification & Validation (Formule Analytique)
+*  ---------
+*
+*  Description :
+*  -----------
+*  plaque 2D sur laquelle on applique 3 modeles
+*    1- Diffusion de la chaleur
+*    2- Changement de phase THERMIQUE à 'T' =  0°C & Qlat > 0
+*    3- Changement de phase THERMIQUE   'T' =100°C & Qlat > 0
+*    4- Changement de phase THERMIQUE   'T' =-2°C  & Qlat = 0
+*
+*  La temperature initiale est de -20°C
+*
+*  Le point P1 est soumis alternativement a un flux impose positif puis
+*  negatif.
+*
+*  Les 3 phases evoluent simultanement
+*
+*  Validation :
+*  ----------
+*  L'integrale de l'energie injectee par P1 au cours du temps doit etre
+*  egale (a la precision machine pres) a la chaleur reguliere (RHO.CP)
+*  plus la chaleur singuliere de changement de phase (Chaleur latente)
+*
+************************************************************************
+
+
+GRAPH = FAUX;
+'OPTI' 'TRAC' 'PSC';
+'OPTI' 'DIME' 2 'ELEM' 'QUA4' 'MODE' plan ;
+
+*************** Temperature de changement de phase ************************
+T_ch1 = 0.  ;
+lat1  = 1000. * 334.00D3 ;
+T_ch2 = 100.  ;
+lat2  = 1000. * 2264.76D3 ;
+T_ch3 =-2.   ;
+lat3  = 0.D0   ;
+
+*************** Geometrie *************************************************
+P1  =  0.     0.    ;
+P2  =  5.e-3  0.    ;
+P3  =  5.e-3 10.e-3 ;
+P4  =  0.    10.e-3 ;
+
+n   = 20 ;
+L23 = P2 'DROI' n  P3 ;
+L41 = P4 'DROI' n  P1 ;
+L14 ='INVE' L41 ;
+
+PA  ='POIN' L41 'PROC' (0. 2.5e-3) ;
+
+n    = 10 ;
+MQUA4=      ('INVE'  L41) 'REGL' n L23 ;
+MTRI3='CHAN' 'TRI3' (L23  'REGL' n (L23 'PLUS' P2));
+
+su1 = MQUA4 'ET' MTRI3;
+
+MPOI1='CHAN' 'POI1' su1 ;
+MPOI1='POIN' MPOI1 'DROI' P1 P2 1.D-10 ;
+L_BAS='ELEM' ('CONT'  su1) 'APPU' 'STRI' MPOI1;
+
+**************** Modeles et caracteristiques *********************************
+modth1 ='MODE' su1 'THERMIQUE'        'CONDUCTION'               'CONS' 'CON1' ;
+modph1 ='MODE' su1 'CHANGEMENT_PHASE' 'PARFAIT' 'INCO' 'T'  'Q'  'CONS' 'CHP1' ;
+modph2 ='MODE' su1 'CHANGEMENT_PHASE' 'PARFAIT' 'INCO' 'T'  'Q'  'CONS' 'CHP2' ;
+modph3 ='MODE' su1 'CHANGEMENT_PHASE' 'PARFAIT' 'INCO' 'T'  'Q'  'CONS' 'CHP3' ;
+
+modtot = modph1 'ET' modph2 'ET' modph3 'ET' modth1;
+
+rho1   = 4500.    ;
+cp1    = 900.     ;
+cd1    = rho1*cp1 ;
+
+matth1 ='MATE' modth1 'C'    cp1   'K'    50. 'RHO' rho1 ;
+matph1 ='MATE' modph1 'PRIM' T_ch1 'DUAL' lat1 ;
+matph2 ='MATE' modph2 'PRIM' T_ch2 'DUAL' lat2 ;
+matph3 ='MATE' modph3 'PRIM' T_ch3 'DUAL' lat3 ;
+
+mattot = matth1 'ET' matph1 'ET' matph2 'ET' matph3 ;
+
+
+*************** Pas de temps "grossier" et fin ********************************
+* Durée totale
+TT1 = 1.2  ;
+TT2 = 2.0  ;
+dt1 = 0.1  ;
+*
+* pas de temps du début "grossier" jusqu'à Temps1 et ensuite fin jusqu'à Temps2 ;
+*
+Temps1 = 0.350e-3 ;
+Temps2 = 0.378e-3 ;
+Temps3 = 0.385e-3 ;
+*  pv: dt1 bricole a cause de difficulte de convergence
+dt1 = dt1 * 2.;
+listT  = prog 0. 'PAS' dt1 TT1 'PAS' dt1 TT2;
+n1     = DIME listT ;
+
+K1     = 1.D0 ;
+K2     =-1.D0 ;
+EvS    = EVOL MANU 'TEMP' (PROG 0. TT1 (TT1+1.D-12) TT2) 'SOUR' (PROG K1 K1 K2 K2);
+'SI' GRAPH;
+  'DESS' EvS 'TITR' 'Evolution chargement';
+'FINS';
+
+T_ini ='MANU' 'CHPO' su1 1 'T'  -20. 'NATURE' 'DIFFUS' ;
+P_ini ='ZERO' modtot 'VARINTER' ;
+
+'SI' GRAPH ;
+  'TRAC' su1 T_ini 'TITR' 'Temperature initiale' ;
+'FINS';
+
+* CHARGEMENT
+srcth1  ='MANU' 'CHPO' ('MANU' 'POI1' P1) 1 'Q' 5.D4 ;
+charth1 ='CHAR' 'Q'  srcth1 EvS ;
+
+chartot = charth1  ;
+
+* PASAPAS
+xtab                       = TABL    ;
+xtab.'TEMPERATURES'        = table   ;
+xtab.'TEMPERATURES' . 0    = T_ini   ;
+*xtab.'CELSIUS'             = VRAI    ;
+*xtab.'PROPORTIONS_PHASE'   = TABL    ;
+*xtab.'PROPORTIONS_PHASE'. 0= P_ini   ;
+xtab.'MODELE'              = modtot  ;
+xtab.'CARACTERISTIQUES'    = mattot  ;
+xtab.'CHARGEMENT'          = chartot ;
+xtab.'TEMPS_CALCULES'      = listT   ;
+*xtab.'PROCESSEURS'         ='MONOPROCESSEUR' ;
+
+PASAPAS xtab ;
+
+* POST-TRAITEMENT
+*'OPTI' 'EPTR' 10 ;
+csu1   ='CONT' su1 ;
+MCHLAT ='EXCO' mattot 'DUAL' 'PPHA' ;
+
+NSAUV ='DIME' xtab.'TEMPERATURES' ;
+
+LTEMP=VIDE 'LISTREEL' ;
+LTPS =VIDE 'LISTREEL' ;
+Pmoy1=VIDE 'LISTREEL' ;
+Pmoy2=VIDE 'LISTREEL' ;
+Pmoy3=VIDE 'LISTREEL' ;
+
+LISOV=PROG 0. 'PAS' 0.01 3. ;
+
+REPE SURI NSAUV;
+  II   =&SURI ;
+  TPSi = xtab.'TEMPS'            . (II-1) ;
+  TEMPi= xtab.'TEMPERATURES'     . (II-1) ;
+  PROPi= xtab.'PROPORTIONS_PHASE'. (II-1) ;
+
+  TEMPi='EXCO' TEMPi 'T'  'T' ;
+  T1   ='EXTR' TEMPi 'T'   PA ;
+
+  PMi1 ='INTG' modph1 PROPi ;
+  PMi2 ='INTG' modph2 PROPi ;
+  PMi3 ='INTG' modph3 PROPi ;
+
+  LTPS =LTPS  'ET' TPSi ;
+  LTEMP=LTEMP 'ET' T1   ;
+  Pmoy1=Pmoy1 'ET' PMi1 ;
+  Pmoy2=Pmoy2 'ET' PMi2 ;
+  Pmoy3=Pmoy3 'ET' PMi3 ;
+
+  PROP_SOMME =('REDU' PROPi modph1) + ('CHAN' ('REDU' PROPi modph2) 'CONS' 'CHP1') + ('CHAN' ('REDU' PROPi modph3) 'CONS' 'CHP1');
+ 'TRAC' PROP_SOMME modph1 'TITR' ('CHAI' 'Proportion sommee :' TPSi 's') LISOV ;
+'FIN' SURI;
+
+EVO2 = 'EVOL' 'ROUG' 'MANU' 'Tps' LTPS 'TPA ' LTEMP ;
+EVO3 =('EVOL' 'BLEU' 'MANU' 'Tps' LTPS 'PMO1' Pmoy1) 'ET'
+      ('EVOL' 'BOUT' 'MANU' 'Tps' LTPS 'PMO2' Pmoy2) 'ET'
+      ('EVOL' 'BRIQ' 'MANU' 'Tps' LTPS 'PMO3' Pmoy3) ;
+'DESS' EVO2 ('CHAI' 'Temperature   au point PA au cours du temps');
+'DESS' EVO3 ('CHAI' 'Moyennes des proportions de phase au cours du temps');
+
+* Bilan d'energie :
+E_ext  ='MAXI' ('RESU' ((K1*srcth1*TT1) + (K2*srcth1*(TT2-TT1)))) ;
+E_reg  ='INTG' modth1 ('CHAN' 'CHAM' modth1 (rho1 * cp1 * (TEMPi - T_ini))) ;
+MCHLA1 ='REDU' modph1  MCHLAT ;
+DELTA1 ='REDU' modph1 (PROPi - P_ini) ;
+E_sing1='INTG' modph1 (MCHLA1 * DELTA1) 'PPHA' ;
+MCHLA2 ='REDU' modph2  MCHLAT ;
+DELTA2 ='REDU' modph2 (PROPi - P_ini) ;
+E_sing2='INTG' modph2 (MCHLA2 * DELTA2) 'PPHA' ;
+
+
+'SI'(E_ext 'NEG' 0.D0);
+  ERR1 =(E_ext - (E_reg + E_sing1 + E_sing2)) / E_ext ;
+'SINO';
+  ERR1 = E_ext - (E_reg + E_sing1 + E_sing2) ;
+'FINS';
+
+ CHAI1 ='CHAI' E_ext ' =?' (E_reg + E_sing1 + E_sing2) ' |' ERR1 ;
+'MESS' CHAI1 ;
+'SI' (('ABS' ERR1) >EG 1.D-14);
+   'ERRE' 5 ;
+'FINS';
+
+'FIN';
+ 
+
+ 
+
+ 
+

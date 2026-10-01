@@ -1,0 +1,10 @@
+=== Cas 41 : g_c_etoile_coque_1 (coque visco) ===
+Valeurs comparees : 402
+Temps horloge (ms) : origine 103475 ; niveau 1 47694 ; niveau 2 47359
+Acceleration par rapport a l origine : niveau 1   2.17 ; niveau 2   2.18
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 0
+Niveau 1 : raideur reutilisee 0 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 0 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

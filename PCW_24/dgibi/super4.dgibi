@@ -1,0 +1,179 @@
+* fichier : super4.dgibi
+* section : thermique conduction convection
+*----------------------------------------------------------------------*
+*                     S U P E R 4 . D G I B I                          *
+*----------------------------------------------------------------------*
+* Objet :                                                              
+* -------
+*
+*    Exemple d'utilisation du SUPERELEMENT, option MASSE, en thermique
+* transitoire sur un probleme avec conduction & convection.
+*
+*    En transitoire, la solution obtenue avec le superelement utilise
+* une capacite equivalente qui ne peut qu'approcher la solutione exacte.
+* L'erreur comise dans ce cas est d'autant plus grande que le temps
+* caracteristique du transitoire est faible.
+*
+*    La resolution du probleme de thermique transitoire est faite sur
+* un maillage contenant 2 elements finis. La condensation statique du
+* probleme porte sur l'element 2. Une description du probleme traite
+* est proposee ci-dessous. Les solutions obtenues avec et sans super-
+* -element sont comparees.
+*
+* Description :
+* -------------
+*
+* Type de calcul : Thermique trasitoire conduction + convection
+* Mode de calcul : 2D
+* Type d'element : QUA8
+* Chargement     : Temperature et flux imposes,
+*                  Echange par convection avec milieu a Text
+* Reference      : Comparaison des solutions avec et sans superelement
+* Objectif       : Ecart relatif < 5 %
+*
+* Ilustration :
+* -------------
+*
+* Temperature initiale : Tini = 20
+* ----------------------
+*
+*    Flux impose
+*    -----------
+*      q = 10.e3
+*      ^ ^ ^ ^
+*      | | | |
+*      _______ 
+*     |       | |>
+*     |       | | 
+*     |  s2   | |>   Echange par convection
+*     |       | |    ----------------------
+*     |-------| |>     h = 20, Tc = 20
+*     |       | | 
+*     |  s1   | |>
+*     |       | |
+*     |_______| |>
+*      x x x x
+*      T = 20
+*  -------------------
+*  Temperature imposee
+*
+*----------------------------------------------------------------------*
+*
+* Pour affichage, mettre IG1 a vrai :
+ig1      = faux ;
+
+*------------------------------ Maillage ------------------------------*
+
+opti dime 2 elem qua8 ; 
+  
+* 1er domaine :
+a        = 0.1 ;
+l1       = (0 0) droi 1 (a 0) ; 
+s1       = l1 tran 1 (0 a) ; 
+l2       = s1 cote 2 ; 
+l3       = s1 cote 3 ; 
+  
+* 2e domaine :
+s2       = l3 tran 1 (0 a) ; 
+l5       = s2 cote 4 ; 
+l6       = s2 cote 3 ; 
+
+* Affichage :
+si ig1 ;
+  trac (s1 et s2) qual ;
+fins ;
+  
+* Domaine complete :
+s0       = s1 et s2 ; 
+  
+*------------------------------- Modele -------------------------------*
+
+* Modele - Caracteristiques :
+mo1      = mode s1 thermique ; 
+mo2      = mode s2 thermique ; 
+ma1      = mate mo1 'K' 25. 'RHO' 7.5e3 'C' 400. tini 20. ; 
+ma2      = mate mo2 'K' 25. 'RHO' 7.5e3 'C' 400. tini 20. ;
+
+moc1     = mode l2 thermique convection ; 
+moc2     = mode l5 thermique convection ; 
+mac1     = mate moc1 h 20. 'TC' 20. ;
+mac2     = mate moc2 h 20. 'TC' 20. ;
+  
+* Chargement (flux) :
+q1       = flux mo1 l1 10.e3 ; 
+ev1      = evol manu temp (prog 0. 1.e6) (prog 1. 1.) ;
+cg1      = char  'Q'   q1 ev1 ;
+
+*------------------------ Resolution sans SUPE ------------------------*
+
+* Liste temps calcules :
+ltca1    = prog 0. pas 200. 7200. ;
+
+* Table PASAPAS :
+ta1                     = tabl ;
+ta1.modele              = mo1 et mo2 et moc1 et moc2 ;
+ta1.caracteristiques    = ma1 et ma2 et mac1 et mac2 ;
+ta1.chargement          = cg1 ;
+ta1.temps_calcules      = ltca1 ;
+
+pasapas ta1 ;
+
+* Affichage solution sans SUPE :
+if1      = dime ta1.temperatures - 1 ;
+cht1     = ta1.temperatures.if1 ;
+si ig1 ;
+  trac cht1 s0 titr 'Temperature solution sans SUPE' ;
+fins ;
+
+*------------------------ Resolution avec SUPE ------------------------*
+*
+* Construction superelement, conductivites et capacites equivalentes :
+k2       = cond mo2 ma2 ;
+kc2      = cond moc2 mac2 ;
+cp2      = capa mo2 ma2 ;
+qc2      = conv moc2 mac2 'T' 20. ;
+
+su1      = supe rigidite (k2 et kc2) l3 ;
+ksu1     = extr su1 rigi ;
+csu1     = supe  masse su1 cp2 ;
+qsu1     = supe charge su1 qc2 ;
+cgsu1    = char 'Q' qsu1 ev1 ;
+
+* Table PASAPAS :
+ta2                     = tabl ;
+ta2.modele              = mo1 et moc1 ;
+ta2.caracteristiques    = ma1 et mac1 ;
+ta2.chargement          = cg1 et cgsu1 ;
+ta2.conductivite_constante = ksu1 ;
+ta2.capacite_constante  = csu1 ;
+ta2.temps_calcules      = ltca1 ;
+
+pasapas ta2 ;
+
+* Affichage solution avec SUPE :
+if1      = dime ta2.temperatures - 1 ;
+chtsu1   = ta2.temperatures.if1 ;
+si ig1 ;
+  trac (chtsu1 - (redu cht1 s1)) s1 titr 'Difference solutions avec-sans SUPE sur partie non condensee' ;
+fins ;
+
+chtsu1   = supe depla su1 chtsu1 (q1 et qc2) ;
+si ig1 ;
+  trac (chtsu1 - cht1) s0 titr 'Difference solutions avec-sans SUPE' ;
+  trac chtsu1 s0 titr 'Temperature solution avec SUPE' ;
+fins ;
+
+*------------------------- Test de validation -------------------------*
+
+err1     = maxi abs (cht1 - chtsu1) / (maxi abs cht1) ;
+
+list err1 ;
+si (err1 > 0.05) ;
+ erre 5 ;
+fins ;
+
+fin ;
+ 
+
+ 
+

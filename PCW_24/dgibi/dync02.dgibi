@@ -1,0 +1,357 @@
+* fichier : dync02.dgibi
+*
+************************************************************************
+*
+* Calcul d'un rotor de type Jeffcott avec contact frottant
+* avec la methode HBM (DYNC)
+*
+*                 ___                           ^ Z
+*                 _|_ kc,mu                     |__
+*               _______  jeu                    |_ \_ 
+*   |   k,c    |       |                        | \  \
+*   |----------|   m   |----------|             +--|--|-----> Y
+*   |          |_______|                           R  R+jeu
+*                 ___    jeu                       
+*                 _|_ kc,mu
+*                
+*  ^ Z
+*  |
+*  +----> X
+*  
+*
+* Ref : [Xie et al., MSSP, 2015]
+* Auteur : PBZ CEA-ENSTA, 2020-07-07
+*
+************************************************************************
+ 
+ 
+*********************************************************************
+* OPTIONS GENERALES
+*********************************************************************
+
+  OPTI DIME 3 ELEM SEG2 ;
+  OPTION 'TRAC' 'PSC' 'EPTR' 8 'POTR' 'HELVETICA_16';
+
+  
+*********************************************************************
+*     PARAMETRES 
+*********************************************************************
+
+* nombre de modes a calculer
+  NMODE = 2;
+* nombre de harmoniques a calculer et NFFT
+  NHBM = 7;
+  NFFT = 256;
+
+* mu de frottement  
+*  mu = 0.05;
+  mu = 0.2;
+
+  
+*********************************************************************
+*     DEFINITION DU MODELE 
+*********************************************************************
+ 
+* rotor data
+  m = 1.  ;
+  k = 100.;
+  c = 5.  ;
+  jeu  = 0.105;
+  R = 20.*jeu ;
+  ebal = 0.1;
+*   Fbal = ebal * m * (Omega**2) ; avec Omega = vitesse de rotation en rad/s
+ 
+* contact parameters
+  kchoc= 25. * k;
+  mu_s = mu;
+  mu_d = mu;
+  si (mu_s < mu_d); erreur 21; finsi;
+  Kt = 10.*kchoc;
+  Ct = 0.5*(m*Kt)**0.5;
+ 
+* deduced parameter
+  w   = (k/m)**0.5;                 
+  wHz = w / (2.*pi);
+  wchoc = (kchoc/m)**0.5;           
+  xi  = 0.5 * c / ((kchoc*m)**0.5); 
+  mess 'w=' w '(' wHz ')Hz < wchoc=' wchoc; 
+  mess 'xi=' xi;
+ 
+* critical timestep (Diff Centrees, no damping)
+  wadhe = ((k+Kt)/m)**0.5;
+  dtc = 2. / wadhe;
+ 
+* !!! on adimensionne apres !!! 
+
+
+************************************************************************
+*                       BASE MODALE 
+************************************************************************
+ 
+* point physique
+  p1 = 0. 0. 0.;
+ 
+* base modale = 2 modes
+  palfa1 = 0. 0. 0.;
+  phi1 = MANU 'CHPO' p1 3 'UX' 0. 'UY' 1. 'UZ' 0. 'NATURE' 'DIFFUS';
+  palfa2 = 0. 0. 0.;
+  phi2 = MANU 'CHPO' p1 3 'UX' 0. 'UY' 0. 'UZ' 1. 'NATURE' 'DIFFUS';
+ 
+  TBAS = TABL 'BASE_MODALE';
+  TBAS . 'MODES' = TABL 'BASE_DE_MODES'; 
+  TBAS . 'MODES' . 1 = TABL 'MODES';
+  TBAS . 'MODES' . 1 . 'POINT_REPERE'      = palfa1;
+  TBAS . 'MODES' . 1 . 'FREQUENCE'         = wHz/wchoc;
+  TBAS . 'MODES' . 1 . 'MASSE_GENERALISEE' = 1.;
+  TBAS . 'MODES' . 1 . 'DEFORMEE_MODALE'   = phi1;
+  TBAS . 'MODES' . 2 = TABL 'MODES';
+  TBAS . 'MODES' . 2 . 'POINT_REPERE'      = palfa2;
+  TBAS . 'MODES' . 2 . 'FREQUENCE'         = wHz/wchoc;
+  TBAS . 'MODES' . 2 . 'MASSE_GENERALISEE' = 1.;
+  TBAS . 'MODES' . 2 . 'DEFORMEE_MODALE'   = phi2;
+
+ 
+************************************************************************
+*                       AMORTISSEMENT 
+************************************************************************
+ 
+  TAMOR = TABL 'AMORTISSEMENT';
+  Ctot = MANU 'RIGIDITE' 'TYPE' 'AMORTISSEMENT' 
+        (palfa1 et palfa2) (MOTS 'ALFA') (prog (c / (m*wchoc)));
+  TAMOR . 'AMORTISSEMENT' = Ctot  ;
+ 
+ 
+************************************************************************
+*                           LIAISONS 
+************************************************************************
+ 
+* contact-frottant point_cercle_frottement
+  TL1 = TABL 'LIAISON_ELEMENTAIRE';
+  TL1 . 'TYPE_LIAISON' = mot 'POINT_CERCLE_FROTTEMENT';
+  TL1 . 'SUPPORT'      = p1;
+  TL1 . 'NORMALE'      = (1. 0. 0.) ;
+  TL1 . 'EXCENTRATION' = (0. 0. 0.) ;
+  TL1 . 'RAIDEUR'      = 1.;
+  TL1 . 'RAYON'        = 1. ;
+  TL1 . 'COEFFICIENT_GLISSEMENT' = mu_d;
+  TL1 . 'COEFFICIENT_ADHERENCE'  = mu_s;
+  TL1 . 'RAIDEUR_TANGENTIELLE'    = -1.*Kt;
+*  TL1 . 'AMORTISSEMENT_TANGENTIEL'= Ct;
+  TL1 . 'AMORTISSEMENT_TANGENTIEL'= 1.E-4;
+  TL1 . 'VITESSE_ENTRAINEMENT'    = 0. ;
+*  TL1 . 'VITESSE_ENTRAINEMENT'    = -1.*R*Omega;
+  
+* stockage  
+  TLB  = TABL 'LIAISON_B';
+  TLB . 1 = TL1;
+  TLIA = TABL 'LIAISON';
+  TLIA . 'LIAISON_B' = TLB; 
+ 
+ 
+************************************************************************
+*                           CHARGEMENT
+************************************************************************
+
+  Fbal = ebal*m/(m*jeu) ;
+  Fchpo_Y  = MANU 'CHPO' 1 palfa1 'FALF' Fbal;
+  Fchpo_Z  = MANU 'CHPO' 1 palfa2 'FALF' Fbal;
+*+++ BALOURD == 1 pour ajouter w**2 a Fbal  
+
+
+*********************************************************************
+*     CALCUL NON LINEAIRE
+*********************************************************************
+
+* chargement spatial : GFC1
+      TAB_CHAR = TABLE 'CHARGEMENT';
+      TAB_CHAR .  1 =  Fchpo_Y;
+      TAB_CHAR . -1 =  Fchpo_Z;
+*Pour ajouter w**2 dans la definition du chargement      
+      TAB_CHAR . 'BALOURD' = 1;
+
+* Approximation pour la solution initiale à fréquence fixe       
+      VEC_INIT = TABLE 'INITIAL';
+      VEC_INIT . 'FREQUENCE' = 0.5/wchoc ;
+*      VEC_INIT . 3 = 0.1;
+      
+* Paramètres numériques pour la continuation
+      PAR_NUM = TABLE 'PARAMETRES_NUMERIQUES';
+      PAR_NUM . 'TYPE'    = MOT 'FORC';
+      PAR_NUM . 'VAL_FIN' = 60./wchoc;
+      PAR_NUM . 'DS0'     =   0.01;
+*      PAR_NUM . 'DSMAX'   =   0.1;
+      PAR_NUM . 'DSMAX'   =   0.025;
+      PAR_NUM . 'DSMIN'   =  1.E-4;
+      PAR_NUM . 'ITERMOY' =    3.4;  
+      PAR_NUM . 'ITERMAX'    =     20;
+      PAR_NUM . 'ANGLE_MIN'  =     0.;
+      PAR_NUM . 'ANGLE_MAX'  =    40.;
+      PAR_NUM . 'ISENS'     =   1.;
+       PAR_NUM . 'NBPAS'     =    2000;
+*      PAR_NUM . 'NBPAS'     =    200;
+      PAR_NUM . 'TOLERANCE' = 1.E-7;
+*      PAR_NUM . 'CALC_JAC'  =  VRAI;       
+      PAR_NUM . 'CALC_JAC'  =  FAUX;       
+
+*----------------------------------------------------------------------*
+* Appel a l'operateur 
+* opti impi 2;
+ opti impi 1;
+      TCON = DYNC TBAS TAB_CHAR TLIA TAMOR VEC_INIT PAR_NUM
+                        NHBM NFFT;
+ opti impi 0;
+*----------------------------------------------------------------------*   
+
+
+************************************************************************
+*  POST-TRAITEMENT
+************************************************************************
+
+* COURBE DE REPONSE
+* -----------------
+
+* frequence
+  FREQ = TCON . 'REPONSE' . 'FREQUENCE';
+* MAX de la NORME2 des COEFFICIENTS de FOURIER pour chaque freq      
+  AMPS = TCON . 'REPONSE' . 'NORME_DEPLACEMENT';
+* evolution
+  XY = EVOL MANU '\w' FREQ  '|Q|' AMPS; 
+  
+* stabilite      
+  STAB = TCON . 'REPONSE' . 'STABILITE';
+  TABSTB = TABLE;
+  TABSTB . 'LIGNE_VARIABLE' = TABL ENTI;
+  TABSTB . 'LIGNE_VARIABLE' . 1 = STAB;  
+
+  TITR 'Jeffcott : courbe de reponse';
+  DESS XY TABSTB ;
+  DESS XY TABSTB XBOR 0.14 0.16 ;
+
+  
+* BIFURCATIONS
+* ------------
+
+* recup
+  NBIF = DIME TCON . 'BIFURCATION' . 'TYPE';
+  prLP_Q = PROG;  prLP_w = PROG;
+  prBP_Q = PROG;  prBP_w = PROG;
+  prPD_Q = PROG;  prPD_w = PROG;
+  prNS_Q = PROG;  prNS_w = PROG;
+  REPE BBIF NBIF;
+    typbif = EXTR TCON . 'BIFURCATION' . 'TYPE'               &BBIF;
+    Qbif   = EXTR TCON . 'BIFURCATION' . 'NORME_DEPLACEMENT'  &BBIF;
+    wbif   = EXTR TCON . 'BIFURCATION' . 'FREQUENCE'          &BBIF;
+    SI (EGA typbif 'LP'); prLP_Q = prLP_Q et Qbif; prLP_w = prLP_w et wbif; FINSI;
+    SI (EGA typbif 'BP'); prBP_Q = prBP_Q et Qbif; prBP_w = prBP_w et wbif; FINSI;
+    SI (EGA typbif 'PD'); prPD_Q = prPD_Q et Qbif; prPD_w = prPD_w et wbif; FINSI;
+    SI (EGA typbif 'NS'); prNS_Q = prNS_Q et Qbif; prNS_w = prNS_w et wbif; FINSI;
+  FIN  BBIF;
+
+* creation d'1 evolution + table de dessin
+  ibif  = 1;
+  evBIF = VIDE 'EVOLUTIO';
+* Limit Point
+  si ((dime prLP_w) > 0);  ibif = ibif + 1;
+    evLP = EVOL MANU LEGE 'LP' '\w' prLP_w '|Q|' prLP_Q;
+    evBIF = evBIF et evLP;
+    TABSTB . ibif = MOT 'NOLI MARQ LOSA';
+  finsi;
+* Branch Point
+  si ((dime prBP_w) > 0);  ibif = ibif + 1;
+    evBP = EVOL MANU LEGE 'BP' '\w' prBP_w '|Q|' prBP_Q;
+    evBIF = evBIF et evBP;
+    TABSTB . ibif = MOT 'NOLI MARQ CARR';
+  finsi;
+* Period Doubling Point
+  si ((dime prPD_w) > 0);  ibif = ibif + 1;
+    evPD = EVOL MANU LEGE 'PD' '\w' prPD_w '|Q|' prPD_Q;
+    evBIF = evBIF et evPD;
+    TABSTB . ibif = MOT 'NOLI MARQ TRID';
+  finsi;
+* Neimark Sacker Point
+  si ((dime prNS_w) > 0);  ibif = ibif + 1;
+    evNS = EVOL MANU LEGE 'NS' '\w' prNS_w '|Q|' prNS_Q;
+    evBIF = evBIF et evNS;
+    TABSTB . ibif = MOT 'NOLI MARQ TRIU';
+  finsi;
+
+  DESS (XY ET evBIF )TABSTB 'TITR' 'Jeffcott : courbe de reponse + bifurcations';
+ 
+
+* STABILITE via les EXPOSANTS DE FLOQUET
+* --------------------------------------
+
+* On assigne une couleur aux exposants de FLOQUET et on leur assigne une couleur
+  TEXP_R = TCON . 'REPONSE' . 'EXPOSANT_REEL';
+  TEXP_I = TCON . 'REPONSE' . 'EXPOSANT_IMAGINAIRE';
+  exp_R = VIDE 'EVOLUTIO';
+  exp_I = VIDE 'EVOLUTIO';
+   coco = MOTS 'ROUG' 'BLEU' 'VERT' 'AZUR' 'ORAN' 'VIOL' 'TURQ' ;
+  repe bexp;
+    si (non (exis TEXP_R &bexp)); quit bexp ; finsi;
+    coco_i = EXTR coco &bexp;
+    exp_R = exp_R ET (evol coco_i 'MANU' '\w' FREQ '\m_{R}' TEXP_R . &bexp);
+    exp_I = exp_I ET (evol coco_i 'MANU' '\w' FREQ '\m_{I}' TEXP_I . &bexp);
+  fin bexp;
+  
+  TITRE 'Jeffcott : exposants de Floquet';
+  DESS exp_R ;
+  DESS exp_I ;
+
+  
+* REPONSE DE L'HARMONIQUE 1 
+* -------------------------
+* evolution de l'harmonique 1 des modes en y et en z
+  j = 1;
+  y1 = TCON . REPONSE . COEFFICIENTS . j . palfa1;
+  z1 = TCON . REPONSE . COEFFICIENTS . j . palfa2;
+  ev1 = (EVOL 'AZUR' 'MANU' 'LEGE' 'mode 1 (y)' '\w'  FREQ 'Q^{j=1}' y1)
+    et (EVOL 'ORAN' 'MANU' 'LEGE' 'mode 2 (Z)' '\w'  FREQ 'Q^{j=1}' Z1);
+  DESS ev1 'TITR' 'Jeffcott : Reponse de l harmonique 1 des 2 modes' LEGE SO;
+
+  
+************************************************************************
+* TEST DE BON FONCTIONNEMENT
+************************************************************************
+
+* listreel des erreurs
+  prERR = PROG;
+  
+* amplitude max et w correspondant a la 1ere resonance (harmonique 1)
+  wref1 = 0.8860;
+  Qref1 = 4.5324;
+  imax1 wmax1 Qmax1 = MAXI XY;
+  prERR = prERR et (wmax1 - wref1) et (Qmax1 - Qref1);
+  
+* nombre et/ou type et/ou localisation des bifurcations
+  wrefNS = 0.28929;
+  QrefNS = 1.5662 ;
+  wNS = EXTR prNS_w 1;
+  QNS = EXTR prNS_Q 1;
+  prERR = prERR et (wNS - wrefNS) et (QNS - QrefNS);
+  
+* test
+  ERRMAX = MAXI prERR 'ABS';
+  SI (ERRMAX > 0.05);
+    LIST prERR;opti donn 5 trac X;
+    ERRE 5;
+  FINSI;
+
+
+
+************************************************************************
+* PERFORMANCES
+************************************************************************
+  TEMP IMPR MAXI CPU;
+
+* opti donn 5 trac X;
+FIN ; 
+
+ 
+
+ 
+
+ 
+
+ 
+

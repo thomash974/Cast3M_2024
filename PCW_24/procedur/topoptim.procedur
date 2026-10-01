@@ -1,0 +1,229 @@
+$$$$ TOPOPTIM
+* TOPOPTIM  PROCEDUR  FD218221  23/11/29    21:15:13     11799          
+
+************************************************************************
+** Topology optimization procedure.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 3.0 2021/04/15 Improving the structure of TOPOPTIM for developers
+**                and adding a new filtering function.
+** 2.4 2021/04/14 Fixing an issue with TET4 in frozen area
+** 2.3 2021/03/19 Modification of default value of 'OC_L2'
+** 2.2 2018/02/09 Make it compatible with the new version of TOPOSAUV
+**                allowing early stop and restart of the optimization
+** 2.1 2017/11/11 Compliant mechanism output displacement maximization
+** 2.0 2017/04/18 Geometric restrictions, non-linear, multiobjective,
+**                multiphysic, customizable topology optimization
+** 1.1 2015/11/02 Check if volume fraction > proportion of frozen area
+** 1.0 2014/04/28 Linear mono-objective topology optimization
+************************************************************************
+
+DEBP TOPOPTIM tab0*'TABLE' ;
+
+SAUT 3 'LIGN' ;
+MESS '+-----------------------------------------------------------------------------+' ;
+MESS '|                                                                             |' ;
+MESS '|                                                                             |' ;
+MESS '|                            DEBUT DE LA PROCEDURE                            |' ;
+MESS '|                                                                             |' ;
+MESS '|    ______  ______   ______  ______   ______  ______  __   __    __          |' ;
+MESS '|   /\__  _\/\  __ \ /\  == \/\  __ \ /\  == \/\__  _\/\ \ /\ =-./  \  v3.0   |' ;
+MESS '|   \/_/\ \/\ \ \/\ \\ \  _-/\ \ \/\ \\ \  _-/\/_/\ \/\ \ \\ \ \-./\ \  ----  |' ;
+MESS '|      \ \_\ \ \_____\\ \_\   \ \_____\\ \_\     \ \_\ \ \_\\ \_\ \ \_\       |' ;
+MESS '|       \/_/  \/_____/ \/_/    \/_____/ \/_/      \/_/  \/_/ \/_/  \/_/       |' ;
+MESS '|         _______________________________________________________________     |' ;
+MESS '|        /\______________________________________________________________\    |' ;
+MESS '|        \/______________________________________________________________/    |' ;
+MESS '|                                                                             |' ;
+MESS '|                                                                             |' ;
+MESS '+-----------------------------------------------------------------------------+' ;
+SAUT 1 'LIGN' ;
+
+
+* Preprocessing
+* *************
+TOPOBOOT tab0 ;
+
+* Information
+* ***********
+TOPOINFO tab0 ;
+
+* Tables
+wtab0 = tab0.'WTABLE' ;
+bool0 = wtab0.'BOOL' ;
+
+* Initializations
+Lstobj0 = PROG ; Lstchg0 = PROG ; Lstp0 = PROG ; Lstq0 = PROG ; Lstnbel0 = LECT ;
+
+**********************************************************************
+*                         OPTIMIZATION LOOP                          *
+**********************************************************************
+REPE loop0 (tab0.'MAX_CYCLES' - wtab0.'CYCLE' + 1) ;
+
+*   Initializations
+    xOld0 = wtab0.'TOPOLOGIE' ;
+    wtab0.'OBJECTIF' = 0.0 ;
+    wtab0.'SENSIBILITE' = wtab0.'ZERO'.(1) ;
+
+*   Update factor values
+*   ********************
+    TOPOFCTR Tab0 ;
+
+*   Density fields
+*   **************
+    TOPODENS Tab0 ;
+
+*   Mesh, model, material and contact of active zone
+*   ************************************************
+    TOPOACTI Tab0 ;
+
+*   Solve FE problem(s)
+*   *******************
+    TOPORESO tab0 ;
+
+*   User defined procedure
+*   **********************
+    SI tab0.'PROCEDURE_TOPOPERS' ; TOPOPERS tab0 ; FINS ;
+
+*   Calculate the objective value and the sensitivity field
+*   *******************************************************
+    TOPOSENS tab0 ;
+
+*   Add some restrictions
+*   *********************
+    SI bool0.'RESTRICTIONS' ; TOPORSTR tab0 ; FINS ;
+
+*   Sensitivity filtering
+*   *********************
+    TOPOFILT tab0 ;
+
+*   Topology update
+*   ***************
+    TOPOLOGY tab0 ;
+
+*   Compute the change
+    wtab0.'CHANGE' = MAXI (ABS (wtab0.'TOPOLOGIE' - xOld0)) ;
+*   Number of active elements
+    nbel0 = NBEL wtab0.'MAILLAGE'.'A' ;
+*   Save progression information
+    Lstobj0  = Lstobj0  ET wtab0.'OBJECTIF' ;
+    Lstchg0  = Lstchg0  ET wtab0.'CHANGE' ;
+    Lstp0    = Lstp0    ET wtab0.'FACTEUR_P' ;
+    Lstq0    = Lstq0    ET wtab0.'FACTEUR_Q' ;
+    Lstnbel0 = Lstnbel0 ET nbel0 ;
+
+*   Save output data
+*   ****************
+    TOPOSAUV tab0 ;
+
+*   Save the number of the last completed cycle
+    tab0.'CYCLE' = wtab0.'CYCLE' ;
+
+*   Plot to screen
+    SI tab0.'TRAC' ;
+        tmp1 = wtab0.'TOPOLOGIE' ;
+        SI bool0.'ZONE_FIGEE' ;
+            tmp1 = tmp1 + wtab0.'UN'.(2) ;
+        FINS ;
+        SI bool0.'MECANIQUE' ;
+            tmp2 = wtab0.'MECANIQUE'.'MODELE'.'A' ;
+        SINO ;
+            tmp2 = wtab0.'THERMIQUE'.'MODELE'.'A' ;
+        FINS ;
+        tmp1 = REDU tmp1 tmp2 ;
+        SI ((NON bool0.'CAS_MULTIPLES') ET (NON bool0.'MECANISME') ET bool0.'MECANIQUE' ET bool0.'PASAPAS') ;
+            tmp1 tmp2 = tmp1 tmp2 PLUS wtab0.'RESOLUTION'.'A'.'DEPLACEMENTS'.(wtab0.'NB_PAS') ;
+        FINS ;
+        TRAC tmp1 tmp2 (PROG 0.0 'PAS' (1.0 / 56.0) 1.0) 'NCLK' ;
+    FINS ;
+
+*   Write progression to screen
+    SI (NON bool0.'PASAPAS') ;
+        MESS (CHAI wtab0.'CYCLE'*6 ' ' '|'
+                   'FORMAT' '(ES14.7E2)' wtab0.'OBJECTIF' '|'
+                   'FORMAT' '(ES14.7E2)' wtab0.'CHANGE' '|'
+                   'FORMAT' '(ES14.7E2)' wtab0.'FACTEUR_P' '|'
+                   'FORMAT' '(ES14.7E2)' wtab0.'FACTEUR_Q' '|'
+                   nbel0*77) ;
+    FINS ;
+
+*   Convergence test
+    SI ((wtab0.'CHANGE' < tab0.'CRITERE') OU (EGA wtab0.'CYCLE' tab0.'MAX_CYCLES')) ;
+        tab0.'CONVERGENCE' = wtab0.'CHANGE' < tab0.'CRITERE' ;
+        QUIT loop0 ;
+    FINS ;
+
+*   Write progression to screen (After the convergence test in case of step by step resolution since there will be a summary at the end)
+    SI bool0.'PASAPAS' ;
+        SAUT 1 'LIGN' ;
+        MESS '+-----------------------------------------------------------------------------+' ;
+        MESS '|                                                                             |' ;
+        MESS '|                           TOPOPTIM : Progression                            |' ;
+        MESS '|                                                                             |' ;
+        MESS (CHAI '|' 'Cycle'*38 wtab0.'CYCLE'/40 '|'*79) ;
+        MESS '|                                                                             |' ;
+        MESS '|   Objective   |   Max change  | Penalty fac. P|  GSF factor Q |  Nb. elem.  |' ;
+        MESS (CHAI '|' 'FORMAT' '(ES14.7E2)' (EXTR Lstobj0 &loop0) ' |'
+                       'FORMAT' '(ES14.7E2)' (EXTR Lstchg0 &loop0) ' |'
+                       'FORMAT' '(ES14.7E2)' (EXTR Lstp0   &loop0) ' |'
+                       'FORMAT' '(ES14.7E2)' (EXTR Lstq0   &loop0) ' |'
+                   nbel0*76 '|'*79) ;
+        MESS '|                                                                             |' ;
+        MESS '+-----------------------------------------------------------------------------+' ;
+        SAUT 1 'LIGN' ;
+    FINS ;
+
+*   Number of the next cycle
+    wtab0.'CYCLE' = wtab0.'CYCLE' + 1 ;
+
+FIN loop0 ;
+**********************************************************************
+*                       END OPTIMIZATION LOOP                        *
+**********************************************************************
+
+* Cleaning
+OTER tab0 'WTABLE' ; MENA 'OBLI' ;
+
+* Write information to screen
+SI (EXIS tab0 'RESOLUTION_PASAPAS') ;
+    SAUT 1 'LIGN' ;
+    MESS '+-----------------------------------------------------------------------------+' ;
+    MESS '|                                                                             |' ;
+    MESS '|                              TOPOPTIM : Bilan                               |' ;
+    MESS '|                                                                             |' ;
+    MESS '+-----------------------------------------------------------------------------+' ;
+    SAUT 1 'LIGN' ;
+    MESS ' Cycle |   Objective  |  Max change  |Penalty fac. P| GSF factor Q | Nb. elem.' ;
+    REPE loop0 (DIME Lstobj0) ;
+        MESS (CHAI &loop0*6 ' ' '|'
+                  'FORMAT' '(ES14.7E2)' (EXTR Lstobj0 &loop0) '|'
+                  'FORMAT' '(ES14.7E2)' (EXTR Lstchg0 &loop0) '|'
+                  'FORMAT' '(ES14.7E2)' (EXTR Lstp0   &loop0) '|'
+                  'FORMAT' '(ES14.7E2)' (EXTR Lstq0   &loop0) '|'
+                   (EXTR Lstnbel0 &loop0)*77) ;
+    FIN loop0 ;
+FINS ;
+SAUT 1 'LIGN' ;
+SI tab0.'CONVERGENCE' ;
+    MESS ' Convergence apres' ' ' (DIME Lstobj0) ' cycles.' ;
+SINO ;
+    MESS ' Nombre maximum de cycles d''optimisation atteint.' ;
+FINS ;
+SAUT 1 'LIGN' ;
+MESS '+-----------------------------------------------------------------------------+' ;
+MESS '|                                                                             |' ;
+MESS '|                             FIN DE LA PROCEDURE                             |' ;
+MESS '|                                                                             |' ;
+MESS '|                               T O P O P T I M                               |' ;
+MESS '|                                                                             |' ;
+MESS '+-----------------------------------------------------------------------------+' ;
+SAUT 3 'LIGN' ;
+
+FINP ;
+
+$$$$
+
+ 

@@ -1,0 +1,10 @@
+=== Cas 28 : chaboche1 (viscoplasticite Chaboche/Onera) ===
+Valeurs comparees : 720
+Temps horloge (ms) : origine 13085 ; niveau 1 13228 ; niveau 2 12970
+Acceleration par rapport a l origine : niveau 1   0.99 ; niveau 2   1.01
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 0
+Niveau 1 : raideur reutilisee 0 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 0 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

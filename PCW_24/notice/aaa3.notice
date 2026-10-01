@@ -1,0 +1,131 @@
+$$$$ **       NOTICE  PASCAL    22/11/21    21:15:02     11502          
+                                             DATE     22/11/21
+
+    Operateur **                             Voir aussi : *  +
+    ------------                                          -  / 
+                                                          
+    RESU1 = OBJET1 ** OBJET2 (MOT1) ;                            
+
+Section : Mathematiques Elementaires
+
+FRAN==============================================================
+
+    Objet :
+    _______
+
+    L'operateur ** eleve l'objet OBJET1 a la puissance OBJET2
+
+    MOT1 permet de preciser le nom de la composante sur laquelle
+    porte l'operation pour les objets de type EVOLUTION (ABSC ou ORDO)
+    ou NUAGE (voir aussi remarques).
+
+    Operations possibles :
+ANGL==============================================================
+
+    Description :
+    ______________
+
+    The ** operator raises the OBJET1 object to the OBJET2
+    exponent.
+
+    MOT1 indicates the component name to which the operation is applied
+    for objects of EVOLUTION (ABSC or ORDO) or NUAGE types (see also
+    remarks).
+ 
+    Possible operations :
+    _____________________    
+==============================================================
+
+
+---------------------------------------------------------------------
+|     OBJET1        |      OBJET2           |       RESU1           |
+---------------------------------------------------------------------
+|     ENTIER        |      ENTIER           |      ENTIER           |
+|     ENTIER        |     FLOTTANT          |     FLOTTANT          |
+|     ENTIER        |     LISTREEL          |     LISTREEL          |
+|     ENTIER        |     LISTENTI          |     LISTENTI          |
+|     ENTIER        |     EVOLUTIO          |     EVOLUTIO          |
+|     ENTIER        |     CHPOINT           |     CHPOINT           |
+|     ENTIER        |     MCHAML            |     MCHAML            |
+|     ENTIER        |     NUAGE             |     NUAGE             |
+---------------------------------------------------------------------
+|    FLOTTANT       |      ENTIER           |     FLOTTANT          |
+|    FLOTTANT       |     FLOTTANT          |     FLOTTANT          |
+|    FLOTTANT       |     LISTREEL          |     LISTREEL          |
+|    FLOTTANT       |     LISTENTI          |     LISTREEL          |
+|    FLOTTANT       |     EVOLUTIO          |     EVOLUTIO          |
+|    FLOTTANT       |     CHPOINT           |     CHPOINT           |
+|    FLOTTANT       |     MCHAML            |     MCHAML            |
+|    FLOTTANT       |     NUAGE             |     NUAGE             |
+---------------------------------------------------------------------
+|    LISTREEL       |      ENTIER           |     LISTREEL          |
+|    LISTREEL       |     FLOTTANT          |     LISTREEL          |
+|    LISTREEL       |     LISTREEL          |     LISTREEL          |
+|    LISTREEL       |     LISTENTI          |     LISTREEL          |
+---------------------------------------------------------------------
+|    LISTENTI       |      ENTIER           |     LISTENTI          |
+|    LISTENTI       |     FLOTTANT          |     LISTREEL          |
+|    LISTENTI       |     LISTREEL          |     LISTREEL          |
+|    LISTENTI       |     LISTENTI          |     LISTENTI          |
+---------------------------------------------------------------------
+|    EVOLUTION      |      ENTIER           |     EVOLUTION         |
+|    EVOLUTION      |     FLOTTANT          |     EVOLUTION         |
+---------------------------------------------------------------------
+|    CHPOINT        |      ENTIER           |     CHPOINT           |
+|    CHPOINT        |     FLOTTANT          |     CHPOINT           |
+---------------------------------------------------------------------
+|    MCHAML         |      ENTIER           |     MCHAML            |
+|    MCHAML         |     FLOTTANT          |     MCHAML            |
+---------------------------------------------------------------------
+|    RIGIDITE       |      ENTIER           |     RIGIDITE          |
+|    RIGIDITE       |     FLOTTANT          |     RIGIDITE          |
+---------------------------------------------------------------------
+|    NUAGE          |      ENTIER           |     NUAGE             |
+|    NUAGE          |     FLOTTANT          |     NUAGE             |
+---------------------------------------------------------------------
+
+FRAN==============================================================
+    Remarque 1 : 
+    ____________
+
+    Lorsque l'operateur ** eleve a la puissance un objet EVOLUTION,
+MOT1 permet de preciser si l'operation porte sur la liste des abscisses
+(mot-cle 'ABSC') ou sur celle des ordonnees (mot-cle 'ORDO', par defaut).
+
+    Remarque 2 :
+    ____________
+
+    Lorsque l'operateur ** eleve a la puissance un objet NUAGE, MOT1
+permet de preciser le nom de la composante sur laquelle porte l'operation.
+
+    Remarque 3 :
+    ____________
+
+    Pour les objets de type NUAGE, l'operation n'est possible que
+    sur les composantes de type : ENTIER, FLOTTANT et EVOLUTION.
+
+
+ANGL==============================================================
+    Remark 1 :
+    __________
+
+    When the ** operator rises to power an EVOLUTION type object, MOT1
+is useful to indicate if the operation works on the list of abscissa
+('ABSC' key-word) or on the list of ordinates ('ORDO' key-word, by default).
+
+    Remark 2 :
+    __________
+
+    When the ** operator rises to power an NUAGE type object, MOT1 is 
+mandatory to indicate the component name on which apply the operation.
+
+    Remark 3 :
+    __________
+
+    For NUAGE type objects, the operation is only available on
+    components of type : ENTIER, FLOTTANT or EVOLUTION.
+
+$$$$
+ 
+ 
+ 

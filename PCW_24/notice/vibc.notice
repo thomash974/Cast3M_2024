@@ -1,0 +1,303 @@
+$$$$ VIBC     NOTICE  BP208322  22/09/16    21:15:13     11454          
+                                             DATE     22/09/16
+                                             
+    Operateur VIBC                           Voir aussi : VIBR PJBA
+    --------------
+
+Section : Mathematiques Autres
+Section : Mecanique Dynamique
+
+FRAN==========================================================
+CHAP{Objet}
+
+    L'operateur VIBC recherche les valeurs propres et les 
+    vecteurs propres (reels ou complexes) de problemes "petits"
+    (typiquement des matrices projetees sur base modale obtenue
+    avec l'operateur VIBR) par des algorithmes directs (QR ou QZ).
+
+    En particulier, 3 syntaxes associees aux 3 problemes aux 
+    valeurs propres suivants sont prevues :
+
+    (1)    [K + (i*2*pi*w)*C - (2*pi*w)**2 M] X = 0 
+    (2)    [ A - \lambda I ] . X = 0    avec A symetrique
+    (3)    [ A - \lambda I ] . X = 0    avec A = [K1 K2 ; K3 K4]
+    
+
+CHAP{Syntaxe 1 : Probleme aux valeurs propres quadratique}
+
+PART{Syntaxe gibiane} 
+
+    BAS2 = VIBC  MASS1 RIG1 (AMOR1) (BAS1) (ENT1);
+
+PART{Arguments}
+
+    BAS2         : objet resultat contenant les valeurs et les vecteurs
+                   propres complexes (type TABLE, sous-type BASEMODA).
+                   Details : cf. §Structure de la table de sortie.
+
+    MASS1        : matrice de masse
+                   (type RIGIDITE, sous-type MASSE)
+
+    RIG1         : matrice de rigidite
+                   (type RIGIDITE, sous-type RIGIDITE)
+
+    AMOR1        : matrice d'amortissement
+                   (type RIGIDITE, sous-type AMORTISSEMENT)
+
+    BAS1         : base de modes reels, sur laquelle les matrices ont 
+                   ete eventuellement projetees (type TABLE, sous-type 
+                   BASEMODA). Sa specification implique la recombinaison  
+                   sur les degres de liberte elements finis (physique).
+                   
+    ENT1         : entier specifiant le nombre de couple de modes 
+                   complexes de plus bas module a sortir. Par defaut,
+                   tous sont fournis en sortie.
+
+    Rem : Si le type des matrices correspond a MASSE, RIGIDITE et 
+          AMORTISSEMENT, elles sont triees et leur ordre d'entree
+          n'a pas d'importance. Sinon elles sont traitees selon 
+          leur ordre d'entree.  
+
+PART{Commentaires}
+
+    Avec cette syntaxe, l'operateur VIBC recherche les valeurs 
+    propres complexes w (en Hz) et les vecteurs propres complexes X
+    solutions de l'equation fondamentale de la dynamique :
+                        M q'' + C q' + K q = 0
+                 avec   q(t) = X exp(i*2*pi*w*t)
+                 
+    Il resoud donc :
+              [K + (i*2*pi*w)*C - (2*pi*w)**2 M] X = 0
+    et fournit :
+              X = X  + i X       et    w = w  + i w
+                   R      I                 R      I
+                   
+    L'algorithme utilise est le QZ. 
+
+
+CHAP{Syntaxe 2 : Probleme aux valeurs propres reel symetrique}
+
+PART{Syntaxe gibiane} 
+
+    BAS2 = VIBC  RIG1 ;
+
+PART{Arguments}
+
+    BAS2         : objet resultat contenant les valeurs et les vecteurs
+                   propres reels (type TABLE, sous-type BASEMODA).
+                   Details : cf. structure de la table de sortie.
+
+    RIG1         : matrice symetrique (type RIGIDITE)
+
+PART{Commentaires}
+
+    Avec cette syntaxe, l'operateur VIBC recherche les valeurs 
+    propres reelles lambda et les vecteurs propres reels X
+    solutions de  :
+               [ A - \lambda I ] . X = 0    avec A symetrique
+    et fournit :  X  et  \lambda
+                   
+    L'algorithme utilise est le QR (Lapack). 
+
+
+CHAP{Syntaxe 3 : Probleme aux valeurs propres reel non-symetrique de taille double}
+
+PART{Syntaxe gibiane} 
+
+    BAS2 = VIBC  RIG1 RIG2 RIG3 RIG4;
+
+PART{Arguments}
+
+    BAS2         : objet resultat contenant les valeurs et les vecteurs
+                   propres reels (type TABLE, sous-type BASEMODA).
+                   Details : cf. structure de la table de sortie.
+
+    RIG1,2,3 et 4 : matrice de rigidite quelconque (type RIGIDITE)
+
+PART{Commentaires}
+
+    Avec cette syntaxe, l'operateur VIBC recherche les valeurs 
+    propres complexes w=-(i/2pi)*\lambda et les vecteurs propres X
+    solutions de  :
+               [ A - \lambda I ] . X = 0    
+               avec A = [ RIG1  RIG2 ] 
+                        [ RIG3  RIG4 ]
+    ce qui correspond par exemple a une matrice de monodromie.
+    Il fournit :  
+                  X = X  + i X       et    w = w  + i w
+                       R      I                 R      I
+                   
+    L'algorithme utilise est le QZ. 
+
+
+CHAP{Structure de la table de sortie}
+
+ANGL==========================================================
+CHAP{Object}
+
+    The VIBC operator computes the eigenvalues and eigenvectors 
+    (real or complex) of "small" eigenproblems (typically projected 
+    onto a real basis built by the VIBR operator) 
+    using direct algorithm (QR or QZ).
+
+
+CHAP{Syntax 1 : Quadratic eigenproblem}
+
+PART{Gibiane syntax} 
+
+    BAS2 = VIBC  MASS1 RIG1 (AMOR1) (BAS1) (ENT1);
+
+PART{Arguments}
+
+    BAS2         : generated object containing the complex eigen 
+                   values and eigen modes (TABLE type, BASEMODA subtype)
+                   Details : cf. §Structure of the output table.
+
+    MASS1        : mass matrix
+                   (RIGIDITE type, MASSE subtype)
+
+    RIG1         : stiffness matrix
+                   (RIGIDITE type, RIGIDITE subtype)
+
+    AMOR1        : damping matrix
+                   (RIGIDITE type, AMORTISSEMENT subtype)
+
+    BAS1         : real eigenmodes basis on which above matrices have
+                   possibly been projected (TABLE type, BASEMODA 
+                   subtype)
+
+    ENT1         : integer specifying the number of wanted couple of 
+                   complex eigenmodes of lowest module. By default,
+                   every modes are given.
+
+    Rem : If matrix subtypes correspond to MASSE, RIGIDITE and 
+          AMORTISSEMENT, they are sorted and so argument order does not 
+          matter. Otherwise, they are processed in the order of their input.
+
+PART{Comments}
+ 
+    With this syntax, the VIBC operator computes the complex 
+    eigenvalues w (in Hz) and complex eigenvectors X solution of 
+    the general equation of motion:
+                         M q'' + C q' + K q = 0
+                 with   q(t) = X exp(i*2*pi*w*t)
+                 
+    Hence it solves:
+              [K + (i*2*pi*w)*C - (2*pi*w)**2 M] X = 0
+    and gives:
+              X = X  + i X       et    w = w  + i w
+                   R      I                 R      I
+                         
+    The algorithm used is the QZ.
+
+
+CHAP{Syntax 2 : Symmetric real eigenproblem}
+
+PART{Gibiane syntax} 
+
+    BAS2 = VIBC  RIG1 ;
+
+PART{Arguments}
+
+    BAS2         : generated object containing the real eigenvalues 
+                   and eigenmodes (TABLE type, BASEMODA subtype)
+                   Details : cf. §Structure of the output table.
+
+    RIG1         : symmetric matrix (type RIGIDITE)
+
+PART{Comments}
+
+    With this syntax, the VIBC operator computes the real 
+    eigenvalues lambda and eigenvectors X solution of :
+               [ A - \lambda I ] . X = 0    with A symmetric
+    eand gives :  X  et  \lambda
+                   
+    The algorithm used is the QR (Lapack). 
+
+
+CHAP{Syntax 2 : Unsymmetric eigenproblem of double-size}
+
+PART{Gibiane syntax} 
+
+    BAS2 = VIBC  RIG1 RIG2 RIG3 RIG4;
+
+PART{Arguments}
+    BAS2         : generated object containing the real eigenvalues 
+                   and eigenmodes (TABLE type, BASEMODA subtype)
+                   Details : cf. §Structure of the output table.
+
+    RIG1,2,3,4   : matrix (type RIGIDITE)
+
+PART{Comments}
+
+    With this syntax, the VIBC operator computes the complex 
+    eigenvalues w=-(i/2pi)*\lambda and eigenvectors X 
+    solution of :
+               [ A - \lambda I ] . X = 0    
+               avec A = [ RIG1  RIG2 ] 
+                        [ RIG3  RIG4 ]
+    which may correspond to a monodromy matrix.
+    It gives: 
+               X = X  + i X       et    w = w  + i w
+                    R      I                 R      I
+                   
+    The algorithm used is the QZ.
+
+
+CHAP{Structure of the output table}
+==============================================================
+           
+      BAS2.'SOUSTYPE'    = mot 'BASE_MODALE'
+      BAS2.'CONVERGENCE' = LOGIQ1         (syntaxes 1 et 3)
+      BAS2.'MODES'       = TAB2  
+      +  TAB2.'SOUSTYPE'    = mot 'BASE_DE_MODES'
+      +  TAB2.'MAILLAGE'    = MAIL1
+      +  TAB2.IMOD          = TAB3 
+         +  TAB3.'SOUSTYPE'      = 'MODE_COMPLEXE'
+         +  TAB3.'POINT_REPERE'  = PT1
+         +  TAB3.'NUMERO_MODE'   = NUMOD
+         +  TAB3.'FREQUENCE_REELLE'           = wR (syntaxes 1 et 3)
+         +  TAB3.'FREQUENCE_IMAGINAIRE'       = wI (syntaxes 1 et 3)
+         +  TAB3.'DEFORMEE_MODALE_REELLE'     = XR   (syntaxes 1 et 3)
+         +  TAB3.'DEFORMEE_MODALE_IMAGINAIRE' = XI   (syntaxes 1 et 3)
+         +  TAB3.'VALEUR_PROPRE'   = lambda (syntaxe 2)
+         +  TAB3.'DEFORMEE_MODALE' = X   (syntaxe 2)
+
+FRAN==========================================================
+      BAS2  : type TABLE, sous-type BASE_MODALE
+      LOGIQ1 : logique indiquant si VIBC a converge
+
+      TAB2  : type TABLE, sous-type BASE_DE_MODES
+      MAIL1 : support geometrique des modes (type MAILLAGE)
+      IMOD  : nombre variant de 1 au nombre de modes calcules (ENTIER) 
+      
+      PT1   : point servant a reperer le mode (POINT)      
+      NUMOD : numero du mode (ENTIER) 
+      wR    : partie reelle de la frequence propre (FLOTTANT)
+      wI    : partie imaginaire de la frequence propre (FLOTTANT)
+      XR    : partie reelle du vecteur propre (CHPOINT)
+      XI    : partie imaginaire du vecteur propre (CHPOINT)
+      lambda: valeur propre (FLOTTANT)
+      X     : vecteur propre (CHPOINT)
+
+ANGL==========================================================
+      BAS2  : type TABLE, subtype BASE_MODALE
+      LOGIQ1 : logical indicating if VIBC converged
+
+      TAB2  : type TABLE, subtype BASE_DE_MODES
+      MAIL1 : modes geometrical support (MAILLAGE type)
+      IMOD  : number from 1 to the number of eigenmodes (ENTIER)
+
+      PT1   : point used to identify the mode (POINT)
+      NUMOD : numero du mode (ENTIER)
+      wR    : real part of the eigen frequency value (FLOTTANT)
+      wI    : imaginary part of the eigen frequency value (FLOTTANT)
+      XR    : real part of the eigen vector (CHPOINT)
+      XI    : imaginary part of the eigen vector (CHPOINT)
+      lambda: eigenvalue (FLOTTANT)
+      X     : eigenvector (CHPOINT)     
+
+
+$$$$
+ 
+ 

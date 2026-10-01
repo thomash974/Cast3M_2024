@@ -1,0 +1,94 @@
+$$$$ USPROF   NOTICE  MB234859  24/01/09    21:15:33     11816          
+                                             DATE     24/01/09
+
+ Procedure USPROF                        Voir aussi : USCALC USDEPL
+ ----------------                       USINIB USPOST USTMPS USURE
+ 
+         TAB2 = USPROF TAB1 ENT1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui calcule le profil d usure a appliquer selon  
+
+                      DeltaH = alpha * beta * phi 
+
+    Avec 
+     - alpha : valeur se trouvant a l'indice 'COEFFICIENT_USURE'
+     - beta  : valeur se trouvant a l'indice 'FACTEUR_ACCELERATION'
+     - phi   : densite surfacique d'energie dissipee (voir USCALC)
+
+    (Voir ci-dessous pour les indices de la table concernes)
+ 
+  Commentaires :
+  --------------
+
+    TAB2 : Objet de type TABLE correspondant a la boite d'usure, avec 
+           les indices correctement initialises
+
+    TAB1 : Objet de type TABLE correspondant a la boite d'usure
+
+    ENT1 : Objet de type ENTIER donnant le numero de la boite a 
+           considerer
+
+  Cette procedure est appelee par USURE
+
+*---------------------------------------------------------------------*
+
+ Resultats conserves en fin de calcul
+ ------------------------------------
+    'USURE_TOTALE' : CHPOINT contenant les profondeurs usees en chaque
+                     point du maillage 'SURFACE_APPLICATION'
+    En 2D : 
+      'EVO_USURE_CYCLE' : EVOLUTION donnant pour chaque cycle calcule 
+                          la profondeur usee le long du maillage 
+                          'SURFACE_APPLICATION'
+
++----------------------------------------------------------------------+
+                                 
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which calculates the wear profil to apply
+
+                      DeltaH = alpha * beta * phi 
+
+    With 
+     - alpha : value of the index 'COEFFICIENT_USURE'
+     - beta  : value of the index 'FACTEUR_ACCELERATION'
+     - phi   : dissipated energy density (see USCALC)
+
+    (See below the index of the table concerned)
+ 
+  Comments :
+  ----------
+
+    TAB2 : TABLE type object which is the wear box, with its index 
+           correctly initialized.
+
+    TAB1 : TABLE type object which corresponds to the wear box
+
+    ENT1 : ENTIER type object which gives the wear box number
+
+  This procedure is called by USURE
+
+*---------------------------------------------------------------------*
+
+ Saved results
+ -------------
+    'USURE_TOTALE' : CHPOINT which contains wear depth for each node of
+                     'SURFACE_APPLICATION' mesh
+    In 2D : 
+      'EVO_USURE_CYCLE' : EVOLUTION which gives for each calculated
+                          cycle wear depth along 'SURFACE_APPLICATION'
+                          mesh
+
++----------------------------------------------------------------------+
+
+ 

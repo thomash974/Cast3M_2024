@@ -1,0 +1,158 @@
+$$$$ ENUM     NOTICE  SP204843  23/02/16    21:15:04     11599          
+                                             DATE     23/02/16
+
+    Operateur ENUMERER                       Voir aussi : PROG    LECT
+    ------------------                                    MOTS
+
+FRAN==========================================================
+CHAP{Definir une liste d'objets}
+ANGL==========================================================
+CHAP{Define a list of objects}
+==============================================================
+      LOBJ1  =  ENUM  OBJ1  OBJ2  ...  ;
+
+Section : Langage Base
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur ENUMERER permet de creer une liste d'objets de
+    meme type. Les types d'objets supportes sont :
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The operator ENUM creates a list of objects of the same type.
+    The object types supported are :
+
+==============================================================
+     MAILLAGE, LISTENTI, POINT   , LISTREEL, CHPOINT , RIGIDITE,
+     STRUCTUR, ATTACHE , SOLUTION, BASEMODA, LISTOBJE, VECTDOUB,
+     LISTMOTS, DEFORME , LISTCHPO, CHARGEME, EVOLUTIO, VECTEUR ,
+     TABLE   , ELEMSTRU, BLOQSTRU, MCHAML  , MMODEL  , NUAGE   ,
+     MATRIK  , OBJET   , ESCLAVE , ANNOTATI, ENTIER.
+
+FRAN==========================================================
+    La liste cree respecte l'ordre d'enumeration.
+
+
+    Commentaire :
+    _____________
+
+
+    OBJ1, OBJ2   : objets de meme type.
+
+    LOBJ1        : objet LISTOBJE, liste des objets enumeres.
+
+
+
+ANGL==========================================================
+    The list fulfills the order of enumeration.
+
+
+    Contents :
+    __________
+
+
+    OBJ1, OBJ2   : objects of the same type.
+
+    LOBJ1        : LISTOBJE type object, list of enumerated objects.
+
+FRAN==========================================================
+CHAP{Créer une liste composée de N1 fois le meme objet}
+ANGL==========================================================
+CHAP{Create a list composed of N1 times the same object}
+==============================================================
+
+      LOBJ1  =  ENUM  N1*OBJ1 ;
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    Cette option crée une liste composée de N1 fois l'objet OBJ1.
+
+    Commentaire :
+    _____________
+
+
+    N1      : objet ENTIER ;
+
+    OBJ1    : objet de la liste.
+
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    This option creates a list composed of N1 times the object
+    OBJ1.
+
+    Contents :
+    __________
+
+
+    N1      : ENTIER type object,
+
+    OBJ1    : Object of the list.
+
+
+FRAN==========================================================
+CHAP{Créer une liste d'objets donnés dans une table}
+ANGL==========================================================
+CHAP{Create a list of objects given in a table}
+==============================================================
+
+      LOBJ1  =  ENUM  'TABL' TAB1 ;
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'option TABLe permet de créer une liste d'objets a partir
+    d'objets indicés dans une table par des entiers. Tous les
+    objets doivent etre du même type.
+
+    Commentaire :
+    _____________
+
+
+    TAB1    : objet TABLE contenant des objets de même type
+              indicés par des entiers.
+
+    LOBJ1   : objet LISTOBJE contenant les objets en question.
+
+
+    Remarque : si TAB1 contient d'autres types d'indice, MOT
+    ---------- ou autre, ceux-ci sont ignores.
+
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The TABLe option creates a list of objects according to
+    objects indexed in a table by integers. All the objects
+    must be of the same type.
+
+    Contents :
+    __________
+
+
+    TAB1    : TABLE type object containing a list of objects
+              of the same type indexed by integers,
+
+    LOBJ1   : LISTOBJE type object, list of the objects given
+              in TAB1.
+
+
+    Remark : if TAB1 has also other types of index, MOT (word)
+    -------- or others, they are ignored.
+
+
+$$$$
+ 
+ 
+ 
+ 

@@ -1,0 +1,299 @@
+* fichier :  pressutq2.dgibi
+*
+* Containment pressurization (Phebus size)
+*
+* 3D mesh of about 14.5 m3 cylindrical containment with a 100oC vertical wall.
+* Initial pressure and temperature are 1.3bar and 123oC.
+* Steam is injected at a constant 10g/s mass flow rate and a temperature of 130oC.
+*
+* Transient is computed for 50s. We check the pressure, the averaged temperature,
+* the velocity and the condensation mass flow rate (that starts later) evolutions. 
+*
+* This test case is similar as pressutq2.dgibi except for the mass conservation
+* of the scalar fields : we use the new paradigm (see 'CORLIM' and 'CORTEMP')
+*
+* Auteurs : E. Studer, J.P. Magnaud    Novembre 1999
+*
+'OPTI' 'DIME' 3 'ELEM' 'CU20' 'TRAC' 'PSC' ;
+'DENS' 1. ;
+*
+COMPLET = FAUX ;
+GRAPH   = FAUX ;
+'SI' COMPLET ;
+  nbit = 100 ;
+  DT0  = 1.  ;
+  n1   = 1  ;
+  n2   = 4  ;
+  n3   = 4  ;
+  nn   = 2  ;
+'SINO' ;
+  nbit = 5   ;
+  DT0  = 10. ;
+  n1   = 1  ;
+  n2   = 2  ;
+  n3   = 4  ;
+  nn   = 1  ;
+'FINS' ;
+epsi = 1.D-2 ;
+*
+*
+* Mesh
+*
+*
+* ri=cavity radius, h1=cavity height, sp=wall depth,
+* fg1=break to cavity radius ratio
+ri  = 1.052 ;
+h1  = 4.163 ;
+sp  = 0.10  ;
+fg1 = 0.25  ;
+fg2 = fg1 * (2.0 ** 0.5) / 2. ;
+*
+p0  = 0.000    0.000    0.000 ;
+p1  = (ri*fg1) 0.000    0.000 ;
+p2  = (ri*fg2) (ri*fg2) 0.000 ;
+p3  = 0.000    (ri*fg1) 0.000 ;
+p4  = ri       0.000    0.000 ;
+p5  = 0.000    ri       0.000 ;
+p6  = (ri+sp)  0.000    0.000 ;
+p7  = 0.000    (ri+sp)  0.000 ;
+*
+* Fluid and structure basement surfaces
+* (built by symetry)
+l1    = 'DROI' p0 p1 n1        ;
+l2    = 'DROI' p1 p2 n1        ;
+l3    = 'DROI' p2 p3 n1        ;
+l4    = 'DROI' p3 p0 n1        ;
+l5    = 'CERC' p4 p0 p5 (2*n1) ;
+basf0 = 'DALL' l1 l2 l3 l4 'PLAN' ;
+basf1 = ('REGL' (l2 'ET' l3) l5 n2) ;
+*
+l44   = 'COTE' 2 basf1;
+ax4   = ('INVE' l4) 'ET' l44 ;
+l11   = 'COTE' 4 basf1;
+ax1   = l11 'ET' ('INVE' l1) ;
+basf  = basf0 'ET' ('REGL' (l2 'ET' l3) l5 n2) ;
+'ELIM' basf epsi ;
+basf  = basf 'ET' ('SYME' basf 'DROI' p0 p3) ;
+ax11  = ('SYME' ax1 'DROI' p0 p3) 'ET' ('INVE' ax1) ;
+'ELIM' basf epsi ;
+basf  = basf 'ET' ('SYME' basf 'DROI' p0 p1) ;
+ax44  = ('INVE' ax4) 'ET' ('SYME' ax4 'DROI' p0 p4) ;
+'ELIM' basf epsi ;
+*
+* Fluid and structure volumes
+* (built by translation)
+nz1   = ('ENTI' (h1 '/' (ri '/' 2.))) '*' nn ;
+v1    = 0. 0. h1 ;
+mt    = basf 'VOLU' nz1 'TRAN' v1 ;
+wall  = ('DIFF' ('ENVE' mt) basf) 'COUL' 'ROUG' ;
+plan1 = ax11 'TRAN' nz1 v1 ;
+plan4 = ax44 'TRAN' nz1 v1 ;
+'ELIM' (mt et wall 'ET' plan1 'ET' plan4) epsi ;
+*
+* Break at the basement if any
+pjg    =  'POIN' basf 'PROC' (0. 0. 0.) ;
+breche = ('ELEM' basf 'APPUIE' 'LARGEMENT' pjg) 'COUL' 'VERT' ;
+*
+*
+* Data for execrxt.procedur
+*
+*
+rxt = 'TABLE' ;
+rxt . 'VERSION' = 'V0' ;
+rxt . 'vtf'     = mt ;
+rxt . 'epsi'    = epsi ;
+rxt . 'pi'      = 0. 0. 0.5 ;
+*
+rxt . 'DISCR' = 'MACRO';
+rxt . 'KPRE'  = 'CENTRE';
+rxt . 'DT0'   = DT0 ;
+*
+* New paradigm (V2022)
+rxt . 'CORLIM'  = faux ;
+rxt . 'CORTEMP' = faux ;
+*
+rxt . 'MODTURB' = 'NUTURB' ;
+rxt . 'NUT'     = 1.D-2    ;
+*
+rxt . 'TIMP'                       = 'TABLE'             ;
+rxt . 'TIMP' . 'TIMP1'             = 'TABLE'             ;
+rxt . 'TIMP' . 'TIMP1' .'MAILLAGE' = wall                ;
+rxt . 'TIMP' . 'TIMP1' .'t'        = 'PROG'   0.0  3000. ;
+rxt . 'TIMP' . 'TIMP1' .'TIMP'     = 'PROG'  100.   100. ;
+rxt . 'TIMP' . 'TIMP1' .'ECHAN'    = 10.                 ;
+*
+* Ancienne structure TIMP1
+* rxt . 'TIMP1'             = 'TABLE'           ;
+* rxt . 'TIMP1'.'MAILLAGE'  = wall              ;
+* rxt . 'TIMP1'.'t'         = 'PROG'   0. 3000. ;
+* rxt . 'TIMP1'.'TIMP'      = 'PROG' 100.  100. ;
+* rxt . 'TIMP1'.'ECHAN'     = 10.               ;
+*
+rxt . 'VAPEUR' = VRAI  ;
+rxt . 'TF0'    = 123.0 ;
+rxt . 'PT0'    = 1.3e5 ;
+rxt . 'Yvap0'  = 1.D-8 ;
+*
+rxt . 'Breches'                    = 'TABLE' ;
+rxt . 'Breches' . 'A'              = 'TABLE' ;
+rxt . 'Breches' . 'A' . 'scenario' = 'TABLE' ;
+rxt . 'Breches' . 'A' . 'Maillage' =  breche ;
+rxt . 'Breches' . 'A' . 'diru'     =  (0. 0. 1.) ;
+rxt . 'Breches' . 'A' . 'scenario' . 't'      = 'PROG' 0.0   1000.0 ;
+rxt . 'Breches' . 'A' . 'scenario' . 'qeau'   = 'PROG' 0.010  0.010 ;
+rxt . 'Breches' . 'A' . 'scenario' . 'qair'   = 'PROG' 0.000  0.000 ;
+rxt . 'Breches' . 'A' . 'scenario' . 'tinj'   = 'PROG' 130.0  130.0 ;
+*
+rxt . 'GRAPH'   = GRAPH ;
+rxt . 'DETMAT'  = VRAI ;
+rxt . 'FRPREC'  = 5 ;
+rxt . 'RENU'    = 'RIEN' ;
+*
+*
+* Transient (with restart after 2 time steps)
+*
+*
+EXECRXT  2    rxt       ;
+EXECRXT  (nbit - 2) rxt ;
+*
+*
+* Tests
+*
+*
+'SI' ('NON' COMPLET) ;
+  ERR1 = 0 ;
+  'LIST' rxt.TIC.'Tfm' ;
+  'LIST' rxt.TIC.'PT'  ;
+  'LIST' rxt.TIC.'Qc'  ;
+  'LIST' rxt.TIC.'LMAXU';
+
+  ltfm = 'PROG' 123.00 120.38 122.04 118.95 117.06 115.42 ;
+
+  lPT = 'PROG' 1.30000E+05 1.30840E+05 1.31132E+05 1.31858E+05
+  1.32614E+05 1.33475E+05 ;
+
+  Lqc = 'PROG' 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000 ;
+
+  Lmaxu = 'PROG' 0.0000 0.11919 0.12541 1.5760 1.0656 2.0002 ;
+
+  tic = rxt . 'TIC' ;
+  ERtf = 'SOMM' ('ABS'(ltfm - tic . 'Tfm')) '/' 80. ;
+  ERPT = 'SOMM' ('ABS'(lPT  - tic . 'PT' )) '/' 1.e5 ;
+  ERQc = 'SOMM' ('ABS'(lqc  - tic . 'Qc' ))  ;
+  ERum = 'SOMM' ('ABS'(Lmaxu  - tic . 'LMAXU')) '/' 2. ;
+  'MESS' 'ERtf=' ERtf ' ' 'ERPT=' ERPT ' '
+         'ERQc=' ERQc ' ' 'ERum=' ERum ;
+  'SI' (ERtf '>' 2.e-4) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' (ERPT '>' 1.e-3) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' (ERQc '>' 1.e-4) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' (ERum '>' 1.e-2) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' ('NEG' ERR1 0) ;
+    'ERRE' 5 ;
+  'FINS' ;
+'FINS' ;
+*
+*
+* Plots devoted to pressu... cases
+*
+*
+'SI' GRAPH ;
+  tbt = rxt . 'TBT' ;
+  tic = rxt . 'TIC' ;
+*
+  $vtf = rxt . 'GEO' . '$vtf' ;
+  vtf  = 'DOMA'  $vtf 'MAILLAGE' ;
+*
+  Mpl1 = 'CHAN' 'QUAF' plan1 ;
+  Mpl4 = 'CHAN' 'QUAF' plan4 ;
+  'ELIM' (vtf 'ET' Mpl1 'ET' Mpl4) epsi ;
+  $mpl1 = 'MODE' Mpl1 'NAVIER_STOKES' 'MACRO' ;
+  $mpl4 = 'MODE' Mpl4 'NAVIER_STOKES' 'MACRO' ;
+  plan1 = 'DOMA' $mpl1 'MAILLAGE' ;
+  plan4 = 'DOMA' $mpl4 'MAILLAGE' ;
+  plan  = plan1 'ET' plan4 ;
+  cplan = 'CONT' plan ;
+*
+  'SI' ('EXIS' tic 'TP') ;
+    $vtp = rxt . 'GEO' . '$vtp' ;
+    vtp  = 'DOMA'  $vtp 'MAILLAGE' ;    
+  'FINS' ;
+  paroif  = rxt . 'TIMP' . 'TIMP1' . 'mtpi' ;
+*
+* Ancienne structure TIMP1
+* paroif  = rxt . 'GEO' . 'mtpi' ;
+  cparoif = 'CONT' paroif ;
+*
+  axe  = p0 d nz1 (p0 plus v1) ;
+  axe = 'CHAN' axe 'QUAF' ;
+  'ELIM' (axe 'ET' mt) epsi ;
+*   
+  un   = tic . 'UN';
+  unp  = 'REDU' un plan ;
+  ung  = 'VECT' un  0.5 'UX' 'UY' 'UZ' 'JAUN' ;
+  ungp = 'VECT' unp 0.5 'UX' 'UY' 'UZ' 'JAUN' ;
+  tf   = tic . 'TF' ;
+  rho  = tic . 'RHO' ;
+  rair = tic . 'RAIR' ;
+  'SI' tbt . 'THE'    ; rhe  = tic . 'RHE'  ; 'FINS' ;
+  'SI' tbt . 'TH2'    ; rh2  = tic . 'RH2'  ; 'FINS' ;
+  'SI' tbt . 'TCO'    ; rco  = tic . 'RCO'  ; 'FINS' ;
+  'SI' tbt . 'TCO2'   ; rco2 = tic . 'RCO2' ; 'FINS' ;
+  'SI' tbt . 'VAPEUR' ; rvp  = tic . 'RVP'  ; 'FINS' ;
+*
+  evauz = 'EVOL' 'CHPO' ('EXCO' un 'UZ') axe ;
+  'DESS' evauz
+  'TITR' 'Velocity with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' m/s' ;
+  'TRAC' ung plan ('CONT' plan) 'TITR' ' Velocity' ;
+*
+  evatf = 'EVOL' 'CHPO' tf  axe ;
+  'DESS' evatf
+  'TITR' 'Gas temperature with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' C' ;
+  'TRAC' tf plan cplan 'TITR' ' Temperature' ;
+  'TRAC' tf paroif cparoif 'TITR' ' Temperature' ;
+*
+  evarh = 'EVOL' 'CHPO' rho axe ;
+  'DESS' evarh
+  'TITR' 'Gas density with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+  'TRAC' rho plan ('CONT' plan) ungp 'TITR' ' Density & velocity' ;
+  'TRAC' rho paroif cparoif 'TITR' ' Density' ;
+*
+  evavap = 'EVOL' 'CHPO' rvp axe ;
+  'DESS' evavap
+  'TITR' 'Steam density with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+  'TRAC' rvp plan cplan 'TITR' ' Steam density' ;
+*
+  Fcond = rxt . 'TIC' . 'Fcond11';
+*
+* Ancienne structure TIMP1
+* Fcond = rxt . 'TIC' . 'Fcond1';
+  'TRAC' fcond paroif cparoif 'TITR' ' Fcond kg/m**2' ;
+*
+* Wall temperature
+  'SI' ('EXIS' tic 'TP') ;
+     'TRAC' tic . 'TP' vtp 'TITR' ' Wall temperature' ;
+  'FINS' ;
+'FINSI' ;
+
+'FIN' ;
+
+
+
+
+
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+

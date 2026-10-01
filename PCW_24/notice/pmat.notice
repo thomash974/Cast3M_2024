@@ -1,0 +1,47 @@
+$$$$ PMAT     NOTICE  CB215821  21/08/20    21:15:33     11089          
+                                             DATE     21/08/20
+
+    Operateur PMAT                           Voir aussi : PHAJ PROP
+    --------------                                        EXCP EXCS
+
+      RIG1 = 'PMAT' MOD1 ;
+
+
+Section : Changement_De_Phase Changement_De_Phase
+
+FRAN==========================================================
+
+    Objet :
+    _______
+
+    L'operateur 'PMAT' calcule les matrices de blocages associees a la
+    formulation 'CHANGEMENT_PHASE'.
+    Cet operateur est automatiquement appele dans la procedure TRANSNON.
+
+
+      Commentaire :
+      _____________
+
+      MOD1  : objet de type MMODEL contenant une formulation de type
+             'CHANGEMENT_PHASE'.
+
+      RIG1  : objet de type RIGIDITE
+
+ANGL==========================================================
+
+    Description :
+    ____________
+
+    The 'PMAT' operator computes the stiffness associated to the formulation
+   'CHANGEMENT_PHASE'.
+    This operator is automatically called by TRANSNON procedure.
+
+
+      Contents :
+      _________
+
+      MOD1  : MMODEL type objet containing a 'CHANGEMENT_PHASE' formulation.
+
+      RIG1  : RIGIDITE object
+$$$$
+ 

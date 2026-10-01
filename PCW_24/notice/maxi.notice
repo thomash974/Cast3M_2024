@@ -1,0 +1,174 @@
+$$$$ MAXI     NOTICE  BP208322  21/01/21    21:15:27     10861          
+                                             DATE     21/01/21
+
+    Operateur MAXIMUM                        Voir aussi : MINI   
+    -----------------                                     POIN   ELEM
+
+    
+Section : Mathematiques Fonctions
+
+FRAN===========================================================
+CHAP{Maximum d'un objet}
+PART{Syntaxe}
+    OBJET1 =  MAXI  OBJET2   ('ABS')  ( |('AVEC')| LMOTS1 ) ;
+                                        | 'SANS' |
+    
+PART{Objet}
+    L'operateur MAXIMUM determine la plus grande valeur algebrique
+OBJET1 d'un objet OBJET2, ou de la valeur absolue d'OBJET2 si le
+mot-cle 'ABS' a ete donne.
+
+    On peut limiter la recherche du maximum a un sous-ensemble d'OBJET2
+en donnant la liste LMOTS1 (type LISTMOTS) des noms de composantes a
+considerer (mot-cle 'AVEC') ou a exclure (mot-cle 'SANS') dans la
+recherche du maximum.
+
+    Types d'objets possibles :
+    ------------------------------
+    |  OBJET2     |     OBJET1   |
+    ------------------------------
+    |  CHPOINT    |    FLOTTANT  |
+    |  LISTENTI   |    ENTIER    |
+    |  LISTREEL   |    FLOTTANT  |
+    |  MCHAML     |    FLOTTANT  |
+    ------------------------------
+
+PART{Remarques}
+ 1. La limitation a certaines composantes n'a pas de sens pour les
+objets de type LISTENTI et LISTREEL.
+
+ 2. On peut aussi utiliser les operateurs POIN ou ELEM pour chercher
+le lieu geometrique du maximum d'un champ.   
+    
+    
+ANGL===========================================================
+CHAP{Maximum of an objet}
+PART{Syntax}
+    OBJET1 =  MAXI  OBJET2   ('ABS')  ( |('AVEC')| LMOTS1 ) ;
+                                        | 'SANS' |
+                                        
+PART{Description}
+    The MAXIMUM operator defines the highest algebraic value 
+ OBJET1 of an OBJET2 object, or of the absolute value of OBJET2
+ if the 'ABS' key word is provided.
+
+    The search for the maximum may be limited to a subset of OBJET2
+ by providing the LMOTS1 (LISTMOTS type) of the names of component 
+ to be considered (key word 'AVEC') or to be excluded (key word 
+ 'SANS') in the search for the maximum.
+
+    Possible types of objects :
+    ------------------------------
+    |  OBJET2     |     OBJET1   |
+    ------------------------------
+    |  CHPOINT    |    FLOTTANT  |
+    |  LISTENTI   |    ENTIER    |
+    |  LISTREEL   |    FLOTTANT  |
+    |  MCHAML     |    FLOTTANT  |
+    ------------------------------
+     
+PART{Remarks}
+ 1. Limiting some components does not apply for objects of LISTENTI
+ and LISTREEL types.
+
+ 2. The POIN or ELEM operators may also be used to find the
+ place where the maximum of a field does occur.
+
+
+FRAN===========================================================
+CHAP{Maximum d'une EVOLUTION}
+PART{Syntaxe}
+    OBJET2 OBJET3 OBJET4  =  MAXI  OBJET1   ('ABS') 
+
+PART{Objet}
+    L'operateur MAXIMUM determine le couple abscisse - ordonnee
+    de plus grande valeur algebrique, ainsi que l'indice de ce
+    couple pour un OBJET1 de type EVOLUTIO ne comportant qu'une
+    seule courbe. Si le  mot-cle 'ABS' a ete donne, il s'agit de
+    l'ordonnee de plus grande valeur absolue. 
+    Le type d'OBJET2 est ENTIER, OBJET3 et OBJET4 sont de type
+    FLOTTANT. En cas de multiplicite de l'ordonnee maximale,
+    le couple de plus faible indice est renvoye.
+
+    Si OBJET1 de type EVOLUTIO comprend plusieurs courbes, 
+    l'operateur construit par extension des objets 
+    OBJET2, type LISTENTI, OBJET3 et OBJET4, type LISTREEL.
+    
+PART{Remarques}
+    Seules les EVOLUTIONs d'un LISTREEL en fonction d'un autre
+    LISTREEL sont permises.
+
+ANGL===========================================================
+CHAP{Maximum of a EVOLUTION}
+PART{Syntax}
+    OBJET2 OBJET3 OBJET4  =  MAXI  OBJET1   ('ABS') 
+
+PART{Description}
+    The MAXIMUM operator defines the couple abscissa - ordonna of
+    highest algebraic value, together with the indice of this
+    couple for an EVOLUTIO type OBJET1 restricted to one curve.      
+    If the 'ABS' key word is provided, the highest absolute value
+    of ordonna is concerned.
+    Thus OBJET2 is ENTIER type, 
+    OBJET3 and OBJET4 are FLOTTANT type. In case of multiple
+    highest ordonna, the lowest indice couple is yielded.
+
+    If OBJET1 type EVOLUTIO includes several curves, the 
+    operator builds OBJET2 type LISTENTI, 
+    OBJET3 and OBJET4, type LISTREEL, following the same rule.
+    
+PART{Remarks}
+    Only the EVOLUTIONs of a LISTREEL as a function of another
+    LISTREEL are permitted.
+    
+FRAN===========================================================
+CHAP{Maximum de n ENTIERs ou FLOTTANTs}
+PART{Syntaxe}
+      XMAX  =  MAXI  ('ABS')  X1  X2  (... Xn)   
+ 
+PART{Objet}
+    L'operateur MAXIMUM retourne dans XMAX le reel/entier
+    maximum des termes X1, X2, ..., Xn
+    (ou des termes |X1|, |X2|, ... |Xn|  si 'ABS est precise).
+    
+    
+ANGL===========================================================
+CHAP{Maximum of n integers (ENTIER) or real (FLOTTANT)}
+PART{Syntax}
+      XMAX  =  MAXI  ('ABS')  X1  X2  (... Xn)   
+
+PART{Description}
+    The MAXIMUM operator returns the real/integer value XMAX
+    which is the maximum of the terms X1, X2, ... Xn
+    (or of the terms |X1|, |X2|, ... |Xn|  if 'ABS' is given). 
+    
+FRAN===========================================================
+CHAP{Maximum de n objets}
+PART{Syntaxe}
+      OBJET3   =  MAXI  ('ABS')  OBJET1  OBJET2  (OBJETi ...)   
+ 
+PART{Objet}
+    L'operateur MAXIMUM crée un objet de meme type que OBJET1, OBJET2,
+    OBJETi... en prenant la valeur maximum (eventuellement en valeur
+    absolue), terme à terme, de OBJET1, OBJET2, OBJETi...
+    
+    Les types autorises sont LISTENTI, LISTREEL et CHPOINT. Pour les
+    objets CHPOINTS, les composantes et maillages supports doivent
+    etre identiques.
+    
+ANGL===========================================================
+CHAP{Maximum of n objects}
+PART{Syntax}
+      OBJET3   =  MAXI  ('ABS')  OBJET1  OBJET2  (OBJETi ...)   
+
+PART{Description}
+    The MAXIMUM operator create an objet of the same type as OBJET1, 
+    OBJET2, OBJETi, ... taking the maximum (optionally in absolute
+    value), value by value, of OBJET1, OBJET2, OBJETi...
+    
+    The objects can be of type LISTENTI, LISTREEL or CHPOINT.
+    For CHPOINTS, component names and meshes must be identical. 
+    
+
+ 
+ 

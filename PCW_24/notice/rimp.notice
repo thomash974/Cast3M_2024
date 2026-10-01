@@ -1,0 +1,30 @@
+$$$$ RIMP     NOTICE  FANDEUR   21/12/15    21:15:08     10824          
+                                             DATE     21/12/15
+                                             
+    Operateur RIMP                           Voir aussi :
+    --------------
+
+    EVOL2  =  RIMP  EVOL1 ;
+
+
+Section : Mathematiques Autres
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur RIMP change le sous-type d'un objet de type EVOLUTION complexe.
+
+    Si EVOL1 est de sous-type 'PREE' 'PIMA' (partie reelle, partie imaginaire), 
+ EVOL2 sera de sous-type 'MODU' 'PHAS' (module, phase) et vice-versa.
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The RIMP operator changes the subtypes of a complex object of EVOLUTION type.
+
+    If the type of the object EVOL1 is 'PREE' 'PIMA' (real part, imaginary part), 
+ EVOL2 will be 'MODU' 'PHAS' type (modulus, phase) and vice-versa.
+
+ 

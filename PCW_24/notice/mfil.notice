@@ -1,0 +1,155 @@
+$$$$ MFIL     NOTICE  FD218221  21/03/01    21:15:06     10906          
+                                             DATE     21/03/01
+                 
+Section : Mathematiques Autres
+
+FRAN==========================================================
+
+               CETTE OPERATEUR A ETE MIS GRACIEUSEMENT
+                A DISPOSITION DE LA COMMUNAUTE CAST3M
+          PAR Guenhael Le Quilliec(1) ET Thomas Fournier(2)
+              (1) Laboratoire de Mecanique Gabriel Lame
+ Universite de Tours, Universite d Orleans, INSA Centre Val de Loire
+    Polytech Tours, 7 avenue Marcel Dassault, 37200 Tours, France
+      (2) Stage au Laboratoire de Mecanique Gabriel Lame en 2020
+
+
+    Operateur MFIL                           Voir aussi : TOPOPTIM
+    ______________                                        TOPOSURF
+                                                          TOPOFILT
+
+
+    RIG1 = MFIL CHPO1 (FLOT1 (FLOT2 (FLOT3))) (MOT1 (MOT2)) ;
+
+
+    Objet :
+    _______
+
+L'operateur MFIL cree une matrice de rigidite contenant pour chaque
+noeud du maillage les poids de ses noeuds voisins a appliquer dans le
+but de pouvoir filtrer (i.e. lisser / floutter) un champ par points en
+le multipliant par cette matrice.
+
+Si un noeud voisin se trouve a une distance D < FLOT1, son poids
+(sa raideur) est alors calcule comme suit :
+       (1.0 - (Rv / FLOT1))**FLOT2
+       * valeur de CHPO1 du noeud voisin
+       / somme des poids de tous les noeuds voisins
+Enfin seuls les poids > FLOT3 sont conserves.
+
+    En entree :
+    ___________
+
+ CHPO1 : (CHPOINT) Champ par points de ponderation (e.g. champ des volumes)
+         qui est utilise dans le calcul des poids (raideurs) de la matrice
+         de sortie.
+         Ce champ permet egalement de recuperer les noeuds sur lesquelles
+         s'appliquera la matrice de rigidite de sortie.
+
+ FLOT1 : (FLOTTANT) Rayon d'action du filtre au voisinage de chaque noeud.
+         Cette donnee est facultative et est egale a 0.0 par defaut. Le
+         filtre n'aura alors aucun effet.
+
+ FLOT2 : (FLOTTANT) Exposant applique lors du calcul des poids.
+         Cette donnee est facultative et est egale a 1.0 par defaut.
+
+ FLOT3 : (FLOTTANT) Valeur comprise entre 0.0 et 1.0 au dela de laquelle les
+         poids sont conserves.
+         Cette donnee est facultative et est egale a 0.0 par defaut.
+
+ MOT1 : (MOT) Nom des inconnues primales.
+        Cette donnee est facultative et est egale a 'SCAL' par defaut.
+
+ MOT2 : (MOT) Nom des inconnues duales.
+        Cette donnee est facultative et est egale a la valeur de MOT1 par defaut.
+
+    En sortie :
+    ___________
+
+ RIG1 : (RIGIDITE) Matrice de rigidite.
+
+
+    Exemples:
+    _________
+
+mfil.dgibi
+
+
+ANGL==========================================================
+
+
+             THIS OPERATOR WAS GRACIOUSLY MADE AVAILABLE
+                       TO THE CAST3M COMMUNITY
+          BY Guenhael Le Quilliec(1) AND  Thomas Fournier(2)
+              (1) Laboratoire de Mecanique Gabriel Lame
+ Universite de Tours, Universite d Orleans, INSA Centre Val de Loire
+    Polytech Tours, 7 avenue Marcel Dassault, 37200 Tours, France
+   (2) Internship at Laboratoire de Mecanique Gabriel Lame in 2020
+
+
+    Operator MFIL                               See also: TOPOPTIM
+    _____________                                         TOPOSURF
+                                                          TOPOFILT
+
+
+    RIG1 = MFIL CHPO1 (FLOT1 (FLOT2 (FLOT3))) (MOT1 (MOT2)) ;
+
+
+    Object:
+    _______
+
+The operator MFIL creates a stiffness matrix containing for each node
+of the mesh the weights of its neighbouring nodes to apply in order to
+allow the filtering (i.e. smoothing / blurring) of a node field by
+multiplying it to this matrix.
+
+If a neighbouring node is located at a distance D < FLOT1, its weight
+(its stiffness) is then calculated as follow :
+       (1.0 - (Rv / FLOT1))**FLOT2
+       * value of CHPO1 of the neighbouring node
+       / sum of the weights of all the neighbouring nodes
+Finally only the weights > FLOT3 are preserved.
+
+
+    Input:
+    ______
+
+ CHPO1 : (CHPOINT type object) Node filed of weighting (field of volumes)
+         which is used for calculating the weights (stiffnesses) of the
+         output matrix.
+         This field also allows to get the nodes on which applies the
+         output stiffness matrix.
+
+ FLOT1 : (FLOTTANT type object) Action radius of the filter in the neighbouring
+         of each node.
+         This data is optional and is set to 0.0 by default. The filter
+         would then have no effect.
+
+ FLOT2 : (FLOTTANT type object) Exponent applied during the calculation of
+         the weights.
+         This data is optional and is set to 1.0 by default.
+
+ FLOT3 : (FLOTTANT type object) Value between 0.0 et 1.0 abbove which the
+         weights are saved.
+         This data is optional and is set to 0.0 by default.
+
+ MOT1 : (MOT type object) Name of primal unknowns.
+        This data is optional and is set to 'SCAL' by default.
+
+ MOT2 : (MOT type object) Name of dual unknowns.
+        This data is optional and is set to the value of MOT1 by default.
+
+    Output:
+    _______
+
+ RIG1 : (RIGIDITE type object) Stiffness matrix.
+
+
+    Examples:
+    _________
+
+mfil.dgibi
+
+$$$$
+
+ 

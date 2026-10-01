@@ -1,0 +1,159 @@
+$$$$ @SOLVMEC NOTICE  FD218221  21/05/07    21:15:01     11001          
+                                             DATE     21/05/07
+
+    Procedure @SOLVMEC                       Voir aussi : PASAPAS UNPAS
+    ------------------
+
+    @SOLVMEC  TAB1 ;
+
+Section : Mecanique Resolution
+
+
+FRAN====================================================================
+    Objet :
+    -------
+
+       La procedure @SOLVMEC permet d'effectuer un calcul mecanique non lineaire
+    incremental selon un parametre d'evolution donne par l'utilisateur
+    (pseudo temps ou temps reel).
+
+       Cette procedure est analogue a la procedure PASAPAS (indices en entree et
+    en sortie identiques) mais en constitue une version beaucoup plus simplifiee
+    et ceci a des fins de tests ou pedagogiques uniquement.
+
+       Cette procedure n'est pas supportee et ne rentre pas dans le perimetre de
+    validation de Cast3M. La procedure de reference pour le calcul incremental
+    en mecanique et thermique est PASAPAS.
+
+       De plus, les performances sont sensiblement moins elevees que celles de PASAPAS
+    et le domaine d'application est limite a la mecanique seule. Cependant, elle met
+    en oeuvre, comme dans PASAPAS, un schema de quasi Newton-Raphson pour la minimisation
+    du residu. Celui-ci est facilement lisible et modifiable pour l'utilisateur.
+
+
+       Les indices de la table TAB1 a definir sont les suivants :
+
+    MODELE              : Objet de type MMODEL, obligatoire.
+                          Ensemble des modeles avec une formulation mecanique
+                          --> objet cree par l'operateur MODE.
+
+    CARACTERISTIQUES    : Objet de type MCHAML, obligatoire.
+                          Champ de caracteristiques materielles et geometriques
+                          (si necessaire) associees au modele
+                          --> objet cree par les operateurs MATE/CARA.
+
+    BLOCAGES_MECANIQUES : Objet de type RIGIDITE, obligatoire.
+                          Matrice des blocages mecaniques associee a une condition aux
+                          limites de type Dirichlet (deplacement impose)
+                          --> objet cree par les operateurs BLOQ/RELA.
+
+    CHARGEMENT          : Objet de type CHARGEME, obligatoire.
+                          Definition du chargement en fonction du parametre d'evolution
+                          Les types de chargements acceptes sont :
+                          * ceux de type 'DIMP' (deplacements imposes)
+                          * ceux de type 'MECA' (efforts      imposes)
+                          --> objet cree par l'operateur CHAR.
+
+    TEMPS_CALCULES      : Objet de type LISTREEL, obligatoire.
+                          Liste des valeurs du parametre d'evolution (temps) pour
+                          lesquelles on effectue le calcul.
+                          --> objet cree par l'operateur PROG.
+
+    GRANDS_DEPLACEMENTS : Objet de type LOGIQUE, facultatif,
+                          egal a FAUX par defaut.
+                          Indique que l'on souhaite faire le calcul sous l'hypothese
+                          des "grands deplacements", c'est-a-dire :
+                          - re-calcul de la matrice de rigidite sur la configuration
+                            au debut de chaque pas de temps
+                            (et non la configuration initiale) ;
+                          - prise en compte de la matrice de raideur geometrique
+                            associee aux contraintes au debut du pas de temps
+                            (appel a l'operateur KSIG) ;
+                          - utilisation de la deformation quadratique (Green Lagrange)
+                            pour evaluer l'increment de deformation sur chaque pas de
+                            temps (et non la deformation lineaire) ;
+                          - transport des contraintes sur la configuration a la fin
+                            du pas de temps (operateur PICA).
+                          - verification de l'equilibre sur la configuration a la fin
+                            du pas de temps (et non la configuration initiale).
+
+    ACCELERATION_CONVERGENCE : Objet de type LOGIQUE, facultatif,
+                          egal a FAUX par defaut.
+                          Indique que l'on souhaite utiliser l'acceleration de convergence
+                          basee sur les precedents residus (operateur ACT3).
+                          L'acceleration est effectuee toutes les 4 iterations.
+
+ANGL====================================================================
+    Object :
+    --------
+
+       The @SOLVMEC procedure enables to carry out an incremental nonlinear mechanical
+    calculation according to a evolution parameter given by the user (pseudo time or
+    real time).
+
+       This procedure is similar to the PASAPAS procedure (same input and output indices)
+    but is very much simplified in order to do tests or for educational purposes.
+
+       This procedure is not supported and is not part of the validation scope of Cast3M.
+    The reference procedure for incremental calculation in mechanical and thermal analysis
+    is PASAPAS.
+
+       In addition, its performance is significantly lower than PASAPAS and the application
+    is limited to mechanics only. However, it implements, as in PASAPAS, a quasi Newton-Raphson
+    scheme for the imbalance minimization. The algorithm is easy to read and to modify
+    for the user.
+
+
+       The indices of table TAB1 to be defined are as follows:
+
+    MODELE              : MMODEL type object, mandatory.
+                          Set of models with mechanical formulation
+                          --> object created by the MODE operator.
+
+    CARACTERISTIQUES    : MCHAML type object, mandatory.
+                          Field of material and geometric (when necessary)
+                          characteristics associated with the model
+                          --> object created by the MATE/CARA operators.
+
+    BLOCAGES_MECANIQUES : RIGIDITE type object, mandatory.
+                          Stiffness matrix associeted with a Dirichlet boundary condition
+                          --> object created by the BLOQ/RELA operators.
+
+    CHARGEMENT          : CHARGEME type object, mandatory.
+                          Definition of the loading according to the evolution parameter
+                          The types of loadings accepted are:
+                          * those of type 'DIMP' (imposed displacements)
+                          * those of type 'MECA' (imposed forces)
+                          --> object created by the CHAR operator.
+
+    TEMPS_CALCULES      : LISTREEL type object, mandatory.
+                          List of values of the evolution parameter (time) for which
+                          we perform calculation.
+                          --> object created by the PROG operator.
+
+    GRANDS_DEPLACEMENTS : LOGIQUE type object, optional,
+                          equal to FAUX (false) by default.
+                          Indicates that we want to use the "large displacements"
+                          assumption, that is to say:
+                          - recalculation of the stiffness matrix on the configuration
+                            at the beginning of each time step
+                            (and not the initial configuration) ;
+                          - taking into account the geometric siffness matrix due to
+                            stresses at the beginning of the time step
+                            (call to the KSIG operator);
+                          - using the quadratic deformation (Green Lagrange) to
+                            evaluate the strain increment on each time step
+                            (and not the linear strain);
+                          - transport of the stresses on the configuration at the end
+                            of the time step (PICA operator).
+                          - the force balance is checked on the configuration at the end
+                            of the time step (and not the initial configuration).
+
+    ACCELERATION_CONVERGENCE : LOGIQUE type object, optional,
+                          equal to FAUX (false) by default.
+                          Indicates that we want to use the convergence acceleration
+                          based on the previous residuals (ACT3 operator).
+                          The acceleration is performed every 4 iterations.
+
+$$$$
+ 

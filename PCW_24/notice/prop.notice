@@ -1,0 +1,67 @@
+$$$$ PROP     NOTICE  CB215821  19/10/08    21:15:16     10329          
+                                             DATE     19/10/08
+
+    Operateur PROP                           Voir aussi : PMAT PHAJ EXCP
+    --------------                                        SOUR RESO
+
+      PROP1 = 'PROP' MOD1 PROP0 QLINT CHP1 ;
+
+
+Section : Changement_De_Phase Changement_De_Phase
+
+FRAN==========================================================
+
+    Objet :
+    _______
+
+    L'operateur 'PROP' calcule le champ par element de proportion de
+phase pour une formulation de type 'CHANGEMENT_PHASE'.
+Cet operateur est automatiquement appele dans la procedure TRANSNON.
+
+
+      Commentaire :
+      _____________
+
+      MOD1  : objet de type MMODEL contenant une formulation de type
+             'CHANGEMENT_PHASE'.
+
+      PROP0 : objet de type MCHAML contenant les proportions de phases
+              initiales.
+
+      QLINT : objet de type MCHAML contenant la quantite latente
+              integree sur l'element (aux NOEUDS) avec l'operateur 'SOUR'.
+
+      CHP1  : objet de type CHPOINT contenant les reactions associees
+              aux matrices de blocages du changement de phases. De maniere
+              classique, ce champ sort directement de 'RESO'
+
+      PROP1 : nouveau MCHAML de proportions de phases.
+
+ANGL==========================================================
+
+    Description :
+    ____________
+
+    The 'PROP' operator computes the new proportion of phase for the
+formulation 'CHANGEMENT_PHASE'.
+This operator is automatically called by TRANSNON procedure.
+
+      Contents :
+      _________
+
+      MOD1  : MMODEL type objet containing a 'CHANGEMENT_PHASE' formulation.
+
+      PROP0 : MCHAML type objet containing initial phase proportion
+
+      QLINT : MCHAML type objet containing the latent quantity integrated
+              on the element (at NODES support) with the 'SOUR' operator.
+
+      CHP1  : CHPOINT type objet reaction of stiffness matrices associated
+              to the phase change. Usually, this field is computed by the
+             'RESO' operator.
+
+      PROP1 : New MCHAML type objet with the phase proportion updated.
+
+$$$$
+
+ 

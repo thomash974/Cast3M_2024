@@ -1,0 +1,194 @@
+$$$$ USURE    NOTICE  MB234859  24/02/06    21:15:05     11833          
+                                             DATE     24/02/06
+
+ Procedure USURE                         Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USDEPL USEXPL USEXPL
+                                        USINIB USPOST USTMPS
+ 
+         TAB2 = USURE TAB1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure principale pour les calculs d'usure dont le principe est 
+    le suivant : 
+    - a chaque instant d'un cycle d'usure, la densite d'energie dissipee 
+      par frottement est calculee
+    - lorsque le dernier instant d'un cycle est atteint, la geometrie 
+      de la zone usee est actualisee selon un schema explicite ou 
+      implicite
+    Le calcul se poursuit jusqu'a ce que le nombre total de cycles 
+    souhaite soit calcule.
+    
+    Pour faire un calcul d'usure, il faut utiliser la procedure PASAPAS.
+    La procedure USURE est la seule procedure a appeler, depuis la 
+    procedure PERSO1 (voir usure.dgibi).
+
+    Les informations propres a l'usure doivent etre contenues dans une 
+    table, notee ici BUSURE, stockee a l'indice 'BOITES_USURE' de la 
+    table de PASAPAS, notee ici TAB1, soit :
+    
+                    TAB1.'BOITES_USURE' = BUSURE ;
+    
+    Les informations a transmettre sont les suivantes :                
+    - pour les i surfaces a user (i > 0) :
+
+        BUSURE. i .'SURFACE_APPLICATION'
+        -> Surface usee (ou sera appliquee l'usure).
+
+        BUSURE. i .'COEFFICIENT_USURE'
+        -> Valeur du coefficient d'usure.
+
+        BUSURE. i .'VOLUME_REPARTITION'
+        -> Volume sous la surface usee pour "repartir" l'usure.
+
+    - de facon commune aux surfaces a user :
+      1/ Informations obligatoires :
+     
+        BUSURE.'DONNEES'.'NB_CYCLES'
+        -> Nombre de cycles d'usure.
+
+        BUSURE.'DONNEES'.'PERIODE'
+        -> Periode d'un cycle d'usure.
+
+        BUSURE.'DONNEES'.'INCREMENTS_CYCLE'
+        -> Nombre de pas de temps calcule par cycle d'usure.
+
+        BUSURE.'DONNEES'.'T_DEBUT_USURE'
+        -> Temps ou demarre l'usure. 
+           Si l'indice 'TEMPS_CALCULES' de la table de PASAPAS ne 
+           contient pas le dernier instant, alors les pas de temps 
+           seront reevalues a chaque fin de cycle. Ce temps doit 
+           alors etre un multiple de la periode.
+
+      2/ Informations facultatives :
+
+        BUSURE.'DONNEES'.'ACCELERATION'
+        -> Valeur du facteur de saut de cycle. 
+           Par defaut, vaut 1.
+
+        BUSURE.'DONNEES'.'SAUV_AUTO'
+        -> Booleen valant VRAI si on souhaite sauvegarder les resultats 
+           a chaque fin de cycle. Lorsque cette option est a VRAI, 
+           l'option ECONOMIQUE de PASAPAS est activee.
+           Par defaut, vaut FAUX.
+
+        BUSURE.'DONNEES'.'SCHEMA'
+        -> Schema de resolution pour l'usure. Choix entre EXPLICITE et 
+           IMPLICITE. 
+           Par defaut, vaut EXPLICITE.
+
+        BUSURE.'DONNEES'.'DELTA_L0'
+        -> Valeur d'elargissement de la zone usee souhaitee entre deux 
+           cycles consecutifs. Utile en cas de facteur de saut de cycle 
+           variable.
+           Par defaut, vaut la taille de maille minimale des i maillages 
+           'SURFACE_APPLICATION'.
+
+        BUSURE.'DONNEES'.'DN_CYCLES_INIT'
+        -> Nombre de cycles a calculer avant de calculer le coefficient 
+           de saut de cycles variable.
+           Par defaut, vaut 10.
+
+  Commentaires :
+  --------------
+
+    TAB2 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Main procedure for wear computations which can be described as :
+    - at each timesteps of each cycle, the wear rate is calculated
+    - if it is the last timestep of a cycle, the wear surface coordinates 
+      are updated according to an explicit or an implicit scheme
+    The computation carries on until the total number of cycles are 
+    calculated.
+    
+    A wear computation must be calculated with PASAPAS procedur.
+    USURE procedur is the only procedur to use. It must be called by 
+    PERSO1 procedur (see usure.dgibi).
+    
+    Informations regarding wear must be contained in a TABLE type object, 
+    denoted here BUSURE, stored in the PASAPAS table, denoted here TAB1, 
+    at index 'BOITES_USURE' :
+    
+                    TAB1.'BOITES_USURE' = BUSURE ;
+    
+    The data are the following :
+    - for each wearing surface (i > 0)
+
+        BUSURE. i .'SURFACE_APPLICATION'
+        -> Wearing surface (where wear will be applied).
+
+        BUSURE. i .'COEFFICIENT_USURE'
+        -> Wear coefficient value.
+
+        BUSURE. i .'VOLUME_REPARTITION'
+        -> Volume under the wearing surface so as to distribute wear.
+
+    - common value for all wearing surfaces :
+      1/ Mandatory information :
+           
+        BUSURE.'DONNEES'.'NB_CYCLES'
+        -> Number of wear cycles.
+
+        BUSURE.'DONNEES'.'PERIODE'
+        -> Period of a wear cycle.
+
+        BUSURE.'DONNEES'.'INCREMENTS_CYCLE'
+        -> Number of timesteps in each wear cycle.
+
+        BUSURE.'DONNEES'.'T_DEBUT_USURE'
+        -> Time when wear begins. 
+           If the final timestep is in inclluded in the index 
+           'TEMPS_CALCULES' of the PASAPAS table, then all timesteps 
+           will be evaluated during computation. In that case, this 
+           value must be a multiple of the period.
+
+      2/ Optional information :
+
+        BUSURE.'DONNEES'.'ACCELERATION'
+        -> Cycle jump coefficient. 
+           By default, it's value is 1.
+      
+        BUSURE.'DONNEES'.'SAUV_AUTO'
+        -> LOGICAL which is VRAI when the results must be saved.
+           When it is VRAI, ECONOMIQUE option of PASAPAS is also VRAI.
+           By default, it's value is FAUX.
+
+        BUSURE.'DONNEES'.'SCHEMA'
+        -> Wear resolution scheme. 
+           Choice is possible between EXPLICITE and IMPLICITE. 
+           By default, it's value is EXPLICITE.      
+
+        BUSURE.'DONNEES'.'DELTA_L0'
+        -> Value of the wear surface widening between two consecutives 
+           cycle. Useful with an adaptative cycle jump.
+           By default, it's value is the minimum element size of all 
+           mesh at the index 'SURFACE_APPLICATION'.
+
+        BUSURE.'DONNEES'.'DN_CYCLES_INIT'
+        -> Number of cycle to simulate prior to calculate the value of 
+           the adaptative cycle jump.
+           By default, it's value is 10.
+
+  Comments :
+  ----------
+
+    TAB2 : TABLE type object which corresponds to the PASAPAS table.
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+*---------------------------------------------------------------------*
+ 

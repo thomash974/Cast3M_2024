@@ -1,0 +1,55 @@
+$$$$ JPMA     NOTICE  PV090527  23/03/09    21:15:05     11619          
+                                             DATE     23/03/09
+FRAN==========================================================
+
+  Operateur JPMA                           Voir aussi : MPMA    JPMM
+        -----------------  
+ANGL==========================================================
+
+  Operator JPMA                            See also   : MPMA    JPMM
+        -----------------  
+==============================================================
+             CHE1 = JPMA CHE2 MOD1 LREE1;
+
+
+
+FRAN==========================================================
+        Objet :
+        -------
+
+        Calcul du potentiel magnetique vecteur en 3D par integration sur les elements d'une geometrie 2D dans le plan XY 
+        avec une epaisseur donnee selon Z.
+        L'integration est faite en multipliant les composantes JX et JY de la densite de courant par la matrice
+        contenue dans la liste de reels LREE1. Il faut d'abord creer cette matrice par l'operateur MPMA.
+
+        Commentaire :
+        -------------
+ 
+           CHE2   densite de courant = un champ par element ayant les composantes JX et JY 
+           MOD1   modele ou la densite de courant est appliquee 
+           LREE1   matrice d'interactions entre les elements obtenue par MPMA
+
+        en sortie :
+
+           CHE1   potentiel magnetique vecteur qui est un champ par elements ayant les composantes AX et AY 
+ANGL==========================================================
+        Purpose:
+        -------
+
+        Calculation of magnetic vector potential in 3D by integration on the elements of a 2D geometry in XY plane 
+        with a thickness given in Z.
+        Integration is done by multiplying the components JX and JY of current density by the matrix stored in the
+        LREE1 LISTREEL. This matrix must be previously created by th MPMA operator.
+
+        Comment :
+        ---------
+ 
+           CHE2   Current density = an element field with JX nd JY components                    
+           MOD1   Model where to apply current density                
+           LREE1  Interaction matrix between the elements constructed by MPMA
+
+        output:     
+
+           CHE1   Vector magnetic potential stored in an element field with AX and AY components                       
+ 
+ 

@@ -1,0 +1,22 @@
+$$$$ TOPOINFO NOTICE  FD218221  23/11/29    21:15:09     11799          
+                                             DATE     23/11/29
+
+FRAN==========================================================
+
+    Procedure TOPOINFO                       Voir aussi : TOPOPTIM
+    __________________
+
+
+Cette procedure est appelee par TOPOPTIM.
+
+
+ANGL==========================================================
+
+    Procedure TOPOINFO                          See also: TOPOPTIM
+    __________________
+
+
+This procedure is called by TOPOPTIM.
+
+$$$$
+ 

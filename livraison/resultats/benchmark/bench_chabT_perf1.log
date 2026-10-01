@@ -1,0 +1,6 @@
+=== Scenario 5 : chabT_perf1 (CHABOCHE_T, PERF_RAID actif, niveau 1) ===
+Elements : 1000 ; pas de temps : 60 ; repetitions : 2
+Temps horloge minimal (ms) : 17482 ; acceleration par rapport a orig :   0.91
+Temps par operateur (ms, calcul le plus rapide) : RESO 6108 ; RIGI 407 ; HOOK 0 ; VARI 1547 ; COMP 4703
+Raideur : reutilisee 0 fois, recalculee 60 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 1 fois
+Ecart relatif de la courbe F/S avec orig :  0.000E+00 : OK

@@ -1,0 +1,10 @@
+=== Cas 17 : traction316L (T uniforme, E(T)) ===
+Valeurs comparees : 54
+Temps horloge (ms) : origine 119 ; niveau 1 139 ; niveau 2 170
+Acceleration par rapport a l origine : niveau 1   0.86 ; niveau 2   0.70
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 1
+Niveau 1 : raideur reutilisee 8 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 10 fois
+Niveau 2 : raideur reutilisee 8 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 10 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

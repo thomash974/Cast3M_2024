@@ -1,0 +1,238 @@
+* fichier : g_decouplage_5.dgibi
+****************************************************
+* Section : Mecanique rupture
+****************************************************
+*                                                  *
+*      VERIFICATION DE LA PROCEDURE G_THETA        *
+*    POUR LE CALCUL DES FIC POUR UNE FISSURE       *
+*        PLANE A FOND DROIT DANS UN CUBE           *
+*                        -                         *
+*  VERIFICATION DU CALCUL DE KI, KII ET KIII VIA   *
+*        DECOUPLAGE EN 3D AVEC ELEMENTS XFEM       *
+*                                                  *
+****************************************************
+
+* I - INIT DES DONNÉES CAS_TEST
+* -----------------------------
+
+OPTI 'DIME' 3 'ELEM' 'CUB8' ;
+BTRA = FAUX ;
+
+* DONNEES GEOMETRIQUES
+A0 = 1. ;
+L1 = A0 / 4. ;
+DENS1 = L1 / 2. ;
+DENS2 = A0 / L1 * DENS1 ;
+DENS3 = 0.5*(DENS1 + DENS2) ;
+DENS DENS1 ;
+
+* PROPRIÉTÉS MATÉRIAU
+MYOU = 2E11 ;
+POI = 0.001 ;
+KAPPA = 3-(4*POI) ;
+MU = MYOU/(2*(1+POI)) ;
+
+
+* II - MAILLAGE
+* -------------
+
+P0 = 0. 0. 0. ;
+D1 = DROI (P0 MOIN (L1 0. 0.)) (P0 PLUS (L1 0. 0.)) ;
+S1 = D1 TRAN (0. L1 0.) ;
+CONT1 = CONT S1 ;
+CONT1 = DIFF CONT1 D1 ;
+CONT2 = CONT1 HOMO (A0 / L1) P0 ;
+S2 = CONT1 REGL 'DFIN' DENS2 CONT2 ;
+S0 = S1 ET S2 ;
+V1 = S0 VOLU 'DINI' DENS3 'DFIN' DENS3 'TRAN' (0. 0. (2.*A0)) ;
+V2 = V1 SYME 'PLAN' P0 (1. 0. 0.) (0. 0. 1.) ;
+V0 = (V1 COUL 'BLEU') ET (V2 COUL 'ROUG') ;
+* TRAC 'CACH' V0 ;FIN ;
+
+* FUSION
+PRE1 = 1.E-10 ;
+ENV1 = ENVE V1 ;
+ELIM V1 V2 PRE1 ;
+PMED = V0 POIN 'PLAN' P0 (1. 0. 0.) (0. 0. 1.) ;
+PLEV = (COOR 1 PMED) POIN 'EGINFE' PRE1 ;
+LEV1 = ENV1 ELEM 'APPUYE' PLEV ;
+LEV1 = (LEV1 PLUS (0. 0. 0.)) COUL 'VIOL' ;
+LEV1 = ORIE LEV1 (0. 1. 0.) ;
+
+* FRONT
+CONT1 = CONT LEV1 ;
+PFRON = (COOR 1 CONT1) POIN 'MAXI' ;
+FRON1 = (CONT1 ELEM 'APPUYE' PFRON) COUL 'VERT' ;
+* TRAC (LEV1 ET FRON1) ;FIN ;
+
+
+* III - MODELE ET MATERIAU
+* ------------------------
+
+MOD1 = MODE V0 'MECANIQUE' 'ELASTIQUE' 'XC8R' ;
+MAT1 = MATE MOD1 'YOUN' MYOU 'NU' POI ;
+PSI0 PHI0 = PSIP V0 LEV1 'DEUX' FRON1 ;
+CHE1X = TRIE MOD1 PSI0 PHI0 ;
+RELAX = RELA MOD1 ;
+RIG1 = RIGI MAT1 MOD1 ;
+
+
+* IV - CONDITIONS AUX LIMITES POUR LES 3 MODES
+* --------------------------------------------
+
+T_CHAR = TABL ;
+T_DEPL = TABL ;
+
+* SEPARATION DE LA FRONTIERE EN 2
+ENV0 = ENVE V0 ;
+PFAC1 = (COOR 1 ENV0) POIN 'MAXI' ;
+FAC1 = ENV0 ELEM 'APPUYE' PFAC1 ;
+FAC2 = DIFF ENV0 FAC1 ;
+* BLOCAGE DES DEPLACEMENTS SUR FAC1
+BLO0 = BLOQ 'DEPL' FAC1 ;
+
+* IV.1 - EFFORTS DONNES
+* *********************
+
+* PREPARATIFS
+VEXT = V0 ELEM 'APPUYE' 'LARGEMENT' ENV0 ;
+MOD2 = REDU MOD1 VEXT ;
+X Y Z = COOR VEXT ;
+X Y = (CHAN 'CHAM' X MOD2 'STRESSES') (CHAN 'CHAM' Y MOD2 'STRESSES') ;
+TETA = CHAN (ATG Y (X + 1.E-30)) 'TYPE' 'SCALAIRE' ;
+RAY1 = (((X)**2) + ((Y)**2))**0.5 ;
+RAY1 = CHAN RAY1 'TYPE' 'SCALAIRE' ;
+PREF = 1. / ((2*PI*RAY1)**0.5) ;
+COS05 = COS (TETA/2) ;
+SIN05 = SIN (TETA/2) ;
+COS15 = COS (3*TETA/2) ;
+SIN15 = SIN (3*TETA/2) ;
+SIG0 = ZERO MOD2 'CONTRAIN' ;
+
+* MODE I :
+SXX = PREF*(COS05*(1.-(SIN05*SIN15))) ;
+SXY = PREF*(COS05*SIN05*COS15) ;
+SYY = PREF*(COS05*(1.+(SIN05*SIN15))) ;
+SZZ = POI * (SXX + SYY) ;
+SIG1 = SIG0 + (NOMC 'SMXX' SXX) + (NOMC 'SMXY' SXY) + (NOMC 'SMYY' SYY)
+                + (NOMC 'SMZZ' SZZ) ;
+T_CHAR.'I' = REDU (BSIG MOD2 SIG1) FAC2 ;
+
+* MODE II :
+SXX = PREF*(0. - (SIN05*(2.+(COS05*COS15)))) ;
+SXY = PREF*(COS05*(1.-(SIN05*SIN15))) ;
+SYY = PREF*(SIN05*COS05*COS15) ;
+SZZ = POI * (SXX + SYY) ;
+SIG1 = SIG0 + (NOMC 'SMXX' SXX) + (NOMC 'SMXY' SXY) + (NOMC 'SMYY' SYY)
+                + (NOMC 'SMZZ' SZZ) ;
+T_CHAR.'II' = REDU (BSIG MOD2 SIG1) FAC2 ;
+
+* MODE III :
+SXZ = 0. - (PREF*SIN05) ;
+SYZ = PREF*COS05 ;
+SIG1 = SIG0 + (NOMC 'SMXZ' SXZ) + (NOMC 'SMYZ' SYZ) ;
+T_CHAR.'III' = REDU (BSIG MOD2 SIG1) FAC2 ;
+
+
+* IV.2 - DEPLACEMENTS DONNES
+* **************************
+
+* PREPARATIFS
+X Y Z = COOR V0 ;
+LSUP = V1 POIN 'PLAN' P0 (1. 0. 0.) (0. 0. 1.) ;
+LSUP = (COOR 1 LSUP) POIN 'EGINFE' (0. - PRE1) ;
+LINF = V2 POIN 'PLAN' P0 (1. 0. 0.) (0. 0. 1.) ;
+LINF = (COOR 1 LINF) POIN 'EGINFE' (0. - PRE1) ;
+Y = Y + ((COOR 2 LSUP) + 1.E-30) + ((COOR 2 LINF) - 1.E-30) ;
+TETA = ATG Y (X + 1.E-30) ;
+RAY1 = (((X)**2) + ((Y)**2))**0.5 ;
+PREF = (RAY1/(2*PI))**0.5 ;
+COS05 = COS (TETA/2) ;
+SIN05 = SIN (TETA/2) ;
+XI0 = CHAN 'CHPO' MOD1 (ZERO MOD1 'DEPLACEM') ;
+
+* MODE I :
+XIX = PREF/(2.*MU)*(COS05*(KAPPA - 1. + (2.*(SIN05**2)))) ;
+XIY = PREF/(2.*MU)*(SIN05*(KAPPA + 1. - (2.*(COS05**2)))) ;
+T_DEPL.'I' = REDU (XI0 + (NOMC 'UX' XIX) + (NOMC 'UY' XIY)) FAC1 ;
+
+* MODE II :
+XIX = PREF/(2.*MU)*(SIN05*(KAPPA + 1. + (2.*(COS05**2)))) ;
+XIY = PREF/(2.*MU)*(0. - (COS05*(KAPPA - 1. - (2.*(SIN05**2))))) ;
+T_DEPL.'II' = REDU (XI0 + (NOMC 'UX' XIX) + (NOMC 'UY' XIY)) FAC1 ;
+
+* MODE III :
+XIZ = PREF*2./MU*SIN05 ;
+T_DEPL.'III' = REDU (XI0 + (NOMC 'UZ' XIZ)) FAC1 ;
+
+
+* V - RESOLUTION ET APPEL A G_THETA
+* ---------------------------------
+
+* CREATION DE LA TABLE
+SUPTAB = TABL ;
+SUPTAB.'OBJECTIF' = MOT 'DECOUPLAGE' ;
+SUPTAB.'FRONT_FISSURE' = FRON1 ; 
+SUPTAB.'MODELE' = MOD1 ;
+SUPTAB.'PSI' = PSI0 ;
+SUPTAB.'PHI' = PHI0 ;
+SUPTAB.'CARACTERISTIQUES' = MAT1 ;
+SUPTAB.'COUCHE' = 4 ;
+
+* RESOLUTION ET APPEL A G_THETA
+GTAB = TABL ;
+RIG0 = RIG1 ET BLO0 ET RELAX ;
+REPE IMOD 3 ;
+    MMOD = EXTR 'III' 1 &IMOD ;
+    TAB1 = COPI SUPTAB ;
+    CHAR0 = T_CHAR.MMOD ET (DEPI BLO0 T_DEPL.MMOD) ;
+    TAB1.'SOLUTION_RESO' = RESO RIG0 CHAR0 ;
+    TAB1.'CHARGEMENTS_MECANIQUES' = CHAR0 ;
+    G_THETA TAB1 ;
+    GTAB.MMOD = TAB1 ;
+FIN IMOD ;
+
+* CALCUL DES ERREURS
+SAUT 'LIGNE' ;
+REPE IMOD 3 ;
+* ON ITERE SUR CHAQUE CHAMP DE DEPLACEMENT UTILISE
+    MMOD = EXTR 'III' 1 &IMOD ;
+    MESS 'SOLUTION EN MODE' ' ' MMOD ' :' ;
+    SAUT 'LIGNE' ;
+    TAB1 = GTAB.MMOD ;
+    REPE JMOD 3 ;
+        MMOD = EXTR 'III' 1 &JMOD ;
+* ET ON ITERE SUR LES 3 MODES
+        KEV = EVOL 'CHPO' TAB1.'CHPO_RESULTATS' (CHAI 'K' &JMOD) FRON1 ;
+        SI BTRA ;
+            DESS KEV ;
+        FINSI ;
+        ABS1 = EXTR KEV 'ABSC' ;
+        SI (EGA &IMOD &JMOD) ;
+* SI LE MODE CORRESPOND A CELUI DU CHAMP ANALYTIQUE ON DOIT TROUVER K=1
+            ORD1 = PROG (DIME ABS1)*1. ;
+        SINON ;
+* SINON ON DOIT TROUVER K=0
+            ORD1 = PROG (DIME ABS1)*0. ;
+        FINSI ;
+        KAEV = EVOL 'MANU' 'ABS' ABS1 (CHAI 'K' &JMOD) ORD1 ;
+        INT1 = (KEV - KAEV)**2. ;
+* ON CALCULE L'ERREUR EN NORME L2
+        ERR1 = (INTG INT1 'INDI' 2 (NBEL FRON1))**0.5 ;
+        MESS 'ERREUR SUR LE CALCUL DE K' MMOD ' :'*30 ERR1 ;
+        SI (EGA &JMOD 1) ;
+            EVO1 = EVOL 'MANU' 'ABS' ABS1 (CHAI 'K' &JMOD) (PROG (DIME ABS1)*1.) ;
+            CRI1 = ((INTG (EVO1**2) 'INDI' 2 (NBEL FRON1))**0.5)*7.E-2 ;
+        FINSI ;
+        SI (ERR1 >EG CRI1) ;
+            MESS 'ERREUR : L''ERREUR SUR K' MMOD ' DEPASSE LE CRITERE' ;
+            MESS '         POUR LE CHAMP ANALYTIQUE EN MODE' ' ' &IMOD ;
+            ERRE 5 ;
+        FINSI ;
+    FIN JMOD ;
+    SAUT 'LIGNE' ;
+FIN IMOD ;
+
+FIN ;
+ 
+

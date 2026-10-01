@@ -1,0 +1,469 @@
+$$$$ DYNC     NOTICE  BP208322  20/10/06    21:15:06     10743          
+                                             DATE     20/10/06
+
+   Operateur DYNC                      Voir aussi : DYNE VIBR
+   --------------  
+   
+Section : Mecanique Dynamique
+
+FRAN==========================================================
+ 
+CHAP{Objet}
+ 
+     Calcul des branches de reponse d'un systeme mecanique en  
+     fonction de ses parametres.
+    
+     Plus precisement, une solution periodique du systeme d'equations
+     differentielles :
+         ..     .                           .
+       M q  + C q + K q = f^ext(t) + f^nl(Q,Q,a) 
+ 
+     avec :
+ 
+       M    : matrice diagonale des masses generalisees
+       C    : matrice des amortissements modaux
+       K    : matrice diagonale des raideurs generalisees
+       f^ext: vecteur des forces exterieures
+       f^nl : vecteur des forces de non-lineaires (liaisons)
+       q    : vecteur des contributions modales
+       a    : parametre de continuation 
+   
+     est calculee par la methode d'equilibrage harmonique (HBM). 
+     Ensuite, des branches de reponse sont construites pas a pas par 
+     l'algorithme de continuation par pseudo-longueur d'arc.
+     A chaque pas, la stabilite des solutions calculees est evaluee et 
+     les bifurcations eventuelles sont detectees. 
+     Trois types de reponses sont prevues : reponse forcee, cycle limite
+     d'un systeme autonome et calcul des modes non-lineaire de systemes 
+     non amorti.
+ 
+CHAP{Syntaxe}
+ 
+    TAB1  =  DYNC TMOD TCHR TLIA TAMOR TINI TNUM NHBM NFFT;
+ 
+    avec :
+
+    TMOD   : table representant une base modale ou un ensemble de
+             bases modales (type TABLE).
+
+    TCHR   : table representant les forces libres appliquees dans le  
+             domaine frequentiel (type TABLE). 
+             Uniquement utile lors du calcul d'une reponse forcee.
+ 
+    TLIA   : table rassemblant les descriptions des liaisons (type
+             TABLE).
+ 
+    TAMOR  : table representant la matrice des amortissements
+             generalises (type TABLE). Par defaut, seule la partie
+             diagonale de la matrice est consideree.
+             Non prise en compte pour les modes non-lineaires.
+
+    TINI   : table donnant une approximation initiale (type TABLE).
+
+    TNUM   : table des parametres numeriques pour la continuation 
+             (type TABLE).
+
+    NHBM   : nombre d'harmoniques dans l'approximation (type ENTIER).
+ 
+    NFFT   : nombre de pas de temps d'evaluation pour l'AFT 
+             (type ENTIER).
+
+    TAB1   : table contenant les resultats (type TABLE). 
+    
+  
+CHAP{Description des tables}
+
+   Remarques :
+   __________
+
+   * Toutes les TABLES doivent etre sous-typees.
+   * Dans toute la suite la base A represente la base modale dans 
+     laquelle les equations sont decouplees (composantes 'ALFA' ) ;
+     et la base B represente la base des deplacements des noeuds 
+     (composantes 'UX' , 'UY' , ... ). 
+  
+PART{TMOD :  Base Modale}
+
+   a/ Cas d'une base unique :
+      TMOD : table issue de l'operateur VIBR telle que :
+      TMOD.'SOUSTYPE'     = MOT  'BASE_MODALE';
+      TMOD.'MODES'        : table contenant les modes 1 a n 
+
+   b/ Cas d'une base composee de plusieurs bases :
+      TAB2.'SOUSTYPE' = MOT 'ENSEMBLE_DE_BASES';
+      TAB2.I          : table de base modale definie comme au a/ 
+                        avec I variant de 1 a n bases       
+  
+PART{TCHR :  Chargement}
+
+      On considere un chargement harmonique et on specifie son contenu 
+      frequentiel.
+
+      TCHR . 'SOUSTYPE' = MOT  'CHARGEMENT';
+      TCHR . j   =  FextA  (CHPOINT); 
+      
+      *  j  :  indice de la composante frequentielle ou s'applique le 
+               chargement avec : - j = 0 : terme constant
+                                 - j > 0 : terme en cos(jwt)
+                                 - j < 0 : terme en sin(jwt)
+      *  FextA :  description spatiale (type CHPOINT) du chargement 
+                 (projete sur base A)
+  
+      Exemple : chargement de 5. variant comme cos(+1*wt) 
+                applique selon FY en P2 : 
+         TMOD  = VIBR 'IRAM' 1. NMODE Ks Ms ;
+         Fext  = MANU CHPO P2 'FY' 5. ; 
+         FextA = PJBA Fext TMOD;
+         TCHR . +1 = FextA ;
+  
+PART{TLIA :  Description des Liaisons}
+
+      TLIA.'SOUSTYPE'   = MOT 'LIAISON';
+      TLIA.'LIAISON_A'  : TABLE de sous-type LIAISON_A, definissant
+                          les liaisons sur base A
+      TLIA.'LIAISON_B'  : TABLE de sous-type LIAISON_B, definissant
+                          les liaisons sur base B
+ 
+      Exemple :
+         TLIA = TABLE 'LIAISON'   ;
+         TTLB = TABLE 'LIAISON_B' ;
+         TLIA.'LIAISON_B' = TTLB  ;
+         TTLB.1 = TL1 ;
+         TTLB.2 = TL2 ;
+
+      TL1 et TL2 sont deux tables definissant des liaisons
+      (voir paragraphe "DEFINITION DES LIAISONS" dans la notice de 
+      l'operateur DYNE).
+      Dans la table qui regroupe les liaisons sur une base 
+      (TTLB dans l'exemple), les liaison doivent etre indicees par 
+      les entiers 1 a NL , ou NL est le nombre de ces liaisons.
+  
+PART{TAMOR :  Amortissement}
+
+      TAMOR.'SOUSTYPE'       = MOT  'AMORTISSEMENT' ;
+      TAMOR.'AMORTISSEMENT'  : matrice d'amortissement (type RIGIDITE)
+
+     * Pour l'instant, on ne considere que de l'amortissement modal, 
+       matrice diagonale.
+
+PART{TINI :  Approximation initiale}
+
+        TINI . 'SOUSTYPE' = MOT  'INITIAL' ;
+      - dans le cas d'un systeme force ou autonome :
+        TINI . 'FREQUENCE'  : valeur initiale de la frequence Wi 
+                              (FLOTTANT) 
+        TINI .    j         : approximation initiale Q0 (CHPOINT) 
+                              (facultatif) 
+      - dans le cas d'un mode non-lineaire :
+        TINI . 'ENERGIE'  : valeur initiale (petite mais non-nulle) 
+                            de l'energie Wi (FLOTTANT) 
+
+     * Wi definit l'une des bornes du parametre de continuation. 
+       L'autre borne (Wf) est renseignee dans la table TNUM . 'VAL_FIN'       
+     * L'indice j prend des valeurs entre -NHBM et +NHBM avec : 
+                 - j = 0 : terme constant
+                 - j > 0 : terme en cos(jwt)
+                 - j < 0 : terme en sin(jwt)
+     * Exemple de creation d'un chpoint Q0 :
+       ptrep1 = TMOD.'MODES' . 1 . 'POINT_REPERE';
+       Q0 = MANU 'CHPO' ptrep1 1 'ALFA' 0.5 ;
+ 
+PART{TNUM :  Parametres numeriques}
+
+        TNUM.'SOUSTYPE'  : 'PARAMETRES_NUMERIQUES' ;
+        TNUM . 'TYPE'    :  specifie le type de calcul. 
+               = | 'FORC' --> systeme non-autonome, reponse forcee
+                 | 'AUTO' --> systeme autonome, calcul de cycles limites  
+                 | 'NNM'  --> systeme Hamiltonien (modes non-lineaires non amorti)
+        TNUM . 'VAL_FIN' :  valeur finale (a atteindre) du parametre de 
+                            continuation Wf  (FLOTTANT)                               
+        TNUM . 'DS0'     :  longueur initial du pas (FLOTTANT)
+        TNUM . 'DSMAX'   :  longueur maximale du pas (FLOTTANT)
+        TNUM . 'DSMIN'   :  longueur minimale du pas (FLOTTANT)
+        TNUM . 'ITERMOY' :  nombre d'iterations ideal (ENTIER)
+        TNUM . 'ITERMAX' :  nombre maximal d'iterations (ENTIER)
+        TNUM . 'ANGLE_MIN': angle minimal en degre entre 2 pas succesifs 
+                             (FLOTTANT) 
+        TNUM . 'ANGLE_MAX': angle maximal en degre entre 2 pas succesifs
+                             (FLOTTANT) 
+        TNUM . 'ISENS'   :  sens du parcours 
+                 ISENS =  1.  : sens croissant
+                 ISENS = -1.  : sens decroissant
+        TNUM . 'NBPAS'   :  nombre de pas a calculer (ENTIER) 
+
+     * On utilise la methode de continuation par pseudo-longueur d'arc.
+       La longueur des pas est automatiquement adaptee en fonction du 
+       nombre d'iterations necessaires à la convergence du pas precedent.
+     * L'algorithme s'arrête lorsque la valeur du parametre de 
+       continuation depasse les bornes specifiees dans TINI, ou bien au
+       bout de NBPAS pas.
+
+PART{TAB1 :  Resultats de l'Operateur}
+  
+        TAB1 . 'SOUSTYPE' :  'RESULTAT_DYNC'  
+        TAB1 . 'REPONSE'  : table dont les indices sont :
+          . 'FREQUENCE'               : (LISTREEL) = { w^n } 
+          . 'COEFFICIENTS' . k . pti  : (LISTREEL) = { |Q_k^n|_2 }
+          . 'NORME_DEPLACEMENT'       : (LISTREEL) = { |Q^n|_2 }
+          . 'STABILITE'               : (LISTENTI) = 0 si stable, 1 si instable
+          . 'EXPOSANT_REEL'       . i': (LISTREEL) = { \lambda_i^n }
+          . 'EXPOSANT_IMAGINAIRE' . i': (LISTREEL) = { \lambda_i^n }
+          
+     avec :   
+     * n   : indice du pas solution
+     * k   : harmonique (k=-NHBM...+NHBM)
+     * pti : est le point repere du mode "i" (i=1..nmode).
+     * i'  : indice des exposants de Floquet (i'=1..2*nmode)
+     
+        TAB1 . 'BIFURCATION' . 'TYPE'               (LISTMOTS)
+                             . 'NORME_DEPLACEMENT'  (LISTREEL)
+                             . 'FREQUENCE'          (LISTREEL)
+                             . 'KAPPA'              (LISTREEL)
+                             . 'VECTEUR_REEL'       (TABLE de LISTREEL)
+                             . 'VECTEUR_IMAGINAIRE' (TABLE de LISTREEL)
+                             . 'COEFFICIENTS'       (TABLE de LISTREEL)
+                             
+     * Les NBIF bifurcations de codim-1 eventuellement trouvees lors de 
+     la continuation sont stockees dans ce TABLE. On les identifie par:
+          TYPE . I = 'LP' : point limite
+                   = 'BP' : point de branchement        
+                   = 'PD' : doublement de periode
+                   = 'NS' : Neimark-Sacker (Hopf secondaire)
+     * KAPPA contient les nouvelles frequences issues des bifurcations.
+       Dans le cas où I est l'indice correspondant à une bifurcation dite 
+       statique (LP ou BP), KAPPA . I = 0.  
+     * Les tableaux VECTEUR_REEL, VECTEUR_IMAGINAIRE et COEFFICIENTS 
+       contiennent NBIF LISTREELs, dont le I-ieme stocke les nm*(2*NHBM+1) 
+       coefficients de Fourier des vecteurs propres complexes et des 
+     deplacements associes à la I-ieme bifurcation.
+
+ANGL==========================================================
+
+
+ 
+CHAP{Object}
+ 
+     Computes steady-state dynamical responses of mechanial systems as
+     a function of their parameters.
+    
+     More precisely, a periodic solution of the differential system:
+         ..     .                           .
+       M q  + C q + K q = f^ext(t) + f^nl(Q,Q,a) 
+ 
+     where :
+ 
+       M    : diagonal modal mass matrix
+       C    : diagonal modal damping matrix
+       K    : diagonal modal stiffness matrix
+       f^ext: vector of applied forces
+       f^nl : vector of nonlinear forces ("linkage")
+       q    : vector of modal displacements
+       a    : continuation parameter 
+   
+     is found through the Harmonic Balance Method (HBM). 
+     Afterwards, full branches are constructed step-by-step with the 
+     pseudo arc-length continuation algorithm.
+     At each step, the stability of solutions is assessed and eventual 
+     bifurcations are detected.  
+     Three kinds of solutions are computable: forced response, limite 
+     cycle of autonomous sytem and non-normal modes of undamped system.
+ 
+CHAP{Syntax}
+ 
+    TAB1  =  DYNC TMOD TCHR TLIA TAMOR TINI TNUM NHBM NFFT;
+ 
+    with :
+
+    TMOD   : table of modal basis (type TABLE).
+
+    TCHR   : table of externally applied loads, defined in the 
+             frequency domain (type TABLE). 
+             Only for forced response.
+ 
+    TLIA   : table of "liaison" specifications (type TABLE).
+ 
+    TAMOR  : table of modal dampings (type TABLE). By default, 
+             only the diagonal part of the matrix is considered.
+             Not retained for non-normal modes.
+
+    TINI   : table describing an initial approximation (type TABLE).
+
+    TNUM   : table of settings for numerical continuation 
+             (type TABLE).
+
+    NHBM   : number of harmonics in the approximation (type ENTIER).
+ 
+    NFFT   : number of samples for AFT (type ENTIER).
+
+    TAB1   : table of results (type TABLE). 
+    
+  
+CHAP{Table description}
+
+   Remarks :
+   __________
+
+   * All TABLES objets must have a sub-type.
+   * In what follows, "base A" represente the (modal) basis on which the
+     equations are linearly uncoupled ('ALFA' components) ;
+     whereas "base B" represents the basis of node displacements
+     (components 'UX' , 'UY' , ... ). 
+  
+PART{TMOD :  Modal basis}
+
+   a/ Case of one basis:
+      TMOD : table provided by the VIBR operator, such that :
+      TMOD.'SOUSTYPE'     = MOT  'BASE_MODALE';
+      TMOD.'MODES'        : table containing modes 1 through n 
+
+   b/ Case of a basis consisting of several sub-bases :
+      TAB2.'SOUSTYPE' = MOT 'ENSEMBLE_DE_BASES';
+      TAB2.I          : modal basis table, defined as in a/ 
+                        where I takes values between 1 and n        
+  
+PART{TCHR :  Applied loads}
+
+      We consider periodic loadings and specify their frequency content. 
+
+      TCHR . 'SOUSTYPE' = MOT  'CHARGEMENT';
+      TCHR . j   =  FextA  (CHPOINT); 
+      
+      *  j  :  index of a given the frequency component of the load,  
+                         where : - j = 0 : static part
+                                 - j > 0 : cos(jwt) part
+                                 - j < 0 : sin(jwt) part
+      *  FextA :  spatial description (type CHPOINT) of the loads
+                 (projected on base A).
+  
+      Exemple for a point-wise force of magnitude 5 applied on P2 along
+      UY and evolving as cos(+1*wt): 
+         TMOD  = VIBR 'IRAM' 1. NMODE Ks Ms ;
+         Fext  = MANU CHPO P2 'FY' 5. ; 
+         FextA = PJBA Fext TMOD;
+         TCHR . +1 = FextA ;
+  
+PART{TLIA :  "Linkage" specification} 
+
+      TLIA.'SOUSTYPE'   = MOT 'LIAISON';
+      TLIA.'LIAISON_A'  : TABLE of LIAISON_A sub-type, defining
+                          base A "linkage".
+      TLIA.'LIAISON_B'  : TABLE of LIAISON_B sub-type, defining
+                          base B "linkage".
+ 
+      Exemple :
+         TLIA = TABLE 'LIAISON'   ;
+         TTLB = TABLE 'LIAISON_B' ;
+         TLIA.'LIAISON_B' = TTLB  ;
+         TTLB.1 = TL1 ;
+         TTLB.2 = TL2 ;
+
+      TL1 and TL2 are two tables containing the description of a given
+      liaison (see paragraph "DEFINITION DES LIAISONS" of the DYNE 
+      operator's manual).
+      In the table which collects all the "linkage" on a given basis
+      (TTLB in the exemple), these must be indexed by the positive 
+       integers from 1 to NL, with NL the number of said "linkage".
+  
+PART{TAMOR :  Damping}
+
+      TAMOR.'SOUSTYPE'       = MOT  'AMORTISSEMENT' ;
+      TAMOR.'AMORTISSEMENT'  : damping matrix (type RIGIDITE)
+
+     * Currently, only modal damping (with a diagonal matrix) 
+       is supported.
+
+PART{TINI :  Initial approximation} 
+
+        TINI . 'SOUSTYPE' = MOT  'INITIAL' ;
+     - in the case of o forced or autonomous system:
+        TINI . 'FREQUENCE'  : initial frequency Wi (FLOTTANT) 
+        TINI .    j         : initial approximation Q0 (CHPOINT) 
+                              (optional) 
+    - in non-normal modes case:
+        TINI . 'ENERGIE'  : initial (small but non-zero) energy Wi
+                            (FLOTTANT) 
+
+     * Wi defines one of the two bounds of the continuation parameter.
+       The other one (Wf) must be defined in the table TNUM . 'VAL_FIN'
+     * The index j takes values between -NHBM and +NHBM, where: 
+                          - j = 0 : static part
+                          - j > 0 : cos(jwt) part
+                          - j < 0 : sin(jwt) part
+     * Exemple creation of a chpoint Q0 :
+       ptrep1 = TMOD.'MODES' . 1 . 'POINT_REPERE';
+       Q0 = MANU 'CHPO' ptrep1 1 'ALFA' 0.5 ;
+ 
+PART{TNUM :  Continuation settings}
+
+        TNUM.'SOUSTYPE'  : 'PARAMETRES_NUMERIQUES' ;
+        TNUM . 'TYPE'    :  specifies the poblem type. 
+                = | 'FORC' --> forced reponse
+                  | 'AUTO' --> autonomous system, limit cycles
+                  | 'NNM'  --> Hamiltonian system (nonlinear modes)
+        TNUM . 'VAL_FIN' :  final bound Wf to reach for the continuation
+                            parameter (FLOTTANT)                               
+        TNUM . 'DS0'     :  initial step length (FLOTTANT)
+        TNUM . 'DSMAX'   :  maximum allowed step length (FLOTTANT)
+        TNUM . 'DSMIN'   :  minimum allowed step length (FLOTTANT)
+        TNUM . 'ITERMOY' :  targeted iteration number (ENTIER)
+        TNUM . 'ITERMAX' :  maximum iteration number (ENTIER)
+        TNUM . 'ANGLE_MIN': minimum allowable angle (in degrees) between 
+                            two consecutive steps (FLOTTANT) 
+        TNUM . 'ANGLE_MAX': maximum allowable angle (in degrees) between 
+                            two consecutive steps (FLOTTANT) 
+        TNUM . 'ISENS'   : continuation direction  
+                 ISENS =  1.  : increasing values
+                 ISENS = -1.  : decreasing values
+        TNUM . 'NBPAS'   :  maximum number of steps to compute (ENTIER) 
+
+     * The pseudo arc-length continuation method is employed.
+       The step size at a given point is automatically adapted as a
+       function of the number of iterations required for convergence at 
+       the preceding step.
+     * A succesful run of the algorithm stops when one of the following
+       conditions is met: the value of the continuation parameter at a 
+       given step leaves the bounds specified in TINI, or NBPAS steps
+       have been taken.
+
+PART{TAB1 :  Results} 
+------------------------------------         
+  
+        TAB1 . 'SOUSTYPE' :  'RESULTAT_DYNC'  
+        TAB1 . 'REPONSE'  : table dont les indices sont :
+          . 'FREQUENCE'               : (LISTREEL) = { w^n } 
+          . 'COEFFICIENTS' . k . pti  : (LISTREEL) = { |Q_k^n|_2 }
+          . 'NORME_DEPLACEMENT'       : (LISTREEL) = { |Q^n|_2 }
+          . 'STABILITE'               : (LISTENTI) = 0 if stable, 1 else
+          . 'EXPOSANT_REEL'       . i': (LISTREEL) = { \lambda_i^n }
+          . 'EXPOSANT_IMAGINAIRE' . i': (LISTREEL) = { \lambda_i^n }
+          
+     avec :   
+     * n   : index specifying the step number
+     * k   : harmonic component (k=-NHBM...+NHBM)
+     * pti : marker point associated with the "i"-th mode (i=1..nmode).
+     * i'  : index of Floquet exponents (i'=1..2*nmode)
+     
+        TAB1 . 'BIFURCATION' . 'TYPE'               (LISTMOTS)
+                             . 'NORME_DEPLACEMENT'  (LISTREEL)
+                             . 'FREQUENCE'          (LISTREEL)
+                             . 'KAPPA'              (LISTREEL)
+                             . 'VECTEUR_REEL'       (TABLE de LISTREEL)
+                             . 'VECTEUR_IMAGINAIRE' (TABLE de LISTREEL)
+                             . 'COEFFICIENTS'       (TABLE de LISTREEL)
+                             
+     * The NBIF codim-1 bifurcations eventually found along the response
+     curve are stocked in this TABLE. They are identified by:
+          TYPE . I = 'LP' : limit point (aka saddle node, turning point)
+                   = 'BP' : branching point 
+                   = 'PD' : period doubling
+                   = 'NS' : Neimark-Sacker (Hopf bifurcation of cycles)
+     * KAPPA contains the new frequencies arising from bifurcations.
+       If I is the index corresponding to a so-called "static" 
+       bifurcation (i.e. LP ou BP), KAPPA . I = 0.  
+     * Tables VECTEUR_REEL, VECTEUR_IMAGINAIRE and COEFFICIENTS 
+       stock NBIF LISTREELs, where I-th one contains the nm*(2*NHBM+1) 
+       Fourier coefficients of the complex eigenvectors, as well as the 
+       equilibrium solution, at the I-th bifurcation.
+
+ 
+ 

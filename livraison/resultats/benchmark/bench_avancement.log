@@ -1,0 +1,15 @@
+AVANCEMENT DU BENCHMARK PERF-RAID
+Calcul en cours : 24 sur 24 : fin - BENCHMARK_TERMINE
+Scenarios termines :
+   1     16414ms chab_orig
+   2     10977ms chab_perf1
+   3      9775ms chab_perf2
+   4     15900ms chabT_orig
+   5     17482ms chabT_perf1
+   6     13446ms chabT_perf2
+   7     30458ms maz_orig
+   8     24008ms maz_perf1
+   9     20981ms maz_perf2
+  10     34539ms mazT_orig
+  11     30704ms mazT_perf1
+  12     27063ms mazT_perf2

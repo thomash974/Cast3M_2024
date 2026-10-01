@@ -1,0 +1,949 @@
+$$$$ BIBLIO   NOTICE  PASCAL    22/12/07    21:15:02     11514          
+                                             DATE     22/12/07
+
+FRAN===================================================================
+CHAP{Specification generale}
+
+ANGL===================================================================
+CHAP{General specification}
+
+=======================================================================
+    Procedure BIBLIO                         Voir aussi :
+    ---------------- 
+
+    TAB1  =  BIBLIO  MOT1  ('REFE' ENT1) ;
+
+
+FRAN===================================================================
+    Objet :
+    -------
+
+        La procedure BIBLIO fournit des donnees issues de la litterature.
+    Les donnees d'un meme sujet sont identifiees par un mot-cle (MOT1).
+    La liste des mot-cles disponibles, donc des sujets couverts par BIBLIO,
+    est precisee dans cette notice, de meme que la liste des references
+    bibliographiques.
+
+        Pour un meme sujet (mot-cle), il peut y avoir plusieurs references
+    bibliographiques. L'option REFE permet alors de choisir parmi celles-ci
+    en fournissant le numero de la reference. Ce numero est precise entre
+    crochets dans la liste des references bibliographiques donnee dans cette
+    notice. La liste des references bibliographiques est presentee par ordre
+    alphabetique du nom du premier auteur. Enfin, pour un sujet donnee, la
+    reference utilisee par defaut est precisee dans la description des donnees
+    associees a chaque mot-cle.
+
+
+    Commentaire :
+    -------------
+
+    MOT1     : objet MOT, sujet pour lequel on souhaite obtenir des donnees.
+
+    ENT1     : objet ENTIER, numero de la reference souhaitee.
+
+    TAB1     : objet TABLE, donnees fournies par la procedure.
+
+
+    Remarque : TAB1 contient systematique les informations complementaires
+    ---------- suivantes (tracabilite) :
+               - CREATEUR  : le nom de la procedure qui les a fournies
+               - REFERENCE : MOT1 et ENT1 concatenes
+
+
+ANGL===================================================================
+    Description :
+    -------------
+
+        The BIBLIO procedure provides open data published in the literature.
+    Data on a given subject are identified by a key-word (MOT1). The list
+    of avalaible keywords, so all the subjects coverred by the procedure,
+    is given hereunder, as well as the list of bibliographic references.
+
+        For a given subject (keyword), it may have several bibliographic
+    references (inputs). The REFE option enables to choose among them by giving
+    the reference number. This reference number is indicated into brackets in
+    the list of bibliographic references given in this manual page. This list
+    is sorted by alphabetic order according to the name of the 1st author.
+    Moreover, the reference number used by default is mentionned in the
+    description of the data related to each keyword.
+
+
+    Contents :
+    ----------
+
+    MOT1     : MOT type object, subject for which your are asking for data.
+
+    ENT1     : ENTIER type object, bibliographic reference number dealing
+               with MOT1.
+
+    TAB1     : TABLE type object, data provided by the procedure.
+
+
+    Remark :   TAB1 contains also the following complementary information
+    --------   (for the sake of traceability):
+               - CREATEUR  : the name of the procedure which creates the table
+               - REFERENCE : MOT1 and ENT1 concatenated
+
+
+FRAN===================================================================
+CHAP{Mot-cle "316L"}
+PART{Caracteristiques thermomecaniques (Depradeux, 2004) [1] (defaut)}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    TAB1 . 'RHO'  : objet EVOLUTION, masse volumique (kg/m^3) en fonction
+                    de la temperature (degC) (tableau 3.6, p. 93).
+                    La valeur a 1500 degC est tiree de la remarque en bas
+                    de p. 95 concernant la chaleur latente massique.
+
+
+    - Caracteristiques thermiques :
+
+    TAB1 . 'K'    : objet EVOLUTION, conductivite thermique (W/m/degC) en
+                    fonction de la temperature (degC) (tableau 3.6, p. 93).
+                    La valeur a 1500 degC est majoree pour tenir compte des
+                    effets hydrodynamiques dans le bain de metal fondu (voir
+                    remarque 1 ci-dessous).
+
+    TAB1 . 'C'    : objet EVOLUTION, capacite calorifique massique (J/kg/degC)
+                    en fonction de la temperature (degC) (tableau 3.6,p. 93).
+
+    TAB1 . 'TFUS' : objet FLOTTANT, temperature de fusion (degC).
+
+    TAB1 . 'QLAT' : objet FLOTTANT, chaleur latente massique de fusion (J/kg).
+                    Valeur tiree de la remarque en bas de p. 95 concernant
+                    la chaleur latente massique.
+
+
+    - Caracteristiques mecaniques :
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson (P. 59).
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module de Young (Pa) en fonction de
+                    la temperature (degC).
+                    Colonne E(2), tableau A2.1, p. 210.
+
+    TAB1 . 'ALPH' : objet EVOLUTION, coefficient de dilatation thermique
+                    en fonction de la temperature (degC).
+                    Colonne alpha(2), tableau A6.2, p. 211.
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite d'elasticite conventionnelle (Pa)
+                    en fonction de la temperature (degC).
+                    Colonne Sigm(3), tableau A6.3, p. 212.
+
+    TAB1 . 'TRAC' : objet EVOLUTION, courbes de traction conventionnelle (Pa)
+                    en fonction de la temperature (degC).
+                    Tableau A6.4, p. 212-213.
+                    NB : limite elastique a 0,2% de def. plastique.
+
+    TAB1 . 'ECRO' : objet NUAGE, courbes d'ecrouissage (Sig. Vs Eps.Plas.)
+                    conventionnelle (Pa) en fonction de la temperature (degC).
+                    Ces courbes sont derivees des courbes de traction (TRAC) :
+                    on corrige la def. totale de la def. elas. (Sig/Youn) pour
+                    avoir la def. plas., puis on interpole la valeur de la
+                    contrainte pour une valeur nulle de la def. plastique.
+                    NB : la contrainte a Eps.Plas.=0 n'est pas necessairement
+                         egale a la limite d'elasticite (SIGY) fournie ci-dessus.
+
+
+    Remarque 1 : la valeur majoree de la conductivite thermique est tiree
+    ------------ de (Cambon, 2018) (voir table 1).
+                 
+
+ANGL===================================================================
+CHAP{Key-word : "316L"}
+PART{Thermomechanical characteristics (Depradeux, 2004) [1] (default)}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    TAB1 . 'RHO'  : EVOLUTION type object, density (kg/m^3) Vs. temperature
+                    (Celsius deg.) (table 3.6, p. 93).
+                    The value at 1500 degC is given according to the footnote
+                    p. 95 about the latent heat of fusion.
+
+
+    - Thermal properties :
+
+    TAB1 . 'K'    : EVOLUTION type object, thermal conductivity (W/m/degC) Vs.
+                    temperature (degC) (table 3.6, p. 93).
+                    The value at 1500 degC is increased to account for the
+                    hydrodynamical effects in the molten metal pool (see
+                    remark 1 here-under).
+
+    TAB1 . 'C'    : EVOLUTION type object, specifiq heat capacity (J/kg/degC)
+                    Vs. temperature (degC) (table 3.6,p. 93).
+
+    TAB1 . 'TFUS' : FLOTTANT type object, fusion temperature (Celcius deg.).
+
+    TAB1 . 'QLAT' : FLOTTANT type object, specific latent heat of fusion (J/kg).
+                    The value is is given according to the footnote p. 95.
+
+
+    - Mechanical properties :
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio (p.59).
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa) Vs. temperature
+                    (degC) (Column E(2), table A2.1, p. 210).
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion (/degC) Vs.
+                    temperature (degC) (Column alpha(2), table A6.2, p. 211).
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa) Vs. temperature
+                    (degC) (Column Sigm(3), table A6.3, p. 212).
+
+    TAB1 . 'TRAC' : EVOLUTION type object, conventionnal traction curves (Pa)
+                    Vs. temperature (degC) (Table A6.4, p. 212-213).
+                    NB: yield stress at 0.2% of plastic strain.
+
+    TAB1 . 'ECRO' : NUAGE type object, hardening curves (Sig. Vs. Eps.Plas.) (Pa)
+                    Vs. temperature (degC).
+                    These curves are derived from the traction curves by
+                    removing the elastic part of the total strain (Sig/Young)
+                    to get the plastic strain in abscissa, then by interpolating
+                    the stress value at zero plastic strain.
+                    NB: the stress at zero plastic strain is then not necessary
+                        equal to the yield stress (SIGY) given here above.
+
+
+    Remarque 1 : the increased value of thermal conductivity is taken from
+    ------------ (Cambon, 2018) (see table 1).
+                 
+
+FRAN===================================================================
+PART{Caracteristiques thermomecaniques (Cambon, 2018) [2]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques thermiques :
+
+    TAB1 . 'K'    : objet EVOLUTION, conductivite thermique (W/m/degC) en
+                    fonction de la temperature (degC) (Table 1).
+
+    TAB1 . 'ENTH' : objet EVOLUTION, enthalpie volumique (J/m^3) en fonction
+                    de la temperature (degC) (table 1).
+
+    TAB1 . 'TFUS' : objet FLOTTANT, temperature de fusion (degC).
+                    Valeur prise au milieu de l'intervalle de temperatures
+                    de changement de phase indiquee dans la reference
+                    (1400-1500 degC).
+
+    TAB1 . 'QLAT' : objet FLOTTANT, chaleur latente volumique de fusion (J/m^3).
+
+
+    - Caracteristiques mecaniques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module de Young (Pa) en fonction de
+                    la temperature (degC) (table 2).
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite d'elasticite conventionnelle (Pa)
+                    en fonction de la temperature (degC) (table 2).
+
+    TAB1 . 'ALPH' : objet EVOLUTION, coefficient de dilatation thermique
+                    en fonction de la temperature (degC) (table 2).
+
+    TAB1 . 'H'    : objet EVOLUTION, module d'ecrouissage (Pa) en fonction de
+                    la temperature (degC) (table 2).
+
+    TAB1 . 'ECRO' : objet NUAGE, courbes d'ecrouissage (Sig. Vs Eps.Plas.)
+                    conventionnelle (Pa) en fonction de la temperature (degC).
+                    Ces courbes sont construites a partir des donnees fournies
+                    sur la limite elastique (SIGY) et sur celles du module
+                    d'ecrouissage (H).
+
+
+ANGL===================================================================
+PART{Thermomechanical characteristics (Cambon, 2018) [2]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Thermal properties :
+
+    TAB1 . 'K'    : EVOLUTION type object, thermal conductivity (W/m/degC) Vs.
+                    temperature (degC) (table 1).
+
+    TAB1 . 'ENTH' : EVOLUTION type object, volumic enthalpy (J/m^3) Vs.
+                    temperature (degC) (table 1).
+
+    TAB1 . 'TFUS' : FLOTTANT type object, fusion temperature (Celcius deg.).
+                    The value is taken in the middle of the given melting
+                    temperature range (1400-1500 C).
+
+    TAB1 . 'QLAT' : FLOTTANT type object, volumic latent heat of fusion (J/m^3).
+
+
+    - Mechanical properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa) Vs. temperature
+                    (degC) (table 2).
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa) Vs. temperature
+                    (degC) (table 2).
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion (/degC) Vs.
+                    temperature (degC) (table 2).
+
+    TAB1 . 'H'    : EVOLUTION type object, hardening modulus (Pa) Vs.
+                    temperature (degC) (table 2).
+
+    TAB1 . 'ECRO' : NUAGE type object, hardening curves (Sig. Vs. Eps.Plas.)
+                    (Pa) Vs. temperature (degC).
+                    These curves are built according to the data on the yield
+                    stress (SIGY) and on the hardening modulus (H).
+
+
+FRAN===================================================================
+PART{Caracteristiques thermomecaniques (Muransky, 2011) [4]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques thermiques :
+
+    TAB1 . 'K'    : objet EVOLUTION, conductivite thermique (W/m^3/degC)
+                    en fonction de la temperature (degC)
+
+    TAB1 . 'C'    : objet EVOLUTION, capacite calorifique massique (J/kg/degC)
+                    en fonction de la temperature (degC)
+
+
+    - Caracteristiques mecaniques thermo-elastiques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+    TAB1 . 'ALPH' : objet EVOLUTION, dilatation thermique en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC)
+
+
+    - Caracteristiques du modele elasto-plastique de Chaboche a ecrouissage mixte :
+
+    TAB1 . 'R0'   : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC).
+
+    TAB1 . 'A1'   : objet EVOLUTION, parametre ecrouissage cinematique (Pa)
+                    en fonction de la temperature (degC).
+
+    TAB1 . 'C1'   : objet FLOTTANT, parametre ecrouissage cinematique (-).
+
+    TAB1 . 'A2'   : objet EVOLUTION, parametre ecrouissage cinematique (Pa)
+                    en fonction de la temperature (degC).
+
+    TAB1 . 'C2'   : objet FLOTTANT, parametre ecrouissage cinematique (-).
+
+    TAB1 . 'RM'   : objet EVOLUTION, contrainte a saturation de l'ecrouissage (Pa).
+
+    TAB1 . 'B'    : objet FLOTTANT, parametre ecrouissage isotrope (-).
+
+
+
+ANGL===================================================================
+PART{Thermomechanical characteristics (Muransky, 2011) [4]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Thermal properties :
+
+    TAB1 . 'K'    : EVOLUTION type object, thermal conductivity (W/m^3/degC)
+                    according to temperature (degC)
+
+    TAB1 . 'C'    : EVOLUTION type object, specifiq heat capacity (J/kg/degC)
+                    according to temperature (degC)
+
+
+    - Thermo-elastic properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion
+                    according to temperature (degC)
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+
+    - Chaboche's elastoplastic behavior law parameters :
+
+    TAB1 . 'R0'   : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'A1'   : EVOLUTION type object, kinematic hardening parameter (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'C1'   : FLOTTANT type object, kinematic hardening parameter (-).
+
+    TAB1 . 'A2'   : EVOLUTION type object, kinematic hardening parameter (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'C2'   : FLOTTANT type object, kinematic hardening parameter (-).
+
+    TAB1 . 'RM'   : EVOLUTION type object, cyclic hardening saturation stress (Pa).
+
+    TAB1 . 'B'    : FLOTTANT type object, cyclic hardening parameter (-).
+
+
+
+FRAN===================================================================
+CHAP{Mot-cle "9Cr ODS"}
+PART{Caracteristiques thermomecaniques (Le Gloannec, 2016) [3]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    TAB1 . 'RHO'  : objet FLOTTANT, masse volumique (kg/m^3)
+
+
+    - Caracteristiques thermiques :
+
+    TAB1 . 'K'    : objet EVOLUTION, conductivite thermique (W/m^3/degC)
+                    en fonction de la temperature (degC)
+
+    TAB1 . 'C'    : objet EVOLUTION, capacite calorifique massique (J/kg/degC)
+                    en fonction de la temperature (degC)
+
+
+    - Caracteristiques electriques :
+
+    TAB1 . 'KE'   : objet EVOLUTION, conductivite electrique (S/m)
+                    en fonction de la temperature (degC)
+
+
+    - Caracteristiques mecaniques thermo-elastiques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+    TAB1 . 'ALPH' : objet EVOLUTION, dilatation thermique (/degC)
+                    en fonction de la temperature (degC)
+
+
+    - Parametres loi elasto-visco-plastique a ecrouissage isotrope :
+
+    TAB1 . 'KK'   : objet EVOLUTION, limite elastique (Pa)
+                    en fonction de la temperature (degC)
+
+    TAB1 . 'RMAX' : objet EVOLUTION, limite elastique a saturation
+                    en fonction de la temperature (degC) pour le modele
+                    de comportement NOUAILHAS_B (voir MATE)
+
+    TAB1 . 'RMIN' : objet EVOLUTION, ecrouissage isotrope a saturation
+                    en fonction de la temperature (degC),
+                    parametre Rinf de la loi de comportement elasto-visco-
+                    -plastique p. 92 de (Le Gloannec, 2016)
+
+    TAB1 . 'BR'   : objet EVOLUTION, coefficient d'ecrouissage isotrope (Pa)
+                    en fonction de la temperature (degC)
+
+    TAB1 . 'N'    : objet EVOLUTION, exposant de la loi de Norton pour
+                    la viscosite en fonction de la temperature (degC)
+
+    TAB1 . 'K0'   : objet EVOLUTION, contrainte d'ecoulement visqueux (Pa.s)
+                    en fonction de la temperature (degC)
+
+
+    Remarque : les noms des parametres de la loi elasto-visco-plastique
+    ---------- a ecrouissage isotrope conviennent au modele NOUAILHAS_B,
+               les autres parametres de ce modele pouvant etre pris nuls.
+               Toutefois, ils peuvent egalement etre utilises avec d'autres
+               modeles de comportement, quitte a modifier leurs noms,
+               notamment dans les etiquettes des ordonnees des courbes
+               d'evolution.
+
+
+ANGL===================================================================
+CHAP{Key-word : "9Cr ODS"}
+PART{Thermomechanical characteristics (Le Gloannec, 2016) [3]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    TAB1 . 'RHO'  : FLOTTANT type object, density (kg/m^3)
+
+    - Thermal properties :
+
+    TAB1 . 'K'    : EVOLUTION type object, thermal conductivity (W/m^3/degC)
+                    according to temperature (degC)
+
+    TAB1 . 'C'    : EVOLUTION type object, specifiq heat capacity (J/kg/degC)
+                    according to temperature (degC)
+
+
+    - Electric properties :
+
+    TAB1 . 'KE'   : EVOLUTION type object, electric conductivity (S/m)
+                    according to temperature (degC)
+
+
+    - Thermo-elastic properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion (/degC)
+                    according to temperature (degC)
+
+
+    - Parameters of elasto-visco-plastic behavior law with isotropic hardening :
+
+    TAB1 . 'KK'   : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'RMAX' : EVOLUTION type object, yield stress at saturation
+                    according to temperature (degC) for the NOUAILHAS_B
+                    mechanical model of behavior (see MODE/MATE)
+
+    TAB1 . 'RMIN' : EVOLUTION type object, isotropic hardening at saturation
+                    according to temperature (degC),
+                    Rinf parameter of the elasto-visco-plastic behavior law
+                    presented p. 92 in (Le Gloannec, 2016)
+
+    TAB1 . 'BR'   : EVOLUTION type object, isotropic hardening ratio (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'N'    : EVOLUTION type object, Norton's law exponent of viscosity
+                    according to temperature (degC)
+
+    TAB1 . 'K0'   : EVOLUTION type object, viscous drag stress (Pa.s)
+                    according to temperature (degC)
+
+
+    Remark : the parameter names satisfy the input data of the NOUAILHAS_B
+    -------- mechanical model (see MODE and/or MATE), the other parameters
+             of this model being able to be taken null.
+             However, they can be used with other models of behavior law,
+             even if it means modifying their names, especially those of
+             the labels of the evolution curve ordinates.
+
+
+FRAN===================================================================
+CHAP{Mot-cle "Inconel 82"}
+PART{Caracteristiques thermomecaniques (Muranski, 2011) [4]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques thermiques :
+
+    TAB1 . 'K'    : objet EVOLUTION, conductivite thermique (W/m^3/degC)
+                    en fonction de la temperature (degC)
+
+    TAB1 . 'C'    : objet EVOLUTION, capacite calorifique massique (J/kg/degC)
+                    en fonction de la temperature (degC)
+
+
+    - Caracteristiques mecaniques thermo-elastiques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+    TAB1 . 'ALPH' : objet EVOLUTION, dilatation thermique en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC)
+
+
+    - Caracteristiques du modele elasto-plastique de Chaboche a ecrouissage mixte :
+
+    TAB1 . 'R0'   : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC).
+
+    TAB1 . 'A1'   : objet EVOLUTION, parametre ecrouissage cinematique (Pa)
+                    en fonction de la temperature (degC).
+
+    TAB1 . 'C1'   : objet FLOTTANT, parametre ecrouissage cinematique (-).
+
+    TAB1 . 'A2'   : objet EVOLUTION, parametre ecrouissage cinematique (Pa)
+                    en fonction de la temperature (degC).
+
+    TAB1 . 'C2'   : objet FLOTTANT, parametre ecrouissage cinematique (-).
+
+    TAB1 . 'RM'   : objet EVOLUTION, contrainte a saturation de l'ecrouissage (Pa).
+
+    TAB1 . 'B'    : objet FLOTTANT, parametre ecrouissage isotrope (-).
+
+
+
+ANGL===================================================================
+CHAP{Key-word : "Inconel 82"}
+PART{Thermomechanical characteristics (Muranski, 2011) [4]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Thermal properties :
+
+    TAB1 . 'K'    : EVOLUTION type object, thermal conductivity (W/m^3/degC)
+                    according to temperature (degC)
+
+    TAB1 . 'C'    : EVOLUTION type object, specifiq heat capacity (J/kg/degC)
+                    according to temperature (degC)
+
+
+    - Thermo-elastic properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion
+                    according to temperature (degC)
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+
+    - Chaboche's elastoplastic behavior law parameters :
+
+    TAB1 . 'R0'   : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'A1'   : EVOLUTION type object, kinematic hardening parameter (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'C1'   : FLOTTANT type object, kinematic hardening parameter (-).
+
+    TAB1 . 'A2'   : EVOLUTION type object, kinematic hardening parameter (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'C2'   : FLOTTANT type object, kinematic hardening parameter (-).
+
+    TAB1 . 'RM'   : EVOLUTION type object, cyclic hardening saturation stress (Pa).
+
+    TAB1 . 'B'    : FLOTTANT type object, cyclic hardening parameter (-).
+
+
+
+FRAN===================================================================
+CHAP{Mot-cle "A508" ou "16MND5"}
+PART{Caracteristiques thermomecaniques (Muranski, 2011) [4]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques thermiques :
+
+    TAB1 . 'K'    : objet EVOLUTION, conductivite thermique (W/m^3/degC)
+                    en fonction de la temperature (degC)
+
+    TAB1 . 'C'    : objet EVOLUTION, capacite calorifique massique (J/kg/degC)
+                    en fonction de la temperature (degC)
+
+
+    - Caracteristiques mecaniques thermo-elastiques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+    TAB1 . 'ALPH' : objet EVOLUTION, dilatation thermique en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC)
+
+
+    - Caracteristiques du modele elasto-plastique de Chaboche a ecrouissage mixte :
+
+    TAB1 . 'R0'   : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC).
+
+    TAB1 . 'A1'   : objet EVOLUTION, parametre ecrouissage cinematique (Pa)
+                    en fonction de la temperature (degC).
+
+    TAB1 . 'C1'   : objet FLOTTANT, parametre ecrouissage cinematique (-).
+
+    TAB1 . 'A2'   : objet EVOLUTION, parametre ecrouissage cinematique (Pa)
+                    en fonction de la temperature (degC).
+
+    TAB1 . 'C2'   : objet FLOTTANT, parametre ecrouissage cinematique (-).
+
+    TAB1 . 'RM'   : objet EVOLUTION, contrainte a saturation de l'ecrouissage (Pa).
+
+    TAB1 . 'B'    : objet FLOTTANT, parametre ecrouissage isotrope (-).
+
+
+PART{Caracteristiques thermomecaniques (Vincent, 2002) [5]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques mecaniques thermo-elastiques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+
+ANGL===================================================================
+CHAP{Key-word : "A508" or "16MND5"}
+PART{Thermomechanical characteristics (Muranski, 2011) [4]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Thermal properties :
+
+    TAB1 . 'K'    : EVOLUTION type object, thermal conductivity (W/m^3/degC)
+                    according to temperature (degC)
+
+    TAB1 . 'C'    : EVOLUTION type object, specifiq heat capacity (J/kg/degC)
+                    according to temperature (degC)
+
+
+    - Thermo-elastic properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion
+                    according to temperature (degC)
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+
+    - Chaboche's elastoplastic behavior law parameters :
+
+    TAB1 . 'R0'   : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'A1'   : EVOLUTION type object, kinematic hardening parameter (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'C1'   : FLOTTANT type object, kinematic hardening parameter (-).
+
+    TAB1 . 'A2'   : EVOLUTION type object, kinematic hardening parameter (Pa)
+                    according to temperature (degC).
+
+    TAB1 . 'C2'   : FLOTTANT type object, kinematic hardening parameter (-).
+
+    TAB1 . 'RM'   : EVOLUTION type object, cyclic hardening saturation stress (Pa).
+
+    TAB1 . 'B'    : FLOTTANT type object, cyclic hardening parameter (-).
+
+
+PART{Caracteristiques thermomecaniques (Vincent, 2002) [5]}
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Thermo-elastic properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+
+FRAN===================================================================
+CHAP{Mot-cle "Austenite"}
+PART{Caracteristiques thermomecaniques (Vincent, 2002) [5]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques mecaniques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+    TAB1 . 'TALP' : objet FLOTTANT, temperature de reference de la
+                    dilatation thermique (degC)
+
+    TAB1 . 'ALPH' : objet EVOLUTION, dilatation thermique en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'DCOM' : objet FLOTTANT, difference de compacite entre l'austenite
+                    et la ferrite (austenite plus compacte). Quantite homogene
+                    a une deformation volumique.
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'ECRO' : objet NUAGE, courbes d'ecrouissage (Sig. Vs Eps.Plas.)
+                    conventionnelle (Pa) en fonction de la temperature (degC).
+
+
+ANGL===================================================================
+CHAP{Key-word : "Austenite"}
+PART{Thermomechanical characteristics (Vincent, 2002) [5]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Mechanical properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+    TAB1 . 'TALP  : FLOTTANT type object, reference temperature for the
+                    thermal expansion (degC)
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion
+                    according to temperature (degC)
+
+    TAB1 . 'DCOM' : FLOTTANT type object, difference in compactness between
+                    austenite and ferrite (austenite more compact).
+                    Thermal expansion-like quantity.
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'ECRO' : NUAGE type object, hardening curves (Sig. Vs. Eps.Plas.)
+                    (Pa) Vs. temperature (degC).
+
+
+FRAN===================================================================
+CHAP{Mot-cle "Ferrite"}
+PART{Caracteristiques thermomecaniques (Vincent, 2002) [5]}
+
+    Donnees fournies dans TAB1 :
+    ----------------------------
+
+    - Caracteristiques mecaniques :
+
+    TAB1 . 'YOUN' : objet EVOLUTION, module d'Young (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'NU'   : objet FLOTTANT, coefficient de Poisson
+
+    TAB1 . 'TALP' : objet FLOTTANT, temperature de reference de la
+                    dilatation thermique (degC)
+
+    TAB1 . 'ALPH' : objet EVOLUTION, dilatation thermique en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'SIGY' : objet EVOLUTION, limite elastique (Pa) en fonction
+                    de la temperature (degC)
+
+    TAB1 . 'ECRO' : objet NUAGE, courbes d'ecrouissage (Sig. Vs Eps.Plas.)
+                    conventionnelle (Pa) en fonction de la temperature (degC).
+
+
+ANGL===================================================================
+CHAP{Key-word : "Ferrite"}
+PART{Thermomechanical characteristics (Vincent, 2002) [5]}
+
+
+    Output data in table TAB1 :
+    ---------------------------
+
+    - Mechanical properties :
+
+    TAB1 . 'YOUN' : EVOLUTION type object, Young's modulus (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'NU'   : FLOTTANT type object, Poisson's ratio
+
+    TAB1 . 'TALP  : FLOTTANT type object, reference temperature for the
+                    thermal expansion (degC)
+
+    TAB1 . 'ALPH' : EVOLUTION type object, thermal expansion
+                    according to temperature (degC)
+
+    TAB1 . 'SIGY' : EVOLUTION type object, yield stress (Pa)
+                    according to temperature (degC)
+
+    TAB1 . 'ECRO' : NUAGE type object, hardening curves (Sig. Vs. Eps.Plas.)
+                    (Pa) Vs. temperature (degC).
+
+
+FRAN===================================================================
+CHAP{References bibliographiques}
+
+ANGL===================================================================
+CHAP{Bibliography}
+
+=======================================================================
+PART{Cambon, 2018 [2]}
+
+    Camille Cambon, Issam Bendaoud, Sébastien Rouquette, Fabien Soulie.
+    "Influence of the first weld bead on strain and stress states in
+    wire+arc additive manufacturing".
+    The 12th International Seminar ”Numerical Analysis of Weldability”,
+    Institute for Materials Science, Joining and Forming (IMAT),
+    Sept. 2018, Seggau, Austria.
+    hal-01954354
+
+
+PART{Depradeux, 2004 [1]}
+
+    Lionel Depradeux.
+    "Simulation numerique du soudage - Acier 316L : validation sur cas
+    tests de complexite croissante".
+    These de doctorat.  
+    Institut National des Sciences Appliquees de Lyon.
+    2004.
+
+
+PART{Le Gloannec, 2016 [3]}
+
+    Brendan Le Gloannec.
+    "Modifications microstructurales sous sollicitations thermomécaniques sévères :
+    application au soudage par résistance des gaines de combustibles en aciers ODS".
+    Thèse de doctorat.
+    Université de Bordeaux.
+    2016.
+
+
+PART{Muranski, 2011 [4]}
+
+    O. Muransky, M.C. Smith, P.J. Bendeich, L. Edwards
+    "Validated numerical analysis of residual stresses in Safety Relief Valve (SRV)
+    nozzle mock-ups"
+    Computational Materials Science, 50 (2011) 2203–2215
+
+
+PART{Vincent, 2002 [5]}
+
+    Yannick Vincent.
+    "Simulation numérique des conséquences métallurgiques et mécaniques
+    induites par une opération de soudage : acier 16MND5".
+    Thèse de doctorat.
+    INSA de Lyon.
+    2002.
+
+
+$$$$
+ 
+ 
+ 
+ 
+ 
+ 

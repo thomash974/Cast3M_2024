@@ -1,0 +1,237 @@
+$$$$ ET       NOTICE  PV090527  23/12/18    21:15:03     11810          
+                                             DATE     23/12/18
+
+
+Section : Langage Objets
+Section : Mathematiques Logique
+Section : Mathematiques Autres
+
+FRAN==========================================================
+    Operateur ET                             Voir aussi :   OU DIFF INTE
+    ------------                                             +
+
+    ----------------------
+    |  1ere possibilite  |
+    ----------------------
+
+ANGL==========================================================
+    Operator  ET                               See also :   OU DIFF INTE
+    ------------                                             +
+
+    ----------------------
+    |  1rst possibility  |
+    ----------------------
+
+==============================================================
+    OBJETR = 'ET' ('TELQUEL') OBJET1  OBJET2 (OBJET3 ...) ('NOER');
+
+FRAN==========================================================
+   Objet :
+    _______
+
+    L'operateur ET construit l'objet OBJETR representant le resultat
+    de la fusion des objets OBJET1 et OBJET2.
+
+    Cette operation n'a actuellement de sens qu'entre objets de meme
+    type. Le resultat a le meme type que les objets OBJET1 et OBJET2.
+   
+    Dans le seul cas ou OBJET1 et OBJET2 sont de type logique, il peut
+    y avoir d'autres opérandes également de type logique.
+
+    Font exceptions a cette regle les concatenations respectives de
+    POINT           et MAILLAGE  ->  MAILLAGE
+    POINT           et POINT     ->  MAILLAGE  (elements de type POI1)
+    MOT             et LISTMOTS  ->  LISTMOTS
+    ENTIER          et LISTENTI  ->  LISTENTI
+    FLOTTANT/ENTIER et LISTREEL  ->  LISTREEL
+    ENTIER          et ENTIER    ->  LISTENTI
+    FLOTTANT        et FLOTTANT  ->  LISTREEL
+    ENTIER          et FLOTTANT  ->  LISTREEL
+    FLOTTANT        et ENTIER    ->  LISTREEL
+    OBJET           et LISTOBJE  ->  LISTOBJE (voir remarque)
+
+    Commentaire :
+    _____________
+
+    Les types d'objet acceptes par l'operateur ET sont :
+ANGL==========================================================
+    Description :
+    ____________
+
+    The ET operator constructs the OBJETR object which results from
+    the fusion between OBJET1 and OBJET2.
+
+    This operation does not make sense if the objects are of a
+    different type. The type of the result is the same as that of OBJET1
+    and OBJET2. 
+  
+    In the unique case where OBJET1 and OBJET2 are of LOGIQUE type, other
+    operands also og LOGIQUE type can be given.
+
+    Exceptions are the respectives concatenations of
+    POINT           and MAILLAGE ->  MAILLAGE
+    POINT           and POINT    ->  MAILLAGE (elements of type POI1)
+    MOT             and LISTMOTS ->  LISTMOTS
+    ENTIER          and LISTENTI ->  LISTENTI
+    FLOTTANT/ENTIER and LISTREEL ->  LISTREEL
+    ENTIER          and ENTIER   ->  LISTENTI
+    FLOTTANT        and FLOTTANT ->  LISTREEL
+    ENTIER          and FLOTTANT ->  LISTREEL
+    FLOTTANT        and ENTIER   ->  LISTREEL
+    OBJET           et LISTOBJE  ->  LISTOBJE (see remark)
+
+    Contents :
+    __________
+
+    The types of object accepted by the ET operator are :
+==========================================================
+    POINT    MAILLAGE  LOGIQUE   CHPOINT  RIGIDITE  MMODEL   MCHAML
+    ATTACHE  BLOQSTRU  ELEMSTRU  SOLUTION DEFORME   BASMOD   VECTEUR
+    LISTREEL LISTENTI  EVOLUTIO  CHARGEME STRUCTUR  MCHAML   TABLE
+    LISTMOTS MOT       NUAGE     LISTCHPO MATRIK    FLOTTANT ENTIER
+    LISTOBJE
+
+FRAN==========================================================
+    Remarques :
+    ___________
+
+   * Si les objets OBJET1 et OBJET2 sont de type LOGIQUE,
+     le resultat est la conjonction logique des 2 objets.
+     D'autres LOGIQUEs peuvent aussi être fournis et le résultat
+     est alors la conjonction logique de tous les objets. 
+
+
+   * Si les objets OBJET1 et OBJET2 sont de type CHPOINT, l'operation
+     n'est possible que si ils ont la meme nature (DISCRET ou DIFFUS).
+     Le resultat est la concatenation des deux objets pour leurs parties
+     disjointes et pour leurs parties communes constituees par les memes
+     composantes aux memes noeuds le resultat depend de leur nature :
+     - s'ils sont de nature diffuse la valeur doit etre la meme pour
+         les deux champs, sauf si le motcle NOER est indique.
+     - s'ils sont de nature discrete on somme les deux valeurs.
+
+
+   * Si les objets OBJET1 et OBJET2 sont de type MOT, ils doivent
+     etre places derriere ET. Le resultat est la concatenation des deux
+     mots. Si le mot 'TELQUEL' est utilise les blancs aux extremites de
+     OBJET1 et OBJET2 sont conserves. Voir aussi operateur 'CHAINE'.
+
+   * Si les objets OBJET1 et OBJET2 sont de type TABLE, ils
+     doivent etre tous les deux de sous-type "LIAISONS_STATIQUES",
+     ou bien "BASE_MODALE".
+
+   * Si les objets OBJET1 et OBJET2 sont de type MAILLAGE, les
+     partitions de type SEG2 sont concatenees en veillant a preserver une
+     continuite de parcours de la partition resultat, sauf en presence du
+     mot-clef 'TELQUEL' qui force un respect de l'ordre des maillages
+     fournis en entree.
+
+   * Si OBJET1 et OBJET2 sont un LISTOBJE et un OBJET de meme type
+     que ceux contenus dans la liste, l'objet est ajoute en fin de
+     liste.
+
+ANGL==========================================================
+    Notes :
+    ________
+
+    * If the type of OBJET1 and OBJET2 is LOGIQUE, the result is
+      the logical conjunction of the 2 objects.
+      Other LOGIQUE can also be given and the result is the logical
+      conjunction of all objects.
+
+    * If the type of OBJET1 and OBJET2 is CHPOINT, this operation is
+      possible only if they have the same attribut of nature
+      (diffus,discret).
+      The result is the concatenation of the 2 objects for their
+      disjointed parts and for their common parts consisting of the
+      same components at the same nodes the result depend on their
+      nature:
+      - if both fileds have a 'diffuse' nature the value must the same
+        at the point execpt in presence of NOER keyword.
+      - if both fields have a 'discrete' nature the two values are
+        added.
+
+    * If the type of OBJET1 and OBJET2 is MOT, they will have to
+      be mentioned after ET. The result is the concatenation of the
+      two words. If the word 'TELQUEL' (as initial) is specified blanks
+      at the ends of OBJET1 and OBJET2 are not suppressed. See also
+      'CHAINE' operator.
+
+    * If the type of OBJET1 and OBJET2 is TABLE, both must be either
+      of "LIAISONS_STATIQUES" subtype or "BASE_MODALE" subtype.
+
+    * If the type of OBJET1 and OBJET2 is MAILLAGE, the sub-meshes of
+      SEG2 type are concatenated so that the succession of segment is
+      continuous (if possible), except with the key-word 'TELQUEL', that
+      forces the respect of the order in which the meshes are given to
+      the operator.
+
+    * If OBJET1 and OBJET2 are a LISTOBJE and an OBJECT of the same
+      type that those contained in the list, this object is added
+      at the end of the list.
+
+FRAN==========================================================
+    ----------------------
+    |  2eme possibilite  |
+    ----------------------
+
+ANGL==========================================================
+    ----------------------
+    |  2nd  possibility  |
+    ----------------------
+
+==============================================================
+    OBJET2 = 'ET'  ( TAB1  )  ;
+                   ( LOBJ1 )
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur ET construit la fusion de l'ensemble des objets
+    contenus :
+    - soit dans la table de sous-type ESCLAVE TAB1 ;
+    - soit dans la liste d'objets LOBJ1.
+
+    Ces objets doivent etre de type POINT, MAILLAGE, CHPOINT, MCHAML,
+    RIGIDITE, MATRIK, MMODEL, EVOLUTION, LISTREEL, LISTENTI, FLOTTANT
+    ou ENTIER.
+
+    Le resultat est du meme type que les objets places en chaque indice
+    entier de TAB1 a l'exception des objets repertories dans le
+    tableau qui suit :
+
+    +----------------------+-------------------+
+    | Type de de l'indice  |  Type du résultat |
+    +----------------------+-------------------+
+    | POINT                |  MAILLAGE         |
+    | FLOTTANT             |  LISTREEL         |
+    | ENTIER               |  LISTENTI         |
+    +----------------------+-------------------+
+
+ANGL==========================================================
+    Purpose:
+    _______
+
+    The ET operator builds the union of the objects stored in:
+    - either the table TAB1 with 'SOUSTYPE' 'ESCLAVE';
+    - or the list of objects LOBJ1.
+
+    These objects must be of type POINT, MAILLAGE, CHPOINT, MCHAML,
+    RIGIDITE, MATRIK, MMODEL, EVOLUTION, LISTREEL, LISTENTI, FLOTTANT
+    or ENTIER.
+
+    The result has the same type as the objects placed at each index
+    of TAB1 excepted for the objects listed in the following table:
+
+    +----------------------+-------------------+
+    | Index's type         |  Result's type    |
+    +----------------------+-------------------+
+    | POINT                |  MAILLAGE         |
+    | FLOTTANT             |  LISTREEL         |
+    | ENTIER               |  LISTENTI         |
+    +----------------------+-------------------+
+
+$$$$
+ 
+ 

@@ -1,0 +1,235 @@
+* fichier : g_c_etoile_3D_1.dgibi
+****************************************************
+* Section : Mecanique Rupture
+****************************************************
+*                                                  *
+*       VALIDATION DE LA PROCEDURE G_THETA         *
+*   POUR UN DEFAUT CIRCONFERENTIEL DANS UN TUYAU   *
+*  SOLUTION DE REFERENCE : Ductile Fracture        *
+*  Handbook, A. Zahoor                             * 
+*                                                  *
+*                                                  *
+*  GEOMETRIE : tube                                *
+*                                                  *
+*  rayon interne du tube     : 500. MM             *
+*  epaisseur du tube         : 100. MM             *
+*  rayon moyen du tube       : 550. MM             *
+*  longueur de la fissure    :  50. MM             *
+*                                                  *
+*  MATERIAU : loi de Norton                        *
+*                                                  *
+*  Module d'Young         : 2.E5 MPa               *
+*  Coefficient de poisson : 0.3                    *
+*  Coefficient N (Norton) : 7                      *
+*  Coefficient A (Norton) : 3.E-24 /h/MPa^7        *
+*                                                  *
+*  CHARGEMENT :                                    *
+*                                                  *
+*  Traction pure          : 193.15 MPa             *
+*                                                  *
+*  SOLUTION ANALYTIQUE (APPROCHEE) :               *
+*                                                  *
+*  Intégrale C*                                    *
+*                C* = 0.25316 kJ/m^2/h             *
+*                                                  *
+****************************************************
+
+* VALIDATION COMPLETE OU JUSTE FONCTIONNEMENT
+VALIDATION = vrai ;
+
+* I - REALISATION DU CALCUL
+* -------------------------
+
+* OPTIONS
+OPTI 'DIME' 3 'ELEM' 'CU20' 'DENS' 1. ;
+
+* I.1 - MAILLAGE
+* **************
+
+* GEOMETRIE :
+* R = RAYON INTERNE
+* B = EPAISSEUR
+* L = LONGUEUR DU TUBE
+* A = LONGUEUR DE LA FISSURE
+* ANR = ANGLE DE ROTATION
+
+R = 500. ;
+B = 100. ;
+A = B/2. ;
+L = 1.5*R ;
+ANR = 0.5 ;
+
+DIS1 = A/8. ;
+P1 = 0. 0. 0. ;
+P2 = (A - DIS1) 0. 0. ;
+P3 = A 0. 0. ;
+P4 = (A - DIS1) 0. DIS1 ;
+P5 = A 0. DIS1 ;
+P6 = 0. 0. (6.*DIS1) ;
+P7 = (A - DIS1) 0. (6.*DIS1) ;
+P8 = A 0. (6.*DIS1) ;
+SUT = SURF 'PLAN' (DROI 2 P2 P3 DROI 2 P4 DROI 1 P2) ;
+SUT = SUT ET (SUT SYME 'DROI' P4 P3) ;
+SUT = SUT ET (REGL (DROI 1 P4 P5) (DROI 1 P7 P8) 'DINI' DIS1 'DFIN' DIS1) ;
+L1 = DROI P1 P2 'DINI' DIS1 'DFIN' DIS1 ;
+L2 = DROI P6 P7 'DINI' DIS1 'DFIN' DIS1 ;
+SUT = SUT ET (REGL L1 L2 'DINI' DIS1 'DFIN' DIS1) ;
+P9 = 0. 0. (8.*DIS1) ;
+P10 = A 0. (8.*DIS1) ;
+L1 = (DROI P6 P7 'DINI' DIS1 'DFIN' DIS1) ET (DROI 1 P7 P8) ;
+L2 = DROI P9 P10 'DINI' (2.*DIS1) 'DFIN' (2.*DIS1) ;
+SUT = SUT ET (COUT L1 L2) ;
+VEC1 = 0. 0 .((L/2.) - (4.*DIS1) - (COOR 3 P9)) ;
+SU2 = TRAN L2 'DINI' (2*DIS1) 'DFIN' (2*DIS1) VEC1 ;
+P15 = 0. 0. L ;
+P16 = A 0. L ;
+SU3 = TRAN (DROI P15 P16 'DINI' (4.*DIS1) 'DFIN' (4.*DIS1))
+                        'DINI' (5.*DIS1) 'DFIN' (3.5*DIS1) (0. 0. (0. - (L/2.))) ;
+L1 = COTE 3 SU2 ;
+L2 = COTE 3 SU3 ;
+SUT = SUT ET SU2 ET SU3 ET (COUT L1 L2) ;
+L5 = (CONT SUT) ELEM 'APPUYE' (SUT POIN 'DROI' (0. 0. 0.) (B 0. 0.) 1.E-8) ;
+SUT = SUT ET (SYME SUT 'DROI' P3 P16) ;
+ELIM SUT 1.E-8 ;
+DEPL 'PLUS' SUT (R 0. 0.) ;
+NN = 1 ;
+PRF1 = 0. 0. 0. ;
+PRF2 = (0. 0. 1.E3) ;
+VOT = SUT VOLU NN 'ROTA' ANR PRF1 PRF2 ;
+CONT1 = CONT SUT ;
+L1 = COUL (CONT1 ELEM 'APPUYE'
+                        (SUT POIN 'DROI' (R 0. 0.) ((B+R) 0. 0.) 1.E-10)) 'ROUG' ;
+L2 = COUL (CONT1 ELEM 'APPUYE'
+                        (SUT POIN 'DROI' ((B+R) 0. 0.) ((B+R) 0. L) 1.E-10)) 'VERT' ;
+L3 = COUL (CONT1 ELEM 'APPUYE'
+                        (SUT POIN 'DROI' ((B+R) 0. L) (R 0. L) 1.E-10)) 'ROUG' ;
+L4 = COUL (CONT1 ELEM 'APPUYE'
+                        (SUT POIN 'DROI' (R 0. L) (R 0. 0.) 1.E-10)) 'VERT' ;
+LF = COUL (L1 ELEM 'COMPRIS' (SUT POIN 'PROC' (R 0. 0.))
+                                                                (SUT POIN 'PROC' ((R+A) 0. 0.))) 'TURQ' ;
+NN = 1 ;
+SU1 = L1 ROTA NN ANR PRF1 PRF2 ;
+SU2 = L2 ROTA NN ANR PRF1 PRF2 ;
+PSUP = (COOR 3 VOT) POIN 'MAXI' ;
+SU3 = (ENVE VOT) ELEM 'APPUYE' PSUP ;
+SU3 = L3 ROTA NN ANR PRF1 PRF2 ;
+SU4 = L4 ROTA NN ANR PRF1 PRF2 ;
+SUF = LF ROTA NN ANR PRF1 PRF2 ;
+ELIM VOT (SU1 ET SU2 ET SU3 ET SU4 ET SUF) 1.E-10 ;
+FRONF = COTE 2 SUF ;
+P1 = L1 POIN 'INITIAL' ;
+P2 = L1 POIN 'FINAL' ;
+P3 = L2 POIN 'FINAL' ;
+P4 = L3 POIN 'FINAL' ;
+SINAN = SIN ANR ;
+COSAN = COS ANR ;
+P11 = VOT POIN 'PROC' ((R*COSAN) (R*SINAN) 0.) ;
+P12 = VOT POIN 'PROC' (((R+B)*COSAN) ((R+B)*SINAN) 0.) ;
+P13 = VOT POIN 'PROC' (((R+B)*COSAN) ((R+B)*SINAN) L) ;
+P14 = VOT POIN 'PROC' ((R*COSAN) (R*SINAN) L) ;
+
+
+* I.2 - MODELE ET MATERIAU
+* ************************
+
+* PROPRIETES :
+* MYOUN = MODULE D'YOUNG
+* NU1 = COEFFICIENT DE POISSON
+* AF1, AF2, AF3 = COEFFICIENTS DE NORTON
+
+MYOUN = 2.E5 ;
+NU1 = 0.3 ;
+AF1 = 3.E-23 ;
+AF2 = 7. ;
+AF3 = 1. ;
+
+* MODELE
+MOD1 = MODE VOT 'MECANIQUE' 'ELASTIQUE' 'FLUAGE' 'NORTON' ;
+MAT1 = MATE MOD1 'YOUN' MYOUN 'NU' NU1 'AF1' AF1 'AF2' AF2 'AF3' AF3 
+         'SMAX' 0. ;
+
+
+* I.3 - CONDITIONS AUX LIMITES ET CHARGEMENT
+* ******************************************
+
+* CHARGE LIMITE
+SIG0 = 320. ;
+SIG1 = 2.*(((R+B)**2.) - ((R+A)**2.))*SIG0/(((R+B)**2.) - (R**2.))/(3.**0.5) ;
+* CHARGEMENT
+FOR1 = PRES 'MASS' MOD1 (0.-SIG1) SU3 ;
+EVO1 = EVOL 'MANU' (PROG 0. 0.2 1.E20) (PROG 0. 1. 1.) ;
+CHA1 = CHAR 'MECA' FOR1 EVO1 ;
+
+* CLS
+CL1 = SYMT 'DEPL' (SU1 DIFF SUF) P1 P2 P11 1.E-5 ;
+CL2 = SYMT 'DEPL' VOT P11 P12 P13 1.E-5 ;
+CL3 = SYMT 'DEPL' SUT P1 P2 P3 1.E-5 ;
+CL0 = CL1 ET CL2 ET CL3 ;
+
+
+* I.4 - APPEL A PASAPAS
+* *********************
+
+TAB1 = TABL ;
+TAB1.'MODELE' = MOD1 ;
+TAB1.'CARACTERISTIQUES' = MAT1 ;
+TAB1.'BLOCAGES_MECANIQUES' = CL0 ;
+TAB1.'CHARGEMENT' = CHA1 ;
+LIS1 = PROG 0. PAS 0.02 0.2 PAS 0.05 1. PAS 0.5 10. PAS 5. 100. PAS 50. 1000.
+                PAS 20. 1500. ;
+SI VALIDATION ;
+        TAB1.'TEMPS_CALCULES' = LIS1 ;
+SINON ;
+        TAB1.'TEMPS_CALCULES' = EXTR LIS1 (LECT 1 PAS 1 20) ;
+FINSI ;
+MES_SAUV = TABL ;
+MES_SAUV.'DEFIN' = VRAI ;
+TAB1.'MES_SAUVEGARDES' = MES_SAUV ;
+PASAPAS TAB1 ;
+
+* COD
+COD = 2.*(EVOL 'TEMP' TAB1 'DEPLACEMENTS' 'UZ' P1) ;
+* DESS COD ;
+
+
+* II - APPEL A G_THETA ET COMPARAISON A LA SOLUTION ANALYTIQUE
+* ------------------------------------------------------------
+
+* II.1 - APPEL A G_THETA
+* **********************
+
+* ON CREE LA TABLE SUPTAB
+SUPTAB = TABL ;
+SUPTAB.'SOLUTION_PASAPAS' = TAB1 ;
+SUPTAB.'OBJECTIF' = 'C*' ;
+SUPTAB.'LEVRE_SUPERIEURE' = SUF ;
+SUPTAB.'FRONT_FISSURE' = FRONF ;
+SUPTAB.'COUCHE' = 4 ;
+
+* ON APPELLE G_THETA
+G_THETA SUPTAB ;
+EVOL_GLOBAL = SUPTAB.'EVOLUTION_RESULTATS'.'GLOBAL';
+NDER = DIME SUPTAB.'RESULTATS' ;
+C_GT = SUPTAB.'RESULTATS'.(NDER-1).'GLOBAL' ;
+
+
+* II.2 - SOLUTION ANALYTIQUE
+* **************************
+
+SI VALIDATION ;
+        H1 = 3.07 ;
+        C_AN = SIG0*AF1*(SIG0**AF2)*B*((1-(A/B))**2)*H1 ;
+        ERR1 = (ABS (C_AN - C_GT)) / C_AN ;
+        MESS  (CHAI 'ERREUR RELATIVE :' ' ' 'FORMAT' '(F4.1)' (100*ERR1) ' %') ;
+        SI (ERR1 > 0.05) ;
+                ERRE 5 ;
+        FINSI ;
+FINSI ;
+
+FIN ;
+ 
+
+ 
+
+ 
+

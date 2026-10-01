@@ -1,0 +1,104 @@
+$$$$ RECOVIBC NOTICE  BP208322  22/02/15    21:15:02     11284          
+                                             DATE     22/02/15
+
+    Procedure RECOVIBC                       Voir aussi : RECO
+    ------------------
+
+    RECOVIBC TbasC2 TbasR1;
+
+
+Section : Dynamique Post-traitement 
+
+FRAN==========================================================
+    Objet :
+    -------
+
+    Recombine une base modale complexe TbasC2 notée [q] obtenue avec VIBC
+    sur un problème projeté sur la base de modes réelles TbasR1 notée [X],
+    qui n'aurait pas déjà été recombinée directement par VIBC.
+    Les déformées modales complexes recombinée z_j sont ainsi
+    supportées par les degrés de liberté du modèle éléments finis : 
+   
+       z_j^R = [X] * q_j^R
+       z_j^I = [X] * q_j^I
+       
+    Commentaire :
+    -------------
+    
+    TbasR1 (E)   : Objet TABLE de sous-type BASE_MODALE issue de VIBR
+    
+    TbasC2 (E/S) : Objet TABLE de sous-type BASE_MODALE issue de VIBC
+                   avec les indices suivants :
+    
+    - en entrée (E) de RECOVIBC :
+   
+      TbasC2
+      . 'MODES' 
+        . 'MAILLAGE'  = maillage des point_repere des modes
+        . j           = table du j ème mode complexe
+          . 'DEFORMEE_MODALE_REELLE'       = q_j^R 
+          . 'DEFORMEE_MODALE_IMAGINAIRE'   = q_j^I 
+    
+    - en sortie (S) de RECOVIBC ::
+   
+      TbasC2
+      . 'MODES' 
+        . 'MAILLAGE'    = maillage de TbasR1
+        . 'MAILLAGE_P'  = maillage des point_repere des modes
+        . j             = table du j ème mode complexe
+          . 'DEFORMEE_MODALE_REELLE'       = z_j^R 
+          . 'DEFORMEE_MODALE_IMAGINAIRE'   = z_j^I 
+          . 'DEFORMEE_MODALE_REELLE_P'     = q_j^R 
+          . 'DEFORMEE_MODALE_IMAGINAIRE_P' = q_j^I
+     
+ 
+ANGL==========================================================
+    Description :
+    -------------
+
+    Recombine the complex modal basis TbasC2 named [q] obtained by VIBC
+    on a problem projected on the real modal basis TbasR1 named [X],
+    which has not be recombined directly by VIBC.
+    The complex modal shapes recombined z_j are then described on the
+    degree of freedom of the finite element model such that : 
+   
+       z_j^R = [X] * q_j^R
+       z_j^I = [X] * q_j^I
+       
+    Comments :
+    ----------
+   
+    TbasR1 (E)   : TABLE object of sub-type BASE_MODALE get from VIBR
+    
+    TbasC2 (E/S) : TABLE object of sub-type BASE_MODALE get from VIBC
+                   so that it has the following indexes :
+    
+    - input (E) of RECOVIBC :
+   
+      TbasC2
+      . 'MODES' 
+        . 'MAILLAGE'  = mesh of "point_repere" of modes
+        . j           = table of the j th complex mode
+          . 'DEFORMEE_MODALE_REELLE'       = q_j^R 
+          . 'DEFORMEE_MODALE_IMAGINAIRE'   = q_j^I 
+    
+    - output (S) of RECOVIBC :
+   
+      TbasC2
+      . 'MODES' 
+        . 'MAILLAGE'    = mesh of TbasR1
+        . 'MAILLAGE_P'  = mesh of "point_repere" of modes
+        . j             = table of the j th complex mode
+          . 'DEFORMEE_MODALE_REELLE'       = z_j^R 
+          . 'DEFORMEE_MODALE_IMAGINAIRE'   = z_j^I 
+          . 'DEFORMEE_MODALE_REELLE_P'     = q_j^R 
+          . 'DEFORMEE_MODALE_IMAGINAIRE_P' = q_j^I
+    
+    
+    
+    
+$$$$
+ 
+ 
+ 
+ 

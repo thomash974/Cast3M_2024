@@ -1,0 +1,233 @@
+$$$$ WAAM     NOTICE  SP204843  23/07/03    21:15:04     11697          
+                                             DATE     23/07/03
+  
+=======================================================================
+    Procedure WAAM                           Voir aussi : SOUDAGE
+    ==============
+
+FRAN===================================================================
+CHAP{Specification generale}
+
+    Objet :
+    -------
+
+        La procedure WAAM permet de mailler une sequence de soudage
+    (voir SOUDAGE). Outre le maillage, elle fournit en sortie un
+    sequencage du maillage en fonction du temps representant une
+    discretisation spatio-temporelle de l'apport de matiere selon
+    un pas de discretisation choisi. Elle propose egalement une
+    discretisation temporelle du chargement (sous-option TEMP).
+    Enfin, l'option VISU permet de visualiser le sequencage realise
+    de l'apport de matiere.
+
+    Remarque : la procedure WAAM est uniquement disponible en dimension 3.
+    ----------
+
+
+ANGL===================================================================
+CHAP{General specification}
+
+    Description :
+    -------------
+
+        The WAAM procedure meshes a welding sequence (see SOUDAGE).
+    Moreover, the procedure provides a time sequencing of the mesh
+    evolution due to material deposit according to a given discretization
+    step. It can also provide a temporal discretization of the thermal
+    loading (sub-option TEMP). Last, the VISU option helps to visualize
+    the time sequencing of the mesh.
+
+    Remark : the WAAM procedure only works in 3 dimensions.
+    --------
+
+
+FRAN===================================================================
+CHAP{Option MAIL}
+
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+CHAP{MAIL option}
+
+    Syntax :
+    --------
+
+=======================================================================
+    TAB2 = WAAM TAB1 'MAIL' 'PAS' | FLOT1 | ('LARG' FLOT2) | ('DENS FLOT3) | ...
+                                  | LREE1 |                |     (N1)      |
+
+           ... ('TEMP' (FLOT4)) ;
+
+FRAN===================================================================
+    Entrees :
+    ---------
+
+    TAB1    : objet TABLE, sequence de soudage definie avec SOUDAGE.
+
+    FLOT1   : objet FLOTTANT, pas de discretisation en espace de l'apport
+              de matiere (le long de la trajectoire de soudage).
+
+    LREE1   : objet LISTREEL, liste des pas de discretisation en espace de
+              l'apport de matiere (le long de la trajectoire de soudage).
+              Chaque pas est utilise successivement. Le dernier pas est
+              conserve pour discretiser le reste de la passe a mailler si
+              l'ensemble des pas de la liste ne couvre pas toute la longueur.
+
+    FLOT2   : objet FLOTTANT, largeur des passes de soudage (facultatif
+              si defini dans TAB1).
+ 
+    FLOT3   : objet FLOTTANT, densite du maillage.
+
+    N1      : objet ENTIER, nombre d'element sur un pas de discretisation
+              en espace (1 par defaut). Si un LISTREEL est fourni,
+              on considere le 1er pas de la liste.
+
+    FLOT4   : objet FLOTTANT, pas de temps de calcul lors des passes de soudage.
+              Par defaut, (1/3pi) du temps de parcours du 1er pas de
+              discretization en espace.
+
+
+    Sorties :
+    ---------
+
+    TAB2 . MAILLAGE           : objet MAILLAGE, maillage final de la sequence
+
+    TAB2 . EVOLUTION_MAILLAGE : objet TABLE definissant le sequencage
+                                temporel de l'apport de matiere
+
+         . EVOLUTION_MAILLAGE . TEMPS    : objet TABLE contenant en indice
+                                           les instants du sequencage de
+                                           l'apport de matiere (0 a N)
+
+         . EVOLUTION_MAILLAGE . MAILLAGE : objet TABLE contenant en indice
+                                           les maillages actives aux instants
+                                           definis a l'indice TEMPS
+
+         . EVOLUTION_MAILLAGE . TEMPS    . i : objet FLOTTANT, (i+1)eme instant
+                                               de la sequence
+ 
+         . EVOLUTION_MAILLAGE . MAILLAGE . i : objet MAILLAGE, maillage
+                                               a l'instant correspant
+                                               de la table des TEMPS
+
+    TAB2 . TEMPS_CALCULES     : objet LISTREEL, liste des temps de calculs
+                                fournie par l'option TEMP.
+
+    TAB2 . TEMPS_EVENEMENTS   : objet LISTREEL, liste des instants relatifs
+                                aux evenements, s'il y en a de defini.
+
+    TAB2 . INDEX_EVENEMENTS   : objet LISTENTI, liste des numeros des evenements
+                                associes aux instants de la liste ci-dessus.
+
+
+    Remarque : dans la liste des TEMPS_CALCULES, le pas de temps est deraffine
+    ---------- progressivement selon une suite geometrique de raison 2 lorsque
+               la puissance thermique est a 0 (deplacement ou pause).
+
+
+ANGL===================================================================
+    Inputs :
+    --------
+
+    TAB1    : TABLE type object, welding sequence defined with SOUDAGE.
+
+    FLOT1   : FLOTTANT type object, discretization step of material deposit
+              along the welding trajectory.
+
+    LREE1   : LISTREEL type object, list of discretization steps of material
+              deposit along the welding trajectory. Each step of the list is
+              used successively. The last step is kept for the discretization
+              of the rest of the pass if the sum of the list is not as long
+              as the pass length.
+
+    FLOT2   : FLOTTANT type object, welding pass width
+              (optional if defined in TAB1).
+ 
+    FLOT3   : FLOTTANT type object, mesh density.
+
+    N1      : ENTIER type object, number of finite elements on the given
+              discretization step (1 by default).  If a LISTREEL of steps
+              is provided, we consider the 1st step of the list.
+
+    FLOT4   : FLOTTANT type object, calculation time step during welding pass.
+              By default, (1/3pi) of travel time of the 1st discretization step
+              of the material deposit.
+
+
+    Outputs :
+    ---------
+
+    TAB2 . MAILLAGE           : MAILLAGE type object, welding sequence
+                                final mesh
+
+    TAB2 . EVOLUTION_MAILLAGE : TABLE defining the time evolution of the mesh
+
+         . EVOLUTION_MAILLAGE . TEMPS    : TABLE defining the time step of the
+                                           mesh evolution (from 0 to N)
+
+         . EVOLUTION_MAILLAGE . MAILLAGE : TABLE containing the mesh
+                                           at each time step
+
+         . EVOLUTION_MAILLAGE . TEMPS    . i : FLOTTANT type object, ith time
+                                               step of the mesh evolution
+ 
+         . EVOLUTION_MAILLAGE . MAILLAGE . i : MAILLAGE type object, mesh
+                                               at the corresponding time step
+                                               in the TEMPS table
+
+    TAB2 . TEMPS_CALCULES     : LISTREEL type object, list of calculation time
+                                steps provided by the TEMP option.
+
+    TAB2 . TEMPS_EVENEMENTS   : LISTREEL type object, list of moments relative
+                                to the events, if some are defined.
+
+    TAB2 . INDEX_EVENEMENTS   : LISTENTI type object, liste of the event number
+                                associated to the instants defined here-above.
+
+    Note : in the list TEMP_CALCULES, the time step is progressively increased
+    ------ according to the values of the geometric series of reason 2 when
+           the thermal power is shut down (displacement or pause periods).
+
+
+FRAN===================================================================
+CHAP{Option VISU}
+
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+CHAP{VISU Option}
+
+    Syntax :
+    --------
+
+=======================================================================
+    WAAM TAB2 'VISU' | (CACH) | (GEO2) ;
+                     | (FACE) | ;
+
+FRAN===================================================================
+    Commentaire :
+    -------------
+    
+     CACH  : visualisation avec option CACH de TRAC
+
+     FACE  : visualisation avec option FACE de TRAC
+
+     GEO2  : objet MAILLAGE ajoute aux maillages visualises
+
+ANGL===================================================================
+    Contents :
+    ----------
+
+     CACH  : visualization with the CACH option of TRAC
+
+     FACE  : visualisation with the FACE option of TRAC
+
+     GEO2  : MAILLAGE type object added to the visualized meshes
+
+$$$$
+ 
+ 
+ 
+ 

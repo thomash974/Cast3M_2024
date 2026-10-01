@@ -1,0 +1,188 @@
+$$$$ @RSTH    NOTICE  CB215821  19/11/18    21:15:02     10383          
+                                             DATE     19/11/18
+Section : Mathematiques Autres
+
+*----------------------------------------------------------------------
+*      CETTE METHODE A ETE MISE GRACIEUSEMENT
+*      A DISPOSITION DE  LA COMMUNAUTE CAST3M
+*      PAR TAMASKOVICS N.
+*     (Freiberg Institut für Geotechnik )
+*----------------------------------------------------------------------
+
+    Methode @RSTH                           Voir aussi:      @RRST @RRSV
+    -------------                                      @RRSR @RSCS @RSCV
+
+    OBJ1 = OBJET @RSTH ;
+
+    OBJ1%'RST'  TAB1 ;
+    OBJ1%'RSV'  ENT1  DBG1 ;
+    OBJ1%'RSR'  FLO1  ENT1  DBG1 ;
+    OBJ1%'SCV'  LRE1  DBG1 ;
+    OBJ1%'SCS'  LRE1  DBG1 ;
+
+FRAN==============================================================
+
+    Objet :
+    _______
+
+    La methode @RSTH cree un objet OBJ1 pour calculer avec la theorie
+    des Random Sets (constructeur d'objet).
+
+
+    Commentaire :
+    _____________
+
+    OBJ1        : Objet random set (type OBJET)
+
+
+    L'objet OBJ1 a les methodes publiques suivantes:
+
+    OBJ1%'RST' : Appelle la methode @RRST pour initialiser le "random set"
+    OBJ1%'RSV' : Appelle la methode @RRSV pour extraire la valeur
+                 courante du "random set"
+    OBJ1%'RSR' : Appelle la methode @RRSR pour afficher un resultat
+                 courant du "random set"
+    OBJ1%'SCV' : Appelle la methode @RSCV pour extraire les valeurs
+                 du LISTREEL pour le "random set" (Intervalles des parametres)
+    OBJ1%'SCS' : Appelle la methode @RSCS pour extraire les valeurs
+                 du LISTREEL pour le "random set" (Probabilite cumulee)
+
+
+    L'objet a les variables publiques suivantes:
+
+    %'RT'   : TABLE TAB1 contennant les distributions des parametres
+    %'NX'   : Variable auxiliaire pour l'enumeration des valeurs courantes
+    %'CX'   : Variable auxiliaire pour l'enumeration des valeurs courantes
+    %'RX'   : Variable auxiliaire pour l'enumeration des valeurs courantes
+    %'PX'   : Variable auxiliaire pour l'enumeration des valeurs courantes
+    %'IR'   : Variable auxiliaire pour les indices de la TABLE TAB1
+    %'IX'   : Numero actuel de parametres dans le "Random Set"
+    %'SN'   : Numero sequentiel de l'element courants du resultat
+    %'PN'   : Probabilite de realisation de l'element courant
+    %'MIN'  : Valeurs minimales des elements courants du resultat
+    %'CPN'  : Probabilites      des elements courants du resultat
+    %'MAX'  : Valeurs maximales des elements courants du resultat
+    %'CPX'  : Probabilites      des elements courants du resultat
+
+    %'MINS' : Valeurs minimales    des elements du resultat
+              ordonnes et modifies pour generer une evolution
+    %'CPNS' : Probabilites cumules des elements du resultat
+              ordonnes et modifies pour generer une evolution
+              (valeur identique au %'CPXS')
+    %'MAXS' : Valeurs maximales    des elements du resultat
+              ordonnes et modifies pour generer une evolution
+    %'CPXS' : Probabilites cumules des elements du resultat 
+              ordonnes et modifies pour generer une evolution
+              (valeur identique au %'CPNS')
+
+
+    La table TAB1 doit avoir le format suivant:
+
+    TAB1.'VAR'       : TABLE    contenant les donnees pour la variable VAR
+    TAB1.'VAR'.'MIN' : LISTREEL avec les valeurs de la borne inferieure des elements focales
+    TAB1.'VAR'.'MAX' : LISTREEL avec les valeurs de la borne superieure des elements focales
+    TAB1.'VAR'.'CPB' : LISTREEL avec les valeurs de probabilite cumule  des elements focales
+
+    DBG1 : An optional argument with a value of type ENTIER indicating
+           the debugging level (DBG1 missing or DBG1=0, no debugging)
+
+
+    Exemple :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+
+ANGL==============================================================
+
+    Description :
+    _____________
+
+    The method @RSTH creates an objet OBJ1 for calculations with
+    the Random Set Theory.
+
+
+    Contents :
+    __________
+
+    OBJ1        : Random Set object (type OBJET)
+
+
+    L'objet a les methodes publiques:
+
+    OBJ1%'RST' : Appelle la methode @RRST pour initialiser le
+                 random set (voir la notice @RRST)
+    OBJ1%'RSV' : Appelle la methode @RRSV pour extraire le valeur
+                 actuelle du random set (methode @RRSV)
+    OBJ1%'RSR' : Appelle la methode @RRSR pour afficher un resultat
+                 actuelle pour le random set (methode @RRSR)
+    OBJ1%'SCV' : Appelle la methode @RSCV pour convertir les valeurs
+                 dans le LISTREEL en un random set notation pour les
+                 valeurs (methode @RSCV)
+    OBJ1%'SCS' : Appelle la methode @RSCS pour convertir les valeurs
+                 dans le LISTREEL en un random set notation pour la
+                 probabilite cumule (methode @RSCS)
+
+
+    L'objet a les variables publiques:
+
+    %'RT'   : Adress of the TABLE TAB1 with the data of the Random Set
+              parameters and their focal elements
+    %'NX'   : Auxiliary variable for the numbering of variants during
+              simulation
+    %'CX'   : Auxiliary variable for the numbering of variants during
+              simulation
+    %'RX'   : Auxiliary variable for the numbering of variants during
+              simulation
+    %'PX'   : Auxiliary variable for the numbering of variants during
+              simulation
+    %'IR'   : Auxiliary variable for the indices of TABLE TAB1
+    %'IX'   : Actual number of the parameter setting in the Random Set
+    %'SN'   : Sequential number of the actual focal element in the
+              result during simulation
+    %'PN'   : Probability of realisation of the actual focal element
+              in the result
+    %'MIN'  : Minimum value of focal elements in the result
+    %'CPN'  : Probabilities of realisation for the focal elements
+              in the result
+    %'MAX'  : Minimum value of focal elements in the result
+    %'CPX'  : Probabilities of realisation for the focal elements
+              in the result
+    %'MINS' : Minimum values of the focal elements in the result in
+              sorted order and modified in order to form a component
+              for evolution generation
+    %'CPNS' : Cumulated probabilities for the focal elements in sorted
+              order and and modified in order to form a component
+              for evolution generation (value identical to %'CPXS')
+    %'MAXS' : Maximum values of the focal elements in the result in
+              sorted order and modified in order to form a component
+              for evolution generation
+    %'CPXS' : Cumulated probabilities for the focal elements in sorted
+              order and and modified in order to form a component
+              for evolution generation (value identical to %'CPNS')
+
+
+    TAB1             : Table des donnees du random set
+
+    La table doit avoir les donnes suivantes:
+
+    TAB1.'VAR'       : TABLE avec les donnees detailles pour la variable VAR
+    TAB1.'VAR'.'MIN' : LISTREEL avec les valeurs du borne minimum des elements focales
+    TAB1.'VAR'.'MAX' : LISTREEL avec les valeurs du borne maximum des elements focales
+    TAB1.'VAR'.'CPB' : LISTREEL avec les valeurs du probabilite cumule pour les elements focales
+
+    DBG1 : An optional argument with a value of type ENTIER indicating
+           the debugging level (DBG1 missing or DBG1=0, no debugging)
+
+
+    Example :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+$$$$
+ 

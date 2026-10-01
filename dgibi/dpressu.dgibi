@@ -1,0 +1,287 @@
+* fichier :  dpressu.dgibi
+*
+* Containment depressurization (Phebus size)
+*
+* 3D mesh of a 14.5 m3 cylindrical containment with a 10cm in depth vertical wall.
+* It the same than the one of the pressu family test cases.
+*
+* Initial pressure and temperature are 1.86bar and 90oC with the wall at 40oC.
+* Due to heat transfer at wall and steam condensation, pressure decreases.
+*
+* Transient is computed for 50s. We check the pressure, the averaged temperature,
+* the velocity ans the condensation mass flow rate evolutions. 
+*
+* Auteurs : E. Studer, J.P. Magnaud    Novembre 1999
+*
+'OPTI' 'DIME' 3 'ELEM' 'CU20' 'TRAC' 'PSC' ;
+'DENS' 1. ;
+*
+COMPLET = FAUX ;
+GRAPH   = faux ;
+'SI' COMPLET ;
+  nbit = 100 ;
+  DT0  = 1.  ;
+  n1   = 1  ;
+  n2   = 4  ;
+  n3   = 4  ;
+  nn   = 2  ;
+'SINO' ;
+  nbit = 5   ;
+  DT0  = 10. ;
+  n1   = 1  ;
+  n2   = 2  ;
+  n3   = 4  ;
+  nn   = 1  ;
+'FINS' ;
+epsi = 1.D-2 ;
+*
+*
+* Mesh
+*
+*
+* ri=cavity radius, h1=cavity height, sp=wall depth,
+* fg1=break to cavity radius ratio
+ri  = 1.052 ;
+h1  = 4.163 ;
+sp  = 0.10  ;
+fg1 = 0.25  ;
+fg2 = fg1 * (2.0 ** 0.5) / 2. ;
+*
+p0  = 0.000    0.000    0.000 ;
+p1  = (ri*fg1) 0.000    0.000 ;
+p2  = (ri*fg2) (ri*fg2) 0.000 ;
+p3  = 0.000    (ri*fg1) 0.000 ;
+p4  = ri       0.000    0.000 ;
+p5  = 0.000    ri       0.000 ;
+p6  = (ri+sp)  0.000    0.000 ;
+p7  = 0.000    (ri+sp)  0.000 ;
+*
+* Fluid and structure basement surfaces
+* (built by symetry)
+l1    = 'DROI' p0 p1 n1        ;
+l2    = 'DROI' p1 p2 n1        ;
+l3    = 'DROI' p2 p3 n1        ;
+l4    = 'DROI' p3 p0 n1        ;
+l5    = 'CERC' p4 p0 p5 (2*n1) ;
+l6    = 'CERC' p6 p0 p7 (2*n1) ;
+basf0 = 'DALL' l1 l2 l3 l4 'PLAN' ;
+basf1 = ('REGL' (l2 'ET' l3) l5 n2) ;
+*
+l44   = 'COTE' 2 basf1;
+ax4   = ('INVE' l4) 'ET' l44 ;
+l11   = 'COTE' 4 basf1;
+ax1   = l11 'ET' ('INVE' l1) ;
+basf  = basf0 'ET' ('REGL' (l2 'ET' l3) l5 n2) ;
+'ELIM' basf epsi ;
+basf  = basf 'ET' ('SYME' basf 'DROI' p0 p3) ;
+ax11  = ('SYME' ax1 'DROI' p0 p3) 'ET' ('INVE' ax1) ;
+'ELIM' basf epsi ;
+basf  = basf 'ET' ('SYME' basf 'DROI' p0 p1) ;
+ax44  = ('INVE' ax4) 'ET' ('SYME' ax4 'DROI' p0 p4) ;
+'ELIM' basf epsi ;
+basm  =  'REGL' l5 l6 n3 ;
+basm  =  basm 'ET' ('SYME' basm 'DROI' p0 p3) ;
+'ELIM' basm epsi ;
+basm  =  basm 'ET' ('SYME'  basm 'DROI' p0 p1) ;
+'ELIM' basm epsi ;
+*
+* Fluid and structure volumes
+* (built by translation)
+nz1   = ('ENTI' (h1 '/' (ri '/' 2.))) '*' nn ;
+v1    = 0. 0. h1 ;
+mt    = basf 'VOLU' nz1 'TRAN' v1 ;
+wall  = (basm 'VOLU' nz1 'TRAN' v1) 'COUL' 'ROUG' ;
+plan1 = ax11 'TRAN' nz1 v1 ;
+plan4 = ax44 'TRAN' nz1 v1 ;
+'ELIM' (mt et wall 'ET' plan1 'ET' plan4) epsi ;
+*
+* Break at the basement if any
+pjg    =  'POIN' basf 'PROC' (0. 0. 0.) ;
+breche = ('ELEM' basf 'APPUIE' 'LARGEMENT' pjg) 'COUL' 'VERT' ;
+*
+*
+* Data for execrxt.procedur
+*
+*
+rxt = 'TABLE' ;
+rxt . 'VERSION' = 'V0' ;
+rxt . 'vtf'     = mt ;
+rxt . 'epsi'    = epsi ;
+rxt . 'pi'      = 0. 0. 0.5 ;
+*
+rxt . 'DISCR' = 'MACRO';
+rxt . 'KPRE'  = 'CENTRE';
+rxt . 'DT0'   = DT0 ;
+*
+rxt . 'MODTURB' = 'NUTURB' ;
+rxt . 'NUT'     = 1.D-2    ;
+*
+rxt . 'THERMP'  = VRAI   ;
+rxt . 'vtp'     = wall   ;
+rxt . 'LAMBDA'  = 15.    ;
+rxt . 'ROCP'    = 3.9E6  ;
+rxt . 'Tp0'     = 40.    ;
+rxt . 'ECHAN'   = 10.    ;
+*
+rxt . 'VAPEUR' = VRAI      ;
+rxt . 'TF0'    = 90.0      ;
+rxt . 'PT0'    = 1.86076E5 ;
+rxt . 'Yvap0'  = 0.2728    ;
+*
+rxt . 'GRAPH'   = GRAPH ;
+rxt . 'DETMAT'  = VRAI ;
+rxt . 'FRPREC'  = 5 ;
+rxt . 'RENU'    = 'RIEN' ;
+*
+*
+* Transient (with restart after 2 time steps)
+*
+*
+EXECRXT  2    rxt       ;
+EXECRXT  (nbit - 2) rxt ;
+*
+*
+* Tests
+*
+*
+'SI' ('NON' COMPLET) ;
+  ERR1 = 0 ;
+  'LIST' rxt.TIC.'Tfm' ;
+  'LIST' rxt.TIC.'PT'  ;
+  'LIST' rxt.TIC.'Qc'  ;
+  'LIST' rxt.TIC.'LMAXU';
+
+
+
+ltfm  = 'PROG'
+*90.000 82.759 68.655 62.941 57.919 53.543 ;
+ 90.000 82.759 68.586 62.869 57.835 53.450 ;
+
+
+lPT   = 'PROG'
+*1.86076E+05 1.83833E+05 1.74892E+05 1.60976E+05 1.54677E+05 1.51025E+05 ;
+ 1.86076E+05 1.83833E+05 1.74857E+05 1.60859E+05 1.54532E+05 1.50862E+05 ;
+
+
+Lqc   = 'PROG'
+*0.0000 5.58061E-02 4.32761E-02 3.43952E-02 3.01430E-02 2.72608E-02 ;
+ 0.0000 5.62319E-02 4.35616E-02 3.46593E-02 3.03835E-02 2.74630E-02 ;
+
+Lmaxu = 'PROG'
+*0.0000 0.0000 0.30666 0.29694 0.35799 0.27128 ;
+ 0.0000 0.0000 0.30666 0.29694 0.35851 0.27152 ;
+
+  tic = rxt . 'TIC' ;
+  ERtf = 'SOMM' ('ABS'(ltfm - tic . 'Tfm')) '/' 80. ;
+  ERPT = 'SOMM' ('ABS'(lPT  - tic . 'PT' )) '/' 1.e5 ;
+  ERQc = 'SOMM' ('ABS'(lqc  - tic . 'Qc' ))  ;
+  ERum = 'SOMM' ('ABS'(Lmaxu  - tic . 'LMAXU')) '/' 2. ;
+  'MESS' 'ERtf=' ERtf 'ERPT=' ERPT 'ERQc=' ERQc 'ERum=' ERum ;
+  'SI' (ERtf '>' 1.e-4) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' (ERPT '>' 1.e-4) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' (ERQc '>' 1.e-4) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' (ERum '>' 1.e-3) ; err1 = err1 '+' 1 ; 'FINS' ;
+  'SI' ('NEG' ERR1 0) ;
+    'ERRE' 5 ;
+  'FINS' ;
+'FINS' ;
+*
+*
+* Plots devoted to pressu... cases
+*
+*
+'SI' GRAPH ;
+  tbt = rxt . 'TBT' ;
+  tic = rxt . 'TIC' ;
+*
+  $vtf = rxt . 'GEO' . '$vtf' ;
+  vtf  = 'DOMA'  $vtf 'MAILLAGE' ;
+*
+  Mpl1 = 'CHAN' 'QUAF' plan1 ;
+  Mpl4 = 'CHAN' 'QUAF' plan4 ;
+  'ELIM' (vtf 'ET' Mpl1 'ET' Mpl4) epsi ;
+  $mpl1 = 'MODE' Mpl1 'NAVIER_STOKES' 'MACRO' ;
+  $mpl4 = 'MODE' Mpl4 'NAVIER_STOKES' 'MACRO' ;
+  plan1 = 'DOMA' $mpl1 'MAILLAGE' ;
+  plan4 = 'DOMA' $mpl4 'MAILLAGE' ;
+  plan  = plan1 'ET' plan4 ;
+  cplan = 'CONT' plan ;
+*
+  'SI' ('EXIS' tic 'TP') ;
+    $vtp = rxt . 'GEO' . '$vtp' ;
+    vtp  = 'DOMA'  $vtp 'MAILLAGE' ;    
+  'FINS' ;
+  paroif  = rxt . 'GEO' . 'paroif';
+  cparoif = 'CONT' paroif ;
+*
+  axe  = p0 d nz1 (p0 plus v1) ;
+  axe = 'CHAN' axe 'QUAF' ;
+  'ELIM' (axe 'ET' mt) epsi ;
+*   
+  un   = tic . 'UN';
+  unp  = 'REDU' un plan ;
+  ung  = 'VECT' un  0.5 'UX' 'UY' 'UZ' 'JAUN' ;
+  ungp = 'VECT' unp 0.5 'UX' 'UY' 'UZ' 'JAUN' ;
+  tf   = tic . 'TF' ;
+  rho  = tic . 'RHO' ;
+  rair = tic . 'RAIR' ;
+  'SI' tbt . 'THE'    ; rhe  = tic . 'RHE'  ; 'FINS' ;
+  'SI' tbt . 'TH2'    ; rh2  = tic . 'RH2'  ; 'FINS' ;
+  'SI' tbt . 'TCO'    ; rco  = tic . 'RCO'  ; 'FINS' ;
+  'SI' tbt . 'TCO2'   ; rco2 = tic . 'RCO2' ; 'FINS' ;
+  'SI' tbt . 'VAPEUR' ; rvp  = tic . 'RVP'  ; 'FINS' ;
+*
+  evauz = 'EVOL' 'CHPO' ('EXCO' un 'UZ') axe ;
+  'DESS' evauz
+  'TITR' 'Velocity with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' m/s' ;
+  'TRAC' ung plan ('CONT' plan) 'TITR' ' Velocity' ;
+*
+  evatf = 'EVOL' 'CHPO' tf  axe ;
+  'DESS' evatf
+  'TITR' 'Gas temperature with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' C' ;
+  'TRAC' tf plan cplan 'TITR' ' Temperature' ;
+  'TRAC' tf paroif cparoif 'TITR' ' Temperature' ;
+*
+  evarh = 'EVOL' 'CHPO' rho axe ;
+  'DESS' evarh
+  'TITR' 'Gas density with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+  'TRAC' rho plan ('CONT' plan) ungp 'TITR' ' Density & velocity' ;
+  'TRAC' rho paroif cparoif 'TITR' ' Density' ;
+*
+  evavap = 'EVOL' 'CHPO' rvp axe ;
+  'DESS' evavap
+  'TITR' 'Steam density with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+  'TRAC' rvp plan cplan 'TITR' ' Steam density' ;
+*
+  Fcond = rxt . 'TIC' . 'Fcondw';
+  'TRAC' fcond paroif cparoif 'TITR' ' Fcond kg/m**2' ;
+*
+* Wall temperature
+  'SI' ('EXIS' tic 'TP') ;
+     'TRAC' tic . 'TP' vtp 'TITR' ' Wall temperature' ;
+  'FINS' ;
+'FINSI' ;
+
+'FIN' ;
+
+
+
+
+
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+ 
+

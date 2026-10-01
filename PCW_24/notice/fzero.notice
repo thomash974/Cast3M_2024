@@ -1,0 +1,68 @@
+$$$$ FZERO    NOTICE  BP208322  19/02/22    21:15:01     10118          
+                                             DATE     19/02/22
+                                             
+    Procedure FZERO                     Voir aussi : ZLEG RACP 
+    ---------------
+
+    XSOL = FZERO FONCTION XA XB (XTOL);
+
+
+Section : Mathematiques Fonctions
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    Cette procedure calcule le zero d'une fonction x->f(x) elle-meme
+    definie par une procedure.
+    La methode de Brent est utilisee.
+
+    Commentaire :
+    _____________
+
+    FONCTION : PROCEDURE definisant la fonction x -> y=f(x) telle que :
+               y = FONCTION x;
+               
+    [XA XB]  : intervalle de recherche (FLOTTANTs)
+    
+    XTOL (facultatif) : precision sur la solution (FLOTTANT)
+    
+    Exemple :
+    _________
+ANGL==========================================================
+    Description :
+    _____________
+
+    This procedure is a root-finding algorithm for function defined
+    by the way of a procedur.
+    The Brent's method is used.
+
+    Contents :
+    __________
+
+    FONCTION : PROCEDURE defining the function x -> y=f(x) so that :
+               y = FONCTION x;
+               
+    [XA XB]  : interval considered (FLOTTANTs)
+    
+    XTOL (facultatif) : requested precision (FLOTTANT)
+
+    Example :
+    _________
+============================================================== 
+    debp f6 x;
+      y  = (exp  x) - 2. - (1. / ((10.*x)**2)) + (2./((100.*x)**3));
+    finp y;
+    
+    x6 = FZERO f6 -4. 2.;
+    y6 = f6 x6;
+    * the result is : x6=0.70320 et f6=-2.7E-16 which is correct !
+    
+    * graphical verification :
+    x6_p = prog -4. PAS 0.01 2.;
+    f6_p = f6 x6_p;
+    ev6 = evol bleu manu 'x' x6_p 'f(x)' f6_p;
+    dess ev6 'YBOR' -5 5 'YGRA' 1 'AXES';
+
+    
+ 

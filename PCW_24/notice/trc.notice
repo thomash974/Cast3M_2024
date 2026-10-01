@@ -1,0 +1,50 @@
+$$$$ TRC      NOTICE  SP204843  22/12/19    21:15:07     11531          
+                                             DATE     22/12/19
+
+    Procedure TRC                            Voir aussi :
+    _____________
+
+    TRC MOD1 MAT1 TINI TFIN LRE1 MOT1 (FLOT1) ;
+
+FRAN==========================================================
+    Objet :
+    _______
+
+  Cette procedure  permet de calculer  un diagramme  TRC a  partir  d'un
+  modele metallurgique.
+
++---------+-----------------------------------------+----------+
+| Entrees | Description                             | Type     |
++---------+-----------------------------------------+----------+
+| MOD1    |Modele de formulation METALLURGIQUE      | MMODEL   |
+| MAT1    |Caracteristiques du Modele METALLURGIQUE | MCHAML   |
+| TINI    |Temperature initiale                     | FLOTTANT |
+| TFIN    |Temperature finale                       | FLOTTANT |
+| LRE1    |Liste des vitesses de refroidissement    | LIRTREEL |
+| MOT1    |Phase consommee au refroidissement       | MOT      |
+| FLOT1   |Seuil de detection d'une transformation  | FLOTTANT |
+|         |de phase (0.005 par defaut)              |          |
++---------+-----------------------------------------+----------+
+
+ANGL==========================================================
+    Description :
+    _____________
+
+  This   procedure   compute   a   CCT    diagram   (Continuous  Cooling
+  Transformation) from a metallurgic model.
+
++---------+-----------------------------------------+----------+
+| Inputs  | Description                             | Type     |
++---------+-----------------------------------------+----------+
+| MOD1    |METALLURGIQUE model formulation          | MMODEL   |
+| MAT1    |Caracteristics of the METALLURGIQUE model| MCHAML   |
+| TINI    |Initial Temperature                      | FLOTTANT |
+| TFIN    |Final   Temperature                      | FLOTTANT |
+| LRE1    |List of cooling rate temperatures        | LIRTREEL |
+| MOT1    |Phase name consumed during cooling       | MOT      |
+| FLOT1   |Detection threshold of a phase trans-    | FLOTTANT |
+|         |formation (0.005 by default)             |          |
++---------+-----------------------------------------+----------+
+$$$$
+ 
+ 

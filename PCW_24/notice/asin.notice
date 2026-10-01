@@ -1,0 +1,77 @@
+$$$$ ASIN     NOTICE  PASCAL    22/07/13    21:15:03     11409          
+                                             DATE     22/07/13
+
+      RESU1 = 'ASIN'  OBJET1 (MOT1) ;
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur ASIN                           Voir aussi : COS  SIN  TAN
+    --------------                                        ACOS      ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH ATAH
+                                                          
+    Objet :
+    _______
+
+    L'operateur ASIN (arc-sinus)   calcule l'arc-sinus d'OBJET1.
+    Le resultat est en degres, dans l'intervalle [-90 ; 90].
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remarque :
+    __________
+      
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+
+ANGL====================================================================
+
+    Operator ASIN                            See also :   COS  SIN  TAN
+    -------------                                         ACOS      ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH ATAH
+                                                          
+    Description :
+    _____________
+
+    The ASIN operator (arcsinus)   calculates the arcsinus of OBJET1.
+    The result is expressed in degrees, in [-90 ; 90] interval.
+    
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remark :
+    _______
+      
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$ 
+ 

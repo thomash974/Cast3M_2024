@@ -1,0 +1,79 @@
+$$$$ CLINC    NOTICE  SERRE     21/12/07    21:15:01     11208          
+                                             DATE     21/12/07
+                                                                                
+    Procedure CLINC                          Voir aussi :
+    ---------------
+
+    CHP1 = CLINC TAB1 TAB2 LOG1 MOT1 MOT2 MOT3 ;
+
+
+Section : Nautilus
+
+FRAN====================================================================
+    Objet :
+    _______
+
+    La procedure CLINC est une procedure appelee par EXECRXT et permet
+d'imposer les conditions aux limites de Dirichlet des champs scalaires.
+
+    Commentaire :
+    _____________
+
+       TAB1 : Description du problème fluide (table RXT)
+
+       TAB2 : Description de l'equation scalaire (table RTF)
+
+       LOG1 : vrai si resolution parallele
+
+       MOT1 : Nom de l'inconnue scalaire
+
+       MOT2 : Nom de l'indice contenant la valeur a imposer
+
+       MOT3 : Nom de l'indice de TAB1 . 'TIC' contenant le champ
+              scalaire en debut de pas de temps
+    
+       CHP1 : Increment de la condition aux limites sur le pas de temps
+
+    Remarque :
+    __________
+
+    Le champ interne TAB2 . 'CLIM' contient le CHPOINT des conditions
+aux limites pour l'operateur KRES.
+    
+ANGL====================================================================
+                                                                                
+                                                                                
+    Description :
+    _____________
+
+    The CLINC procedure is called by EXECRXT and allows Dirichlet 
+boundary conditions for scalar equations.
+
+    Contents :
+    __________
+
+       TAB1 : Fluid problem description (table RXT)
+
+       TAB2 : Scalar field equation description (table RTF)
+
+       LOG1 : vrai if paralelisme is activated
+
+       MOT1 : Name of the calar field
+
+       MOT2 : Name of the index that contains the boudary condition
+
+       MOT3 : Name of the indes of TAB1 . 'TIC' that contains the scalar 
+              field at the beginning of the time step
+
+       CHP1 : Boundary condition variation over the time step
+
+    Remarque
+    ________
+
+    The index 'CLIM' of TAB2 contains the boundary conditions for the
+KRES operator.
+
+ 
+$$$$ 
+ 
+ 

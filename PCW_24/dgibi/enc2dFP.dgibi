@@ -1,0 +1,259 @@
+* fichier : enc2dFP.dgibi similar with enc2d but with wall functions
+*
+* Adiabatic and 2D axisymetric containment
+* H2, He and CO injections
+*
+* We check MACRO-MSOMMET (instead of LINE-MSOMMET in enc2d).
+* With wall functions, QUAF-MSOMMET and QUAF-CENTREP1 are not available.
+*
+'OPTI' 'DIME' 2 'ELEM' 'CU20' 'MODE' 'AXIS' 'TRAC' 'PSC' ;
+*
+COMPLET = FAUX ;
+GRAPH   = FAUX ;
+'SI' COMPLET ;
+  nbit = 100 ;
+  DT0  = 1.  ;
+  n1 = 5  ;
+  n2 = 10 ;
+  n3 = 20 ;
+'SINO' ;
+  nbit = 20 ;
+  DT0  = 1. ;
+  n1 = 5  ;
+  n2 = 10 ;
+  n3 = 20 ;
+'FINSI' ;
+*
+* Mesh
+*
+p1 = 0.  0. ;
+p2 = 0.1 0. ;
+p3 = 1.  0. ;
+p4 = 1.  2. ;                                                                                
+p5 = 0.  2. ;
+*
+breche = p1 'DROI' n1 p2 ;
+bas    = p2 'DROI' n2 p3 ;
+paroid = p3 'DROI' n3 p4 ;
+plaf   = p4 'DROI' (n1 + n2) p5 ;
+axe    = p5 'DROI' n3 p1 ;
+vtp    = bas 'ET' paroid 'ET' plaf ;
+mt     = 'DALLER' (breche 'ET' bas) paroid plaf axe ;
+*
+*- Data for execrxt.procedur
+*
+rxt = 'TABLE' ;
+rxt . 'VERSION' = 'V0' ;
+rxt . 'vtf'     = mt ;
+rxt . 'axe'     = axe ;
+rxt . 'epsi'   = 1.e-4 ;
+*
+rxt . 'pi'     = 0.5 0.5 ;
+*
+rxt . 'DISCR' = 'MACRO' ;
+rxt . 'KPRE'  = 'MSOMMET' ;
+rxt . 'DT0'   = DT0 ;
+*
+rxt . 'MODTURB' = 'LMEL'  ;
+rxt . 'LMEL'    = 0.05  ;
+rxt . 'FPAROI'  = VRAI ;
+rxt . 'YP'      = 5.e-3 ;
+*
+rxt . 'HE'   = VRAI ;
+rxt . 'H2'   = VRAI ;
+rxt . 'CO'   = VRAI ;
+rxt . 'TF0'  = 20.0  ;
+rxt . 'PT0'  = 1.0e5 ;
+rxt . 'Yhe0' = 0.0   ;
+rxt . 'Yh20' = 0.0   ;
+rxt . 'Yco0' = 0.0   ;
+*
+rxt . 'Breches' = 'TABLE' ;
+rxt . 'Breches' . 'A' = 'TABLE' ;
+rxt . 'Breches' . 'A' . 'Maillage' = breche ;
+rxt . 'Breches' . 'A' . 'diru'  = (0. 1.) ;
+rxt . 'Breches' . 'A' . 'scenario'          = 'TABLE' ;
+rxt . 'Breches' . 'A' . 'scenario' . 't'    = 'PROG' 0.0     100.0   ;
+rxt . 'Breches' . 'A' . 'scenario' . 'qair' = 'PROG' 0.0     0.0     ;
+rxt . 'Breches' . 'A' . 'scenario' . 'qhe'  = 'PROG' 0.0011  0.0011 ;
+rxt . 'Breches' . 'A' . 'scenario' . 'qh2'  = 'PROG' 0.0011  0.0011 ;
+rxt . 'Breches' . 'A' . 'scenario' . 'qco'  = 'PROG' 0.0011  0.0011 ;
+rxt . 'Breches' . 'A' . 'scenario' . 'tinj' = 'PROG' 20.0    20.0   ;
+*
+rxt . 'GRAPH'   = GRAPH ;
+rxt . 'DETMAT'  = VRAI ;
+rxt . 'RENU'    = 'RIEN' ;
+*
+*- Transient
+*
+EXECRXT  nbit rxt ;
+*
+*- Tests
+*  FD : Pourquoi le lissage ELNO(NOEL(un)) ?
+'SI' ('NON' COMPLET) ;
+  ERR1 = 0 ;
+  un = 'ELNO' ('NOEL' rxt . 'TIC' . 'UN' rxt . 'GEO' . '$vtf')
+       rxt . 'GEO' . '$vtf' ;
+  'MESS' ' Max U ' ('MAXI' un) ' Min U ' ('MINI' un) ;
+  test = 'ABS' (('MAXI' un) '-' 5.029) ;
+  'MESS' ' Test =' test ;
+  'SI' (test '>' 0.1  ) ; ERR1 = ERR1 '+' 1 ; 'FINS' ;
+*
+  tf = rxt . 'TIC' . 'TF' ;
+  'MESS' ' Max Tf' ('MAXI' tf) ' Min Tf' ('MINI' tf) ;
+  test = 'ABS' (('MAXI' tf) '-' 27.293) ;
+  'MESS' ' Test =' test ;
+  'SI' (test '>' 0.5) ; ERR1 = ERR1 '+' 1 ; 'FINS' ;
+*
+*- Specific test for wall functions
+*  Each ten points on the wall boundary we check the velocity
+*  FD : Pourquoi la vitesse normale en paroi n'est-elle pas nulle ?
+  evunv1 = 'EVOL' 'CHPO' un 'UX' rxt . 'GEO' . 'menvf' ;
+  evunv2 = 'EVOL' 'CHPO' un 'UY' rxt . 'GEO' . 'menvf' ;
+  Lunv1  = 'EXTR' ('LECT' 1 'PAS' 10 141) ('EXTR' evunv1 'ORDO') ;
+  Lunv2  = 'EXTR' ('LECT' 1 'PAS' 10 141) ('EXTR' evunv2 'ORDO') ;
+  'LIST' lunv1 ;
+  'LIST' lunv2 ;
+  LRunv1 = 'PROG'
+  -4.77452E-02  2.58242E-04  3.73809E-03  4.63039E-04  0.18522
+  0.86811      0.98377      0.22216     -1.96206E-02 -8.11362E-03
+  1.92531E-04 -1.41814E-02 -8.63366E-02 -0.46183     -4.77452E-02 ;
+  LRunv2 = 'PROG'
+  0.97878       3.3448       4.1101       4.8215       2.4430
+  0.14722      1.73137E-02 -0.12874     -0.45017     -0.12690    
+  -5.95941E-02 -3.44642E-02  1.34808E-03  3.06570E-02  0.97878 ;
+  ERPS1  = 'SOMM' ('ABS' (LRunv1 '-' Lunv1)) ;
+  ERPS2  = 'SOMM' ('ABS' (LRunv2 '-' Lunv2)) ;
+  'MESS' 'ERPS1=' ERPS1 '  ' 'ERPS2=' ERPS2 ;
+  'SI' (ERPS1 '>' 5.e-4) ; ERR1 = ERR1 '+' 1  ; 'FINS' ;
+  'SI' (ERPS2 '>' 5.e-4) ; 'ERRE' 5 ; 'FINS' ;
+*
+  'SI' ('NEG' ERR1 0) ;
+    'ERRE' 5 ;
+  'FINS' ;
+'FINS' ;
+*
+*- Plots devoted to enc2d... cases
+*
+'SI' rxt . 'GRAPH' ;
+  tbt = rxt . 'TBT' ;
+  tic = rxt . 'TIC' ;
+*
+  $vtf = rxt . 'GEO' . '$vtf' ;
+  vtf  = 'DOMA'  $vtf 'MAILLAGE' ;
+  'SI' ('EXIS' tic 'TP') ;
+    $vtp = rxt . 'GEO' . '$vtp' ;
+    vtp  = 'DOMA'  $vtp 'MAILLAGE' ;    
+  'FINS' ;
+*   
+  un   = tic . 'UN';
+  ung  = 'VECT' un 0.1 'UX' 'UY' 'JAUN' ;
+  tf   = tic . 'TF' ;
+  rho  = tic . 'RHO' ;
+  rair = tic . 'RAIR' ;
+  'SI' tbt . 'THE'    ; rhe  = tic . 'RHE'  ; 'FINS' ;
+  'SI' tbt . 'TH2'    ; rh2  = tic . 'RH2'  ; 'FINS' ;
+  'SI' tbt . 'TCO'    ; rco  = tic . 'RCO'  ; 'FINS' ;
+  'SI' tbt . 'TCO2'   ; rco2 = tic . 'RCO2' ; 'FINS' ;
+  'SI' tbt . 'VAPEUR' ; rvap = tic . 'RVAP' ; 'FINS' ;
+*
+  axe = 'CHAN' rxt . 'DISCR' axe ;
+  ixe = 'INVE' axe ;
+*
+  evauz = 'EVOL' 'CHPO' ('EXCO' un 'UY') ixe ;
+  'DESS' evauz
+  'TITR' 'Velocity with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' m/s' ;
+*
+  evatf = 'EVOL' 'CHPO' tf  ixe ;
+  'DESS' evatf
+  'TITR' 'Gas temperature with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' C' ;
+  'TRAC' tf vtf vtp 'TITR' ' Temperature' ;
+  evarh = 'EVOL' 'CHPO' rho ixe ;
+  'DESS' evarh
+  'TITR' 'Gas density with the z axis' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+  'TRAC' rho vtf ('CHAN' 'LINE' vtp) ung 'TITR' ' Density & velocity' ;
+*
+  'SI' tbt . 'THE'     ;
+    evahe  = 'EVOL' 'CHPO' rhe  ixe ;
+    'DESS' evahe
+    'TITRE' 'Helium density with the z axis' 'MIMA'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+    'TRAC' rhe vtf vtp 'TITR' ' He density' ;
+  'FINS' ;
+  'SI' tbt . 'TH2'     ;
+    evah2  = 'EVOL' 'CHPO' rh2  ixe ;
+    'DESS' evah2
+    'TITR' 'Hydrogen density with the z axis' 'MIMA'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+    'TRAC' rh2 vtf vtp 'TITR' ' H2 density' ;
+  'FINS' ;
+  'SI' tbt . 'TCO'     ;
+    evaco  = 'EVOL' 'CHPO' rco  ixe ;
+    'DESS' evaco
+    'TITR' 'CO density with the z axis' 'MIMA'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+    'TRAC' rco vtf vtp 'TITR' ' CO density' ;
+  'FINS' ;
+  'SI' tbt . 'TCO2'    ;
+    evaco2 = 'EVOL' 'CHPO' rco2 ixe ;
+    'DESS' evaco2
+    'TITR' 'CO2 density with the z axis' 'MIMA'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+    'TRAC' rco2 vtf vtp 'TITR' ' CO2 density' ;
+  'FINS' ;
+  'SI' tbt . 'VAPEUR' ;
+    evavap = 'EVOL' 'CHPO' rvap ixe ;
+    'DESS' evavap
+    'TITR' 'Steam density with the z axis' 'MIMA'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+    'TRAC' rvap vtf vtp 'TITR' ' Steam density' ;
+  'FINS' ;
+*
+* Wall temperature or air density (in cases enc2d with wall temperature 
+* only air is involved ; hence rair=rho and rho is plotted above))
+  'SI' ('EXIS' tic 'TP') ;
+    'TRAC' tic . 'TP' vtp 'TITR' ' Wall temperature' ;
+  'SINO' ;
+    evarair = 'EVOL' 'CHPO' rair ixe ;
+    'DESS' evarair
+    'TITR' 'Air density with the z axis' 'MIMA'
+    'GRIL' 'POIN' 'GRIS' 'TITX' 'z' 'TITY' ' kg/m3' ;
+    'TRAC' rair vtf vtp 'TITR' ' Air density' ;
+  'FINS' ;
+*
+  'SI' ('EXIS' tic 'KN') ;
+    'TRAC' tic . 'KN' vtf vtp 'TITR' ' KN' ;
+    'TRAC' tic . 'EN' vtf vtp 'TITR' ' EN' ;
+  'FINS' ;
+*
+'FINS' ;
+*
+* Specific plots for wall functions
+'SI' rxt . 'GRAPH' ;
+  TAB1 = 'TABLE' ;
+  TAB1 . 'TITRE' = TABLE ;
+  TAB1 . 'TITRE' . 1  = 'MOT' ' UX'  ;
+  TAB1 . 'TITRE' . 2  = 'MOT' ' UY'  ;
+  TAB1 . 1 = ' REGU MARQ TRIL' ;
+  TAB1 . 2 = ' REGU MARQ TRIU' ;
+  'DESS' (evunv1 'ET' evunv2)
+  'TITR' 'Velocity with the wall curvilinear abscissa' 'MIMA'
+  'GRIL' 'POIN' 'GRIS' 'TITX' 's' 'TITY' ' m/s' 'LEGE' tab1 ;
+'FINS' ;
+*
+FIN ;
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+

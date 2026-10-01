@@ -1,0 +1,275 @@
+* fichier :  excel5.dgibi
+************************************************************************
+* Section : Mathematiques Fonctions
+************************************************************************
+
+************************************************************************
+*      Test de l'opérateur EXCE : Méthode des Asymptotes Mobiles       *
+*         Optimisation des dimensions d'une boite de conserve          *
+*                                                                      *
+* On considère une boite de conserve cylindrique de rayon r et de      *
+* hauteur h et devant contenir un volume de 1000 cm3 d'aliments.       *
+* On cherche le couple (r,h) qui minimise la surface de métal à        *
+* utiliser pour la fabrication de cette boite.                         *
+*                                                                      *
+* La fonction objectif est la surface de la boite :                    *
+* f(r,h) = 2*(pi*r*r) + (2*pi*r*h)                                     *
+*                                                                      *
+* Les contraintes portent sur :                                        *
+* le volume  : v(r,h) = pi*r*r*h = v0 = 1000 cm3                       *
+*              cette égalité sera imposée via 2 inégalités :           *
+*              g1(r,h) =  v(r,h) <  v0 * (1 + epsilon)                 *
+*              g2(r,h) = -v(r,h) < -v0 * (1 - epsilon)                 *
+* le rayon   : 0 cm < r < 20 cm                                        *
+* la hauteur : 0 cm < h < 20 cm                                        *
+*                                                                      *
+* La solution au problème est :                                        *
+* r = 5.42 cm et h = 10.84 cm                                          *
+************************************************************************
+
+* Options d'affichage
+OPTI 'ECHO' 0 ;
+OPTI 'TRAC' PSC ;
+idess = FAUX ;
+
+* Choix des paramètres du problème d'optimisation
+v0 = 1000. ;
+epsilon = 0.01 ;
+rmin = 0. ;
+rmax = 20. ;
+hmin = 0. ;
+hmax = 20. ;
+g1max = (1. + epsilon) * v0 ;
+g2max = (1. - epsilon) * v0 * -1. ;
+
+
+
+************************************************************************
+*                  F O N C T I O N   O B J E C T I F                   *
+*                                 E T                                  *
+*              F O N C T I O N S   C O N T R A I N T E S               *
+************************************************************************
+
+* Procédure FF : calcul de la fonction objectif s(r,h) et de ses
+* dérivées partielles
+DEBP FF tx*'TABLE' ;
+  r = tx . 1 ;
+  h = tx . 2 ;
+  tf = TABL 'VECTEUR' ;
+  tf . 0 = (2. * pi * r * r) + (2. * pi * r * h) ;
+  tf . 1 = (4. * pi * r) + (2. * pi * h) ;
+  tf . 2 = 2. * pi * r ;
+FINP tf ;
+
+* Procédure FG1 : calcul de la fonction contrainte v(r,h) et ses
+* dérivées partielles
+DEBP FG1 tx*'TABLE' ;
+  r = tx . 1 ;
+  h = tx . 2 ;
+  tc = TABL 'VECTEUR' ;
+  tc . 0 = pi * r * r * h ;
+  tc . 1 = 2. * pi * r * h ;
+  tc . 2 = pi * r * r ;
+FINP tc ;
+* Procédure FG2 : calcul de la fonction contrainte -v(r,h) et ses
+* dérivées partielles
+DEBP FG2 tx*'TABLE' ;
+  r = tx . 1 ;
+  h = tx . 2 ;
+  tc = TABL 'VECTEUR' ;
+  tc . 0 = -1. * pi * r * r * h ;
+  tc . 1 = -2. * pi * r * h ;
+  tc . 2 = -1. * pi * r * r ;
+FINP tc ;
+
+
+
+
+************************************************************************
+*                       O P T I M I S A T I O N                        *
+************************************************************************
+
+* Initialisation de la table d'optimisation
+to = TABL ;
+* -- valeurs initales de r et h
+to . 'VX0' = TABL 'VECTEUR' ;
+to . 'VX0' . 1 = 19. ;
+to . 'VX0' . 2 = 7. ;
+* -- valeur initiale de la fonction f(r,h)
+to . 'VF' = FF (to . 'VX0') ;
+* -- valeurs initiales des contraintes g1(r,h) et g2(r,h)
+to . 'MC' = TABL ;
+to . 'MC' . 1 = FG1 (to . 'VX0') ;
+to . 'MC' . 2 = FG2 (to . 'VX0') ;
+* -- bornes pour r et h
+to . 'VXMIN' = TABL 'VECTEUR' ;
+to . 'VXMIN' . 1 = rmin ;
+to . 'VXMIN' . 2 = hmin ;
+to . 'VXMAX' = TABL 'VECTEUR' ;
+to . 'VXMAX' . 1 = rmax ;
+to . 'VXMAX' . 2 = hmax ;
+* -- bornes pour les fonctions contraintes (g1max et g2max)
+to . 'VCMAX' = TABL 'VECTEUR' ;
+to . 'VCMAX' . 1 = g1max ;
+to . 'VCMAX' . 2 = g2max ;
+* -- choix de la methode ('STA' ou 'MOV')
+to . 'METHODE' = 'MOV' ;
+to . 'T0' = 4./5. ;
+to . 'S0' = 0.5 ;
+
+* Listes pour stocker les resultats intermediaires :
+* fonction objectif, infaisabilité et variables de conception
+lf  = PROG (to . 'VF'  . 0) ;
+g1 = to . 'MC' . 1 . 0 ;
+g2 = to . 'MC' . 2 . 0 ;
+li = PROG (MAXI (PROG 0. ((g1 - g1max) / g1max) ((g2 - g2max) / g2max))) ;
+lr = PROG (to . 'VX0' . 1) ;
+lh = PROG (to . 'VX0' . 2) ;
+
+* Boucle d'optimisation
+REPE bop 150 ;
+* appel a l'operateur EXCE --> nouveau couple (r,h) optimisé
+  to_new = EXCE to ;
+* récuperation des nouvelles valeurs des variables r et h
+  tx_new = to_new . 'VX0' ;
+* calcul de la nouvelle valeur de la fonction objectif et de ses dérivées
+  tf_new = FF tx_new ;
+  fi = tf_new . 0 ;
+* calcul des nouvelles valeurs des fonctions contraintes et de leurs dérivées
+  tg1_new = FG1 tx_new ;
+  tg2_new = FG2 tx_new ;
+  g1 = tg1_new . 0 ;
+  g2 = tg2_new . 0 ;
+* mise à jour de la table d'optimisation
+  to . 'VX0'    = tx_new ;
+  to . 'VF'     = tf_new ;
+  to . 'MC' . 1 = tg1_new ;
+  to . 'MC' . 2 = tg2_new ;
+* calcul de l'infaisabilité (écart sur les fonctions contraintes)
+  infi = MAXI (PROG 0. ((g1 - g1max) / g1max) ((g2 - g2max) / g2max)) ;
+* remplissage des listes pour visualition des itérations
+  lf  = lf  ET fi ;
+  li  = li  ET infi ;
+  lr = lr ET (tx_new . 1) ;
+  lh = lh ET (tx_new . 2) ;
+FIN bop ;
+nit = (DIME lf) - 1 ;
+
+
+
+
+************************************************************************
+*                       V É R I F I C A T I O N                        *
+************************************************************************
+
+* Valeurs de référence attendues pour la fonction objectif et les
+* variables de conception r,h
+fref = 554.  ;
+rref = 5.42  ;
+href = 10.84 ;
+* Comparaison avec les valeurs calculées par Cast3M
+tol1 = 1.E-2 ;
+ierr = FAUX ;
+MESS ;
+MESS ' Variable de | Valeur    | Valeur    | Erreur' ;
+MESS ' conception  | calculee  | attendue  | relative' ;
+MESS '-----------------------------------------------' ;
+r = tx_new . 1 ;
+h = tx_new . 2 ;
+errr = ABS ((r - rref) / rref) ;
+errh = ABS ((h - href) / href) ;
+motr = CHAI 'FORMAT' '(F7.2)' 'r' *5 '|' *14 r /16 '|' *26 rref /28 '|' *38 errr /40 ;
+moth = CHAI 'FORMAT' '(F7.2)' 'h' *5 '|' *14 h /16 '|' *26 href /28 '|' *38 errh /40 ;
+SI (errr > tol1) ;
+  ierr = VRAI ;
+  motr = CHAI motr ' <-- NOK' ;
+FINSI ;
+MESS motr ;
+SI (errh > tol1) ;
+  ierr = VRAI ;
+  moth = CHAI moth ' <-- NOK' ;
+FINSI ;
+MESS moth ;
+MESS ;
+MESS ' Fonction    | Valeur    | Valeur    | Erreur' ;
+MESS ' objectif    | calculee  | attendue  | relative' ;
+MESS '-----------------------------------------------' ;
+erri = ABS ((fi - fref) / fref) ;
+moti = CHAI 'FORMAT' '(F7.2)' 'f' *5 '|' *14 fi /16 '|' *26 fref /28 '|' *38 erri /40 ;
+SI (erri > tol1) ;
+  ierr = VRAI ;
+  moti = CHAI moti ' <-- NOK' ;
+FINSI ;
+MESS moti ;
+
+
+
+
+
+************************************************************************
+*                    P O S T   T R A I T E M E N T                     *
+************************************************************************
+
+* Évolutions temporelles de f, de l'infaisabilité et des variables
+* de conception en fonction des iterations d'optimisation
+SI idess ;
+  lit   = PROG 0. 'PAS' 1. nit ;
+  evf   = EVOL 'ROUG' 'MANU' 'Iteration' lit 'F'  lf ;
+  evfr  = EVOL 'ROUG' 'MANU' 'Iteration' (PROG 0. nit) 'F' (PROG fref fref) ;
+  tl    = TABL ;
+  tl . 2 = 'TIRR' ;
+  tl . 'TITRE' = TABL ;
+  tl . 'TITRE' . 1  = 'F calculee' ;
+  tl . 'TITRE' . 2  = 'F ref.' ;
+  DESS (evf ET evfr) 'TITR' 'Fonction objectif F(x) VS Iterations' 'LEGE' tl ;
+  evi   = EVOL 'VERT' 'MANU' 'Iteration' lit 'Inf' li ;
+  tl . 'TITRE' . 1  = 'Infaisabilite' ;
+  DESS evi 'TITR' 'Infaisabilite VS Iterations' 'LEGE' tl ;
+  evr   = EVOL 'ROUG' 'MANU' 'Iteration' lit 'r,h' lr ;
+  evrr  = EVOL 'ROUG' 'MANU' 'Iteration' (PROG 0. nit) 'F' (PROG rref rref) ;
+  evh   = EVOL 'ORAN' 'MANU' 'Iteration' lit 'r,h' lh ;
+  evhr  = EVOL 'ORAN' 'MANU' 'Iteration' (PROG 0. nit) 'F' (PROG href href) ;
+  tl . 4  = 'TIRR' ;
+  tl . 'TITRE' . 1  = 'r calcule' ;
+  tl . 'TITRE' . 2  = 'r ref.' ;
+  tl . 'TITRE' . 3  = 'h calcule' ;
+  tl . 'TITRE' . 4  = 'h ref.' ;
+  DESS (evr ET evrr ET evh ET evhr) 'TITR' 'Valeurs r et h VS Iterations' 'LEGE' tl ;
+FINSI ;
+
+* Tracé des points de recherche (r,h) dans l'espace
+OPTI 'DIME' 2 'ELEM' 'QUA4' ;
+* maillage du plan (r,h)
+lr0 = PROG rmin 'PAS' ((rmax - rmin) / 20.) rmax ;
+lh0 = PROG hmin 'PAS' ((hmax - hmin) / 20.) hmax ;
+l1 = QUEL 'SEG2' lr0 (0. * lr0) ;
+l2 = QUEL 'SEG2' (0. * lh0) lh0 ;
+mail = l1 GENE l2 ;
+* champs des fonctions surface et volume de la boite
+r h = COOR mail ;
+chs = (2. * pi) * ((r * r) + (r * h)) ;
+chv = pi* r * r * h ;
+* maillage des points de recherche lors de l'optimisation
+lrh = QUEL 'SEG2' lr lh ;
+* maillage du point optimum
+po = rref href ;
+po1 = po PLUS (0.2 0.) ;
+lo = CERC 4 'ROTA' 360. po1 po 'ELIM' ;
+* tracés
+TRAC chs mail ((CONT mail) ET lrh ET lo) 'TITR' 'Trajet de recherche dans l''espace de la fonction objectif' ;
+OPTI 'ISOV' 'LIGN' ;
+lv = PROG 50. 500. 1000. 1500. 2000. 3000. ;
+TRAC chv mail ((CONT mail) ET lrh ET lo) lv 'TITR' 'Trajet de recherche dans l''espace de la fonction contrainte' ;
+
+
+* Sortie en erreur si l'écart aux valeurs de références est trop important
+SI ierr ;
+  ERRE 'Erreur dans le calcul d''optimisation' ;
+FINSI ;
+
+FIN ;
+
+ 
+
+ 
+

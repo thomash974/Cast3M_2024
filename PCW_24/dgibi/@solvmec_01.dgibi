@@ -1,0 +1,185 @@
+* fichier : @solvmec_01.dgibi
+************************************************************************
+* Test du mini solveur mecanique (procedure @SOLVMEC)                  *
+* - eprouvette entaillee en traction                                   *
+* - comportement elastique                                             *
+* - calcul en grands deplacements                                      *
+* - calcul avec acceleration de convegence                             *
+*                                                                      *
+* On compare les resultats a ceux de la procedure PASAPAS              *
+************************************************************************
+
+
+
+** Options generales
+OPTI 'DIME' 2 'ELEM' 'QUA4' 'MODE' 'PLAN' 'CONT' 'ECHO' 0 ;
+
+
+** Geometrie : barre rectangulaire l x h avec une
+*  entaille circulaire de largeur le et profondeur pe
+l  = 1.0 ;
+h  = 0.1 ;
+le = 0.1 * l ;
+pe = 0.1 * h ;
+
+
+** Maillage
+ne = 51 ;
+* barre rectangulaire
+p0 = 0. 0. ;
+p1 = l  0. ;
+lb = DROI ne p0 p1 ;
+mai = lb TRAN 3 (0. h) ;
+ld = mai COTE 2 ;
+lh = mai COTE 3 ;
+lg = mai COTE 4 ;
+* deplacement des noeuds pour l'entaille circulaire
+p2 = ((l - le) / 2.) h ;
+p3 = ((l + le) / 2.) h ;
+re = (pe / 2.) + (le * le / (8. * pe)) ;
+p4 = (l / 2.) (h - pe + re) ;
+xh yh = COOR lh ;
+pmil = xh POIN 'COMPRIS' (COOR 1 p2) (COOR 1 p3) ;
+DEPL pmil 'PROJ' 'CYLI' (0. 1.) 'CERC' p4 p2 ;
+cmai = CONT mai ;
+*****TRAC mai 'TITR' 'Maillage' ;
+
+
+** Modele et caracteristiques materiau
+mo = MODE mai 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' ;
+ma = MATE mo 'YOUN' 1.E9 'NU' 0.3 ;
+
+
+** Blocages
+clg = BLOQ 'UX' lg ;
+clb = BLOQ 'UY' lb ;
+cld = BLOQ 'UX' ld ;
+cl  = clg ET clb ET cld ;
+
+
+** Chargement : deformation de gonflement imposee sur l'ensemble du maillage
+epg = 0.2 ;
+eps1 = MANU 'CHML' mo 'EPXX' epg 'EPYY' epg 'EPZZ' epg 'GAXY' 0. 'TYPE' 'DEFORMATIONS' 'STRESSES' ;
+feps = BSIG mo (ELAS mo ma eps1) ;
+ev1  = EVOL 'MANU' 'Temps' (PROG 0. 1.) 'Coef' (PROG 0. 1.) ;
+cha  = CHAR 'MECA' feps ev1 ;
+
+
+** Resolutions avec PASAPAS et @SOLVMEC
+tab1 = TABL ;
+tab1 . 'MODELE'                   = mo ;
+tab1 . 'CARACTERISTIQUES'         = ma ;
+tab1 . 'BLOCAGES_MECANIQUES'      = cl ;
+tab1 . 'CHARGEMENT'               = cha ;
+tab1 . 'TEMPS_CALCULES'           = PROG 0.005 'PAS' 0.005 1. ;
+tab1 . 'GRANDS_DEPLACEMENTS'      = VRAI ;
+tab2 = COPI tab1 ;
+
+TEMP 'ZERO' ;
+PASAPAS tab1 ;
+tpp = TEMP 'HORL' ;
+
+TEMP 'ZERO' ;
+@SOLVMEC tab2 ;
+tms = TEMP 'HORL' ;
+
+
+** Performances
+MESS ;
+MESS 'Duree d''execution (ms)' ;
+MESS '----------------------' ;
+MESS 'PASAPAS  :' ' ' tpp ;
+MESS '@SOLVMEC :' ' ' tms ;
+MESS ;
+
+
+** Post traitement : courbes     F   (resultante des reactions a gauche) vs Temps
+*                            Sig_min (contrainte XX min)                 vs Temps
+*                            Sig_max (contrainte XX max)                 vs Temps
+n1 = DIME (tab2 . 'TEMPS') ;
+ltp     = PROG ;
+lsmin1  = PROG ;
+lsmin2  = PROG ;
+lsmax1  = PROG ;
+lsmax2  = PROG ;
+lr1     = PROG ;
+lr2     = PROG ;
+lersmin = PROG ;
+lersmax = PROG ;
+lerr    = PROG ;
+REPE b1 n1 ;
+* temps
+  ltp = ltp ET (tab1 . 'TEMPS' . (&b1 - 1)) ;
+* contrainte SMXX
+  s1 = tab1 . 'CONTRAINTES' . (&b1 - 1) ;
+  s2 = tab2 . 'CONTRAINTES' . (&b1 - 1) ;
+  smin1 = MINI (EXCO 'SMXX' s1) ;
+  smin2 = MINI (EXCO 'SMXX' s2) ;
+  lsmin1 = lsmin1 ET smin1 ;
+  lsmin2 = lsmin2 ET smin2 ;
+  smax1 = MAXI (EXCO 'SMXX' s1) ;
+  smax2 = MAXI (EXCO 'SMXX' s2) ;
+  lsmax1 = lsmax1 ET smax1 ;
+  lsmax2 = lsmax2 ET smax2 ;
+  SI (NEG &b1 1) ;
+    lersmin = lersmin ET (ABS ((smin1 - smin2) / smin1)) ;
+    lersmax = lersmax ET (ABS ((smax1 - smax2) / smax1)) ;
+  FINSI ;
+* effort de reaction
+  r1 = tab1 . 'REACTIONS' . (&b1 - 1) ;
+  r2 = tab2 . 'REACTIONS' . (&b1 - 1) ;
+  SI (EGA &b1 1) ;
+    rr1 = 0. ;
+    rr2 = 0. ;
+  SINON ;
+    rr1 = @TOTAL r1 lg 'FX' ;
+    rr2 = @TOTAL r2 lg 'FX' ;
+    lerr = lerr ET (ABS ((rr1 - rr2) / rr1)) ;
+  FINSI ;
+  lr1 = lr1 ET rr1 ;
+  lr2 = lr2 ET rr2 ;
+FIN b1 ;
+* ecarts relatifs max
+ersmin = MAXI 'ABS' lersmin ;
+ersmax = MAXI 'ABS' lersmax ;
+err    = MAXI 'ABS' lerr ;
+MESS ;
+MESS 'Ecarts relatifs max' ;
+MESS '-------------------' ;
+MESS 'Contrainte SMXX mini :' ' ' ersmin ;
+MESS 'Contrainte SMXX maxi :' ' ' ersmax ;
+MESS 'Reaction             :' ' ' err ;
+MESS ;
+* trace des courbes
+tleg = TABL ;
+tleg . 'TITRE'     = TABL ;
+tleg . 'TITRE' . 1 = CHAI 'SMXX maxi - Pasapas' ;
+tleg . 'TITRE' . 2 = CHAI 'SMXX maxi - Mini solveur' ;
+tleg . 'TITRE' . 3 = CHAI 'SMXX mini - Pasapas' ;
+tleg . 'TITRE' . 4 = CHAI 'SMXX mini - Mini solveur' ;
+tleg . 2 = MOT 'MARQ ROND NOLI' ;
+tleg . 4 = MOT 'MARQ ROND NOLI' ;
+evsmin1 = EVOL        'MANU' 'Temps' ltp 'SMXX' lsmin1 ;
+evsmin2 = EVOL 'VERT' 'MANU' 'Temps' ltp 'SMXX' lsmin2 ;
+evsmax1 = EVOL        'MANU' 'Temps' ltp 'SMXX' lsmax1 ;
+evsmax2 = EVOL 'ROUG' 'MANU' 'Temps' ltp 'SMXX' lsmax2 ;
+*****DESS (evsmax1 ET evsmax2 ET evsmin1 ET evsmin2) 'TITR' 'Contrainte SMXX min et max vs Temps' 'LEGE' tleg 'NO' ;
+tleg . 'TITRE' . 1 = CHAI 'Reaction - Pasapas' ;
+tleg . 'TITRE' . 2 = CHAI 'Reaction - Mini solveur' ;
+evr1 = EVOL        'MANU' 'Temps' ltp 'Reaction' lr1 ;
+evr2 = EVOL 'ROUG' 'MANU' 'Temps' ltp 'Reaction' lr2 ;
+*****DESS (evr1 ET evr2) 'TITR' 'Force vs temps' 'LEGE' tleg 'NO' ;
+
+** Test et erreur si ecart trop important
+SI ((ersmin > 1.E-2) OU (ersmax > 1.E-2) OU (err > 1.E-3)) ;
+  ERRE 'Ecart trop important entre les resultats de @SOLVMEC et de PASAPAS' ;
+FINSI ;
+
+FIN ;
+
+ 
+
+ 
+
+ 
+

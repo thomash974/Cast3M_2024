@@ -1,0 +1,71 @@
+$$$$ JPMM     NOTICE  PV090527  23/03/09    21:15:05     11619          
+                                             DATE     23/03/09
+FRAN==========================================================
+
+  Operateur JPMM                           Voir aussi : MPMA    JPMA
+        -----------------  
+ANGL==========================================================
+
+  Operator  JPMM                           See also   : MPMA    JPMA
+        -----------------  
+==============================================================
+             LREE2 = JPMM CHE1 MOD1 LREE1;
+
+
+
+FRAN==========================================================
+        Objet :
+        -------
+
+        Multiplication de chaque ligne d'une matrice (LREE1) par la valeur correspondante d'un champ par element (CHE1).
+
+        Cet operateur est utilise en electromagnetisme afin d'obtenir la matrice sigma*M (sigma = conductivite, 
+        M = matrice pour calculer le potentiel vecteur magnetique, obtenue par MPMA).
+
+
+        Commentaire :
+        -------------
+ 
+           CHE1   un champ par element a une seule composante (typiquement la conductivite)
+           MOD1   le modele ou CHE1 est defini 
+           LREE1   une matrice representee par une LISTREEL (typiquement la matrice pour la calcul du potentiel magnetique vecteur)
+
+        en sortie :
+
+           LREE2   LISTREEL qui represente la matrice en sortie (ligne par ligne) 
+
+
+        Remarques :
+        -----------
+
+        - si CHE1 a plusieurs composantes, une seule est prise en compte (la premiere)
+        
+ANGL==========================================================
+        Purpose: 
+        -------
+
+        Multiplication of each line of a matrix (LREE1) by corresponding vulue of an element field (CHE1).
+
+        Tis operator is used in electromagnetism to obtain the matrix sigma*M (sigma = conductivity, 
+        M = matrix used to compute the magnetic vector potential, produced by MPMA).
+
+
+        Comment :
+        --------
+ 
+           CHE1   One component element field (typically conditivity)
+           MOD1   The lodel where CHE1 is defined 
+           LREE1  A matrix stored in a LISTREEL (typically then matrix used for magnetic vector potential calculus)
+
+        Output :
+
+           LREE2   LISTREEL storing the resulting matrix (line by line)
+
+
+        Remarks :
+        -----------
+
+        - If CHE1 has several components, only the first will be used.
+        
+ 
+ 

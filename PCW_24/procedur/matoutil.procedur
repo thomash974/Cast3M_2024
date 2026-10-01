@@ -1,0 +1,650 @@
+$$$$ MATOUTIL
+* MATOUTIL  PROCEDUR  GOUNAND   21/04/14    21:15:05     10960          
+************************************************************************
+* NOM         : MATOUTIL
+* DESCRIPTION : Procédures utilitaires utilisées par la procédure
+*               MAILTOPO
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stephane GOUNAND (CEA/DES/ISAS/DM2S/SEMT/LTA)
+*               mail : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 08/04/2021, version initiale
+* HISTORIQUE : v1, 08/04/2021, creation
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+'DEBPROC' MATOUTIL ;
+'ARGUMENT' motcle*'MOT' ;
+*
+lmotcle = 'MOTS' 'GASTIDX' 'GENTABIN' 'VERTABIN' 'MESUINTE' 'AFFQUAL'
+   'BORD' 'FERMEPZ' 'OUVREPZ' 'MOYECHAM' 'AFFCAND' 'MAILINTE' ;
+'SI' ('NON' ('EXISTE' lmotcle motcle)) ;
+   'ERREUR' 1052 'AVEC' ('CHAI' motcle
+'GASTIDX GENTABIN VERTABIN MESUINTE AFFQUAL BORD FERMEPZ OUVREPZ'
+' MOYECHAM AFFCAND MAILINTE') ;
+'FINSI' ;
+*
+'SI' ('EGA' motcle 'GASTIDX') ;
+************************************************************************
+* NOM         : GASTIDX
+* DESCRIPTION : Get and set table index
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 08/12/2017, version initiale
+* HISTORIQUE : v1, 08/12/2017, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' GASTIDX ;
+'ARGU' tab*'TABLE' ;
+'ARGUMENT' idx*'MOT' ;
+'ARGU' valdef ;
+*
+valdefd = 'EXIS' valdef ;
+idxd    = 'EXIS' tab idx ;
+setd    = valdefd 'ET' ('NON' idxd) ;
+*
+*debug = 'VALE' debu  ;
+*
+'SI' setd ;
+   tab . idx = valdef ;
+'FINS' ;
+val = tab . idx ;
+*
+'SI' faux ;
+   tval = 'TYPE' val ;
+   'SI' (('EGA' tval 'ENTIER') 'OU' ('EGA' tval 'FLOTTANT') 'OU' ('EGA'
+      tval 'MOT') 'OU' ('EGA' tval 'LOGIQUE')) ;
+      mval = val ;
+   'SINO' ;
+      mval = 'CHAI' '*' tval ;
+   'FINS' ;      
+   ch = 'CHAI' 'tab . ' idx*20 '='/21 mval*40 ;
+   'SI' setd ;
+      ch = 'CHAI' ch '(defaut)'*60 ;
+   'FINS' ;
+   'MESS' ch ;
+'FINS' ;
+*
+'RESPRO' val ;
+*
+* End of procedure file GASTIDX
+*
+'FINSI' ;
+'SI' ('EGA' motcle 'GENTABIN') ;
+*$$$$ GENTABIN
+************************************************************************
+* NOM         : GENTABIN
+* DESCRIPTION : Construit une table dont les indices sont les mots
+*               donnés en entrée.
+*               Cette table sert ensuite dans VERTABIN pour vérifier
+*               que tous les indices d'une autre table ne sont pas
+*               différents de ceux de la première 
+*
+*               C'est un peu l'équivalent de MOTS et EXIS tab LISTMOTS
+*               pour des mots de taille quelconque.
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stephane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mail : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 14/04/2020, version initiale
+* HISTORIQUE : v1, 14/04/2020, creation
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' GENTABIN ;
+'ARGUMENT' tabin/'TABLE' ;
+'SI' ('NON' ('EXIS' tabin)) ;
+   tabin = 'TABL' ;
+'FINS' ;
+'REPE' bcl ;
+   'ARGU' titi/'MOT' ;
+   'SI' ('EXIS' titi) ;
+*dbg      'MESS' 'gentabin titi' ' ' titi ;
+      tabin . titi = vrai ;
+   'SINO' ;
+      'QUIT' bcl ;
+   'FINS' ;
+'FIN' bcl ;
+'RESPRO' tabin ;
+*
+* End of procedure file GENTABIN
+*
+*'FINPROC' ;
+'FINS' ;
+*
+'SI' ('EGA' motcle 'VERTABIN') ;
+************************************************************************
+* NOM         : VERTABIN
+* DESCRIPTION : GENTABIN a construit une table dont les indices sont les
+*               mots donnés en entrée.
+*               Cette table sert ensuite dans VERTABIN pour vérifier
+*               que tous les indices d'une autre table ne sont pas
+*               différents de ceux de la première
+*
+*               C'est un peu l'équivalent de MOTS et EXIS tab LISTMOTS
+*               pour des mots de taille quelconque.
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stephane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mail : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 14/04/2020, version initiale
+* HISTORIQUE : v1, 14/04/2020, creation
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' VERTABIN ;
+'ARGU' tverif*'TABLE' ;
+'ARGU' tabin*'TABLE' ;
+tlicit = 'INDE' tverif ;
+*dbg 'LIST' tlicit ;
+dtl = 'DIME' tlicit ;
+'REPE' itl dtl ;
+   idx = 'CHAI' tlicit . &itl ;
+*dbg   'MESS' 'vertabin idx' ' ' idx ;
+   'SI' ('NON' ('EXIS' tabin idx)) ;
+* 791 2
+*Indice %m1:8 : N'est pas un indice de table reconnu
+      'ERRE' 791 'AVEC' idx ;
+   'FINS' ;
+'FIN' itl ;
+*
+* End of procedure file VERTABIN
+*
+*'FINPROC' ;
+'FINS' ;
+*
+'SI' ('EGA' motcle 'MESUINTE') ;
+************************************************************************
+* NOM         : MESUINTE
+* DESCRIPTION :
+*
+*
+* Procédure MESUINTE qui devient MESU SURF (si dim 2) ou MESU VOLU (si dim 3)
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/08/2016, version initiale
+* HISTORIQUE : v1, 25/08/2016, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+'ARGUMENT' mai*'MAILLAGE' ;
+vdim = 'VALEUR' 'DIME' ;
+'SI' ('EGA' vdim 2) ;
+   vol = 'MESURE' mai 'SURF' ;
+'SINON' ;
+   vol = 'MESURE' mai 'VOLU' ;
+'FINSI' ;   
+'RESPRO' vol ;
+*
+* End of procedure file MESUINTE
+*
+'FINS' ;
+*
+'SI' ('EGA' motcle 'AFFQUAL') ;
+************************************************************************
+* NOM         : AFFQUAL
+* DESCRIPTION : Affiche les qualités d'un maillage
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/08/2016, version initiale
+* HISTORIQUE : v1, 25/08/2016, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+'ARGUMENT' curtopo*'MAILLAGE' ;
+'ARGU' volucib*'FLOTTANT' ;
+'ARGU' volutol*'FLOTTANT' ;
+*
+*lmet=faux ;
+
+laff=vrai ;
+lres=faux ;
+
+lmotcle = 'MOTS' 'VMET' 'NAFF' 'REST' ;
+'REPETER' imotcle ;
+   'ARGUMENT' motcle/'MOT' ;
+   'SI' ('NON' ('EXISTE' motcle)) ; 'QUITTER' imotcle ; 'FINSI' ;
+*   'MESS' ('CHAI' 'affqual.proc : mot-cle lu :' motcle) ; 
+   'SI' ('NON' ('EXISTE' lmotcle motcle)) ;
+      cherr = 'CHAINE' 'Keyword' ' ' motcle ' unknown.' ; 'ERREUR' cherr ;
+   'FINSI' ;
+   'SI' ('EGA' motcle 'VMET') ;
+      'ARGU' metva ;
+*      'MESS' ('CHAI' 'affqual.proc : metva=') ;
+*      'LIST' ('TYPE' metva);
+   'FINS' ;
+   'SI' ('EGA' motcle 'NAFF') ; laff=faux ; 'FINSI' ;
+   'SI' ('EGA' motcle 'REST') ; lres=vrai ; 'FINSI' ;
+'FIN' imotcle ;
+*'MESS' ('CHAI' 'laff=' laff) ;
+*'MESS' ('CHAI' 'lmet=' lmet) ;
+*'MESS' ('CHAI' 'lres=' lres) ;
+*   lmet = faux ;
+   'SI' ('EXIS' metva) ;
+      qtopo = 'INDI' 'TOPO' curtopo metva ;
+   'SINO' ;   
+      qtopo = 'INDI' 'TOPO' curtopo ;
+   'FINS' ;
+*listreel   nel = 'DIME' qtopo ;
+   nel = 'NBEL' curtopo ;
+   nno = 'NBNO' curtopo ;
+   dvol = '-' ('MESURE' curtopo) volucib ;
+   miq = 'MINIMUM' qtopo ; maq = 'MAXIMUM' qtopo ;
+*listreel   moq = '/' ('SOMME' qtopo) nel ;
+   moq = MATOUTIL 'MOYECHAM' qtopo ;
+*! Test des deux façons de calculer !   
+   'SI' ('EXIS' metva) ;
+      qtopo2 = 'INDI' 'TOPO' curtopo metva 'LISTREEL' ;
+   'SINO' ;   
+      qtopo2 = 'INDI' 'TOPO' curtopo 'LISTREEL' ;
+   'FINS' ;
+   moq2 = ('SOMM' qtopo2) '/' ('DIME' qtopo2) ;
+* VALE prec un peu trop serré pour semt2
+   'SI' ('NEG' moq moq2 ('*' ('VALE' 'PREC') 10.)) ;
+     'MESS' 'moq,moq2,dmoq' moq moq2 ('-' moq moq2) ;
+   'FINS' ;
+*   moqtopo = 'MODE' curtopo 'THERMIQUE' ;
+*   moq = '/' ('INTG' qtopo moqtopo) ('MESU' curtopo) ;
+*listreel   lvnul = POSI 0.D0 'DANS' qtopo volutol 'TOUS' ;
+*listreel   nnul = 'DIME' lvnul ;
+   nnul = 'MASQ' qtopo 'EGINFE' 'SOMME' volutol ; 
+   'SI' lres ;
+      'RESP' dvol nel nnul nno miq maq moq ;
+   'FINS' ;
+   'SI' laff ;
+*'SI' ('EGA' nnul 0) ;   
+      titq = 'CHAINE' 'FORMAT' '(E9.2)'
+                   ' Dvol=' dvol ' Nel=' nel ' NelV0=' nnul  ' Nno=' nno
+                   '  Qmin=' miq ' Qmax=' maq ' Qmoy=' moq ;
+*'SINON' ;
+*   titq = 'CHAINE' ' Dvol=' dvol ' N=' nel
+*                   ' N0=' nnul ' max=' maq ' moy=' moq ;
+*'FINSI' ;
+*   titv = 'CHAINE' 'Nb. Elements plats=' nnul ;
+      'MESSAGE' titq ;
+*   'MESSAGE' titv ;
+   'FINS' ;
+*
+* End of procedure file AFFQUAL
+*
+'FINS' ;
+*
+'SI' ('EGA' motcle 'BORD') ;
+************************************************************************
+* NOM         : BORD
+* DESCRIPTION :
+*
+*
+* Procédure BORD qui devient CONTOUR (si dim 2) ou ENVELOPPE (si dim 3)
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/08/2016, version initiale
+* HISTORIQUE : v1, 25/08/2016, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+'ARGUMENT' mail*'MAILLAGE' ;
+*vdim = 'VALEUR' 'DIME' ;
+mdim = DEADUTIL 'DIMM' mail ;
+mailb = faux ;
+'SI' ('EGA' mdim 2) ;
+   mailb = 'CONTOUR' mail 'NOID' ;
+'FINSI' ;
+'SI' ('EGA' mdim 3) ;
+   mailb = 'ENVELOPPE' mail 'NOID' ;
+*   mailb = 'ENVELOPPE' mail ;
+'FINSI' ;
+'SI' ('EGA' ('TYPE' mail) 'LOGIQUE') ;
+   'ERREUR' ('CHAINE' 'mdim=' mdim) ;
+'FINSI' ;
+'RESPRO' mailb ;
+*
+* End of procedure file BORD
+*
+'FINS' ;
+*
+'SI' ('EGA' motcle 'FERMEPZ') ;
+************************************************************************
+* NOM         : FERMEPZ
+* DESCRIPTION :
+*
+* Ferme une topologie en étoilant son contour avec un point donné
+*
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/08/2016, version initiale
+* HISTORIQUE : v1, 25/08/2016, création
+* HISTORIQUE : v2  11/06/2018, ajout 2eme maillage servant à la partie
+*                 du contour qui ne doit pas être changée
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' FERMEPZ ;
+'ARGUMENT' topo*'MAILLAGE' ;
+'ARGU' mailnoch/'MAILLAGE' ;
+'ARGUMENT' pferm*'POINT' ;
+* Le inverse semble hyper important !!!!
+   btopo = (MATOUTIL 'BORD' topo) ;
+   'SI' ('EXIS' mailnoch) ;
+      btopo2 = 'DIFF' btopo mailnoch ;
+      btopo = btopo2 ;
+   'FINS' ;      
+   ctopo = 'INVERSE' btopo ;
+*   topof = topo 'ET' (ETOILE pferm ctopo) ;
+   topof = topo 'ET' ('COUT' pferm ctopo) ;
+* Teste si la topologie résultante est sans bord   
+*TESTIDMA (BORD topof) ('VIDE' 'MAILLAGE') ;
+'RESPRO' topof ;
+*
+* End of procedure file FERMEPZ
+*
+*'FINPROC' ;
+'FINS' ;
+*
+*
+'SI' ('EGA' motcle 'OUVREPZ') ;
+************************************************************************
+* NOM         : OUVREPZ
+* DESCRIPTION :
+*
+*
+* Ouvre une topologie en enlevant les éléments touchant un point donné
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/08/2016, version initiale
+* HISTORIQUE : v1, 25/08/2016, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' OUVREPZ ;
+'ARGUMENT' topo*'MAILLAGE' ;
+'ARGUMENT' pferm*'POINT' ;
+   touchp = 'ELEM' topo 'APPUYE' 'LARGEMENT' pferm 'NOVERIF' ;
+   topoo = 'DIFF' topo touchp ;
+'RESPRO' topoo ;
+*
+* End of procedure file OUVREPZ
+*
+*'FINPROC' ;
+'FINS' ;
+*
+'SI' ('EGA' motcle 'MOYECHAM') ;
+************************************************************************
+* NOM         : MOYECHAM
+* DESCRIPTION : Fait la moyenne d'un champ par élément (supposé scalaire
+*               et constant par élément) au sens : somme des valeurs
+*               sur les éléments divisée par le nombre d'éléments.
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stephane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mail : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 02/05/2020, version initiale
+* HISTORIQUE : v1, 02/05/2020, creation
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' MOYECHAM ;
+'ARGUMENT' cha*'MCHAML' ;
+*
+lco = 'EXTR' cha 'COMP' ;
+dco = 'DIME' lco ;
+* 320 2
+* Il faut specifier un champ par element avec une seule composante
+'SI' ('NEG' dco 1) ;
+   'ERRE' 320 ;
+'FINS' ;
+* Change le nom de composante en scal plutôt que qualtopo
+* car sinon chan chpo supp plante.
+*cha = 'EXCO' ('EXTR' lco 1) cha 'SCAL    ' ;
+cha = 'CHAN' 'COMP' 'SCAL    ' cha ;
+mai = 'EXTR' cha 'MAIL' ;
+nel = 'NBEL' mai ;
+*moc = 'MODE' mai 'THERMIQUE' ;
+moc = 'MODE' mai 'MECANIQUE' ;
+*'MESS' 'moyecham : gravit' ;
+cha2 = 'CHAN' 'CHAM' cha moc 'GRAVITE' 'SCALAIRE' ;
+* Pb ici
+*cha1 = 'MANU' 'CHML' moc 'SCAL' 1. 'TYPE' 'SCALAIRE' 'GRAVITE' ;
+*chavol = 'INTG' moc cha1 'ELEM' ;
+*'LIST' 'RESU' chavol ;
+*'ERRE' stop ;
+*ms = 'MOTS' 'SCAL' ;
+*'LIST' 'RESU' cha ;
+*'LIST' 'RESU' cha2 ;
+*'LIST' 'RESU' cha1 ;
+*'LIST' 'RESU' chavol ;
+* chavol est nul sur les éléments de volume nul
+*cha2v = '/' cha2 chavol ms ms ms ;
+*som = 'INTG' moc cha2v ;
+* Plante sur une erreur 5.
+*'MESS' 'moyecham : chpo' ;
+chp2 = 'CHAN' 'CHPO' moc cha2 'SUPP' ;
+som = 'MAXI' ('RESU' chp2) ;
+moy = '/' som nel ;
+'RESPRO' moy ;
+*
+* End of procedure file MOYECHAM
+*
+*'FINPROC' ;
+'FINS' ;
+*
+'SI' ('EGA' motcle 'AFFCAND') ;
+************************************************************************
+* NOM         : AFFCAND
+* DESCRIPTION :
+*
+* Procédure pour afficher une table de candidat + la valeur dun critère
+* en coloriant le candidat
+*
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/08/2016, version initiale
+* HISTORIQUE : v1, 25/08/2016, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' AFFCAND ;
+'ARGUMENT' tcand/'TABLE' ;
+'SI' ('NON' ('EXISTE' tcand)) ; tcand = 'TABLE' ; 'FINSI' ;
+'REPETER' boumail ;
+   'ARGUMENT' mail/'MAILLAGE' ;
+   'SI' ('EXISTE' mail) ;
+      itab = '+' ('DIME' tcand) 1 ;
+      tcand . itab = mail ;
+   'SINON' ;
+      'QUITTER' boumail ;
+   'FINSI' ;      
+'FIN' boumail ;
+*
+ltypost = 'MOTS' 'MAIL' 'VOLU' 'QUAL' ;
+'ARGU' typost*'MOT' ;
+itypost = 'POSI' typost 'DANS' ltypost ;
+'SI' ('EGA' itypost 0) ;
+*Mot-clé incorrect "%M1:4". Voici la liste des valeurs admises :
+   'ERRE' 1052 'AVEC' ('CHAI' typost ' MAIL VOLU QUAL') ;
+'FINS' ;
+*
+tit = 'GOONI FECIT' ;
+*
+lmotcle = 'MOTS' 'VMET' 'TITR' ;
+'REPETER' imotcle ;
+   'ARGUMENT' motcle/'MOT' ;
+   'SI' ('NON' ('EXISTE' motcle)) ; 'QUITTER' imotcle ; 'FINSI' ;
+*   'MESS' ('CHAI' 'affcand.proc : mot-cle lu :' motcle) ; 
+   'SI' ('NON' ('EXISTE' lmotcle motcle)) ;
+      cherr = 'CHAINE' 'Keyword ' motcle ' unknown.' ; 'ERREUR' cherr ;
+   'FINSI' ;
+   'SI' ('EGA' motcle 'VMET') ;
+      'ARGU' metva ;
+*      'MESS' ('CHAI' 'affcand.proc : metva=') ;
+*      'LIST' ('TYPE' metva);
+   'FINS' ;
+   'SI' ('EGA' motcle 'TITR') ;
+      'ARGU' tit*'MOT' ;
+   'FINS' ;
+'FIN' imotcle ;
+*   
+ncand = 'DIME' tcand ;
+'SI' ('NON' ('>' ncand 0)) ;
+   'ERREUR' 'Table vide' ;
+'FINSI' ;
+dx = 0. ;
+mtot = 'VIDE' 'MAILLAGE' ;
+chvol = 'VIDE' 'CHPOINT'/'DIFFUS' ;
+mqual = 'VIDE' 'MMODEL' ;
+cqual = 'VIDE' 'MCHAML' ;
+vdim = 'VALEUR' 'DIME' ;
+'REPETER' icand ncand ;
+   tcandi = tcand . &icand ;
+   mdec = tcandi ;
+   mtot = 'ET' mtot mdec ;
+   xm = 'COORDONNEE' 1 tcandi ;
+   ddx = '*' ('-' ('MAXIMUM' xm) ('MINIMUM' xm)) 1.1 ;
+   dx = '+' dx ddx ;
+   'SI' ('EGA' itypost 2) ;
+      cdec = 'MANUEL' 'CHPO' mdec 1 'SCAL' ('MESURE' mdec)
+               'NATURE' 'DIFFUS' ;
+      chvol = 'ET' chvol cdec ;
+   'FINSI' ;      
+   'SI' ('EGA' itypost 3) ;
+      modec = 'MODE' mdec 'THERMIQUE' ;
+      mqual = 'ET' mqual modec ;
+      'SI' ('EXIS' metva) ;
+         cdec = 'INDI' 'TOPO' mdec metva ;
+      'SINO' ;   
+         cdec = 'INDI' 'TOPO' mdec ;
+      'FINS' ;
+      cqual = 'ET' cqual cdec ;
+   'FINSI' ;
+'FIN' icand ;
+*mtra = mtot 'ET' cnt ;
+mtra = mtot ;
+echq = 'PROG' 0. 'PAS' ('/' 1. 20.) 1. ;
+*echv = 'PROG' volucib 'PAS' ('/' ('-' voluini volucib) 20.) voluini ;
+*'SI' lnclk ;
+*   'SI' ('EGA' itypost 1) ;
+*      'TRACER' mtra 'TITR' tit 'NCLK' ;
+*   'FINSI' ;   
+*   'SI' ('EGA' itypost 2) ;
+*      'TRACER' chvol mtot mtra 'TITR' tit 'NCLK' ;
+*   'FINSI' ;   
+*   'SI' ('EGA' itypost 3) ;
+*      'TRACER' cqual mqual mtra echq 'TITR' tit 'NCLK' ;
+*   'FINSI' ;
+*'SINON' ;   
+   'SI' ('EGA' itypost 1) ;
+      'TRACER' mtra 'TITR' tit  ;
+   'FINSI' ;   
+   'SI' ('EGA' itypost 2) ;
+*   'LISTE' echv ; 'LISTE' mtot ;'LISTE' mtra ; 'LISTE' chvol ;
+      'TRACER' chvol mtot mtra  'TITR' tit  ;
+   'FINSI' ;   
+   'SI' ('EGA' itypost 3) ;
+      'TRACER' cqual mqual mtra echq 'TITR' tit  ;
+   'FINSI' ;
+*'FINSI' ;
+*
+* End of procedure file AFFCAND
+*
+*'FINPROC' ;
+'FINS' ;
+*
+'SI' ('EGA' motcle 'MAILINTE') ;
+************************************************************************
+* NOM         : MAILINTE
+* DESCRIPTION :
+*
+*
+* Procédure MAILINTE qui devient SURF (si dim 2) ou VOLU (si dim 3)
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 25/09/2017, version initiale
+* HISTORIQUE : v1, 25/09/2017, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*'DEBPROC' MAILINTE ;
+'ARGUMENT' mail*'MAILLAGE' ;
+vdim = 'VALEUR' 'DIME' ;
+mailb = faux ;
+'SI' ('EGA' vdim 2) ;
+   mailb = 'SURF' mail ;
+'FINSI' ;
+'SI' ('EGA' vdim 3) ;
+   mailb = 'VOLU' mail 'VERB' ;
+'FINSI' ;
+'SI' ('EGA' ('TYPE' mail) 'LOGIQUE') ;
+   'ERREUR' ('CHAINE' 'vdim=' vdim) ;
+'FINSI' ;
+'RESPRO' mailb ;
+*
+* End of procedure file MAILINTE
+*
+*'FINPROC' ;
+'FINS' ;
+*
+* End of procedure file MATOUTIL
+*
+'FINPROC' ;
+
+ 
+ 

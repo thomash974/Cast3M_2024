@@ -1,0 +1,1034 @@
+$$$$ G_THETA  NOTICE  JB251061  22/04/20    21:15:02     11350          
+                                             DATE     22/04/20
+
+    Procedure G_THETA                        Voir aussi : G_CALCUL
+    -----------------                                     CH_THETA
+                                                          CH_THETX
+                                                          G_CAS
+                                                          G_AUX
+
+    G_THETA SUPTAB ;
+
+                       SUPTAB.'BLOCAGES_MECANIQUES'    'LEVRE_INFERIEURE'
+                              'CALCUL_CRITERE'         'METH_AUX'
+                              'CARACTERISTIQUES'       'MODELE'
+                              'CHAMP_THETA'            'MODELES_COMPOSITES'
+                              'CHARGEMENTS_MECANIQUES' 'NOEUDS_AVANCES'
+                              'CHPOINT_TRANSFORMATION' 'OBJECTIF'
+                              'CHPO_RESULTATS'         'OPERATEUR'
+                              'COUCHE'                 'PHI'
+                              'CRIT_DECHA_GLOBAL1'     'POINT_CENTRE'
+                              'CRIT_DECHA_GLOBAL2'     'POINT_1'
+                              'CRIT_DECHA_LOCAL1'      'POINT_2'
+                              'CRIT_DECHA_LOCAL2'      'POINT_3'
+                              'DEFORMATIONS_IMPOSEES'  'PRESSION'
+                              'ELEMENT_MULTICOUCHE'    'PSI'
+                              'EPAISSEUR_RESULTATS'    'RESULTATS'
+                              'EVOLUTION_RESULTATS'    'ROTATION_RIGIDIFIANTE'
+                              'FISSURE_2'              'SOLUTION_PASAPAS'
+                              'FRONT_FISSURE'          'SOLUTION_RESO'
+                              'FRONT_FISSURE_2'        'TEMPERATURES'
+                              'LEVRE_SUPERIEURE'
+
+
+Section : Mecanique Rupture
+
+FRAN==========================================================
+    Objet :
+    -------
+
+    Cette procedure a deux objectifs principaux :
+
+    1 ) calculer les integrales suivantes de la mecanique de la rupture :
+        1.1) l'integrale J (ou G) d'un materiau isotrope, caracteristique
+             en elasto-plastique. Les discontinuites de proprietes ne sont
+             pas encore acceptables dans le cas des elements 3D massifs.
+        1.2) l'integrale J dynamique d'un materiau isotrope,
+             caracteristique en elasto-dynamique. Les discontinuites de
+             proprietes ne sont pas encore acceptables dans le cas des
+             elements 3D massifs.
+        1.3) l'integrale C* d'un materiau isotrope, caracteristique
+             dans le cas de fluage secondaire stationnaire. Le chargement
+             doit etre mecanique et les dicsontinuites de proprietes ne sont
+             pas encore acceptables, ni en 2D ni en 3D.
+        1.4) l'integrale C*(h) d'un materiau isotrope, caracteristique
+             dans le cas de fluage primaire ou tertiaire sous un chargement
+             radial. Le chargement doit etre mecanique et les dicsontinuites
+             de proprietes ne sont pas encore acceptables, ni en 2D ni en 3D.
+        1.5) l'integrale de derivation dJ/da (a : longueur de la fissure)
+             d'un materiau homogene et isotrope, utile pour etudier la
+             stabilite de propagation d'une fissure ou des fissures
+             interagissantes. Ne sont pas encore acceptables les discontinuites
+                         de proprietes en 2D ou en 3D et les elements de coque (mince
+             ou epaisse).
+
+    2 ) decoupler les modes mixtes d'un solide homogene constitue d'un materiau
+        elastique lineaire isotrope, c'est a dire la separation des facteurs
+        d'intensite des contraintes K1, K2 (et K3 en 3D).
+        Les discontinuites de proprietes en 3D et les elements de coque ne sont
+        pas encore acceptables.
+        Les proprietes materielles doivent etre des constantes.
+
+
+CHAP{ENTREES}
+
+    En entree, SUPTAB (objet de type TABLE) sert a definir les options
+    et les parametres du calcul. Ses indices sont des objets de type
+    MOT (a ecrire en toutes lettres) dont voici la liste :
+
+
+PART{Arguments obligatoires dans tous les cas}
+
+    SUPTAB.'OBJECTIF'
+    = MOT pour preciser le but du calcul, valant :
+      1) 'J'      pour calculer l'integrale J (ou G), caracteristique
+                  en elasto-plastique.
+      2) 'J_DYNA' pour calculer l'integrale J (ou G), caracteristique
+                  en elasto-dynamique.
+      3) 'C*'     pour calculer l'integrale C*, caracteristique
+                  en fluage secondaire stationnaire.
+      4) 'C*H'    pour calculer l'integrale C*(h), caracteristique
+                  en fluage primaire ou tertiaire.
+      5) 'DJ/DA'  pour calculer l'integrale de la derivation dJ/da,
+                  caracteristique pour analyser la stabilite de
+                  propagation d'une fissure ou des fissures
+                  interagissantes.
+      6) 'DECOUPLAGE' pour decouper les modes mixtes, c'est a dire la
+                  separation des facteurs K1, K2 (et K3 et 3D).
+
+    SUPTAB.'COUCHE'
+    = ENTIER representant le nombre de couches d'elements autour du
+             front de la fissure qui se deplacent pour simuler la
+             propagation de la fissure. Il vaut 0 si seul la pointe de
+             la fissure se deplace, 1 si c'est la premiere couche
+             d'elements entourant la fissure qui se deplace, 2 si c'est
+             l'ensemble des premiere et deuxieme couches d'elements qui
+             se deplace, etc.
+             Il convient veiller a ce que l'ensemble des elements a deplacer
+             n'atteint pas le bord de la structure fissuree.
+             Si COUCHE et CHAMP_THETA sont tous deux donnés, CHAMP_THETA
+             est écrasé (cf.8.).
+
+    SUPTAB.'FRONT_FISSURE'
+    = type POINT en 2D massif ou 3D coque
+      representant la pointe de la fissure;
+    = type MAILLAGE en 3D massif (elements SEG2 ou SEG3)
+      representant le front de la fissure.
+
+
+PART{Arguments obligatoires avec des elements standards}
+
+    SUPTAB.'LEVRE_SUPERIEURE'
+    = Selon la convention habituelle de definition, cet objet (type
+      MAILLAGE) represente la levre superieure de la fissure.
+
+    SUPTAB.'LEVRE_INFERIEURE'
+    = Selon la convention habituelle de definition, cet objet (type
+      MAILLAGE) represente la levre inferieure de la fissure.
+
+    Si une seule levre est modelisee, un des deux mots (LEVRE_SUPERIEURE
+    ou LEVRE_INFERIEURE) sera suffisant pour decrire la fissure entiere.
+    Dans le cas de l'objectif DECOUPLAGE, les deux levres sont obligatoires.
+
+
+PART{Arguments obligatoires avec des elements enrichis (XFEM)}
+
+    SUPTAB.'PSI' =   1ere level set (CHPOINT) decrivant la fissure dans
+                     le cas ou l'on utilise des elements XFEM .
+
+    SUPTAB.'PHI' =   2eme level set.
+
+
+PART{Arguments obligatoires avec une solution issue de la procedure PASAPAS}
+
+    SUPTAB.'SOLUTION_PASAPAS' = TABLE sortant de la procedure PASAPAS.
+
+
+PART{Arguments obligatoires avec une solution issue de l'operateur RESO}
+
+    SUPTAB.'SOLUTION_RESO'
+    = CHPOINT de deplacement issus de RESO.
+
+    SUPTAB.'CARACTERISTIQUES'
+    = Champ de caractristiques materielles et eventuellement
+      geometriques si necessaire.
+
+    SUPTAB.'MODELE'
+    = Objet modele (type MMODEL) englobant toute la structure.
+
+
+PART{Arguments optionnels avec une solution issue de l'operateur RESO}
+
+    SUPTAB.'TEMPERATURES'
+    = CHPOINT ou MCHAML de temperature creant une contrainte thermique
+      non nulle si elle existe.
+
+    SUPTAB.'CHARGEMENTS_MECANIQUES'
+    = CHPOINT representant l'ensemble des forces exterieures
+      (surfaciques, volumiques ou ponctuelles ....) appliquees
+      sur le systeme si elles existent, SAUF la pression sur les
+      levres de la fissure qui doit obligatoirement etre donnee
+      dans l'indice PRESSION et le modele correspondant dans
+      l'indice MODELE.
+
+    SUPTAB.'BLOCAGES_MECANIQUES'
+    = RIGIDITE representant les blocages mecaniques du probleme, a fournir
+      uniquement pour le calcul de l'integrale de derivation dJ/da.
+
+    SUPTAB.'PRESSION'
+    = MCHAML de pression, obligatoire si l'on fournit un modele de
+      chargement pression a l'indice MODELE.
+
+    SUPTAB.'DEFORMATIONS_IMPOSEES'
+    = MCHAML de deformations imposees s'il y en a
+
+
+PART{Autres arguments optionnels}
+
+    1 : Discontinuites de proprietes (2D massif ou 3D coque seulement)
+
+    SUPTAB.'MODELES_COMPOSITES'
+    = TABLE indicee par des entiers (1 2... M, M = nombre de modeles)
+      pour donner les modeles permettant d'identifier les discontinuites
+      de proprietes materielles ou geometriques. Les proprietes sont donc
+      continues sur chaque modele, et les lieux de discontinuites sont
+      les interfaces entre les modeles.
+
+    2 : Pour un front de fissure tridimensionnel massif
+
+    SUPTAB.'NOEUDS_AVANCES'
+    = MAILLAGE de type POI1 pour donner les points du front pour
+      lesquels le calcul sera effectue. Si cet argument est obsent, le
+      calcul sera fait pour tous les noeuds sur le front de la fissure.
+
+    3 : Calcul des termes croises de la matrice de derivation dJi/daj
+        (i n'est pas egal a j) dans le cas des fisures interagissantes.
+
+    SUPTAB.'FISSURE_2'
+    = Objet de type MAILLAGE representant une autre fissure (levres
+      superieure + inferieure si toutes les deux levres sont presentes).
+
+    SUPTAB.'FRONT_FISSURE_2'
+    = POINT ou MAILLAGE reprsentant le front de la fissure 2 telle que
+      decrite ci-dessus.
+
+    4 : Cas d'une fissure circulaire dans une geometrie plane
+
+    SUPTAB.'POINT_CENTRE' = centre de la fissure circulaire
+
+    5 : Cas ou l'extension de la fissure correspond a une simple
+        translation dans un tuyauterie droite (3D). Dans ce cas
+        on effectue dans la procedure CH_THETA une transformation
+        de tuyau en plaque en passant au systeme de coordonnees
+        cylindriques. Il est alors necessaire de fournir :
+
+    SUPTAB.'POINT_1' = centre du systeme de coordonnees
+
+    SUPTAB.'POINT_2' = POINT tel que l'axe defini par POINT_1
+                       vers POINT_2 soit l'axe Z poisitif
+
+    SUPTAB.'POINT_3' = POINT tel que le plan defini par les 3 points
+                       POINT_1 POINT_2 POINT_3 donne l'angle theta nul
+
+    6 : Cas ou l'extension de la fissure ne correspond
+        pas a une simple translation (3D)
+
+        6.1 : Fissure dans un tuyauterie droite (3D, Rotation)
+
+        SUPTAB.'POINT_1' = Objet de type POINT sur l'axe du tuyau
+
+        SUPTAB.'POINT_2' = Objet de type POINT qui, avec le point
+                           SUPTAB.'POINT_1', defini l'axe du tuyau
+
+        6.2 : Fissure dans un coude (3D, rotation + transformation)
+              Outre les deux points SUPTAB.'POINT_1' et SUPTAB.'POINT_2'
+              definis en haut on donne encore :
+
+        SUPTAB.'CHPOINT_TRANSFORMATION'
+        = Objet de type CHPOINT utilise pour transformer un coude en un
+          tuyauterie droite.
+        SUPTAB.'OPERATEUR'
+        = Objet de type MOT valant 'PLUS' ou 'MOIN' pour indiquer
+          l'operateur PLUS ou MOIN a utiliser si l'on veut transformer
+          le coude en un tuyauterie droite.
+
+    7 : Rotation rigidifiante imposee dans le calcul par PASAPAS
+
+    SUPTAB.'ROTATION_RIGIDIFIANTE'
+    = table indicee par entiers 0,1,2...donnant les champs de
+      deplacements due a une rotation rigidifiante de la piece autour
+      d'un point. Cette rotation rigidifiante est imposee dans le calcul
+      par PASAPAS en tant d'un calcul en grand deplacement.
+
+    8 : Cas ou on souhaite donner soi-meme un champ de type Theta
+
+      SUPTAB.'CHAMP_THETA'
+      = Objet de type CHPOINT caracterisant l'avancee virtuelle de la
+        fissure. Attention : dans le cas d'une demi-eprouvette
+        (condition de symetrie dans le plan de fissure), la norme du
+        champ theta doit logiquement varier de 2. à 0.
+       (au lieu de 1. à 0. dans le cas d'une éprouvette complète).
+
+    9 : Cas ou on souhaite calculer une integrale dans l epaisseur
+        d une structure en coque (rapport DMT/96-317)
+
+        On utilise pour cela la technique de multicouche, qui
+        consiste, avant d'appeler la proceduer G_THETA, a :
+        1) Etablir un modele multicouches (cf MODE CONS) sur un ou
+           des element(s) proche(s) de la fissure sachant qu'il faut
+           au moins une couche en peau inferieure, une couche en
+           peau superieure, une couche en ligne moyenne {ces couches
+           doivent avoir une epaisseur inferieure a 1e-4*(epaisseur
+           totale de la coque) et donc 2 couches intermediaires.
+        2) Penser a donner un excentrement et un nom constituant
+           different a ces couches.
+        3) Assembler le modele multicouches avec le modele du reste
+           de la structure.
+        4) Effectuer le calcul des contraintes et des deplacements
+           avec le modele total et le materiau qui en decoule.
+        Le calcul de l'integrale avec la procedure G_THETA sera
+        realise sur UN SEUL element en multicouche et pour toutes les
+        couches dans cet element qui ont une epaisseur inferieure a
+        1e-4*(epaisseur totale de la coque). Un tel element doit
+        etre designe par l'argument suivant :
+
+        SUPTAB.'ELEMENT_MULTICOUCHE'
+        = Objet MAILLAGE comportant UN SEUL element modelise en
+          multicouche. Il doit etre a l'interieur de la zone THETA,
+          c'est a dire dans la zone definie par le nombre SUPTAB.'COUCHE'.
+          Il ne doit pas etre trop loin, ni trop proche de la pointe de
+          la fissure. Theoriquement, l'integrale a calculer est
+          independante du choix de l'element pres de la fissure, ce qui
+          est numeriquement verifiable en la determinant sur des elements
+          en multicouche differents. NOTA : Cette technique necessite un
+          maillage tres fin dans la zone de la pointe de la fissure.
+
+    10 : Si on souhaite le calcul de criteres de decharge des contraintes
+
+       SUPTAB.'CALCUL_CRITERE'
+       = LOGIQUE = VRAI si on veut le calcul,
+                 = FAUX si on ne veut pas le calcul.
+         (Valeur par defaut = VRAI)
+
+    11 : Calcul des facteurs d'intensité des contraintes (DECOUPLAGE)
+
+        SUPTAB.'METH_AUX'
+        = MOT pour preciser la methode de calcul des champs auxiliaires :
+          1) 'GANA'      pour utiliser les expressions analytiques du
+                         gradient du deplacement et du champ de contraintes
+                         en deformations planes (champs de Westergaard).
+                         Cette methode n'est pas encore disponible dans
+                         le cas ou la fissure est dans une discontinuite
+                         materielle.
+          2) 'UANA'      pour utiliser l'expression analytique du champ de
+                         deplacement en deformations planes ou contraintes
+                         planes. Le gradient du deplacement et le champ de
+                         contraintes sont ensuite deduits en appelant
+                         GRAD et SIGM respectivement.
+                         Cette methode n'est pas encore disponible en 3D.
+          3) 'MECANIQUE' pour resoudre des problemes elementaires en appelant
+                         RESO.
+                         Cette methode n'est actuellement disponible qu'en 3D
+                         avec des elements standards. De plus, celle-ci est
+                         assez couteuse.
+          Lorsque l'indice n'est pas rempli, on utilise pas defaut la methode
+          G-analytique dans tous les cas ou la fissure n'est pas dans une
+          discontinuite materielle, et la methode U-analytique sinon (en 2D).
+
+
+CHAP{SORTIES}
+
+    Les resultats du calcul correspondant a un champ THETA specifie
+    par l'objet SUPTAB.'COUCHE' (ou SUPTAB.'CHAMP_THETA' dans le cas
+    ou on souhaite donner soi-meme un champ de type Theta) sont sauves
+    de la maniere suivante :
+
+
+PART{Dans tous les cas de calcul}
+
+    SUPTAB.'CHPO_RESULTATS' = Objet decrivant l'evolution du la grandeur
+                              calculee le long du front de fissure.
+                              Son type est variable selon la solution du
+                              probleme traite :
+
+                              1) solution provenant de l'operateur RESO
+                                  => CHPOINT
+
+                              2) solution provenant de la procedure PASAPAS
+                                  => TABLE de CHPOINT indicee par
+                                     .(numero du pas de calcul)
+
+                              La ou les composantes du ou des CHPOINT sont
+                              déterminées par l'objectif :
+                              'J' ou 'J_DYNA' => J
+                              'DJ/DA'         => DJDA
+                              'C*' ou 'C*H'   => C*
+                              'DECOUPLAGE'    => KI, KII (et KIII en 3D)
+
+    SUPTAB.'RESULTATS' = Objet contenant la valeur numerique du calcul.
+                         Son type est variable selon qu'on est en 2D ou
+                         3D et selon la solution du probleme traite :
+
+                         1) valeur de l'integrale de contour dans le cas
+                            d'une solution provenant de l'operateur RESO
+                            2D        => FLOTTANT
+                            3D massif => TABLE indicee par
+                               .(fonction d'interpolation) et
+                               .'GLOBAL' pour une estimation globale
+                            3D coque  => TABLE indicee par
+                               .'SUPERI' en peau superieure
+                               .'INFERI' en peau inferieure
+                               .'MEDIAN' au plan median et
+                               .'GLOBAL' pour une estimation globale
+
+                         2) valeur de l'integrale de contour a un
+                            certain numero du pas de calcul dans le
+                            cas d'une solution provenant de la
+                            procedure PASAPAS
+                            2D        => TABLE indicee par
+                               .(numero du pas de calcul)
+                            3D massif => TABLE indicees par
+                               .(numero du pas de calcul).(fonction
+                                d'interpolation) et
+                               .(numero du pas de calcul).'GLOBAL'
+                            3D coque  => TABLE indicees
+                               .(numero du pas de calcul).'SUPERI'
+                               .(numero du pas de calcul).'INFERI'
+                               .(numero du pas de calcul).'MEDIAN' et
+                               .(numero du pas de calcul).'GLOBAL'
+
+                         3) valeur des F.I.C. (facteurs d'intensite des
+                            contraintes) dans le cas de decouplage des
+                            modes avec une solution provenant de
+                            l'operateur RESO
+                            2D        => TABLE indicee par
+                               .'I'  pour KI et
+                               .'II' pour KII
+                            3D massif => TABLE indicee par
+                               .'I'  .(fonction d'interpolation) et
+                               .'I'  .'GLOBAL' pour KI
+                               .'II' .(fonction d'interpolation) et
+                               .'II' .'GLOBAL' pour KII
+                               .'III'.(fonction d'interpolation) et
+                               .'III'.'GLOBAL' pour KIII
+
+                         4) valeur des F.I.C. (facteurs d'intensite des
+                            contraintes) a un certain numero du pas de
+                            calcul dans le cas de decouplage des modes
+                            avec une solution provenant de la procedure
+                            PASAPAS
+                            2D        => TABLE indicee par
+                               .'I' .(numero du pas de calcul) pour KI et
+                               .'II'.(numero du pas de calcul) pour KII
+                            3D massif => TABLE indicee par
+                               .'I'  .(numero du pas de calcul).(fonction
+                                 d'interpolation) et
+                               .'I'  .(numero du pas de calcul).'GLOBAL'
+                                 pour KI
+                               .'II' .(numero du pas de calcul).(fonction
+                                 d'interpolation) et
+                               .'II' .(numero du pas de calcul).'GLOBAL'
+                                 pour KII
+                               .'III'.(numero du pas de calcul).(fonction
+                                 d'interpolation
+                                 de fissure) et
+                               .'III'.(numero du pas de calcul).'GLOBAL'
+                                 pour KIII
+
+                         Les fonctions d'interpolation utilisees pour indicer
+                         les TABLE dans le cas 3D massif sont celles qui sont
+                         utilisees pour reconstituer l'intégrale de contour le
+                         long du front de fissure (pour l'instant il s'agit
+                         necessairement des fonctions de forme des segments du
+                         front).
+
+
+PART{Dans le cas de calcul effectue pas a pas}
+
+    SUPTAB.'EVOLUTION_RESULTATS' = Objet contenant l'evolution des
+                                   resultats en fonction du temps.
+                                   Son type est variable selon la
+                                   configuration du probleme traite :
+
+                                   1) Evolution de l'integrale de contour
+                                      2D ou 3D coque => EVOLUTION
+                                              (dans le cas des coques il y a 4
+                                               SOUS-EVOLUTION :
+                                               SUPE, MEDI, INFE et GLOB)
+                                      3D massif      => TABLE indicee par
+                                         .(points au front de fissure)
+                                         .'GLOBAL' evolution pour une
+                                           estimation globale
+
+                                   2) Evolution des F.I.C. (facteurs
+                                      d'intensite de contrainte)
+                                      2D        => EVOLUTION a 2 SOUS-EVOLUTION
+                                                   KI et KII
+                                      3D massif => TABLE indicee par
+                                              .(points au front de fissure) et
+                                              .'GLOBAL'
+                                              La table contient des evolutions
+                                              a 3 SOUS-EVOLUTION KI, KII et KIII
+
+
+PART{Dans le cas des elements de coque}
+
+    SUPTAB.'EPAISSEUR_RESULTATS' = representant l'evolution de la valeur
+                                   des integrales dans l'epaisseur de la
+                                   coque. Son type est variable selon la
+                                   solution du probleme traite :
+
+                                  1) EVOLUTION dans le cas d'une solution
+                                     provenant de l'operateur RESO
+                                  2) TABLE indicee par
+                                     .(numero du pas de calcul)
+                                     dans le cas d'une solution provenant
+                                     de la procedure PASAPAS
+
+
+PART{Dans le cas de calcul elasto-plastique}
+
+     En cas de calcul elasto-plastique isotrope ou cinematique,
+     eventuellement thermique :
+
+    SUPTAB.'CRIT_DECHA_GLOBAL1'
+    = On calcul un critere de decharge des contraintes defini par
+      (si F = courbe de traction ) :   crit = F(EPSeq)/ SIGeq.
+      - crit = 1. si non-decharge,
+      - et crit > 1. si decharge.
+      SUPTAB.'CRIT_DECHA_GLOBAL1' est une table indicee par les numeros
+      du pas de calcul contenant des reels.
+    SUPTAB.'CRIT_DECHA_GLOBAL2'
+    = On calcul un critere de decharge et de changement de direction des
+      contraintes defini par : crit = 2 - SIG:EPSpl/SIGeq_max.EPSE.
+      - crit = 1. si non-decharge et non-changement de direction,
+      - crit > 1. dans le cas contraire.
+      SUPTAB.'CRIT_DECHA_GLOBAL2' est une table indicee par les numeros
+      du pas de calcul contenant des reels.
+    SUPTAB.'CRIT_DECHA_LOCAL1'
+    = On calcul un critere de decharge defini par: crit = (delta SIG)/SIG
+      - crit = 0. si non-decharge,
+      - crit > 0. si decharge.
+      SUPTAB.'CRIT_DECHA_LOCAL1' est une table indicee par les numeros
+      du pas de calcul contenant des CHPOINTs.
+    SUPTAB.'CRIT_DECHA_LOCAL2'
+    = On calcul un critere de changement de direction des contraintes
+      defini par: crit = SIG:(delta SIG)/norme(SIG).norme(delta SIG)
+      - crit = 1. si la contrainte evolue proportionnellement et de facon
+        monotone,
+      - crit = -1. si la contrainte evolue proportionnellement mais dans la
+        direction opposee
+      SUPTAB.'CRIT_DECHA_LOCAL2' est une table indicee par les numeros
+      du pas de calcul contenant des CHPOINTs.
+
+
+     Remarque
+     --------
+
+     La table SUPTAB contient aussi d'autres objets servant aux
+     reprises. C'est cette table qu'il convient de sauver en vue
+     d'une reprise ulterieure du calcul.
+
+
+ANGL==========================================================
+    Description:
+    ------------
+
+    This procedure has two objectives:
+
+    1 ) calculate some line integrals of fracture mechanics as follows :
+        1.1) the J line (or G) integral of an isotropic material, which
+             characterizes the crack tip fields in elasto-plasticity.
+             In 3D brick element case, discontinuous properties are
+             not yet acceptable.
+        1.2) the J line dynamic integral of an isotropic material,
+             which characterizes the crack tip fields for
+             elasto-dynamic problems. In 3D brick element case,
+             discontinuous properties are not yet acceptable.
+        1.3) the C* line integral of an isotropic material, which
+             characterizes the crack tip fields in the case of
+             secondary creep problems. Applied loadings must be
+             mechanical and discontinuous properties are not yet acceptable,
+             neither in 2D configurations nor in 3D configurations.
+        1.4) the C*(h) line integral of an isotropic material, which
+             characterizes the crack tip fields in the case of
+             primary or tertiary creep problems. Applied loadings must
+             be mechanics and discontinuous properties are not yet acceptable,
+             neither in 2D configurations nor in 3D configurations.
+        1.5) the derivative dJ/da (a : crack length) line
+             integral of an isotropic homogeneous material, required
+             in the stability analysis of a single crack or a system
+             of interacting cracks. Only the brick elements (2D or
+             3D) are acceptable and discontinuous properties are not yet
+             available for calculating this derivative integral.
+
+    2 ) seperate the stress intensity factors K1, K2 (and K3 in 3D)
+        for homogeneous isotropic linear elastic media.
+        Discontinuous properties in 3D and shell elements are currently not
+        accepted.
+        The material properties must be constant.
+
+
+CHAP{INPUT}
+
+    Input data of the procedure is a TABLE type object, SUPTAB, whose
+    indexes are objects of MOT type, writen in capital case and
+    described as follows:
+
+
+PART{Arguments compulsory for all types of calculations}
+
+    SUPTAB.'OBJECTIF' = MOT type, specifying the calculation aim, equal to
+                        1.1) 'J' for calculating the J line integral,
+                              characteristics in elasto-plasticity.
+                        1.2) 'J-DYNA' for calculating the J dynamic line
+                              integral, characteristic in elasto-
+                              dynamic mechanics.
+                        1.3) 'C*' for calculating the C* line integral,
+                              characteristic for secondary creep problems.
+                        1.4) 'C*(h)' for calculating the C*(h) line
+                              integral, characteristic for primary or
+                              tertiary creep problems.
+                        1.5) 'DJ/DA' for calculating the derivative dJ/da
+                              line integral, required in the analysis of
+                              crack growth stability analysis.
+                        1.6) 'DECOUPLAGE' for seperating the the stress
+                              intensity factors K1, K2 (and K3 in 3D) for
+                              crack problems in mixed fracture mode.
+
+   SUPTAB.'COUCHE' = ENTIER type. It is the number of layers of elements
+                     surrounding the crack tip in 2D (or surrounding a
+                     point on the crack front in 3D) that support the
+                     virtual crack extension. If COUCHE = 0, the norm of the
+                     THETA field equals 1 only at the crack tip in 2D, and only
+                     on the crack front in 3D.
+                     In general, the more the number of layers of elements
+                     is important, the more the value calculated by the
+                     present G_THETA procedure is accurate. But the
+                     elements included in the number of layers should
+                     not attain the mesh boundary.
+                     If COUCHE and CHAMP_THETA are both given, CHAMP_THETA
+                     is overwritten (cf.8.).
+
+   SUPTAB.'FRONT_FISSURE' = POINT type in 2D or 3D shell elements case,
+                            MAILLAGE type in 3D brick elements case.
+                            This object contains the crack front.
+
+
+PART{Arguments compulsory for standard elements}
+
+   SUPTAB.'LEVRE_SUPERIEURE' = following the conventional definition, this
+                               object (MAILLAGE type) gives the crack's
+                               upper lip.
+
+   SUPTAB.'LEVRE_INFERIEURE' = following the conventional definition, this
+                               object (MAILLAGE type) gives the crack's
+                               lower lip. If only one of the lips is
+                               modeled, one of the words LEVRE_SUPERIEURE
+                               or LEVRE_INFERIEURE is sufficient to
+                               describe the entire crack.
+
+   If the calculation aim is DECOUPLAGE, then the two lips are mandatory.
+
+
+PART{Arguments compulsory for XFEM elements}
+
+   SUPTAB.'PSI' =   1st level set function (CHPOINT) describing the crack.
+   SUPTAB.'PHI' =   2nd level set.
+
+
+PART{Arguments compulsory for solutions by PASAPAS procedure}
+
+   SUPTAB.'SOLUTION_PASAPAS' = TABLE resulting from PASAPAS procedure.
+
+
+PART{Arguments compulsory for solutions by RESO operator}
+
+   SUPTAB.'SOLUTION_RESO' = displacement solution (CHPOINT type)
+                            resulting from RESO operator.
+
+   SUPTAB.'CARACTERISTIQUES' = MCHAML object of CARACTERISTIQUES subtype.
+                               In the case of calculations with shell
+                               elements, this object includes material's
+                               properties (Young's modulus, Poisson's
+                               coefficient ...) and geometrical parameters
+                               like shell's thincknees, generated by operator
+                               MATE or CARA.
+
+   SUPTAB.'MODELE' = modele object (type MMODEL) including all structure.
+
+
+PART{Optional arguments for solutions by RESO operator}
+
+   SUPTAB.'TEMPERATURES' = temperature field (CHPOINT or MCHAML type) generating
+                           a non-zero stress field if present.
+
+   SUPTAB.'CHARGEMENTS_MECANIQUES' = all external mechanical forces
+                                     (CHPOINT type) if they exist, EXCEPT
+                                     pressures applied on the crack lips which
+                                     must be given in the index PRESSION and
+                                     the corresponding model in the index MODELE.
+
+   SUPTAB.'BLOCAGES_MECANIQUES'    = RIGIDITE type associated to the prescribed
+                                     displacements, to be provided only for the
+                                     computation of the derivative dJ/da.
+
+   SUPTAB.'PRESSION'               = MCHAML of pressure, mandatory if a model
+                                     of pressure loading (CHARGEMENT PRESSION)
+                                     is given in the index MODELE.
+
+   SUPTAB.'DEFORMATIONS_IMPOSEES'  = MCHAML of prescribed strains if applicable.
+
+
+PART{Other optional arguments}
+
+   1: Case of discontinuous properties (2D brick or 3D shell element only)
+
+   SUPTAB.'MODELES_COMPOSITES' = TABLE type whose index is 1, 2, 3,..., n.
+                                 n is the number of MMODEL objects used to
+                                 define the dicsontinuous material or
+                                 geometrical properties. The properties are thus
+                                 continuous over each MMODEL object, and the
+                                 discontinuities are located at the interfaces
+                                 between the models.
+
+   2: For a 3D crack front
+
+   SUPTAB.'NOEUDS_AVANCES' = POI1 type, giving points on the crack front
+                             for which the calculations will be performed.
+
+   3: Calculation of the termes dJi/daj (i is not egal to j)
+       in the cas of interacting cracks
+
+   SUPTAB.'FISSURE_2' = MAILLAGE type representing another crack
+                       (superior lip + inferior lip if all two lips
+                        are present).
+   SUPTAB.'FRONT_FISSURE_2' = POINT ou MAILLAGE type representing the
+                              tip of the crack 2 described above.
+
+   4: Circular crack in a plane configuration (2D)
+
+   SUPTAB.'POINT_CENTRE' = POINT type, giving the center of the circular
+                           crack.
+
+   5: Crack in a straight pipe (3D)
+
+   SUPTAB.'POINT_1' = POINT type, giving the center of the coordinate
+                      system.
+
+   SUPTAB.'POINT_2' = POINT type. POINT_1 to POINT_2 constitutes the
+                      positive direction of the Z axis.
+
+   SUPTAB.'POINT_3' = POINT type. POINT_1, POINT_2 and POINT_3 constitute
+                      the plane theta = 0.
+
+   6: Crack in the elbow of a pipe (3D)
+
+   SUPTAB.'POINT_1' = POINT type on the pipe axis
+
+   SUPTAB.'POINT_2' = POINT type which, along with SUPTAB.'POINT_1', defines
+                      the pipe axis
+
+   SUPTAB.'CHPOINT_TRANSFORMATION' = CHPOINT type, used for transforming
+                                     an elbow into a straight pipe by
+                                     using the operator 'PLUS' or 'MOIN'.
+
+   SUPTAB.'OPERATEUR' = MOT type. Its value is 'PLUS' or 'MOIN' to
+                        indicate the use of operator PLUS or MOIN
+                        for transforming the elbow into a straight pipe.
+
+   7: Rigid rotation given in the calculations by PASAPAS
+
+   SUPTAB.'ROTATION_RIGIDIFIANTE' = TABLE type whose index is 0,1,2...
+                                    in order to provide the displacement
+                                    field due to the rigid rotation of
+                                    the structure arround a point. This
+                                    rotation is required as an input of
+                                    the PASAPAS procedure when performing
+                                    a calculation with large displacements.
+
+   8: User-provided theta field
+
+     SUPTAB.'CHAMP_THETA'
+     = CHPOINT type, caracterizing the virtual crack growth.
+       Caution : if half of the specimen is modeled (due to symetry in the crack
+       plane), the norm of theta field shoudl vary from 2. to 0.
+       (instead of from 1. to 0. when the whole specimen is modeled).
+
+   9: Case where one wants to calculate a line integral along any
+       3D crack front modeled by shell elements (report DMT/96-317)
+
+       For this purpose we can use the multilayer technique which
+       consists, before the call of G_THETA procedure, in :
+       1) Establishing a multilayer model (cf MODE CONS) for one
+          or several element(s) near the crack tip. These elements
+          should be neither too close to the crack tip, nor too
+          far from it for the reason of calculation accuracy. At
+          least three multilayers must be established, respectively
+          in crack's inferior level, middle level and superior level.
+          These layers must have thickness less 1e-4*(total shell
+          thickness). Taking into account the intermediate layers
+          betweent the thin multilayers, there must be at least five
+          layers in the thickness direction of shell element.
+       2) giving an exccentricity and a different constituent name
+          for all layers in shell elements.
+       3) assembling the resulting multilayer models with the
+          model objet established for the other monolayer elements.
+       4) performing the stress-strain calculations with the total
+          mecanical model and the total meterial characteristics
+          including all structure.
+       Then, the calculation of the line integral using the G_THETA
+       procedure will be done for A SINGLE element and for all its
+       thin layers having a thickness less than 1e-4*(total shell
+       thickness).This multilayer element should be specified thoughout
+       an argument as follows :
+
+       SUPTAB.'ELEMENT_MULTICOUCHE' = MAILLAGE objet including A SINGLE
+                                      multilayer element. It should be
+                                      situated in the THETA region, i.e.
+                                      a crack-tip-near zone defined by
+                                      the number, SUPTAB.'COUCHE', which
+                                      indicates the number of circular
+                                      element rows from the crack tip
+                                      to support the virtual crack
+                                      extensions. For the reason of
+                                      computation accuracy, this element
+                                      should be neither too close to
+                                      the crack tip, nor too far from it.
+                                      Theoritically, the value of the
+                                      line integral is independent of
+                                      the selecion of such a multilayer
+                                      element. Numerically, this point
+                                      is verifiable by computing the
+                                      integral with different multilayer
+                                      element in a serie of G_THETA
+                                      callings. Note however that the
+                                      presented multilayer method needs
+                                      a mesh model very fine in the crack
+                                      type region.
+
+    10: If we want the calculation of criteria for proportional loading
+       SUPTAB.'CALCUL_CRITERE' = BOOLEAN     VRAI if we want the calculation,
+                                             FAUX otherwise
+                                        (default value = VRAI)
+
+    11: Computation of the stress intensity factors (DECOUPLAGE)
+
+        SUPTAB.'METH_AUX'
+        = MOT type to specify how the auxiliary fields should be computed:
+          1) 'GANA'      to use the analytical expressions of the gradient
+                         of the displacement field and of the stress field
+                         in plane strain conditions (Westergaard fields).
+                         This method is currently not available if the crack
+                         is located in a material discontinuity.
+          2) 'UANA'      to use the analytical expression in either plane
+                         strain or plane stress conditions of the displacement
+                         field. The gradient of the displacement and the stress
+                         field are then deduced by calling GRAD and SIGM
+                         respectively.
+                         This method is currently not available in 3D.
+          3) 'MECANIQUE' to solve elementary problems by calling RESO.
+                         This method is currently available only in 3D with
+                         standard elements. Additionally, it is computationally
+                         expensive.
+          When this index is not specified, the G-analytical method is used by
+          default if the crack is not located in a material dicsontinuity, and
+          the U-analytical method if it is (in 2D).
+
+
+CHAP{Output}
+
+   The results corresponding to a THETA field specified by the
+   SUPTAB.'COUCHE' object (or SUPTAB.'CHAMP_THETA' object in the case
+   where user want to give himself a THETA field) are stored in
+   the following manner:
+
+
+PART{In all calculation case}
+
+   SUPTAB.'CHPO_RESULTATS' = Object describing the spatial evolution of the
+                             computed quantity along the crack front.
+                             Its type is variable according to the solution of
+                             the problem considered :
+
+                             1) solution obtained with the RESO operator
+                                 => CHPOINT
+
+                             2) solution obtained with the PASAPAS procedure
+                                 => TABLE of CHPOINT indexed by
+                                     .(calculation step number)
+
+                             The component(s) of the CHPOINT is (are)
+                             determined by the calculation aim :
+                             'J' or 'J_DYNA' => J
+                             'DJ/DA'         => DJDA
+                             'C*' or 'C*H'   => C*
+                             'DECOUPLAGE'    => KI, KII (and KIII in 3D)
+
+   SUPTAB.'RESULTATS' = Object containing the numerical value of
+                        calculations. Its type is variable, depending
+                        on the problem configuration (2D or 3D) and the
+                        solutions provided (PASAPAS or RESO) :
+
+                        1) value of a line integral in the case of a
+                           solution obtained with the RESO operator
+                           2D         => FLOTTANT
+                           3D brick   => TABLE indexed by
+                              .(interpolation function) and
+                              .'GLOBAL' for a global estimation
+                           3D shell   => TABLE indexed by words (MOT type)
+                              .'SUPERI' on the superior layer of shell
+                              .'INFERI' on the inferior layer of shell
+                              .'MEDIAN' on the middle plan of shell
+                              .'GLOBAL' for a global estimation
+
+                        2) value of a line integral in the case of a solution
+                           solution obtained with the PASAPAS procedure
+                           2D         => TABLE  indexed by
+                              .(calculation step number)
+                           3D brick   => TABLE indexed by
+                              .(calculation step number).(interpolation
+                                function) and
+                              .(calculation step number).'GLOBAL' for
+                                a global estimation
+                           3D shell   => TABLE indexed by
+                              .(calculation step number).'SUPERI'
+                              .(calculation step number).'INFERI'
+                              .(calculation step number).'MEDIAN' and
+                              .(calculation step number).'GLOBAL'
+
+                        3) value of stresse intensity factors S.I.C. in the
+                           case of seperation of mixed mode fracture with a
+                           solution come from RESO operator
+                           2D         => TABLE indexed by
+                              .'I'  for the value of KI
+                              .'II' for the value of KII
+                           3D brick   => TABLE indexed by
+                              .'I'  .(interpolation function) and
+                              .'I'  .'GLOBAL' for the value of KI
+                              .'II' .(interpolation function) and
+                              .'II' .'GLOBAL' for the value of KII
+                              .'III'.(interpolation function) and
+                              .'III'.'GLOBAL' for the value of KIII
+
+                        4) value of stresse intensity factors S.I.C. in the
+                           case of seperation of mixed mode fracture with a
+                           solution come from PASAPAS procedure
+                           2D         => TABLE indexed by
+                              .'I' .(calculation step number) for KI
+                              .'II'.(calculation step number) for KII
+                           3D brick   => TABLE indexed by
+                              .'I'  .(calculation step number).(interpolation
+                                      function) and
+                              .'I'  .(calculation step number).'GLOBAL' for KI
+                              .'II' .(calculation step number).(interpolation
+                                      function) and
+                              .'II' .(calculation step number).'GLOBAL' for KII
+                              .'III'.(calculation step number).(interpolation
+                                      function) and
+                              .'III'.(calculation step number).'GLOBAL' for KIII
+
+                        The interpolation functions used to index the TABLE in
+                        the 3D brick case are those used to reconstruct the
+                        line integral along the crack front (it can only be
+                        the shape function of the front segments for now).
+
+
+PART{Solution come from PASAPAS procedure}
+
+   SUPTAB.'EVOLUTION_RESULTATS' = Object representing the variation of
+                                  computed results as a function of time.
+                                  Its type is variable, depending on the problem
+                                  configuration (2D or 3D) :
+
+                                  1) Time evolution of a line integral
+                                     2D or 3D shell => EVOLUTION type
+                                              (for shells there are 4
+                                              SOUS-EVOLUTION :
+                                              SUPRE, MEDI, INFE and GLOB)
+                                     3D brick       => TABLE indexed by
+                                        .(points on the crack front)
+                                        .'GLOBAL' time evolution for a
+                                          global estimation
+
+                                  2) Time evolution of stresse intensity
+                                     factors (S.I.F.)
+                                     2D         => EVOLUTION with 2
+                                                   SOUS-EVOLUTION KI and KII
+                                     3D brick   => TABLE indexed by
+                                            .(points on the crack front) and
+                                            .'GLOBAL'
+                                            The TABLE contains evolutions with
+                                            3 SOUS-EVOLUTION KI, KII and KIII
+
+
+
+PART{Calculations with shell elements}
+
+   SUPTAB.'EPAISSEUR_RESULTATS' = object representing the variation of computed
+                                  value of a line integral in the shell's
+                                  thickness. Its type is variable, depending on
+                                  the solution given :
+                                  1) EVOLUTION in the case of a solution coming
+                                     from RESO operator
+                                  2) TABLE indexed by
+                                     .(calculation step number)
+                                     in the case of a solution coming from
+                                     PASAPAS procedure.
+
+
+PART{Calculations in elasto-plasticity}
+
+     In case of ELASTIQUE PLASTIQUE material, ISOTROPE or CINEMATIQUE,
+     possibly THERMIQUE :
+
+    SUPTAB.'CRIT_DECHA_GLOBAL1' = We evaluate a global unloading criterion
+                               defined by:
+                               crit = F(STRAINeq)/ STRESSeq.
+                               where s = F(p) is the stress-strain curve.
+                               crit = 1 as soon as plastic flow starts and for
+                               as long as no material point returns in the
+                               elastic domain.
+                               crit > 1 as soon as some material point returns
+                               in the elastic domain (local unloading).
+                               SUPTAB.'CRITERE_DECHARGE' is a TABLE type object
+                               indexed by the calculation step containing
+                               INTEGERs.
+    SUPTAB.'CRIT_DECHA_GLOBAL2' = We evaluate a global unloading and
+                               non-proportionality critetion defined by:
+                               crit = 2 - SIG:EPSpl/SIGeq_max.EPSE.
+                               if the stress evolves proportionally and
+                               monotonically crit=1, otherwise crit > 1.
+                               SUPTAB.'CRIT_DECHA_GLOBAL2' is a TABLE type objec
+                               indexed by the calculation step containing
+                               INTEGERs.
+    SUPTAB.'CRIT_DECHA_LOCAL1' = We evaluate a local unloading criterion
+                               defined by:
+                               crit = (delta SIG)/SIG
+                               crit = 0. if no unloading, crit > 0. otherwise
+                               SUPTAB.'CRIT_DECHA_LOCAL1' is a TABLE type object
+                               indexed by the calculation step containing
+                               CHPOINT type objects.
+    SUPTAB.'CRIT_DECHA_LOCAL2' = We evaluate a local non-proportionality
+                                critetion defined by:
+                                crit = SIG:(delta SIG)/
+                                                    norme(SIG).norme(delta SIG)
+                                crit = 1. if the stress evolves proportionally
+                                and monotonically
+                                crit = -1. if the stress evolves proportionally
+                                but in the opposite direction
+                                SUPTAB.'CRIT_DECHA_LOCAL2' is a TABLE type objec
+                                indexed by the calculation step containing
+                                CHPOINT type objects.
+
+
+    Remark:
+    -------
+
+    The table SUPTAB also contains other objects used for resuming
+    calculations; this table should be saved for resumimg a later
+    calculation. Since the results are located in SUPTAB this procedure
+    does not create any other object.
+
+$$$$
+ 

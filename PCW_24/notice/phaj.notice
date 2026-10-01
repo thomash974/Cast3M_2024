@@ -1,0 +1,63 @@
+$$$$ PHAJ     NOTICE  CB215821  21/08/20    21:15:32     11089          
+                                             DATE     21/08/20
+
+    Operateur PHAJ                           Voir aussi : PMAT PROP
+    --------------                                        EXCP EXCS
+
+      CHP2 =  PHAJ  MOD1 MAT1 CHP1 ;
+
+
+Section : Changement_De_Phase Changement_De_Phase
+
+FRAN==========================================================
+
+    Objet :
+    _______
+
+    L'operateur 'PHAJ' calcule la valeur des "jeux" associes aux
+conditions unilaterales de changement de phase en thermique.
+Cet operateur est automatiquement appele dans la procedure TRANSNON.
+
+
+
+      Commentaire :
+      _____________
+
+      MOD1  : objet de type MMODEL contenant une formulation de type
+             'CHANGEMENT_PHASE'.
+
+      MAT1  : objet MCHAML des caracteristiques. La composante  'PRIM'
+              est  attendue constante par SOUS-ZONE.
+
+      CHP1  : objet CHPOINT contenant les inconnues initiales.
+
+      CHP2  : objet CHPOINT contenant les "jeux" des inconnues ('FLX')
+              avant d'effectuer le changement de phase.
+
+ANGL==========================================================
+
+    Description :
+    ____________
+
+    The 'PHAJ' operator computes the "gap" associated with unilateral
+conditions to drive thermal change of phase.
+This operator is automatically called by TRANSNON procedure.
+
+
+      Contents :
+      _________
+
+      MOD1  : MMODEL type objet containing a 'CHANGEMENT_PHASE' formulation.
+
+      MAT1 :  MCHAML type objet representing material datas. The 'PRIM'
+              componentis expected to be constant for each SUB-MODEL.
+
+      CHP1  : CHPOINT type objet containing initial values of unknowns.
+
+      CHP2  : CHPOINT type objet containing the "gaps" of unknowns ('FLX')
+              before the beginning of the phase change.
+
+$$$$
+
+
+ 

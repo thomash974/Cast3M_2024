@@ -1,0 +1,45 @@
+$$$$ USINIB   NOTICE  MB234859  24/02/06    21:15:04     11833          
+                                             DATE     24/02/06
+
+ Procedure USINIB                        Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USDEPL USEXPL USEXPL
+                                        USPOST USTMPS USURE
+
+             USINIB TAB1 ;
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure d'initialisation des tables de stockage des resultats. 
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+  Cette procedure est appelee par USURE.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+   
+    Procedure which initializes table of results.
+
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+  This procedure is called by USURE.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+ 

@@ -1,0 +1,36 @@
+$$$$ DIMN     NOTICE  MB234859  21/12/01    21:15:01     11203          
+                                             DATE     21/12/01
+
+    Operateur DIMNOYAU                       Voir aussi : DIME
+    ------------------
+
+    ENTI1 = DIMNOYAU RIG1 ;
+
+
+Section : Mathematiques Autres
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur DIMNOYAU donne la dimension ENTI1 (type ENTIER)
+du noyau de la matrice RIG1 (type RIGIDITE).
+
+    Remarque :
+    __________
+
+    La matrice RIG1 doit avoir ete factorisee au prealable.
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The DIMNOYAU operator gives the ENTI1 dimension (ENTIER type)
+ of the kernel of the matrix RIG1 (RIGIDITE type).
+
+    Note :
+    _______
+
+    The matrix RIG1 must have been factorised before using this operator.
+
+ 

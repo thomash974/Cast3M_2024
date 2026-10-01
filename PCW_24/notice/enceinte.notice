@@ -1,0 +1,1559 @@
+$$$$ ENCEINTE NOTICE  SERRE     21/07/15    21:15:00     11059          
+                                             DATE     21/07/15
+
+    Procedure ENCEINTE                        Voir aussi :
+    ------------------
+
+      ENCEINTE NDT RXT ;
+
+
+Section : Fluides Resolution
+
+FRAN====================================================================
+
+    Commentaires
+    ____________
+
+    NDT ENTI1 : nombre de pas de temps 
+    RXT TAB1  : table contenant les informations permettant de calculer
+                l'evolution de la composition d'un melange gazeux dans
+                une enceinte fermee
+
+
+    OBJET :
+    -----
+
+  La procedure ENCEINTE calcule, a partir d'un etat initial, l'evolution
+ au cours du temps d'un melange gazeux dans une enceinte fermee.
+
+
+CHAP{Generalites}
+
+  L'etat initial est uniforme en espace lorsqu'il est donne par
+ l'utilisateur, issu d'un calcul precedent sinon.
+
+  L'air est toujours present dans le melange gazeux. Il peut aussi contenir un
+ ou plusieurs des constituants suivants: vapeur d'eau, H2, N2, He, O2, CO et
+ CO2. Les gaz incondensables sont modelises par la loi des gaz parfaits. C'est
+ aussi le choix par defaut de la vapeur (version V0), un modele gaz reel etant
+ en test (version V1).
+
+  En presence de vapeur la condensation en paroi peut apparaitre si les
+ conditions locales sont reunies (Pvap > Psat). Le modele de condensation est
+ de type Chilton-Colburn et associe a une correlation d'echange de type
+ convection naturelle le long d'une plaque plane verticale.
+
+  On distingue 4 types de conditions aux limites suivant la nature de la
+ frontiere du domaine fluide : zones d'injection (breches), ventilation forcee
+ et clapet de decharge (sorties), parois thermiques et parois inertes :
+
+  - sur les zones d'injection ou breches, on impose des conditions aux limites
+ de type valeur imposee pour la vitesse, la temperature du melange, la densite
+ du melange et de ses constituants. Il faut donc y preciser le debit massique
+ de chaque constituant du melange (kg/s) et la temperature d'entree (oC) (voir
+ entree 'scenario' des Breches) ;
+
+  - sur les sorties, on impose un debit (ventilation) et on precise les
+ parametres de la perte de charge (clapet de decharge) (voir entree 'scenario'
+ des Sorties) ;
+  
+  - sur les parois thermiques, la vitesse est nulle (suf si fonction de paroi
+ (entree FPAROI)) et la temperature evolue au cours du temps (entree TIMP), est
+ a priori constante (entree ECHANP), le resultat d'un calcul de thermique paroi
+ (entree THERMP). Pour ce dernier cas, il est possible de coupler la resolution
+ des equations de l'enrergie paroi et fluide de façon implicite (entree
+ THERCO). En presence de vapeur les parois thermiques sont susceptibles de
+ condenser. Elles sont par contre impermeables pour tous les incondensables.
+
+  - sur les parois inertes, la vitesse est nulle, et elles sont impermeables
+ pour toutes les autres inconnues (temperature, vapeur et gaz incondensables).
+ Les parois inertes correspondent au maillage obtenu par difference entre
+ l'enveloppe du volume fluide et les parois, breches et sorties.
+
+ Par suite, les conditions aux limites sont correctement definies.
+
+  La turbulence des mouvements de gaz est modelisee soit par une viscosite
+ tourbillonnaire constante, soit par un modele de longueur de melange soit par
+ un modele K-epsilon (entree MODTURB). En absence de l'entree MODTURB,
+ l'ecoulement est laminaire.
+
+  Un modele d'aspersion est disponible.
+
+  Un modele de condensation en masse est en test.
+
+  Au moyen du fichier d'extension dgibi, l'utilisateur transmet a CAST3M les
+ donnees du scenario etudie. Regroupees dans la table notee RXT a differents
+ indices qui sont precises dans cette notice, le transitoire est alors calcule
+ par la procedure ENCEINTE avec la table RXT et le nombre de pas de temps ndt
+ en donnees d'entree :
+
+   ENCEINTE ndt rxt ;
+
+  La table RXT est completee au moment de l'execution par trois tables :
+  - la sous table rxt.'GEO' contient les modeles et objets geometriques crees a 
+ partir des donnees fournies.
+  - la sous table rxt.'TBT' est la table de travail proprement dite et contient
+ les autres objets crees necessaires au calcul hormis les inconnues.
+  - la sous table rxt.'TIC' contient les inconnues au dernier temps connu
+ (temps calcule ou condition initiale) ainsi que les champs variables en temps.
+
+ Les entrees de RXT fournis par l'utilisateur ne sont donc pas modifiees.
+
+ Les indices de RXT sont les presentes ci-dessous.
+
+
+CHAP{Objets geometriques}
+
+ rxt . 'vtf'    = GEO1   ; maillage fluide (OBLIGATOIRE)
+ rxt . 'pi'     = POI1   ; point interieur du domaine fluide ou sera imposee
+                           la pression (OBLIGATOIRE).
+ rxt . 'axe'    = GEO2   ; axe de revolution si 2D AXI
+
+  On peut definir un nombre quelconque de Breches en indiquant le nom de la
+ breche, son maillage et la direction du champ de vitesse a la breche autant
+ de fois que necessaire :
+
+ rxt . 'Breches' = 'TABLE'                     ; data des Breches
+ rxt . 'Breches' . MOT1              = 'TABLE' ; data de la breche MOT1
+ rxt . 'Breches' . MOT1 . 'Maillage' = GEO1    ; maillage surfacique de MOT1
+ rxt . 'Breches' . MOT1 . 'diru'     = POI1    ; direction de la vitesse
+
+ avec MOT1 le nom de la breche choisie par l'utilisateur.
+
+  On peut definir un nombre quelconque de Sorties en indiquant le nom de la
+ sortie, son maillage et la direction du champ de vitesse a la sortie autant
+ de fois que necessaire :
+
+ rxt . 'Sorties' = 'TABLE'                     ; data des Sorties
+ rxt . 'Sorties' . MOT1              = 'TABLE' ; data de la sortie MOT1
+ rxt . 'Sorties' . MOT1 . 'Maillage' = GEO1    ; maillage surfacique de MOT1
+ rxt . 'Sorties' . MOT1 . 'diru'     = POI1    ; direction de la vitesse
+
+ avec MOT1 le nom de la sortie choisi par l'utilisateur.
+
+  On peut definir un nombre quelconque de PAROIS en indiquant le nom MOT1 de
+ la paroi et son maillage autant de fois que necessaire :
+
+ rxt . 'PAROIS' = 'TABLE'                     ; data des PAROIS
+ rxt . 'PAROIS' . MOT1              = 'TABLE' ; data de la paroi MOT1
+ rxt . 'PAROIS' . MOT1 . 'vtp'      = GEO1    ; maillage volumique de MOT1
+
+ avec MOT1 le nom de la paroi choisi par l'utilisateur.
+
+  On peut definir un nombre quelconque de surface a temperature imposee en
+ indiquant le nom MOT1 de la surface et son maillage autant de fois que
+ necessaire :
+
+ rxt . 'TIMP' = 'TABLE'                      ; data des surfaces a TIMP
+ rxt . 'TIMP' . MOT1              = 'TABLE'  ; data de la surface MOT1
+ rxt . 'TIMP' . MOT1 . 'MAILLAGE' = GEO1     ; maillage surfacique de MOT1
+
+ avec MOT1 le nom de la paroi a temperature imposee choisi par l'utilisateur.
+ 
+  Exemple : On definit les breches A et B de la facon suivante :
+
+ rxt . 'Breches' = 'TABL' ;
+ rxt . 'Breches' . 'A'              = 'TABL'      ;
+ rxt . 'Breches' . 'A' . 'Maillage' = surfacea    ;
+ rxt . 'Breches' . 'A' . 'diru'     = (0. 0. 1.)  ;
+ rxt . 'Breches' . 'B'              = 'TABL'      ;
+ rxt . 'Breches' . 'B' . 'Maillage' = surfaceb    ;
+ rxt . 'Breches' . 'B' . 'diru'     = (0. -1. 0.) ;
+
+
+CHAP{Modelisation Physique}
+
+PART{Loi d'etat pour la vapeur}
+
+ rxt . 'VERSION' = (MOT1) ;
+ avec MOT1=('V0') si gaz parfait (par defaut), 'V1' si gaz reel (en test) 
+
+
+PART{Thermique parois}
+
+  A. Activation
+  -------------
+
+  Certaines parois sont maillees en volume et on y calcule l'evolution de la
+ temperature due aux echanges avec le fluide et le milieu ambiant. Les
+ informations globales associees a la thermique paroi sont les suivantes :
+
+ rxt . 'THERMP' = (LOG1) ; VRAI si thermique paroi (FAUX par defaut)
+ rxt . 'THERCO' = (LOG2) ; VRAI si couplage paroi/fluide implicite (FAUX)
+ rxt . 'ECHAN'  = FLOT1  ; coefficient d'echange fluide / paroi (W/m2/oC)
+
+ En cas de condensation, la valeur du coefficient d'echange convectif FLOT1
+ est ecrasee par HTC, celle issue de la correlation associee au modele de 
+ condensation, sauf si FLOT1 lui est superieure : HT = max(FLOT1,HTC). La 
+ valeur fournie est donc un seuil.
+
+
+  B. Proprietes des PAROIS
+  ------------------------
+
+  Pour chaque paroi MOT1, on precise les proprietes de la paroi par :
+
+ rxt . 'PAROIS' . MOT1 . 'vtp'    = GEO1  ; maillage de MOT1
+ rxt . 'PAROIS' . MOT1 . 'LAMBDA' = FLOT1 ; condu. thermique de MOT1 (W/m/oC)
+ rxt . 'PAROIS' . MOT1 . 'ROCP'   = FLOT2 ; rho*Cp de MOT1 (J/m3/oC)
+ rxt . 'PAROIS' . MOT1 . 'Tp0'    = FLOT3 ; temperature initiale de MOT1 (oC)
+
+ Par exemple, on definit ainsi les parois 'Peinture' et 'Acier' :  
+
+ rxt . 'PAROIS' = 'TABL' ;
+ rxt . 'PAROIS' . 'Peinture' = 'TABL'              ;
+ rxt . 'PAROIS' . 'Peinture' .'vtp'    = mpeinture ;
+ rxt . 'PAROIS' . 'Peinture' .'LAMBDA' = 0.2       ;
+ rxt . 'PAROIS' . 'Peinture' .'ROCP'   = 1.E6      ;
+ rxt . 'PAROIS' . 'Peinture' .'Tp0'    = 60.       ;
+ rxt . 'PAROIS' . 'Acier' = 'TABL'            ;
+ rxt . 'PAROIS' . 'Acier' . 'vtp'    = macier ;
+ rxt . 'PAROIS' . 'Acier' . 'LAMBDA' = 15.    ;
+ rxt . 'PAROIS' . 'Acier' . 'ROCP'   = 3.9E6  ;
+ rxt . 'PAROIS' . 'Acier' . 'Tp0'    = 60.    ;
+
+
+PART{Temperature de paroi imposee}
+
+  A. Surfaces internes
+  --------------------
+
+  Les parois internes de l'enceinte peuvent echanger via un coefficient
+ d'echange avec le fluide, l'evolution de la temperature de la paroi etant
+ connue en fonction du temps.
+
+ rxt . 'TIMP'                     = 'TABL' ; data des surfaces a T imposee
+ rxt . 'TIMP' . MOT1              = 'TABL' ; data de la surface MOT1
+ rxt . 'TIMP' . MOT1 . 'MAILLAGE' = GEO1   ; maillage de la surface MOT1              
+ rxt . 'TIMP' . MOT1 . 'ECHAN'    = FLOT1  ; coef. d'echange (W/m2/oC)
+ rxt . 'TIMP' . MOT1 . 't'        = LREE1  ; temps (s)
+ rxt . 'TIMP' . MOT1 . 'TIMP'     = LREE2  ; temperature imposee (oC)
+
+ avec MOT1 le nom de la paroi a temperature imposee choisi par l'utilisateur.
+ Cela permet en particulier de modeliser des condenseurs. 
+
+ En cas de condensation, la valeur du coefficient d'echange convectif FLOT1
+ est ecrasee par HTC, celle issue de la correlation associee au modele de 
+ condensation, sauf si FLOT1 lui est superieure : HT = max(FLOT1,HTC). La 
+ valeur fournie est donc un seuil.
+
+  L'ancienne structure de donnee ECHANP permettant d'imposer une surface a
+ temperature constante au cours du temps sera supprimee a la prochaine version
+ de CAST3M.
+
+ rxt . 'ECHANP'              = 'TABL' ;
+ rxt . 'ECHANP' . 'MAILLAGE' = GEO1   ;
+ rxt . 'ECHANP' . 'ECHAN'    = FLOT1  ;
+ rxt . 'ECHANP' . 'TMUR'     = FLOT2  ; 
+
+
+  B. Surface externe
+  ------------------
+
+  Les parois externes de l'enceinte peuvent echanger via un coefficient
+ d'echange avec le milieu ambiant (exterieur) a condition d'activer ECHEXT.
+
+ rxt . 'ECHEXT' = (LOG1) ; VRAI si echange externe paroi/milieu ambiant (FAUX)
+ 
+ rxt . 'parext' = GEO1   ; maillage de la surface externe
+ rxt . 'HEXT'   = FLOT1  ; coefficient d'echange avec l'exterieur (W/m2/oC)
+ rxt . 'TPEXT'  = FLOT2  ; temperature exterieure (oC)
+
+ Exemple : Si l'enceinte est semi immergee on peut definir deux zones (une
+ pour la partie immergee et une pour la partie emmergee) en utilisant la
+ procedure PROCHEXT. Les deux zones sont identifiees par la hauteur d'eau qui
+ est une donnee du modele. Cette procedure est a appeler a partir d'une
+ procedure PERSO (voir entree PRCPERSO). On renvoie a la notice de la procedure
+ PROCHEXT pour renseigner correctement l'appel dans la procedure PERSO. Les
+ donnees fournies peuvent dependre du temps (voir les jeux de donnees pressuhx1
+ et pressuhx2.dgibi).
+
+
+PART{Conditions initiales}
+
+  A. Constituants du melange
+  --------------------------
+
+  L'air est toujours present dans le melange.
+
+ rxt . 'VAPEUR' = (LOG1) ; presence de vapeur (FAUX)
+ rxt . 'H2'     = (LOG2) ; presence d'hydrogene (FAUX)
+ rxt . 'HE'     = (LOG3) ; presence d'helium (FAUX)
+ rxt . 'N2'     = (LOG4) ; presence d'azote (FAUX)
+ rxt . 'O2'     = (LOG5) ; presence d'oxygene (FAUX)
+ rxt . 'CO'     = (LOG6) ; presence d'oxyde de carbone (FAUX)
+ rxt . 'CO2'    = (LOG7) ; presence de gaz carbonique (FAUX)
+
+
+  B. Composition du melange
+  -------------------------
+
+  Le mélange initial est constant dans le domaine fluide.
+
+ rxt . 'TF0' = FLOT1 ; temperature initiale du melange (oC)
+ rxt . 'PT0' = FLOT2 ; pression totale initiale (Pa)
+ rxt . MOT1  = FLOT3 ; fraction massique d'un constituant present
+ avec MOT1='Yvap0','Yhe0','Yh20','Yo20','Yn20','Yco0','Yco20'.
+
+ Remarque : L'air assure le complement a 1 des fractions massiques fournies.
+
+
+  C. Proprietes du melange
+  ------------------------
+
+ * Proprietes physiques du melange gazeux prises par defaut
+ * Constantes des gaz (J/kg/K)
+ Rgh2  = 4156.5
+ Rghe  = 2078.25
+ Rgo2  = 259.8
+ Rgn2  = 296.9
+ Rgco2 = 188.9
+ Rgco  = 296.9
+ Rgvap = 461.513
+ Rgair = 287.1
+
+ muair =  1.800e-5 : viscosite dynamique (air)  (kg/m/s)
+ alf   =  1.800e-5 : diffusivite thermique      (m2/s)
+ lamair=  2.580e-2 : conductivite thermique     (W/m/oC)
+ db    =  1.000e-5 : diffusion Browniene        (m2/s)
+ Cpvap =  1700.0   : chaleur specifique a pression constante
+                     pour la vapeur d'eau       (J/oC/kg)
+ Lv    =  2.3E6    : chaleur latente            (J/kg)
+
+ Les chaleurs specifiques des autres gaz sont donnees par la
+ procedure CALCP.
+
+
+PART{Conditions aux limites}
+
+  Les frontieres entre fluide et paroi etant traites en B/ et C/, nous
+ indiquons les conditions aux entrees (breches) et aux sorties fluide.
+
+  A. Breches
+  ----------
+
+  Pour chaque breche MOT1, le debit et la temperature associes a differents
+ temps sont regroupes dans la sous table scenario de la breche concernee :
+
+ rxt.'Breches'.MOT1.'scenario'        = 'TABL' ; scenario de la breche MOT1
+ rxt.'Breches'.MOT1.'scenario'.'t'    = LREE1  : temps du scenario (s) 
+ rxt.'Breches'.MOT1.'scenario'.'qair' = LREE2  : debit d'air (kg/s)
+ rxt.'Breches'.MOT1.'scenario'. MOT2  = LREE3  : debit d'une espece (kg/s)
+ rxt.'Breches'.MOT1.'scenario'.'tinj' = LREE4  : temperature d'injection (oC)
+
+ avec MOT2='qeau','qhe','qh2','qo2','qn2','qco' ou 'qco2' suivant la
+ composition du melange. Comme l'air est present par defaut, la donnee 'qair'
+ est toujours indiquee.
+
+ Par exemple, on definit une breche A de vapeur d'eau a 150oC et 50 g/s par :
+
+ rxt.'Breches'.'A'.'scenario'        = 'TABL' ;
+ rxt.'Breches'.'A'.'scenario'.'t'    = 'PROG' 0.0    1000.0 ;
+ rxt.'Breches'.'A'.'scenario'.'qair' = 'PROG' 0.000  0.000  ;
+ rxt.'Breches'.'A'.'scenario'.'qeau' = 'PROG' 0.050  0.050  ;
+ rxt.'Breches'.'A'.'scenario'.'tinj' = 'PROG' 150.0  150.0  ;
+
+  Pour la vapeur, la separation vapeur/liquide a la breche est realisee a la
+ temperature d'ebullition. Par suite, la qualite de la vapeur a la breche est :
+ xsi = (h_{vap,inj}-h_{liq,ebu}) / (h_{vap,sat}-h_{liq,ebu}),
+ avec h_{vap,inj} = h(P_{vap,inj},T_{inj}),
+      h_{vap,ebu} = hvap(P,Tsat(P)),
+      h_{liq,ebu} = hliq(P,Tsat(P)),
+      P, la pression totale dans l'enceinte.
+
+  La partie liquide va directement dans le puisard dont la masse est
+ initialisee avec rxt . 'Mliq0' (en kg, 0. par defaut).
+
+
+  B. Sorties
+  ----------
+
+  Pour chaque sortie MOT1, deux modeles sont disponibles : on modelise une
+ ventilation forcee (entree 'Qext') ou un clapet de decharge (entree 'Pext').
+ Dans le premier cas, le debit de ventilation forcee est donne en fonction du
+ temps ; dans le deuxieme cas, il est calcule en fonction de la difference
+ entre la pression de l'enceinte et l'exterieur. Il faut alors renseigner les
+ donnees exterieures relatives a la perte de charge :
+     P - Pext = Kext (U ** Bext). 
+ Si les conditions sont reunies, le col est sonique (debit critique atteint).
+
+ rxt . 'Sorties' . MOT1 . 'scenario'             = 'TABL' ; scenario de MOT1
+ rxt . 'Sorties' . MOT1 . 'scenario' . 't'       = LREE1  ; temps (s)
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Section' = FLOT1  ; section (m2)
+
+  Cas a : 'Qext' : ventilation forcee
+
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Qext'    = LREE2 ; debit (kg/s)
+
+  Cas b : 'Pext' : clapet de decharge
+
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Pext'    = LREE2 ; P exterieur (Pa)
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Kext'    = LREE3 ; Perte de charge
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Bext'    = LREE4 ; Perte de charge
+
+  Remarque : Si la condition de sortie n'est pas active pendant tout le
+ scenario, il suffit d'annuler par une procedure PERSO sa section (<1.e-10).
+
+  Exemple d'une sortie appelee S :
+
+ rxt . 'Sorties' = 'TABL' ;
+
+ rxt . 'Sorties' . 'S' = 'TABL' ;
+ rxt . 'Sorties' . 'S' . 'Maillage' = ms         ;
+ rxt . 'Sorties' . 'S' . 'diru'     = (0. 0. 1.) ;
+ rxt . 'Sorties' . 'S' . 'scenario' = 'TABL'     ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Section' = 4.68e-4           ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 't'       = 'PROG' 0.0 1000.0 ;
+
+  Cas a : 'Qext'
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Qext'    = 'PROG' 1.     1.    ;
+
+  Cas b : 'Pext'
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Pext'    = 'PROG' 1.e5   1.e5  ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Kext'    = 'PROG' 1.000  1.000 ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Bext'    = 'PROG' 0.75   0.75  ;
+
+
+  C. Flux de masse diffuse impose
+  -------------------------------
+
+  On peut imposer les debits de masse issus d'une surface MOT1 sous forme de
+ flux diffusif lorsque le debit est tres faible.
+
+ rxt . 'XFIMP' = 'TABL'                    ; data des flux diffusifs
+ rxt . 'XFIMP' . MOT1 = 'TABL'             ; data de la surface MOT1
+ rxt . 'XFIMP' . MOT1 . 'MAILLAGE' = GEO1  ; maillage
+ rxt . 'XFIMP' . MOT1 . 't'        = LREE1 ; temps (s)
+ rxt . 'XFIMP' . MOT1 . MOT2       = LREE2 ; debit (kg/s)
+
+ avec MOT1 le nom de la paroi a flux diffusif imposee choisi par l'utilisateur,
+ MOT2='qeau','qair','qhe','qh2','qo2','qn2','qco','qco2' suivant l'espece
+ concernee.
+
+
+PART{Turbulence}
+
+  L'absence de cette entree signifie que l'on est en laminaire.
+
+ < rxt . 'MODTURB' =  MOT1 ; > modele de turbulence choisi
+ avec MOT1='NUTURB','LMEL' ou 'KEPSILON'.
+
+ a/  rxt . 'MODTURB'  =  'NUTURB'  ; Nu turbulent constant
+     rxt . 'NUT'      =  FLOT1     ; valeur de Nut (m2/s) 
+
+ b/  rxt . 'MODTURB'  =  'LMEL'    ; longueur de melange
+     rxt . 'LMEL'     =  FLOT1     ; valeur de lm (m)
+
+ c/  rxt . 'MODTURB'  = 'KEPSILON' ; k-epsilon
+     < rxt . 'FPAROI' = LOGIQUE    ; > fonction de paroi (FAUX) 
+     < rxt . 'YP'     = FLOT1      ; > valeur de y+ 
+
+ Le modele KEPSILON n'est disponible qu'avec l'algorithme semi-explicite EFM1
+ (voir entree ALGO).
+
+
+PART{Aspersion}
+
+  rxt . 'ASPER' = (LOG1) ; VRAI si presence d'aspersion (FAUX)
+
+ En cas d'aspersion le logique rxt.'VAPEUR' doit etre = VRAI
+
+ rxt.'aspinj' = GEO1 ; Maillage de la surface d'injection
+                           de la phase dispersee
+ rxt.'toitf'  = GEO2 ; Maillage de la surface superieure (par
+                           rapport a la verticale) du volume
+                           fluide
+ rxt.'rod'    = GEO3 ; Densite de la phase dispersee
+ rxt.'Cpd'    = GEO4 ; Chaleur specifique de la phase dispersee
+ rxt.'scenario'.'vzinj'  = LREE1 ; Liste des vitesses (verticales)
+                                   d'injection de la phase disp.
+ rxt.'scenario'.'xdinj'  = LREE2 ; Liste de la fraction volumique
+                                   de la phase disp. a l'inject.
+ rxt.'scenario'.'tdinj'  = LREE3 ; Liste de la temperature de la
+                                   phase disp. a l'injection.
+ rxt.'scenario'.'ddinj'  = LREE4 ; Liste du diametre de la phase
+                                   disp. a l'injection.
+
+
+PART{Condensation en masse (en test)}
+
+ rxt . 'CONDMAS' = (LOG1) ; Activation de la condensation en masse (FAUX).
+
+
+
+PART{PAR (recombineur catalytique passif)}
+
+  Les recombineurs ne peuvent etre defini qu'en presence a minima des
+ constituants suivants : H2, N2, O2, VAPEUR.
+
+  On definit autant de PAR que necessaire (rang=1,n). 
+
+ rxt . 'RECOMB' = 'TABLE'                     ; data des PARs
+ rxt . 'RECOMB' . rang = 'TABL'               ; data du rangieme PAR
+ rxt . 'RECOMB' . rang . 'PAREXT'   = MAIL1   ; paroi du PAR
+ rxt . 'RECOMB' . rang . 'ENTREE'   = MAIL2   ; entree du PAR
+ rxt . 'RECOMB' . rang . 'SORTIE'   = MAIL3   ; sortie du PAR
+ rxt . 'RECOMB' . rang . 'direntr'  = POI1    ; normale a l'entree
+ rxt . 'RECOMB' . rang . 'dirsort'  = POI2    ; normale a la sortie
+ rxt . 'RECOMB' . rang . 'NSECTION' = (ENTI1) ; nombre de PAR
+ rxt . 'RECOMB' . rang . 'A'        = (FLOT1) ; coef. taux de combustion
+ rxt . 'RECOMB' . rang . 'B'        = (FLOT2) ; coef. taux de combustion
+ rxt . 'RECOMB' . rang . 'XH2ON'    = (FLOT3) ; condition allumage
+ rxt . 'RECOMB' . rang . 'XH2OFF'   = (FLOT4) ; condition extinction
+ rxt . 'RECOMB' . rang . 'BETA'     = (FLOT5) ; parametrage
+
+  Par defaut, le nombre d'unite NSECTION dans le bati est 1.
+
+  Le taux de consommation d'H2 est calcule par la loi constructeur SIEMENS.
+ Les valeurs par defaut correspondent au modele SIEMENS FR90/1-150 :
+  - A et B : Coefficient de la loi lineaire en pression
+    (0.48D-8 kg/s/Pa et 0.58D-3 kg/s par defaut)
+  - XH2ON  : Fraction molaire d'H2 au dela de laquelle le
+    recombineur entre en fonctionnement (0.005 par defaut)
+  - XH2OFF : Fraction molaire d'H2 en deça de laquelle le
+    recombineur passe en arret (0.005 par defaut)
+  - BETA   : Zone de transition affectee par la correction
+    pour les faibles concentrations en H2 (0.2 par defaut)
+
+
+PART{Condensation en parois}
+
+ rxt . 'MODCOND' = (MOT1) ; Modele de condensation en paroi
+ avec MOT1=('CHIL0') ou 'CHIL1'.
+
+ a/ rxt . 'MODCOND' = 'CHIL0' : Jv = Jstand = kc rho (Yv - Yvsat)
+ Modele de type Chilton-Colburn valable pour les tres faibles concentration de
+ vapeur. La correlation utilisee est une correlation de convection naturelle.
+
+ b/ rxt . 'MODCOND' = 'CHIL1' : Jv = Jstand / (1-Yvsat)
+ Modele deduit de la loi de Fick en masse volumique avec diffusivite de la
+ vapeur dans le melange calculé comme dans RALOC.
+
+
+CHAP{Parametres de fonctionnement}
+
+PART{Table RXT}
+
+  Il y a la possibilite d'executer une procedure personnelle en tete de la
+ boucle en temps de l'algorithme.
+
+ rxt . 'PERSO'    = (LOG1)  ; activation d'une procedure PERSO (FAUX)
+ rxt . 'PRCPERSO' = MOT1    ; nom de la procedure
+ rxt . 'TABPERSO' = TAB1    ; data associees
+
+ rxt . 'DT0'      =  FLOT1  ; valeur du pas de temps (s)
+ rxt . 'IMPR'     = (ENTI1) ; (0) ou 1 si impressions supplementaires
+ rxt . 'epsi'     = (FLOT1) ; critere de precision des maillages (1.E-4)
+
+ rxt . 'FRPREC'   = (ENTI1) ; frequence de calcul du preconditionnement (1)
+ rxt . 'FCPRECT'  = (ENTI2) ; frequence de recalcul du preconditionneur base
+                              sur le rang des pas de temps (1)
+ rxt . 'FCPRECI'  = (ENTI3) ; frequence de recalcul du preconditionneur base
+                              sur le rang des iterations internes (1)
+
+ Attention : si FPREC est donne, les valeurs par defaut pour FCPRECT et
+ FCPRECI sont egales a 5 au lieu de 1.
+
+ rxt . 'ALGO'     = (MOT1)  ; Type d'algorithme ('IMPL')
+ avec MOT1='IMPL' si semi-implicite et 'EFM1' si semi explicite.
+
+ rxt . 'DISCR'    = (MOT1)  ; discretisation de la vitesse et des champs 
+                              scalaires (sauf la pression) ('MACRO').
+ rxt . 'KPRE'     = (MOT2)  ; discretisation de la pression ('CENTRE')
+
+ Attention : tous les couples MOT1/MOT2 ne sont pas licites (voir les
+ notices de NAVI et de MODEL).
+
+ rxt . 'STAB'     = (FLOT1) ; facteur de stabilisation des elements MACRO
+                              d'ancienne generation (1.).
+
+ rxt . 'MAXELPRE' = (ENTI1) ; nombre maximum d'elements pour lequel on utilise
+                              une methode directe (Cholesky) pour inverser la
+                              matrice de pression (150000).
+ rxt . 'TYPINV'   = (ENTI2) ; methode de resolution iterative (voir KRES) (3)
+ rxt . 'RESIDU'   = (FLOT1) ; residu des methodes iteratives (1.E-20).
+ rxt . 'NTIT'     = (ENTI3) ; Nombre max d'iterations pour les methodes
+                              iteratives (800)
+
+ rxt . 'GRAPH'    = (LOG1)  ; trace de controle (FAUX)
+ rxt . 'DETMAT'   = (LOG1)  ; Destruction des matrices en fin du calcul (VRAI)
+ rxt . 'REINIT'   = (LOG1)  ; Re-initialisation du scenario (FAUX)
+ rxt . 'CORTEMP'  = (LOG1)  ; Controle du bilan d'energie (VRAI)
+
+
+PART{Limitations du modele actuel}
+
+ Pas de modelisation gaz reel de la vapeur d'eau
+ Pas de modelisation de la turbulence en implicite
+ Pas de modelisation de la condensation en masse
+ Pas de plan de symetrie possible
+ Modele numerique adapte aux grands pas de temps
+ Parallelisme embryonnaire
+
+
+PART{Quelques recettes}
+
+  A. Modification des conditions aux limites
+  -------------------------------------------
+
+  Lorsque par exemple une breche cesse d'emettre, la nature des conditions aux
+ limites change a la breche. Pour prendre en compte cela, le plus simple est
+ de sauvegarder le premier calcul, de decrire le 'nouveau' probleme sans la
+ breche et de surcharger la table des inconnues par celle de l'ancien calcul.
+
+  1/ On recupere la table rxt.'TIC' du premier calcul
+     'OPTI' 'REST' 'MONFIC.sauv' ; 'REST' ;
+     tic = rxt . 'TIC' ;
+  2/ On recupere eventuellemnt le maillage
+     opti rest 'MONMAIL.sauv';
+     rest ;
+  3/ On decrit entierement le nouveau probleme
+     rxt = 'TABL' ;
+     rxt . 'vtf' =  mon maillage ;
+     rxt . ... etc
+  4/ On initialise avec la table tic precedente
+     rxt . 'TIC' = tic ;
+
+
+  B. Taille du fichier de sauvegarde
+  ----------------------------------
+
+  Il est possible de reduire la taille du fichier de sauvegarde obtenu
+ par l'opérateur 'SAUV' en detruisant les matrices (voir rxt . 'DETMAT').
+
+
+CHAP{Resultats du calcul}
+
+PART{Table rxt.'TIC'}
+
+  La table TIC contient en particulier :
+  - des listes temporelles (LT) 0D (champs moyens) qui permettent de tracer des
+ evolutions lorsqu'elles sont associees a la liste des temps de calcul stockee
+ a l'indice 'LTPS' de TIC.  
+  - des champs multi-D (CHPO) calcules au dernier temps calcule.
+
+ Pour chaque indice de la table, nous indiquons le type de l'indice, son nom
+ ainsi que le type du contenu de l'indice.
+
+
+  A. Suivi temporel 0D
+  --------------------
+
+ Indice          Objet
+ Type & Valeur   Type       Commentaires
+
+ MOT    Tps      FLOTTANT : temps physique
+ MOT    NUPADT   ENTIER   : rang du pas de temps Tps
+ MOT    DT       FLOTTANT : pas de temps courant
+
+ MOT    LTPS     LISTREEL : LT, liste des temps calcules
+
+ MOT    LMAXU    LISTREEL : LT, module max de la vitesse (m/s)
+ MOT    Rhomn    LISTREEL : LT, densite du melange (kg/m3)
+ MOT    Rhomv    LISTREEL : LT, densite de vapeur dans le melange (kg/m3)
+ MOT    Rhom?    LISTREEL : LT, densite de ? dans le melange (kg/m3)
+ avec '?'='air','he','h2','o2','n2','co','co2'
+
+ MOT    PT       LISTREEL : LT, pression thermodynamique
+ MOT    Tfm      LISTREEL : LT, temperature moyenne du melange (oC)
+ MOT    Remn     LISTREEL : LT, energie interne specifique melange (J/m3)
+
+ MOT    Econv    LISTREEL : LT, energie extraite par convection (J/m3)
+ MOT    Econd    LISTREEL : LT, energie extraite par condensation (J/m3)
+ MOT    Hcond    LISTREEL : LT, enthalpie extraite par condensation (J/m3)
+
+ MOT    Easpe    LISTREEL : LT, energie extraite par l'aspersion (J/m3)
+ MOT    Haspe    LISTREEL : LT, enthalpie extraite par l'aspersion (J/m3)
+ MOT    Qaspe    LISTREEL : LT, debit aspersion  (kg/s)
+
+ MOT    Rgpm     LISTREEL : LT, constante gaz parfaits melange (J/kg/K)
+ MOT    Cvm      LISTREEL : LT, capacite calorifique a volume cst (J/kg/K)
+ MOT    Cpm      LISTREEL : LT, capacite calorifique a p cst (J/kg/K)
+ MOT    Gamm     LISTREEL : LT, rapport Cpm/Cvm
+
+ MOT    Minj     LISTREEL : LT masse injectee  (kg)
+ MOT    Mrest    LISTREEL : LT masse restante  (kg)
+
+ MOT    Mcond    LISTREEL : LT masse de vapeur condensee (total) (kg)
+ MOT    Mcondw   LISTREEL : LT masse de vapeur condensee (THERMP) (kg)
+ MOT    Mcond0   LISTREEL : LT masse de vapeur condensee (ECHANP) (kg)
+ MOT    Mcond1i  LISTREEL : LT masse de vapeur condensee (TIMP) (kg)
+
+ MOT    Qc       LISTREEL : LT, Debit de vapeur condensee (total) (kg/s)
+ MOT    Qcw      LISTREEL : LT, Debit de vapeur condensee (THERMP) (kg/s)
+ MOT    Qc0      LISTREEL : LT, Debit de vapeur condensee (ECHANP) (kg/s)
+ MOT    Qc1i     LISTREEL : LT, Debit de vapeur condensee (TIMP) (kg/s)
+
+ MOT    mdTf     LISTREEL : LT, Correction locale sur TF (min) (oC)
+ MOT    MdTf     LISTREEL : LT, Correction locale sur TF (max) (oC)
+ MOT    Mdr?     LISTREEL : LT, Correction de masse pour l'espece ? (kg)
+ avec '?'='vap','air','he','h2','o2','n2','co','co2'
+
+
+ *--- Parois a temperature imposee (TIMP) ---*
+
+ MOT    TIMP     TABLE : informations relatives a TIMP
+
+ TIMP . nomi     TABLE, data de la paroi nomi
+ MOT    Ltbpi    LISTREEL : LT, temperature de la paroi nomi (oC)
+
+ *--- Breches (Breches) ---*
+
+ MOT    Breches   TABLE : informations relatives aux breches
+
+ Breches . nomi  TABLE, data de la breche nomi
+ MOT    guj      LISTREEL : LT, vitesse a l'injection (m/s)
+ MOT    Qj       LISTREEL : LT, debit d'injection (kg/s)
+ MOT    Tinj     LISTREEL : LT, temperature d'injection (kg/s)
+ MOT    Hj       LISTREEL : LT, enthalpie a l'injection (J/kg)
+ MOT    Ej       LISTREEL : LT, energie a l'injection (J/kg)
+ MOT    Ksi      LISTREEL : LT, partition liquide/vapeur (kg/s)
+ MOT    Qlj      LISTREEL : LT, debit liquide a l'injection (kg/s)
+ MOT    Hlj      LISTREEL : LT, enthalpie liquide a l'injection (J/kg)
+
+ Usage : rxt . 'Breches' . nomi . 'Tinj' contient la LT de la
+ temperature imposee a la breche nomi. Les temps  associes sont
+ ceux de rxt . 'TIC' . 'LTPS'
+
+ *--- RECOMBINEUR ---*
+
+ MOT    RECOMB   TABLE    : informations issues des PARs
+
+ RECOMB . i      TABLE, data du ieme PAR
+ MOT    DEB      LISTREEL : LT, debit (kg/s)
+ MOT    Uin      LISTREEL : LT, vitesse a l'entree (m/s)
+ MOT    Uout     LISTREEL : LT, vitesse a la sortie (m/s)
+ MOT    Tin      LISTREEL : LT, temperature a l'entree (oC)
+ MOT    Tout     LISTREEL : LT, temperature a la sortie (oC)
+ MOT    Tpla     LISTREEL : LT, temperature des plaques (oC)
+ MOT    EFF      LISTREEL : LT, efficacite du recombineur 
+ MOT    Hin      LISTREEL : LT, enthalpie a l'entree (J/kg)
+ MOT    Hout     LISTREEL : LT, enthalpie a la sortie (J/kg)
+ MOT    R?E      LISTREEL : LT, densite de l'espece ? a l'entree (kg/m3)
+ MOT    R?S      LISTREEL : LT, densite de l'espece ? a la sortie (kg/m3)
+ MOT    Y?E      LISTREEL : LT, fraction massique de l'espece ? a l'entree
+ MOT    Y?S      LISTREEL : LT, fraction massique de l'espece ? a la sortie
+ avec '?'='H2O','HE','H2','O2','N2','CO','CO2'.
+
+ Usage : rxt . 'RECOMB' . 2 . 'DEB' contient la LT des debits traversant le
+ deuxieme recombineur. Les temps associes sont ceux de rxt . 'TIC' . 'LTPS'
+
+
+  B. Grandeurs multi-D
+  --------------------
+
+ Indice         Objet
+ Type & Valeur  Type       Commentaires
+
+ MOT    UN      CHPOINT  : vitesse au pas de temps courant (m/s)
+ MOT    UNM     CHPOINT  : vitesse au pas de temps precedent (m/s)
+ MOT    PRES    CHPOINT  : pression (Pa)
+ MOT    TF      CHPOINT  : temperature au pas courant (oC)
+ MOT    TFNM    CHPOINT  : temperature au pas precedent (oC)
+ MOT    TP      CHPOINT  : temperature paroi au pas courant (oC)
+ MOT    TPNM    CHPOINT  : temperature paroi au pas precedent (oC)
+ MOT    RHO     CHPOINT  : densite au pas courant (kg/m3)
+ MOT    RHONM   CHPOINT  : densite au pas precedent (kg/m3)
+ MOT    RVP     CHPOINT  : densite de vapeur (kg)
+ MOT    YVAP    CHPOINT  : Fraction massique de vapeur
+
+ MOT    R?      CHPOINT  : densite de ? (kg)
+ MOT    Y?      CHPOINT  : FLOTTANT si l'espece est absente
+ avec ?='AIR','HE','H2','O2','N2','CO','CO2'
+
+ MOT    Mu      CHPOINT  : viscosite dynamique du melange (kg/m/s)
+ MOT    NU      CHPOINT  : viscosite cinematique du melange (m2/s)
+ MOT    NUEFF   CHPOINT  : viscosite cinematique effective (m2/s)
+
+ MOT    KHW     CHPOINT  : coefficient d'echange (convectif) (THERMP)
+ MOT    KH0     CHPOINT  : coefficient d'echange (convectif) (ECHANP)
+ MOT    KH1i    CHPOINT  : coefficient d'echange (convectif) (TIMP)
+
+
+ *--- Aspersion ---*
+
+ MOT    VN      CHPOINT  : vitesse de la phase dispersee (m/s)
+ MOT    TD      CHPOINT  : temperature de la phase dispersee (oC)
+ MOT    XD      CHPOINT  : Fraction volumique de la phase dispersee 
+ MOT    DD      CHPOINT  : Diametre de la phase dispersee (m)
+
+
+PART{Table rxt.'GEO'}
+
+  La table GEO contient les MMODEL NAVIER-STOKES des modelisations
+ choisies ainsi que les maillages associes.
+
+ Indice          Objet
+ Type & Valeur   Type       Commentaires
+
+ MOT    epsi     FLOTTANT : tolerance sur les maillages
+ MOT    $vtf     MMODEL   : modele du domaine fluide
+ MOT    $menvf   MMODEL   : modele pour la frontiere fluide 
+ MOT    $axe     MMODEL   : axe ou plan de symetrie
+ MOT    $vtp     MMODEL   : paroi thermique
+ MOT    $mtp1i   MMODEL   : paroi temperature imposee (TIMP)
+ MOT    $mtp0    MMODEL   : paroi temperature constante (ECHANP)
+ MOT    Pimp     MAILLAGE : POI1 ou la pression est imposee.
+
+
+ANGL====================================================================
+
+    Comment
+    -------
+
+    NDT ENTI1 : Number of time steps 
+    RXT TAB1  : problem description to compute the closed containment
+                content evolution with time
+
+
+    Description :
+    -----------
+
+  The ENCEINTE procedure computes, from an initial state, the evolution in
+ time of a gazeous mixture in a closed containment.
+
+
+CHAP{Overview}
+
+  The initial state can either be a uniform state or the result of a previous
+ computation.
+
+  The gazeous mixture is basically composed of air but it can contain one or
+ several gases like: steam, H2, N2, He, O2, CO and CO2. Noncondensable gases
+ and steam are perfect gases (version V0), even steam can be a real gas
+ (version V1, work in progress).
+
+  In presence of steam wall condensation can occur if locally conditions are
+ satisfied (Pvap > Psat). The wall condensation model is a Chilton-Colburn
+ type using a natural convection correlation along a vertical plane plate.
+
+  We make out 4 types of boundary conditions: the injection zones
+ (leak), outlets and valves, thermal walls and passive walls:
+
+  - the injection zones are surfaces of prescribed values. It concerns the
+ velocity, the mixture temperature, air and all other constitutive gases if
+ they are present: steam, H2, N2, He, O2, CO and CO2. It is necessary to
+ specify the mass flow rate for the mixture (kg/s), the inlet temperature (oC)
+ the mass flow rate for air and each present gases function of time (see table
+ 'scenario' of Breches).
+
+  - at the outlets, the mass flow rate is imposed (forced ventilation) or data
+ at the exit are prescribed to compute there the pressure loss (valve) (see
+ table 'scenario' of 'Sorties'). 
+
+  - at thermal walls, the velocity is set to zero. The temperature is either
+ prescribed in time (entry TIMP), set at an initial value which can be modified
+ after by personnal procedure (entry ECHANP) or the result of a thermics
+ computation (entry THERMP). It is possible to couple thermal equations for
+ walls and the flow in an implicit way (entry THERCO). In presence of steam
+ these walls are able to condense steam. They are impermeable for all
+ noncondensable gases.
+
+  - at passive walls, the velocity is set to zero, and the walls are
+ adiabatic/impermeable for all other unknowns (temperature steam and
+ noncondensable gases). They are obtained by difference between the meshes of
+ the boundary of the fluid domain, the thermal walls, the inlets and the
+ outlets.
+
+  Hence, boundary conditions are well posed according to the transient problem
+ to solve.
+
+  The turbulent motion of the mixture is modeled either with a constant eddy
+ viscosity model, a length scale model or a K-epsilon model (entry MODTURB).
+ Absence of entry MODTURB means the flow is laminar.
+
+  A Spray model is avaliable.
+
+  A Mass condensation model is in progress.
+
+  The preparation of a computation consists to fill entries of the RXT table
+ and then call the ENCEINTE procedure with this table. Therein, the RXT table
+ is achieved with three new tables:
+  - the table rxt.'GEO' contains all the objects concerning the geometry.
+  - the table rxt.'TBT' is a work table and contains all the objects needed
+ for the computation except the unknowns and the geometry. 
+  - the table rxt.'TIC' contains all the unknowns at the last known time as
+ well as data depending on time evolution.
+
+  Hence, the RXT entries given by the user are not modified.
+
+  Entries and their meaning are following :
+
+
+CHAP{Geometrical objects}
+
+ rxt.'vtf'    = GEO1   ; fluid mesh (mandatory)
+ rxt.'pi'     = POI1   ; point inside the fluid domain which will be used
+                         to prescribe the pressure (mandatory).
+ rxt.'axe'    = GEO2   ; axe if 2D AXI
+
+  As many inlets (Breches in french) as mandatory can be defined thanks to the
+ name of each inlet, it flow direction and mesh:
+
+ rxt . 'Breches' = 'TABLE'                     ; Breches' data
+ rxt . 'Breches' . MOT1              = 'TABLE' ; data for the inlet MOT1
+ rxt . 'Breches' . MOT1 . 'Maillage' = GEO1    ; mesh of MOT1
+ rxt . 'Breches' . MOT1 . 'diru'     = POI1    ; flow direction
+
+ with MOT1, the name of the inlet to be chosen by the user.
+
+  As many outlets (Sorties in french) as mandatory can be defined thanks to 
+ the name of each outlet, it flow direction and mesh:
+
+ rxt . 'Sorties' = 'TABLE'                     ; Sorties' data
+ rxt . 'Sorties' . MOT1              = 'TABLE' ; data for the outlet MOT1
+ rxt . 'Sorties' . MOT1 . 'Maillage' = GEO1    ; mesh of MOT1
+ rxt . 'Sorties' . MOT1 . 'diru'     = POI1    ; flow direction
+
+ with MOT1, the name of the outlet to be chosen by the user.
+
+  As many surface at a prescribed temperature (TIMP) as mandatory can be
+ defined thanks to the name of each surface and it mesh:
+
+ rxt . 'TIMP' = 'TABLE'                      ; TIMP data
+ rxt . 'TIMP' . MOT1              = 'TABLE'  ; data for the surface MOT1
+ rxt . 'TIMP' . MOT1 . 'MAILLAGE' = GEO1     ; mesh of MOT1
+
+ with MOT1, the name of the surface at a prescribed temperature to be chosen
+ by the user.
+ 
+  Exemple. We define two inlets A and B by:
+
+ rxt . 'Breches' = 'TABL' ;
+ rxt . 'Breches' . 'A'              = 'TABL'      ;
+ rxt . 'Breches' . 'A' . 'Maillage' = surfacea    ;
+ rxt . 'Breches' . 'A' . 'diru'     = (0. 0. 1.)  ;
+ rxt . 'Breches' . 'B'              = 'TABL'      ;
+ rxt . 'Breches' . 'B' . 'Maillage' = surfaceb    ;
+ rxt . 'Breches' . 'B' . 'diru'     = (0. -1. 0.) ;
+
+
+CHAP{Physical models}
+
+PART{Steam state law}
+
+ rxt . 'VERSION' = (MOT1) ;
+ with MOT1=('V0') if perfect gas (default value), 'V1' if real gas (in test) 
+
+
+PART{Wall thermics}
+
+  A. Activation
+  -------------
+
+  Some walls are meshed in volume and not only in surface to compute therein
+ temperature evolution in time due to heat exchange with fluid and ambient.
+ Global information are the following:
+
+ rxt . 'THERMP' = (LOG1) ; VRAI if wall thermics (FAUX by default).
+ rxt . 'THERCO' = (LOG2) ; VRAI if implicit coupling between wall and fluid
+ rxt . 'ECHAN'  = FLOT1  ; heat exchange coef. fluid / wall (W/m2/oC)
+
+ In case of steam condensation at walls, FLOT1 is a threshold value. The
+ effective convective heat transfer coefficient HT is computed according to the
+ HTC value given by the correlation associated with the condensation model, and
+ HT = max(FLOT1,HTC).
+
+
+  B. Wall properties
+  ------------------
+
+  For each wall MOT1, wall properties are given by:
+
+ rxt . 'PAROIS' . MOT1 . 'vtp'    = GEO1  ; mesh of MOT1
+ rxt . 'PAROIS' . MOT1 . 'LAMBDA' = FLOT1 ; thermal conductivity (W/m/oC)
+ rxt . 'PAROIS' . MOT1 . 'ROCP'   = FLOT2 ; rho*Cp (J/m3/oC)
+ rxt . 'PAROIS' . MOT1 . 'Tp0'    = FLOT3 ; initial temperature (oC)
+
+ For instance, we define 'Peinture' and 'Acier' walls by:  
+
+ rxt . 'PAROIS' = 'TABL' ;
+ rxt . 'PAROIS' . 'Peinture' = 'TABL'              ;
+ rxt . 'PAROIS' . 'Peinture' .'vtp'    = mpeinture ;
+ rxt . 'PAROIS' . 'Peinture' .'LAMBDA' = 0.2       ;
+ rxt . 'PAROIS' . 'Peinture' .'ROCP'   = 1.E6      ;
+ rxt . 'PAROIS' . 'Peinture' .'Tp0'    = 60.       ;
+ rxt . 'PAROIS' . 'Acier' = 'TABL'            ;
+ rxt . 'PAROIS' . 'Acier' . 'vtp'    = macier ;
+ rxt . 'PAROIS' . 'Acier' . 'LAMBDA' = 15.    ;
+ rxt . 'PAROIS' . 'Acier' . 'ROCP'   = 3.9E6  ;
+ rxt . 'PAROIS' . 'Acier' . 'Tp0'    = 60.    ;
+
+
+PART{Prescribed wall temperatures}
+
+  A. Internal walls
+  -----------------
+
+  At the fluid domain boundaries, heat exchange can occur with a prescribed
+ wall temperature via a heat exchange coefficient. It allows to modelize a
+ condensor. Three zones are possible.
+
+ The value of the heat exchange coefficient is the default value if there is
+ no condensation o is the lowest value if condensation.
+
+ rxt . 'TIMP'                     = 'TABL' ; data for prescribed wall temp.
+ rxt . 'TIMP' . MOT1              = 'TABL' ; data at the internal wall MOT1
+ rxt . 'TIMP' . MOT1 . 'MAILLAGE' = GEO1   ; mesh of the surface MOT1
+ rxt . 'TIMP' . MOT1 . 'ECHAN'    = FLOT1  ; heat exchange coef. (W/m2/oC)
+ rxt . 'TIMP' . MOT1 . 't'        = LREE1  ; time (s)
+ rxt . 'TIMP' . MOT1 . 'TIMP'     = LREE2  ; prescribed temperature (oC)
+
+ with MOT1 the name of the internal wall to be chosen by the user.
+ In particular, it modelizes wall condensor. 
+
+ In case of steam condensation, FLOT1 is a threshold value. If we notice HTC,
+ the heat exchange coefficient computed by using the correlation according to
+ the condensation model, the effective heat exchange coefficient HT is computed
+ by: HT = max(FLOT1,HTC).
+
+  Another way to impose constant prescribed inner wall temperature is to use
+ ECHANP. Only one wall can be defined. This structure will be suppressed in the
+ future. Hence, don't use it. Nevertheless :
+
+ rxt . 'ECHANP' = 'TABL' ; 
+ rxt . 'ECHANP' . 'MAILLAGE' = GEO1 ; 
+ rxt . 'ECHANP' . 'ECHAN'    = FLOT1 ; 
+ rxt . 'ECHANP' . 'TMUR'     = FLOT2 ;
+
+
+  B. External walls
+  -----------------
+
+  External walls can exchange heat with the ambient via a heat exchange
+ coefficient between the wall and the ambient. For that, the ECHEXT boolean
+ have to be activated.
+
+ rxt . 'ECHEXT' = (LOG1) ; VRAI if external walls are defined (FAUX)
+ 
+ rxt . 'parext' = GEO1   ; mesh of the external wall
+ rxt . 'HEXT'   = FLOT1  ; heat exchange coefficient (W/m2/oC)
+ rxt . 'TPEXT'  = FLOT2  ; external temperature (oC)
+
+ Example. If the enclosure is semi-immersed, two zones can be defined (one for
+ the immersed part and the other for the emmerged part) by using the PROCHEXT
+ procedure.  The two zones are identified by the water height, which has to be
+ provided to the model (HZ).  This procedure is to be called from a personnal
+ procedure (see PRCPERSO entry). We refer to the notice of the procedure
+ PRCHEXT to adress the way to call it in the PERSO procedure. The entries
+ provided may depend on time (look at pressuhext1.dgibi and pressuhext2.dgibi
+ as examples).
+
+
+PART{Initial conditions}
+
+  A. Mixture definition
+  ---------------------
+
+ rxt . 'VAPEUR' = (LOG1) ; presence of stem (FAUX)
+ rxt . 'H2'     = (LOG2) ; presence of hydrogen (FAUX)
+ rxt . 'HE'     = (LOG3) ; presence of helium (FAUX)
+ rxt . 'N2'     = (LOG4) ; presence of nitrogen (FAUX)
+ rxt . 'O2'     = (LOG5) ; presence of oxygen (FAUX)
+ rxt . 'CO'     = (LOG6) ; presence of carbon monoxyde (FAUX)
+ rxt . 'CO2'    = (LOG7) ; presence de carbon dioxyde (FAUX)
+
+
+  B. Mixture composition
+  ----------------------
+
+  The initial mixture composition is uniform over the fluid domain.
+
+ rxt . 'TF0' = FLOT1 ; initial temperature (oC)
+ rxt . 'PT0' = FLOT2 ; initial pressure (Pa)
+ rxt . MOT1  = FLOT3 ; mass fraction of a component if present
+ with MOT1='Yvap0','Yhe0','Yh20','Yo20','Yn20','Yco0','Yco20'.
+
+ Remark : It is not necessary to define the air component as the sum of mass
+ fractions is 1.
+
+
+  C. Proprietes du melange
+  ------------------------
+
+* Physical properties of the gazeous mixture
+* Gas constant (J/kg/K)
+ Rgh2  = 4156.5
+ Rghe  = 2078.25
+ Rgo2  = 259.8
+ Rgn2  = 296.9
+ Rgco2 = 188.9
+ Rgco  = 296.9
+ Rgvap = 461.513
+ Rgair = 287.1
+
+ muair =  1.800e-5 : dynamic viscosity (air)  (kg/m/s)
+ alf   =  1.800e-5 : thermal diffusivity      (m2/s)
+ lamair=  2.580e-2 : thermal conductivity     (W/m/oC)
+ db    =  1.000e-5 : Brownian diffusivity     (m2/s)
+ Cpvap =  1700.0   : steam specific heat capacity 
+                     at constant pressure     (J/oC/kg)
+ Lv    =  2.3E6    : latent heat              (J/kg)
+
+ The heat capacity for non condensable gases are computed with temperature
+ evolution by the CALCP procedure.
+
+
+PART{Boundary conditions}
+
+  Boundaries with walls are treated in B/ and C/. Hereafter we deal with fluid
+ inlets and outlets.
+
+
+  A. Fluid inlets
+  ---------------
+
+  For each fluid inlet MOT1, the mass flow rate and the inlet temperature
+ evolutions are given in the scenario table in the following way: 
+
+ rxt.'Breches'.MOT1.'scenario'        = 'TABL' ; inlet MOT1 scenario
+ rxt.'Breches'.MOT1.'scenario'.'t'    = LREE1  : time evolution (s) 
+ rxt.'Breches'.MOT1.'scenario'.'qair' = LREE2  : air mass flow rate (kg/s)
+ rxt.'Breches'.MOT1.'scenario'. MOT2  = LREE3  : MOT2 mass flow rate (kg/s)
+ rxt.'Breches'.MOT1.'scenario'.'tinj' = LREE4  : inlet temperature (oC)
+
+ with MOT2='qeau','qhe','qh2','qo2','qn2','qco' ou 'qco2' depending of the
+ mixture composition. As air is always present, 'qair' entry is always
+ specified.
+
+ For example, a steam mass flow rate of 50 g/s at 150oC is specified at the
+ inlet labeled A by:
+
+ rxt.'Breches'.'A'.'scenario'        = 'TABL' ;
+ rxt.'Breches'.'A'.'scenario'.'t'    = 'PROG' 0.0    1000.0 ;
+ rxt.'Breches'.'A'.'scenario'.'qair' = 'PROG' 0.000  0.000  ;
+ rxt.'Breches'.'A'.'scenario'.'qeau' = 'PROG' 0.050  0.050  ;
+ rxt.'Breches'.'A'.'scenario'.'tinj' = 'PROG' 150.0  150.0  ;
+
+  For steam, gas and liquid flow separation is done at boiling
+ temperature. Hence, steam quality xsi is defined by:
+ xsi = (h_{vap,inj}-h_{liq,ebu}) / (h_{vap,sat}-h_{liq,ebu}), 
+ with h_{vap,inj} = h(P_{vap,inj},T_{inj}), 
+      h_{vap,ebu} = hvap(P,Tsat(P)), 
+      h_{liq,ebu} = hliq(P,Tsat(P)), 
+      P, the (total) containment pressure.
+
+  The liquid part goes directly inside the sump. Initial sump mass
+ entry is rxt . 'Mliq0' (in kg, 0. by default).
+
+
+  B. Fluid outlets
+  ----------------
+
+  For each MOT1 outlet, two models are available: the former is a forced
+ ventilation ('Qext' entry), the latter is a valve ('Pext' entry).  In the
+ first case, the forced mass flow rate evolution is given ; in the second case,
+ the mass flow rate is proportional to the pressure loss according to: 
+    P - Pext = Kext (U ** Bext).  
+ Hence, ambient pressure as well as valve parameters have to be given. One's
+ has to note that sonic conditions are applied if necessary at the valve
+ outlet.
+
+ rxt . 'Sorties' . MOT1 . 'scenario'             = 'TABL' ; MOT1 scenario
+ rxt . 'Sorties' . MOT1 . 'scenario' . 't'       = LREE1  ; time evolution (s)
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Section' = FLOT1  ; outlet section (m2)
+
+  Cas a : 'Qext' : forced ventilation
+
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Qext'    = LREE2 ; mass flow rate (kg/s)
+
+  Cas b : 'Pext' : valve
+
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Pext'    = LREE2 ; ambient pressure (Pa)
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Kext'    = LREE3 ; head loss coef.
+ rxt . 'Sorties' . MOT1 . 'scenario' . 'Bext'    = LREE4 ; head loss exponent
+
+ Remark : To suppress the outlet MOT1 for the transient, FLOT1 at the Section
+ entry can be set to zero (<1.e-10) with a PERSO procedure.
+ 
+  Example. Hereafter we define the outlet S :
+
+ rxt . 'Sorties' = 'TABL' ;
+
+ rxt . 'Sorties' . 'S' = 'TABL' ;
+ rxt . 'Sorties' . 'S' . 'Maillage' = ms         ;
+ rxt . 'Sorties' . 'S' . 'diru'     = (0. 0. 1.) ;
+ rxt . 'Sorties' . 'S' . 'scenario' = 'TABL'     ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Section' = 4.68e-4           ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 't'       = 'PROG' 0.0 1000.0 ;
+
+  Case a : 'Qext'
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Qext'    = 'PROG' 1.     1.    ;
+
+  Case b : 'Pext'
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Pext'    = 'PROG' 1.e5   1.e5  ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Kext'    = 'PROG' 1.000  1.000 ;
+ rxt . 'Sorties' . 'S' . 'scenario' . 'Bext'    = 'PROG' 0.75   0.75  ;
+
+
+  C. Low mass fluxes
+  ------------------
+
+  When the mass flow rate is very low, it can be modelise as a diffusive mass
+ flux coming from a surface MOT1:
+
+ rxt . 'XFIMP' = 'TABL'                    ; diffusive fluxes data
+ rxt . 'XFIMP' . MOT1 = 'TABL'             ; MOT1 surface data
+ rxt . 'XFIMP' . MOT1 . 'MAILLAGE' = GEO1  ; mesh
+ rxt . 'XFIMP' . MOT1 . 't'        = LREE1 ; time evolution (s)
+ rxt . 'XFIMP' . MOT1 . MOT2       = LREE2 ; mass flow rate (kg/s)
+
+ with MOT1 the name of the surface chosen by the user
+      MOT2='qeau','qair','qhe','qh2','qo2','qn2','qco','qco2'
+
+
+PART{Turbulence}
+
+  If this entry is ommited the flow is considered laminar.
+
+ < rxt . 'MODTURB' =  MOT1 ; > type of turbulence model
+ with MOT1='NUTURB','LMEL' or 'KEPSILON'.
+
+ a/  rxt . 'MODTURB'  =  'NUTURB'  ; constant eddy viscosity
+     rxt . 'NUT'      =  FLOT1     ; Nut value (m2/s) 
+
+ b/  rxt . 'MODTURB'  =  'LMEL'    ; length scale model
+     rxt . 'LMEL'     =  FLOT1     ; lm value (m)
+
+ c/  rxt . 'MODTURB'  = 'KEPSILON' ; k-epsilon model
+     < rxt . 'FPAROI' = LOGIQUE    ; > wall function (FAUX) 
+     < rxt . 'YP'     = FLOT1      ; > reference y+ value 
+
+ KEPSILON option is only available with the EFM1 algorithm 
+ (see ALGO entry).
+
+
+PART{Spray}
+
+ rxt.'ASPER'  = (LOG1) ; VRAI if spray model is activated.
+
+ Spray model needs  rxt.'VAPEUR' = VRAI ;
+
+ rxt.'aspinj' = GEO1 ; Mesh of the injection surface 
+                       for the dispersed phase.
+ rxt.'toitf'  = GEO2 ; Mesh of the upper surface 
+                       of the fluid volume
+ rxt.'rod'    = GEO3 ; Density of the dispersed phase.
+ rxt.'Cpd'    = GEO4 ; Specific heat of the dispersed phase.
+ rxt.'scenario'.'vzinj' = LIST1 ; List of injection velocities
+                                  (vertical) for the dispersed phase.
+ rxt.'scenario'.'xdinj' = LIST2 ; List of volumic fraction of the
+                                  dispersed phase at injection.
+ rxt.'scenario'.'tdinj' = LIST3 ; List of dispersed phase temperature
+                                  at injection
+ rxt.'scenario'.'ddinj' = LIST4 ; List of droplet diameters at injection
+
+
+PART{Bulk condensation (in progress)}
+
+ rxt.'CONDMAS' = (LOG1) ; VRAI when bulk condensation model is activated (FAUX)
+
+
+PART{PAR (Passive Autocatalytic Recombiner)}
+
+  Recombiners can be defined only if these constituants are present :
+ H2, N2, O2, VAPEUR
+
+  As many PARs as necessary are defined by the following sequence (rank=1,n):
+
+ rxt . 'RECOMB' = 'TABLE'                     ; data for PARs
+ rxt . 'RECOMB' . rank = 'TABL'               ; Par number rank data
+ rxt . 'RECOMB' . rank . 'PAREXT'   = MAIL1   ; PAR walls
+ rxt . 'RECOMB' . rank . 'ENTREE'   = MAIL2   ; PAR inlet mesh
+ rxt . 'RECOMB' . rank . 'SORTIE'   = MAIL3   ; PAR outlet mesh
+ rxt . 'RECOMB' . rank . 'direntr'  = POI1    ; inlet direction
+ rxt . 'RECOMB' . rank . 'dirsort'  = POI2    ; outlet direction
+ rxt . 'RECOMB' . rank . 'NSECTION' = (ENTI1) ; PAR numbers at that rank
+ rxt . 'RECOMB' . rank . 'A'        = (FLOT1) ; h2 consumption law coef.
+ rxt . 'RECOMB' . rank . 'B'        = (FLOT2) ; h2 consumption law coef.
+ rxt . 'RECOMB' . rank . 'XH2ON'    = (FLOT3) ; switch on condition
+ rxt . 'RECOMB' . rank . 'XH2OFF'   = (FLOT4) ; switch off condition
+ rxt . 'RECOMB' . rank . 'BETA'     = (FLOT5) ; h2 consumption law coef.
+
+  By default, the number of unit (NSECTION entry) is 1.
+
+  The PAR hydrogen consumption law is the one given by SIEMENS. By default, 
+ they correspond to the SIEMENS FR90/1-150 model:
+  - A and B : Coefficients of the linear function in pressure
+    (0.48D-8 kg/s/Pa et 0.58D-3 kg/s by default)
+  - XH2ON  : Swith on molar fraction of H2 (0.005)
+  - XH2OFF : Switch off molar fraction of H2 (0.005)
+  - BETA   : Correction for low H2 concentration (0.2)
+
+
+PART{Wall condensation}
+
+ rxt . 'MODCOND' = (MOT1) ; wall condensation model
+ with MOT1=('CHIL0') or 'CHIL1'.
+
+ a/ rxt . 'MODCOND' = 'CHIL0' : Jv = Jstand = kc rho (Yv - Yvsat)
+ Chilton-Colburn model type. It is only for very small steam mass fraction.
+ We use a natural convection correlation for sensible heat transfer.
+
+ b/ rxt . 'MODCOND' = 'CHIL1' : Jv = Jstand / (1-Yvsat)
+ This model comes from a volumic mass Fick's law with. The steam diffusivity
+ coefficient in the mixture is computed from RALOC formula.
+
+
+CHAP{Numerical parameters}
+
+PART{RXT table}
+
+  It is possible to define a personal procedure to be called at the begining of
+ each time step.
+
+ rxt . 'PERSO'    = (LOG1)  ; PERSO procedure activation (FAUX)
+ rxt . 'PRCPERSO' = MOT1    ; name of the procedure
+ rxt . 'TABPERSO' = TAB1    ; associated data
+
+ rxt . 'DT0'      =  FLOT1  ; time step value (s)
+ rxt . 'IMPR'     = (ENTI1) ; (0) ou 1 if further listing informations
+ rxt . 'epsi'     = (FLOT1) ; smallest distance between mesh points (1.E-4)
+
+ rxt . 'FRPREC'   = (ENTI1) ; frequency for matrix preconditionning (1)
+ rxt . 'FCPRECT'  = (ENTI2) ; frequency for update matrix prec. based 
+                              on time step loop (1)
+ rxt . 'FCPRECI'  = (ENTI3) ; frequency for update of matrix prec. based 
+                              on inner iteration loop (1)
+
+ Warning: if FPREC is prescribed, default values for FCPRECT and FCPRECI are 5
+ instead of 1.
+
+ rxt . 'ALGO'     = (MOT1)  ; Algorithm choice ('IMPL')
+ with MOT1='IMPL' if semi implicit and 'EFM1' if semi explicit.
+
+ rxt . 'DISCR'    = (MOT1)  ; spatial discretization for velocity and 
+                              scalar fields (except pressure) ('MACRO').
+ rxt . 'KPRE'     = (MOT2)  ; spatial discretization for pressure ('CENTRE')
+
+ Warning: all couples MOT1/MOT2 doesn't make sense (see NAVI and MODEL notices)
+
+ rxt . 'STAB'     = (FLOT1) ; stability coef. for MACRO elements (1.).
+
+ rxt . 'MAXELPRE' = (ENTI1) ; Maximum number of elements for which a direct
+                              method (Cholesky) is used to invert the pressure
+                              matrix (150000).
+ rxt . 'TYPINV'   = (ENTI2) ; iterative solver choice (voir KRES) (3)
+ rxt . 'RESIDU'   = (FLOT1) ; residual for iterative solver (1.E-20).
+ rxt . 'NTIT'     = (ENTI3) ; Number of iterations for iterative solver (800)
+
+ rxt . 'GRAPH'    = (LOG1)  ; display of mean value (FAUX)
+ rxt . 'DETMAT'   = (LOG1)  ; matrix are killed at the end of the computation
+                              to limit file output size (VRAI)
+ rxt . 'REINIT'   = (LOG1)  ; Re-built the scenario (FAUX)
+ rxt . 'CORTEMP'  = (LOG1)  ; energy balance control (VRAI)
+
+
+PART{Model restrictions}
+
+ No real gas modeling for steam
+ No implicit k-epsilon tubulence model
+ No bulk condensation model
+ No symetry plane for boundary conditions 
+ Numerical scheme devoted to large time steps
+ No parallelism capability
+
+
+PART{Guidelines}
+
+  A. Change in the type of boundary conditions
+  --------------------------------------------
+
+  Lorsque par exemple une breche cesse d'emettre, la nature des conditions aux
+ limites change a la breche. Pour prendre en compte cela, le plus simple est
+ de sauvegarder le premier calcul, de decrire le 'nouveau' probleme sans la
+ breche et de surcharger la table des inconnues par celle de l'ancien calcul.
+
+  1/ One gets the rxt.'TIC' table from the previous simulation
+     'OPTI' 'REST' 'MONFIC.sauv' ; 'REST' ;
+     tic = rxt . 'TIC' ;
+  2/ Also (eventualy) the mesh
+     opti rest 'MONMAIL.sauv';
+     rest ;
+  3/ One describe (fully) the new problem
+     rxt = 'TABL' ;
+     rxt . 'vtf' =  my mesh ;
+     rxt . ... etc
+  4/ One initialize the new TIC entry with the previous one
+     rxt . 'TIC' = tic ;
+
+
+  B. SAUV file size
+  -----------------
+
+  It is possible to suppress the matrices (see rxt . 'DETMAT') in order to
+ reduce the size of the file output ('SAUV' file).
+
+
+CHAP{Computational results}
+
+PART{rxt.'TIC' table}
+
+  The TIC table contains in particular: 
+  - list in time (LT) 0D (mean values) to plot scaler quantity evolution in
+ time according to the time list rxt.'TIC'.'LTPS' de TIC.
+  - multi dimensional fields (CHPO) at the last time computed.  
+
+ For each index, we indicate the index type, his name and the index contente.
+
+
+  A. 0D fields
+  ------------
+
+ Index          Object
+ Type & Value   Type       Comments
+
+ MOT    Tps      FLOTTANT : Physical time
+ MOT    NUPADT   ENTIER   : time step nummer.
+ MOT    LTPS     LISTREEL : list of computed times.
+ MOT    DT       FLOTTANT : time step
+
+ MOT    LMAXU    LISTREEL : List in time (LT) of maximum velocity  (m/s)
+ MOT    Rhomn    LISTREEL : LT mean density of the mixture (kg/m3)
+ MOT    Rhomv    LISTREEL : LT mean density of steam (kg/m3)
+ MOT    Rhom?    LISTREEL : LT mean density for ? (kg/m3)
+ with '?'='air','he','h2','o2','n2','co','co2'
+
+ MOT    PT       LISTREEL : LT thermodynamic pressure (Pa)
+ MOT    Tfm      LISTREEL : LT mean temperature of the mixture (oC)
+ MOT    Remn     LISTREEL : LT specific energy of the mixture (J/m3)
+
+ MOT    Econv    LISTREEL : LT energy extracted by convection (J/m3)
+ MOT    Econd    LISTREEL : LT energy extracted by condensation (J/m3)
+ MOT    Hcond    LISTREEL : LT enthalpy extracted by condensation(J/m3)
+
+ MOT    Easpe    LISTREEL : LT energy extracted by spray (J/m3)
+ MOT    Haspe    LISTREEL : LT enthalpy extracted by spray (J/m3)
+ MOT    Qaspe    LISTREEL : LT spray flow rate (kg/s)
+
+ MOT    Rgpm     LISTREEL : LT perfect gaz constant for the mixture (J/kg/K)
+ MOT    Cvm      LISTREEL : LT heat capacity at constant volume (J/kg/K)
+ MOT    Cpm      LISTREEL : LT heat capacity at constant pressure (J/kg/K)
+ MOT    Gamm     LISTREEL : LT Cpm.Cvm ratio
+
+ MOT    Minj     LISTREEL : LT injected mass (kg)
+ MOT    Mrest    LISTREEL : LT resident mass (kg)
+
+ MOT    Mcond    LISTREEL : LT condensed mass (kg)
+ MOT    Mcondw   LISTREEL : LT condensed mass (THERMP) (kg)
+ MOT    Mcond0   LISTREEL : LT condensed mass (ECHANP) (kg)
+ MOT    Mcond1i  LISTREEL : LT condensed mass (TTIMPi) (kg)
+
+ MOT    Qc       LISTREEL : LT Total flow rate for condensation (kg/s)
+ MOT    Qcw      LISTREEL : LT condensation flow rate for (THERMP) (kg/s)
+ MOT    Qc1i     LISTREEL : LT condensation flow rate for (TTIMPi) (kg/s)
+ MOT    Qc0      LISTREEL : LT condensation flow rate for (ECHANP) (kg/s)
+
+ MOT    mdTf     LISTREEL : LT local TF correction (min) (oC)
+ MOT    MdTf     LISTREEL : LT local TF correction (max) (oC)
+ MOT    Mdr?     LISTREEL : LT mass correction for ? (kg)
+ with '?'='vap','air','he','h2','o2','n2','co','co2'
+
+
+ *--- Prescribed wall temperatures (TIMP) ---*
+
+ MOT    TIMP     TABLE : data for TIMP
+
+ TIMP . nomi     TABLE, data for the wall nomi
+ MOT    Ltbpi    LISTREEL : LT, wall temperature (oC)
+
+
+ *--- Inlets (Breches) ---*
+
+ MOT    Breches   TABLE : inlets data
+
+ Breches . nomi  TABLE, data for the inlet nomi
+ MOT    guj      LISTREEL : LT, inlet velocity (m/s)
+ MOT    Qj       LISTREEL : LT, inlet mass flow rate (kg/s)
+ MOT    Tinj     LISTREEL : LT, inlet temperature (kg/s)
+ MOT    Hj       LISTREEL : LT, inlet enthalpy (J/kg)
+ MOT    Ej       LISTREEL : LT, inlet energy (J/kg)
+ MOT    Ksi      LISTREEL : LT, inlet steam quality (kg/s)
+ MOT    Qlj      LISTREEL : LT, inlet liquid mass flow rate (kg/s)
+ MOT    Hlj      LISTREEL : LT, inlet liquid enthalpy (J/kg)
+
+ Use. rxt . 'Breches' . nomi . 'Tinj' contains the LT of the 
+ inlet temperature at the nomi inlet. Associated times are those 
+ of rxt . 'TIC' . 'LTPS'
+
+ *--- RECOMBINER ---*
+
+ MOT    RECOMB   TABLE    : PARs information
+
+ RECOMB . i      TABLE, data of the PAR number rank
+ MOT    DEB      LISTREEL : LT, mass flow rate (kg/s)
+ MOT    Uin      LISTREEL : LT, inlet velocity (m/s)
+ MOT    Uout     LISTREEL : LT, outlet temperature (oC)
+ MOT    Tin      LISTREEL : LT, inlet temperature (oC)
+ MOT    Tout     LISTREEL : LT, outlet temperature (oC)
+ MOT    Tpla     LISTREEL : LT, catalytic plates temperature (oC)
+ MOT    EFF      LISTREEL : LT, PPAR efficiency
+ MOT    Hin      LISTREEL : LT, inlet enthalpy (J/kg)
+ MOT    Hout     LISTREEL : LT, outlet enthalpy (J/kg)
+ MOT    R?E      LISTREEL : LT, inlet density for ? (kg/m3)
+ MOT    R?S      LISTREEL : LT, outlet density for ? (kg/m3)
+ MOT    Y?E      LISTREEL : LT, inlet mass fraction for ?
+ MOT    Y?S      LISTREEL : LT, outlet mass fraction for ?
+ avec '?'='H2O','HE','H2','O2','N2','CO','CO2'.
+
+ Use. rxt . 'RECOMB' . 2 . 'DEB' is the mass flow rate LT through the
+ second PAR according to the list of times given at rxt . 'TIC' . 'LTPS'
+
+
+  B. CFD Fields
+  -------------
+
+ Index           Object
+ Type & Value    Type       Comments
+
+
+ MOT    UN       CHPOINT  : current velocity (m/s)
+ MOT    UNM      CHPOINT  : previous velocity (m/s)
+ MOT    PRES     CHPOINT  : pressure (Pa)
+ MOT    TF       CHPOINT  : current fluid temperature (oC)
+ MOT    TFNM     CHPOINT  : previous fluid temperature field (oC)
+ MOT    TP       CHPOINT  : current wall temperature (oC)
+ MOT    TPNM     CHPOINT  : previous wall temperature (oC)
+ MOT    RHO      CHPOINT  : current density (kg/m3)
+ MOT    RHONM    CHPOINT  : previous density (kg/m3)
+ MOT    RVP      CHPOINT  : current steam density (kg/m3)
+ MOT    YVAP     CHPOINT  : current steam mass fraction
+
+ MOT    R?       CHPOINT  : current ? density (kg/m3)
+ MOT    Y?       CHPOINT  : current ? mass fraction
+ avec ?='AIR','HE','H2','O2','N2','CO','CO2'
+
+ MOT    Mu       CHPOINT  : dynamic viscosity (kg/m/s)
+ MOT    NU       CHPOINT  : cinematic viscosity (m2/s)
+ MOT    NUEFF    CHPOINT  : effective cinematic viscosity (m2/s)
+
+ MOT    KHW      CHPOINT  : heat exchange coefficient (THERMP)
+ MOT    KH0      CHPOINT  : heat exchange coefficient (ECHANP)
+ MOT    KH1i     CHPOINT  : heat exchange coefficient (TIMP)
+
+
+ *--- Spray ---*
+
+ MOT    VN       CHPOINT  : disperse phase velocity (m/s)
+ MOT    TD       CHPOINT  : disperse phase temperature (oC)
+ MOT    XD       CHPOINT  : disperse phase molar fraction
+ MOT    DD       CHPOINT  : droplets diameter (m)
+
+
+PART{rxt.'GEO' table}
+
+  GEO table contains MMODEL NAVIER-STOKES objects for the chosen models as well
+ as associated meshes (at the same index without $).
+
+ Index           Object
+ Type & Value    Type       Comments
+
+ MOT    epsi     FLOTTANT : smallest distance between mesh points
+ MOT    $vtf     MMODEL   : fluid model
+ MOT    $menvf   MMODEL   : fluid boundary model
+ MOT    $axe     MMODEL   : axis or symetry plane
+ MOT    $vtp     MMODEL   : thermal walls
+ MOT    $mtp1i   MMODEL   : prescribed walls temperature (TIMP)
+ MOT    $mtp0    MMODEL   : constant wall temperature (ECHANP)
+ MOT    Pimp     MAILLAGE : POI1 where the pressure is fixed
+ 

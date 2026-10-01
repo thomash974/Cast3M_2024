@@ -1,0 +1,73 @@
+$$$$ GAMM     NOTICE  CB215821  23/10/18    21:15:06     11760          
+                                             DATE     23/10/18
+
+      RESU1 = 'GAMM' OBJET1 (MOT1) ;
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur GAMM                           Voir aussi : BESS
+    --------------
+                                                          
+    Objet :
+    _______
+
+    L'operateur GAMM applique la fonction Gamma d'Euler a l'objet OBJET1.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remarque :
+    __________
+      
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+
+ANGL====================================================================
+
+    Operator GAMM                            See also : BESS
+    -------------
+                                                          
+    Description :
+    ____________
+
+    The GAMM operator applies the Gamma function to the values
+    of the OBJET1 object.
+    
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remark :
+    _______
+      
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$ 
+ 
+ 

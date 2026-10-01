@@ -1,0 +1,59 @@
+$$$$ EXCF     NOTICE  PV        21/12/21    21:15:02     11215          
+                                             DATE     21/12/21
+
+    Operateur EXCF                           Voir aussi : IMPF FRIG
+    --------------                                        IMPO EXCC
+
+     RIG3 RIG4 CHPOI1 = EXCF RIG1 DEPL1 MODE1 CHAM1 ENT1;
+
+
+Section : Mecanique Limites
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    EXCF permet de calculer un champ de force limite de frottement
+    (type CHPOINT) ainsi que la partie non symetrique de la raideur de
+    frottement RIG4 a partir de la raideur de frottement RIG1, du champ
+    de deplacement DEPL1 (type CHPOINT), du modele de contact-frottant
+    MODE1 et du champ de proprietes de frottement CHAM1 (type MCHAML).
+
+    RIG4 est la partie non symetrique de la raideur de frottement.
+    RIG3 est la matrice de transfert du multiplicateur de Lagrange .
+    de contact vers celui de frottement.
+
+    ENT1 est un entier indiquant l'iteration courante. Il permet de
+    regulariser la direction de frottement.
+
+    Remarque :
+    __________
+     
+    EXCF est employe dans UNPAS. Il y a peu de raisons de l'employer
+    directement.
+ 
+ANGL==========================================================
+    Description :
+    ____________
+
+    EXCF is used to calculate a force field of friction (CHPOINT type)
+    as well as the non symetrical part of the friction stiffness RIG4
+    using the friction stiffness RIG1, the deplacement field DEPL1
+    (CHPOINT type), the contact-friction model MODE1 and the friction
+    properties field CHAM1 (MCHAML type).
+
+    RIG4 is the non symerical part of the friction stiffness.
+    RIG3 is the transfert matrix of contact Lagrange multiplier toward
+    friction Lagrange multiplier.
+    
+    ENT1 is an integer giving the actual iteration. It is used to
+    regularise the friction direction.
+
+    Observation :
+    ___________
+
+    EXCF is used in UNPAS. There is little reason to use it directly.
+
+$$$$
+ 
+ 

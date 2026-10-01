@@ -1,0 +1,73 @@
+$$$$ RAIN     NOTICE  BP208322  23/03/10    19:39:26     11626          
+                                             DATE     23/03/10
+
+    Operateur RAIN                         
+    --------------
+    
+Section : Mathematiques Traitement
+Section : Mathematiques Statistiques
+
+FRAN===========================================================
+    L'operateur RAIN effectue la decomposition d'un signal de contrainte
+    en une succession de cycles de contrainte elementaires en suivant
+    la methode de comptage rainflow. Le signal de contrainte en entree 
+    doit etre une suite alternee de maxima et de minima.
+
+    L'operateur RAIN retourne les amplitudes des cycles de contrainte ainsi
+    que le residu, defini comme les extrema du signal d'entree n'appartenant a aucun 
+    cycle de contrainte identifie. 
+    
+    
+ANGL==========================================================
+    The RAIN operator performs the decomposition of a stress signal
+    into a succession of elementary stress cycles following the
+    the rainflow counting method. The input stress signal 
+    must be an alternating sequence of maxima and minima.
+
+    The RAIN operator returns the amplitudes of the stress cycles as well as the
+    the residual, defined as the extrema of the input signal not belonging to any
+    identified stress cycle. 
+    
+
+FRAN==========================================================
+    +-------------+
+    |  Syntaxe :  |
+    +-------------+
+    
+ANGL==========================================================
+    +-----------+
+    |  Syntax:  |
+    +-----------+
+    
+==========================================================
+    LREE1 LREE2 = RAIN LREE3 ;
+
+FRAN==========================================================
+    Commentaire :
+    _____________
+
+    LREE1 : Amplitudes des cycles de contrainte identifies (type LISTREEL)
+
+    LREE2 : Residu du signal d'entree, defini comme les extrema du signal 
+            n'appartenant a aucun cycle de contrainte identifie (type LISTREEL)
+
+    LREE3 : Signal de contrainte a traiter, doit etre une suite alternee 
+            de maxima et de minima (type LISTREEL)  
+
+ANGL===========================================================
+    Contents :
+    __________
+
+    LREE1 : Amplitudes of the identified stress cycles (LISTREEL type)
+
+    LREE2 : Residual of the input signal, defined as the extrema of the signal 
+            not belonging to any identified stress cycle (type LISTREEL)
+
+    LREE3 : Input stress cycle, must be an alternating sequence of maxima and 
+            minima (LISTREEL type)
+
+ 
+ 
+ 
+ 
+ 

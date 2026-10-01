@@ -1,0 +1,131 @@
+* fichier : char_constant.dgibi
+*
+************************************************************************
+*           Test de fonctionnement des CHARGEMEnts constants           *
+* Calcul thermo-mecanique d'une portion de cylindre en dilatation avec *
+* PASAPAS en grands deplacements                                       *
+*                                                                      *
+* - comparaison du resultat avec un calcul en utilisant la syntaxe     *
+*   generale des chargements variables                                 *
+* - test sur la valeur nulle des contraintes finale                    *
+************************************************************************
+
+** Options generales
+OPTI 'DIME' 2 'MODE' 'AXIS' 'ELEM' 'QUA4' 'DENS' 0.1 'ECHO' 0 ;
+itrac = FAUX ;
+
+** Instant final du calcul transitoire
+tpsf = 1.E6 ;
+
+** Maillage
+l1 = DROI (1. 0.) (1.5 0.) ;
+s1 = l1 TRAN (0. 2.) ;
+p1 = l1 POIN 'PROC' (1.25 0.) ;
+p2 = s1 POIN 'PROC' (1.25 2.) ;
+p3 = s1 POIN 'PROC' (BARY s1) ;
+
+** Modeles et materiaux
+mot = MODE s1 'THERMIQUE' ;
+mat = MATE mot 'K' 50. 'RHO' 7500. 'C' 400. 'TINI' 25. ;
+mom = MODE s1 'MECANIQUE' ;
+mam = MATE mom 'YOUN' 200.E9 'NU' 0.3 'ALPH' 1.E-5 'TREF' 25. 'TALP' 25. ;
+
+** BLocages
+bl1 = BLOQ 'T'  l1 ;
+bl2 = BLOQ 'UZ' l1 ;
+
+** Chargements
+f1 = DEPI bl1 100. ;
+ev1 = EVOL 'MANU' (PROG 0. tpsf) (PROG 1. 1.) ;
+cha1 = CHAR 'TIMP' f1 ev1 ;
+cha2 = CHAR 'TIMP' f1 ;
+
+** Resolutions
+t1 = TABL ;
+t1 . 'MODELE'              = mot ET mom ;
+t1 . 'CARACTERISTIQUES'    = mat ET mam ;
+t1 . 'BLOCAGES_THERMIQUES' = bl1 ;
+t1 . 'BLOCAGES_MECANIQUES' = bl2 ;
+t1 . 'CHARGEMENT'          = cha1 ;
+xpas = tpsf / 50. ;
+t1 . 'TEMPS_CALCULES'      = PROG 0. 1. xpas 'PAS' xpas tpsf ;
+t1 . 'GRANDS_DEPLACEMENTS' = VRAI ;
+t2 = COPI t1 ;
+t2 . 'CHARGEMENT'          = cha2 ;
+PASAPAS t1 ;
+PASAPAS t2 ;
+
+** Post tratitement
+** --temperature vs temps
+ev11 = EVOL 'ROUG' 'TEMP' t1 'TEMPERATURES' 'T' p1 ;
+ev12 = EVOL 'BLEU' 'TEMP' t1 'TEMPERATURES' 'T' p2 ;
+ev13 = EVOL 'VERT' 'TEMP' t1 'TEMPERATURES' 'T' p3 ;
+ev21 = EVOL 'ORAN' 'TEMP' t2 'TEMPERATURES' 'T' p1 ;
+ev22 = EVOL 'TURQ' 'TEMP' t2 'TEMPERATURES' 'T' p2 ;
+ev23 = EVOL 'OLIV' 'TEMP' t2 'TEMPERATURES' 'T' p3 ;
+tleg = TABL ;
+tleg . 1 = 'MARQ LOSA' ;
+tleg . 2 = 'MARQ LOSA' ;
+tleg . 3 = 'MARQ LOSA' ;
+tleg . 'TITRE' = TABL ;
+tleg . 'TITRE' . 1 = 'T en p1 - Chargement avec EVOL' ;
+tleg . 'TITRE' . 2 = 'T en p2 - Chargement avec EVOL' ;
+tleg . 'TITRE' . 3 = 'T en p3 - Chargement avec EVOL' ;
+tleg . 'TITRE' . 4 = 'T en p1 - Chargement constant' ;
+tleg . 'TITRE' . 5 = 'T en p2 - Chargement constant' ;
+tleg . 'TITRE' . 6 = 'T en p3 - Chargement constant' ;
+SI itrac ;
+  DESS (ev11 ET ev12 ET ev13 ET ev21 ET ev22 ET ev23) 'TITR' 'Temperature vs Temps' 'LEGE' tleg ;
+FINSI ;
+** --contraintes mini et maxi vs temps
+lis11 = PROG ;
+lis12 = PROG ;
+lis21 = PROG ;
+lis22 = PROG ;
+REPE b1 (DIME (t1 . 'TEMPS')) ;
+  sig1  = t1 . 'CONTRAINTES'  . (&b1 - 1) ;
+  lis11 = lis11 ET (MINI sig1) ;
+  lis12 = lis12 ET (MAXI sig1) ;
+  sig2  = t2 . 'CONTRAINTES'  . (&b1 - 1) ;
+  lis21 = lis21 ET (MINI sig2) ;
+  lis22 = lis22 ET (MAXI sig2) ;
+FIN  b1 ;
+lis0 = t1 . 'TEMPS_CALCULES' ;
+ev11 = EVOL 'ROUG' 'MANU' 'Temps' lis0 'Contrainte min' lis11 ;
+ev12 = EVOL 'BLEU' 'MANU' 'Temps' lis0 'Contrainte max' lis12 ;
+ev21 = EVOL 'ORAN' 'MANU' 'Temps' lis0 'Contrainte min' lis21 ;
+ev22 = EVOL 'TURQ' 'MANU' 'Temps' lis0 'Contrainte max' lis22 ;
+tleg = TABL ;
+tleg . 1 = 'MARQ LOSA' ;
+tleg . 2 = 'MARQ LOSA' ;
+tleg . 'TITRE' = TABL ;
+tleg . 'TITRE' . 1 = 'Sig min - Chargement avec EVOL' ;
+tleg . 'TITRE' . 2 = 'Sig max - Chargement avec EVOL' ;
+tleg . 'TITRE' . 3 = 'Sig min - Chargement constant' ;
+tleg . 'TITRE' . 4 = 'Sig max - Chargement constant' ;
+SI itrac ;
+  DESS (ev11 ET ev12 ET ev21 ET ev22) 'TITR' 'Contrainte vs Temps' 'LEGE' tleg 'SE' ;
+FINSI ;
+
+** Comparaison des solutions des tables t1 et t2
+lsig = PROG (MAXI 'ABS' (lis11 - lis21)) (MAXI 'ABS' (lis12 - lis22)) ;
+dsig = MAXI lsig ;
+MESS 'Ecart maxi entre les 2 calculs =' dsig ;
+SI (dsig > 1.) ;
+  ERRE 'Les deux calculs donnent des resultats differents' ;
+FINSI ;
+
+** Comparaison a la solution de reference (contrainte nulle au regime permanent)
+lsf = PROG (EXTR lis21 (DIME lis21)) (EXTR lis22 (DIME lis22)) ;
+sigf = MAXI 'ABS' lsf ;
+MESS 'Contrainte finale max          =' sigf ;
+SI (sigf > 2.E5) ;
+  ERRE 'La contrainte finale n''est pas nulle' ;
+FINSI ;
+
+FIN ;
+
+ 
+
+ 
+

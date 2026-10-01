@@ -1,0 +1,99 @@
+$$$$ OPTO     NOTICE  GOUNAND   21/04/06    21:15:16     10940          
+                                             DATE     21/04/06
+
+
+Section : Maillage Manipulation
+
+FRAN==========================================================
+    Operateur OPTO                            Voir aussi : MAILTOPO
+    --------------                                         TRIA REMA
+                                                           INDI
+
+ANGL==========================================================
+    Operator OPTO                             See also : MAILTOPO
+    -------------                                        TRIA REMA
+                                                         INDI
+==========================================================
+    MAIL1 CHPO1 ENTI1 ENTI2 ENTI3 ENTI4 = 'OPTO'
+          MAIL2 MAIL3 CHPO2 ('VTOL' FLOT1) ('QTOL' FLOT2) ('ALGO' ENTI5)
+             ('AJNO' ENTI6) ('VIRT' POIN1) ('NCMA' ENTI7) ('STMA' ENTI8)
+             ('VERI' ENTI9) ('SGAJ' ENT10) ('IMPR' ENT11) ;
+
+FRAN===========================================================
+    Objet :
+    _______
+
+    Cet operateur n'est pas destine a etre appele par l'utilisateur.
+    Il OPtimise une TOpologie de maillage par amelioration locale.
+    Il est appele par la procedure MAILTOPO.
+
+    Commentaire :
+    _____________
+
+      MAIL1 : Topologie optimisee (type MAILLAGE)
+      CHPO1 : Metrique inverse sur la topologie optimisee (type CHPOINT)
+      ENTI1 : Nombre de topologies examinees (type ENTIER)
+      ENTI2 : Nombre de topologies changees (type ENTIER)
+      ENTI3 : Nombre de topologies parcourues (type ENTIER)
+      ENTI4 : Nombre de limitation du nombre de candidats (type ENTIER)
+
+      MAIL2 : Topologie a optimiser (type MAILLAGE)
+      MAIL3 : Entitees de la topologie autour desquelles optimiser
+              (type MAILLAGE) 
+      CHPO2 : Inverse de la Metrique voulue definie sur MAIL2 (type
+              CHPOINT)
+      FLOT1 : Tolerance sur les volumes (1.d-11 par defaut)
+      FLOT2 : Tolerance sur les qualites (1.d-2 par defaut)
+      ENTI5 : Creation d'un maillage si egal a 0 (par defaut)
+              Amelioration d'un maillage si egal a 1
+      ENTI6 : L'algorithme n'ajoute pas de nouveaux noeuds si egal a 0
+              (par defaut)
+              L'algorithme ajoute des nouveaux noeuds si egal a 1
+      POIN1 : Noeud virtuel
+      ENTI7 : Nombre de Candidats MAximum (1000 par defaut)
+      ENTI8 : STrategie quand on atteint le MAximum  (0 par defaut)
+      ENTI9 : Si egal a 1 : verification dans l'algorithme (lent, pour
+              debugger, 0 par defaut)
+      ENT10 : Si egal a 1 affichage des nombres de fois ou des segments
+              sont ajustes (debug, 0 par defaut)
+      ENT11 : Niveau d'impression (0 par defaut)
+ANGL===========================================================
+    Description :
+    _____________
+
+    This operator is not to be called by the user.
+    It OPtimizes a mesh TOpology.
+    This operator is called by the MAILTOPO procedure.
+    
+    Contents :
+    __________
+
+      MAIL1 : Optimized topology (MAILLAGE type)
+      CHPO1 : Inverse metric on the optimized topology (CHPOINT type)
+      ENTI1 : Number of examined topologies (ENTIER type)
+      ENTI2 : Number of changed topologies (ENTIER type)
+      ENTI3 : Number of traversed topologies (ENTIER type)
+      ENTI4 : Number of candidates limitation (ENTIER type)
+
+      MAIL2 : Topology to be optimised (MAILLAGE type)
+      MAIL3 : Topology entities around which one optimizes (MAILLAGE
+              type) 
+      CHPO2 : Inverse of the wanted metric tensor defined on MAIL2
+              (CHPOINT type)
+      FLOT1 : Volume tolerance (1.d-11 by default)
+      FLOT2 : Quality tolerance (1.d-2 by defaut)
+      ENTI5 : Mesh creation if equal to 0 (default value)
+              Mesh enhancement if equal to 1
+      ENTI6 : No new nodes if equal to 0 (default value)
+              New nodes can be created if equal to 1
+      POIN1 : Virtual node
+      ENTI7 : MAximum Candidates Number (default value : 1000)
+      ENTI8 : STrategy when the MAximum is reached  (0 : default value)
+      ENTI9 : Equal to 1 : several verifications in the algorithm
+              (slow, debug, default value : 0) 
+      ENT10 : Equal to 1 : debugging messages when segments'size are
+              modified (default value : 0)
+      ENT11 : Verbosity level (default value : 0)
+
+
+ 

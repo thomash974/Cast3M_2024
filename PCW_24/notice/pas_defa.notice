@@ -1,0 +1,74 @@
+$$$$ PAS_DEFA NOTICE  PASCAL    20/12/03    21:15:05     10801          
+                                             DATE     20/12/03
+
+
+    procedure PAS_DEFA   
+    ------------------
+
+
+Section : Mecanique Resolution
+
+FRAN===========================================================   
+    Cette procedure est appelee au debut de PASAPAS, elle initialise 
+    les valeurs par defaut et cree la table WTAB de pasapas. 
+    
+    Syntaxe :
+    ---------
+    
+ANGL============================================================
+
+    This procedure is invoked at the beginning of PASAPAS. It permits
+    to set default values and it create the working table WTAB used
+    in pasapas.
+
+    Syntax :
+    --------
+ 
+================================================================
+    PAS_DEFA TAB1 ;
+
+FRAN===========================================================
+    Avec TAB1, table de donnees de PASAPAS.
+
+    En sortie, PAS_DEFA renvoie TAB1 avec un nouvel indice WTABLE.
+    Quelques sous-indices de WTABLE :
+
+    ... 
+
+    'CHAR_MODE'       : LOGIQUE, vrai si chargement de nom MODE
+
+    'CHAR_MATE'       : LOGIQUE, vrai si chargement de nom MATE
+
+    'CHAR_BLOD'       : LOGIQUE, vrai si chargement de nom BLOD
+
+    'CHAR_BLOM'       : LOGIQUE, vrai si chargement de nom BLOM
+
+    'CHAR_BLOT'       : LOGIQUE, vrai si chargement de nom BLOT
+
+    ... 
+
+ANGL============================================================
+    With TAB1, the input data table of the PASAPAS procedure.
+
+    In output, PAS_DEFA returns TAB1 with a new indice WTABLE.
+
+    ... 
+
+    'CHAR_MODE'       : LOGIQUE, true if there is a CHARGEMENT named MODE
+
+    'CHAR_MATE'       : LOGIQUE, true if there is a CHARGEMENT named MATE
+
+    'CHAR_BLOD'       : LOGIQUE, true if there is a CHARGEMENT named BLOD
+
+    'CHAR_BLOM'       : LOGIQUE, true if there is a CHARGEMENT named BLOM
+
+    'CHAR_BLOT'       : LOGIQUE, true if there is a CHARGEMENT named BLOT
+
+    ... 
+
+$$$$
+
+    
+ 
+ 
+ 

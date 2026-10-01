@@ -1,0 +1,31 @@
+$$$$ TOPORSTR NOTICE  FD218221  23/11/29    21:15:14     11799          
+                                             DATE     23/11/29
+
+FRAN==========================================================
+
+    Procedure TOPORSTR                       Voir aussi : TOPOPTIM
+    __________________
+
+
+Cette procedure est appelee par TOPOPTIM pour appliquer une restriction
+geometrique sur la topologie de sortie.
+
+Les utilisateurs avances peuvent definir leur propre version de
+TOPORSTR, juste avant de faire appel a TOPOPTIM.
+
+
+ANGL==========================================================
+
+    Procedure TOPORSTR                          See also: TOPOPTIM
+    __________________
+
+
+This procedure is called by TOPOPTIM to apply a geometric restriction
+on the output topology.
+
+Advanced users can define their own version of TOPORSTR, just before
+invoking TOPOPTIM.
+
+$$$$
+ 
+ 

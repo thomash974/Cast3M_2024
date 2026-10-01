@@ -1,0 +1,28 @@
+$$$$ MIXE     NOTICE  KICH      20/10/05    21:15:25     10740          
+                                             DATE     20/10/05
+
+    Operateur MIXE                    Voir aussi : MODE, MATE
+    --------------------    
+
+  
+           CHE3 = MIXE MOD1 CHE1 CHE2 ;
+
+    Objet :
+    _______
+
+    L'operateur MIXE construit un objet CHE3 de type MCHAML, 
+    qui selon les lois contenues par l'objet MOD1,
+    combine avec les pondérations du champs
+    de caractéristiques CHE1, de type MCHAML, associé à MOD1,
+    les grandeurs physiques de memes noms pour différentes 
+    phases collectées dans CHE2, de type MCHAML ;
+    un coefficient de CHE1 de nom MOT1 est relatif aux 
+    grandeurs de CHE2 associées à la phase de nom identique.
+
+    MOD1 : type MMODEL, formulation 'MELANGE'
+
+    
+
+    
+$$$$
+ 

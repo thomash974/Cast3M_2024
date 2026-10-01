@@ -1,0 +1,49 @@
+$$$$ USTMPS   NOTICE  MB234859  24/02/06    21:15:05     11833          
+                                             DATE     24/02/06
+
+ Procedure USTMPS                        Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USDEPL USEXPL USEXPL
+                                        USINIB USPOST USURE
+ 
+         USTMPS TAB1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui determine la liste d'instants de calcul pour le 
+    prochain cycle.
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+  Cette procedure est appelee par USURE.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which makes a list of calculation time according to the 
+    cycle wear profil.
+ 
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+  This procedure is called by USURE.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+
+ 
+ 

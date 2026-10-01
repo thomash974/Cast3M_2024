@@ -1,0 +1,361 @@
+* fichier : INTG_test.dgibi
+************************************************************************
+* Section : Langage Objets
+************************************************************************
+
+
+************************************************************************
+* Ce Cas-Test permet de tester l'operateur INTG dans differentes
+* configurations d'options
+************************************************************************
+
+OPTI DIME 3 ELEM 'CUB8';
+XZPREC = (VALE 'PREC') * 100.D0;
+
+************************************************************************
+*  MAILLAGE d'un CUBE de cote L
+************************************************************************
+L  = 2.D0 ;
+NBE1 = 10 ;
+
+P1 = 0. 0. 0. ;
+P2 = L  0. 0. ;
+
+L1 = DROI NBE1 P1 P2;
+L2 = L1 PLUS (0. L  0.);
+
+S1 = L1 REGL NBE1 L2;
+S2 = S1 PLUS (0. 0. L);
+
+V1 = S1 VOLU NBE1 S2;
+
+*TRAC CACH V1;
+
+
+************************************************************************
+*  MODELE et MCHAML
+************************************************************************
+MOD1 = MODE V1 'MECANIQUE' 'ELASTIQUE';
+MCH1 = MANU 'CHML' MOD1 'VOL1' 1.D0   ; COMM 'MCHAML CONSTANT';
+
+MOD2 = REDU MOD1 (VIDE 'MAILLAGE');
+
+
+************************************************************************
+*  INTEGRALES
+************************************************************************
+INTG11 = INTG MOD1 MCH1;
+
+TEST = ABS (INTG11 - (L ** 3)) ;
+MESS TEST XZPREC;
+SI (TEST > XZPREC);
+  MESS 'ERREUR 1 DANS INTG';
+  ERRE 5;
+FINS;
+
+
+INTG12 = INTG MOD1 MCH1 'ELEM';
+MIN12  = MINI INTG12;
+MAX12  = MAXI INTG12;
+DELTA  = MAX12 - MIN12;
+TEST   = MAX12 - (INTG11 / (NBE1 **3));
+MESS MIN12 MAX12 DELTA TEST;
+SI ((DELTA > XZPREC) OU (TEST > XZPREC));
+  MESS 'ERREUR 2 DANS INTG';
+  ERRE 5;
+FINS;
+
+
+INTG21 = INTG MOD2 MCH1;
+MESS INTG21;
+SI (INTG21 > 0.D0);
+  MESS 'ERREUR 3 DANS INTG';
+  ERRE 5;
+FINS;
+
+
+INTG22 = INTG MOD2 MCH1 'ELEM';
+MAIL22 = EXTR INTG22 'MAIL';
+TEST   = NBEL MAIL22;
+SI (TEST NEG 0);
+  MESS 'ERREUR 4 DANS INTG';
+  ERRE 5;
+FINS;
+
+*----------------------------------------------------------------------*
+*                  INTEGRATION DE COURBES D'EVOLUTION                  *
+*----------------------------------------------------------------------*
+
+
+* COURBES MONOTONES :
+*--------------------
+
+* Definition de 2 evolutions :
+ev1 = evol manu 'x' (prog 1. pas 1. 10.) 'y' (prog 1. pas 1. 10.) ;
+ev1 = 3. * ev1 ;
+ev2 = ev1 ** 2 ;
+ev0 = ev1 et ev2 ;
+
+zp1 = 2.e4 * (vale prec) ;
+
+*-------------- Integration de 1 courbe sur 1 intervalle --------------*
+
+xx = intg ev1 ;
+list xx ;
+* 'Resultat doit etre' : 148.5 ;
+yy = 148.5 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+*--- Option INDI :
+xx = intg ev1 indi 1 2 ;
+list xx ;
+* 'Resultat doit etre' : 4.5 ;
+yy = 4.5 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+xx = intg ev1 indi 2 4 ;
+list xx ;
+* 'Resultat doit etre' : 18. ;
+yy = 18.0 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+*--- Option BORN :
+* Pour les bornes reelles, je cree une evol + raffinee
+ev3 = evol manu 'x' (prog 1. pas 0.1 10.) 'y' (prog 1. pas 0.1 10.) ;
+ev3 = 3. * ev3 ;
+xx  = intg ev1 born 1.2 5.3 ;
+list xx ;
+* 'Resultat doit etre' : 39.975 ;
+* (6. + 3.6) * 0.5 * 0.8 + (2.5 + 10.5 + 13.5) + ((15.9 + 15.) * 0.5 * 0.3) 
+yy  = 39.975 ;
+zz  = intg ev3 indi 3 44 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+si ((zz - yy) > zp1) ; erre 21 ; fins ;
+
+* Bornes en dehores de l'intervalle de definition :
+* On prolonge avec la valeur a droite eou a gauche :
+xx  = intg ev1 born 0. 10. ;
+list xx ;
+* 'Resultat doit etre' : 15.5*9.+1. = 151.5
+yy  = 151.5 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+xx  = intg ev1 born 0. 15. ;
+list xx ;
+* 'Resultat doit etre' : 15.5*9.+1.+30.*5. = 301.5
+yy  = 301.5 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Bornes inversees :
+xx  = intg ev1 born 11.2 1.7 ;
+list xx ;
+* 'Resultat doit etre' : -1.*xx
+yy  = -1. * (intg ev1 born 1.7 11.2) ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Intervalle de largeur nulle ;
+xx  = intg ev1 born 2.5 2.5 ;
+list xx ;
+* 'Resultat doit etre' : 0.
+yy  = 0. ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+
+*----------------- 1 evolution, plusieurs intervalles -----------------*
+
+*--- Option INDI :
+xx = intg ev1 indi (lect 1 2) (lect 2 4) ;
+list xx ;
+* 'Resultat doit etre' : {0. 3.5 18.}
+yy = prog 4.5 18. ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+*--- Option BORN :
+xx = intg ev1 born (prog 1.2 2.) (prog 5.3 7.7) ;
+list xx ;
+* 'Resultat doit etre' : {39.975 82.935}
+* (7.5 + 10.5 + 13.5 + 16.5 + 19.5) + ((21.+23.1)*0.5*0.7) ;
+yy = prog 39.975 82.935 ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+* En dehors de l'intervalle de definition :
+xx = intg ev1 born (prog 1.2 0.) (prog 5.3 11.) ;
+list xx ;
+* 'Resultat doit etre' : {39.975 181.5}
+* 148.5 + 3. + 30. = 181.5
+yy = prog 39.975 181.5 ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+* Bornes "inversees" :
+xx = intg ev1 born (prog 1.2 11.) (prog 5.3 0.) ;
+list xx ;
+* 'Resultat doit etre' : {39.975 -181.5}
+* 148.5 + 3. + 30. = -181.5
+yy = prog 39.975 -181.5 ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+* 1 intervalle de largeur nulle :
+xx = intg ev1 born (prog 1.2 11.) (prog 1.2 0.) ;
+list xx ;
+* 'Resultat doit etre' : {0. -181.5}
+* 148.5 + 3. + 30. = -181.5
+yy = prog 0. -181.5 ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+*---------- Integration de plusieurs courbes sur 1 intervalle ---------*
+xx = intg ev0 ;
+list xx ;
+* 'Resultat doit etre' (148.5 3010.5) ;
+yy = prog 148.5 3010.5 ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+*--- Option INDI :
+xx = intg ev0 indi 1 2 ;
+list xx ;
+* 'Resultat doit etre' (4.5 22.5)
+yy = prog 4.5 22.5 ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+xx = intg ev0 indi 2 4 ;
+list xx ;
+* 'Resultat doit etre' : {18. 171.}
+yy = prog 18. 171. ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+*--- Option BORN :
+ev4 = ipol (prog 1. pas 0.1 10.) ev2 ;
+ev4 = evol manu (prog 1. pas 0.1 10.) ev4 ;
+ev5 = ev3 et ev4 ;
+xx  = intg ev0 born 1.2 5.3 ;
+list xx ;
+yy  = intg ev5 indi 3 44 ;
+list yy ;
+si ((xx - yy maxi abs) > zp1) ; erre 21 ; fins ;
+
+*----- Integration de plusieurs courbes sur plusieurs intervalles -----*
+
+*--- Option INDI :
+xx = intg ev0 indi (lect 1 2) (lect 2 4) ;
+list xx ;
+* 'Resultat doit etre' : 1 NUAGE avec 2 LISTREEL, 1 par courbe
+* {4.5 18.000} {22.5 171.}
+yy1 = prog 4.5 18. ;
+yy2 = prog 22.5 171. ;
+* Extraction LISTREEL du NUAGE :
+xx1 = extr xx 'IE1' ;
+ii  = 2 ;
+xx2 = extr xx (chai 'IE' ii) ;
+si ((xx1 - yy1 maxi abs) > zp1) ; erre 21 ; fins ;
+si ((xx2 - yy2 maxi abs) > zp1) ; erre 21 ; fins ;
+
+*--- Option BORN :
+
+* Plusieurs evolutions, plusieurs intervalles :
+xx  = intg ev0 born (prog 1.2 1.7) (prog 5.3 7.1) ;
+yy  = intg ev5 indi (lect 3 8) (lect 44 62) ;
+xx1 = extr xx IE1 ;
+yy1 = extr yy IE1 ;
+xx2 = extr xx IE2 ;
+yy2 = extr yy IE2 ;
+list xx1 ;
+list yy1 ;
+list xx2 ;
+list yy2 ;
+si ((xx1 - yy1 maxi abs) > zp1) ; erre 21 ; fins ;
+si ((xx2 - yy2 maxi abs) > zp1) ; erre 21 ; fins ;
+
+* FONCTIONS MULTIVALUEES :
+* ------------------------
+
+* Cercle :
+* --------
+
+lx1 = prog 0. pas 0.05 2. ;
+lx1 = 180. * lx1 ;
+ly1 = cos lx1 ;
+ly2 = sin lx1 ;
+evx = evol manu ly1 ly2 ;
+*dess evx ;
+
+xx  = intg evx ;
+list xx ;
+* 'Resultat doit etre' : approximation de -pi
+yy  = intg evx indi 1 41 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Valeur absolu, resultat doit etre : 0.
+xx  = intg evx abso ;
+list xx ;
+* 'Resultat doit etre' : 0.
+yy  = 0. ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Avec INDI et borne :
+xx  = intg evx born 1. 0. ;
+list xx ;
+yy  = intg evx indi 41 1 ;
+* 'Resultat doit etre' : moitie integrale totale
+yy  = 0.5 * yy ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Sinus "vertical" :
+* ------------------
+
+* Integrale sur tout le domaine :
+lx1 = prog 0. pas 0.05 2. ;
+lx1 = 180. * lx1 ;
+ly2 = sin lx1 ;
+evx = evol manu ly2 lx1 ;
+*dess evx ;
+
+xx  = intg evx ;
+list xx ;
+* 'Resultat doit etre' : 0.
+yy  = 0. ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* En donnant les bornes :
+xx  = intg evx born 0. 1. ;
+list xx ;
+yy  = intg evx indi 1 21 ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* "S" :
+lx1 = prog 1.1 pas 1. 5.1 5.1 5.1 pas -1. 1.1 1.1 1.1 pas 1. 5.1 ;
+ly1 = prog 5*0          1. 5*2         3. 5*4 ;
+evx = evol roug manu 'x' lx1 'y' ly1 ;
+*dess evx ;
+
+xx  = intg evx ;
+list xx ;
+* 'Resultat doit etre' : 8.
+yy  = 8. ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Moitie intervalle :
+xx  = intg evx born 1.1 3.1 ;
+list xx ;
+* 'Resultat doit etre' : 4.
+yy  = 4. ;
+si ((xx - yy) > zp1) ; erre 21 ; fins ;
+
+* Cas pathologique signale au support :
+* -------------------------------------
+lra      = prog 0 pas 0.5 2;
+lro      = prog 5*1;
+ev1      = evol manu lra lro;
+
+int1     = intg ev1 borne 1. 1.3 ;
+list int1 ;
+
+si (int1 neg 0.3 (vale prec)) ; erre 21 ; fins ;
+
+fin ;
+
+
+ 
+
+ 
+
+ 
+

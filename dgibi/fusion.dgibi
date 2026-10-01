@@ -1,0 +1,247 @@
+* fichier fusion.dgibi
+* section : Mecanique, Plastique
+*----------------------------------------------------------------------*
+* Test de validation de l'option FUSION du modele.                     *
+*                                                                      *
+* Cette option permet de mettre a zero les variables internes du modele*
+* lorsque la temperature depasse la temperature de fusion (TFUS).      *
+*                                                                      *
+* Essai de traction sur 1 element carre de cote 1.                     *
+* On fait un premier essai de traction.                                *
+* Puis, on fait un traitement de restauration en depassant TFUS.       *
+* On fait un 2e essai de traction, identique au 1er.                   *
+* Les 2 courbes de traction doivent etre identiques a la deformation   *
+* plastique initiale pres, qui n'est pas remise a zero par l'option    *
+* FUSION du modele (seules les variables internes le sont).            *
+*                                                                      *
+* Enfin, on compare les solutions avec ou sans l'option FUSION.        *
+* Sans, le materiau ne plastifie pas a la 2e charge car celle-ci est   *
+* identique a la premiere et que le materiau est ecroui. Il n'y a donc *
+* pas d'effet de restauration au cours du traitement thermique.        *
+*                                                                      *
+* Description :                                                        *
+* -------------                                                        *
+*                                                                      *
+* Type de calcul : Thermomecanique, plastique                          *
+* Mode de calcul : 2D                                                  *
+* Type d'element : QUA4                                                *
+* Chargement     : Force, Temperature                                  *
+* Reference      : validation restauration propriete elastoplastique   *
+*                  avec option FUSION du modele et verification de la  *
+*                  relation de comportement (loi de l'elasticite).     *
+*                                                                      *
+*----------------------------------------------------------------------*
+opti dime 2 elem qua4 mode plan cont ;
+
+* Pour affichages, mettre ig1 a VRAI :
+ig1      = faux ;
+
+*----------------------- Construction du modele -----------------------*
+
+* Maillage :
+l1       = (0 0) droi 1 (1 0) ;
+s1       = l1 tran 1 (0 1) ;
+l3       = s1 cote 3 ;
+l4       = s1 cote 4 ;
+
+si ig1 ;
+  trac qual S1 titr 'Maillage' ;
+fins ;
+
+* Modele, Caracteristiques :
+ecro1    = evol vert manu (prog 0. 1.) ecro (prog 200.e6 (10.e9+200.e6)) ;
+si ig1 ;
+  dess ecro1 titr 'Courbe d ecrouissage : module = 10.E9 Pa' xbor 0. 0.1 ybor 0. 1.25e9 ygra 0.2e9 ;
+fins ;
+mo1      = mode s1 mecanique elastique plastique isotrope fusion ;
+ma1      = mate mo1 youn 200.e9 nu 0.3 alph 1.e-5 ecro ecro1 tref 20. talp 20. tfus 100. ;
+  
+* C.L., Chargement :
+clm1     = bloq uy l1 ;
+clm2     = bloq ux l4 ;
+
+si ig1 ;
+  trac qual ((l1  coul roug) et (l4 coul vert) et s1) titr ' Uy = 0 sur L1, Ux = 0 sur L4' ;
+fins ;
+
+fimp1    = forc l3 (0. 1.e6) ;
+lt1      = prog 0.  1.    2.    3.  4.   5.  6.   7.   8.   ;
+lfimp1   = prog 0.  200.  300.   0.  0.   0. 200. 300. 0.   ;
+lt2      = prog 20. 20.   20.   20. 120. 20. 20.  20.  20. ;
+evfimp1  = evol vert manu temp lt1 meca lfimp1 ;
+cgfimp1  = char dimp fimp1 evfimp1 ;
+
+* Chargement en temperature :
+cht1     = manu chpo s1 1 'T' 1. ;
+evt1     = evol roug manu temp lt1 t lt2 ;
+cgt1     = char 'T' cht1 evt1 ;
+
+si ig1 ;
+  trac (vect fimp1 forc vert) s1 titre 'Force appliquee' ;
+  dess evfimp1 titre 'Evolution temporelle de l effort (Re = 200)' ;
+  dess evt1    titre 'Evolution de la temperature en temps (Tfus = 100)' ;
+fins ;
+
+*----------------------------- Resolution -----------------------------*
+
+* Resolution PASAPAS a 20 deg. C :
+tpas1    = table ;
+tpas1. modele              = mo1 ;
+tpas1. caracteristiques    = ma1 ;
+tpas1. blocages_mecaniques = clm1 et clm2 ;
+tpas1. chargement          = cgfimp1 et cgt1 ;
+tpas1. temps_calcules      = prog 0. 1. pas 0.1 2. 3. 4. 5. 6. pas 0.1 7. 8. ;
+
+* Sauvegarde deformations pour verif. comportement :
+tpas1. mes_sauvegardes        = table ;
+tpas1. mes_sauvegardes. defin = vrai ;
+tpas1. mes_sauvegardes. defto = vrai ;
+
+pasapas tpas1 ;
+
+*-------------------------- Post-traitement ---------------------------*
+
+* Courbe traction initiale :
+p4       = s1 poin proc (0 1) ;
+lf1      = ipol evfimp1 (prog 0. 1. pas 0.1 2. 3.) ;
+evu1     = evol temp tpas1 deplacements UY P4 ;
+lu1      = ipol evu1 (prog 0. 1. pas 0.1 2. 3.) ;
+evfu1    = evol vert manu 'Uy' lu1 'Fy' lf1 ;
+
+* Courbe dilatation a effort nul (traitement restauration) :
+lf2      = ipol evfimp1 (prog 3. 4. 5.) ;
+evu2     = evol temp tpas1 deplacements UY P4 ;
+lu2      = ipol evu2 (prog 3. 4. 5.) ;
+evfu2    = evol rose manu 'Uy' lu2 'Fy' lf2 ;
+
+* Courbe traction apres traitement thermique restauration :
+lf3      = ipol evfimp1 (prog 5. 6. pas 0.1 7. 8.) ;
+evu3     = evol temp tpas1 deplacements UY P4 ;
+lu3      = ipol evu3 (prog 5. 6. pas 0.1 7. 8.) ;
+evfu3    = evol oran manu 'Uy' lu3 'Fy' lf3 ;
+
+si ig1 ;
+  tleg1    = table ;
+  tleg1. titre = table ;
+  tleg1. titre. 1 = 'Courbe initiale' ;
+  tleg1. titre. 2 = 'Dilatation TT' ;
+  tleg1. titre. 3 = 'Apres TT restauration' ;
+  titre 'Courbes force-deplacement initiale et apres TT restauration' ;
+  dess (evfu1 et evfu2 et evfu3) ybor 0. 310. ygra 50. lege tleg1 ;
+fins ;
+
+*----------------------------- Validation -----------------------------*
+
+* Validation option FUSION :
+* --------------------------
+* On veut que les 2 courbes de traction soient identiques,
+* a la deformation inelastique pres car elle n'est pas remise a zero.
+* evfu4 : courbe de traction corrigee de la def. plast. initiale
+u3ini    = lu3 extr 1 ;
+lu4      = lu3 - u3ini ;
+evfu4    = evol manu 'Uy' lu4 'Fy' lf3 ;
+
+si ig1 ;
+  tleg1    = table ;
+  tleg1. 2 = mot 'MARQ S ROND NOLI' ;
+  tleg1. titre = table ;
+  tleg1. titre. 1 = 'Courbe initiale' ;
+  tleg1. titre. 2 = 'Apres TT corrigee' ;
+  titre 'Comparaison courbe initiale-apres TT corrigee de la def. plast. ini.' ;
+  dess (evfu1 et evfu4) lege tleg1 ;
+fins ;
+
+* test validation :
+err1     = (maxi abs (lu1 - lu4)) / (maxi abs lu1) ;
+list err1 ;
+si (err1 > 1.e-8) ;
+  erre 5 ;
+fins ;
+
+* Validation relation de comportement :
+* -------------------------------------
+* On compare les contraintes obtenues par PASAPAS au max. des courbes de traction,
+* aux contraintes calculees par loi de l'elasticite a l'aide des deformations
+
+* Contraintes calculees par PASAPAS :
+sig2     = peche tpas1 contraintes  2. ;
+sig7     = peche tpas1 contraintes  7. ;
+
+* Calcul contraintes a partir des deformations :
+dep2     = peche tpas1 deplacements 2. ;
+dep7     = peche tpas1 deplacements 7. ;
+eto2     = epsi dep2 mo1 ;
+eto7     = epsi dep7 mo1 ;
+cht2     = tire cgt1 t 2. ;
+cht7     = tire cgt1 t 7. ;
+eth2     = epth mo1 ma1 cht2 ;
+eth7     = epth mo1 ma1 cht7 ;
+ein2     = peche tpas1 deformations_inelastiques 2. ;
+ein7     = peche tpas1 deformations_inelastiques 7. ;
+lmein1   = extr ein2 comp ;
+lmeto1   = extr mo1 deformations ;
+ein2     = exco ein2 lmein1 lmeto1 ;
+ein7     = exco ein7 lmein1 lmeto1 ;
+sel2     = elas mo1 ma1 (eto2 - eth2 - ein2) ;
+sel7     = elas mo1 ma1 (eto7 - eth7 - ein7) ;
+
+* Ecart relatif a la loi de l'elasticite :
+err2     = (maxi abs (sig2 - sel2)) / (maxi abs sig2) ;
+err3     = (maxi abs (sig7 - sel7)) / (maxi abs sig7) ;
+err0     = maxi (prog err2 err3) ;
+list err0 ;
+
+* Validation relation de comportement :
+si (err0 > 1.e-5) ;
+  erre 5 ;
+fins ;
+
+*------------------------- Sans Option FUSION -------------------------*
+
+mo2      = mode s1 mecanique elastique plastique isotrope ;
+ma2      = mate mo2 youn 200.e9 nu 0.3 alph 1.e-5 ecro ecro1 tref 20. talp 20. ;
+
+tpas2    = table ;
+tpas2. modele              = mo2 ;
+tpas2. caracteristiques    = ma2 ;
+tpas2. blocages_mecaniques = clm1 et clm2 ;
+tpas2. chargement          = cgfimp1 et cgt1 ;
+tpas2. temps_calcules      = prog 0. 1. pas 0.1 2. 3. 4. 5. 6. pas 0.1 7. 8. ;
+
+* Sauvegarde deformations pour verif. comportement :
+tpas2. mes_sauvegardes        = table ;
+tpas2. mes_sauvegardes. defin = vrai ;
+tpas2. mes_sauvegardes. defto = vrai ;
+
+pasapas tpas2 ;
+
+* Comparaison avec / sans option FUSION :
+lf1      = ipol evfimp1 tpas1.temps_calcules ;
+evu1     = evol temp tpas1 deplacements UY P4 ;
+lu1      = ipol evu1 tpas1.temps_calcules ;
+evfu1    = evol vert manu 'Uy' lu1 'Fy' lf1 ;
+evu2     = evol temp tpas2 deplacements UY P4 ;
+lu2      = ipol evu2 tpas2.temps_calcules ;
+evfu2    = evol blan manu 'Uy' lu2 'Fy' lf1 ;
+evut1    = evol vert manu 't' tpas1.temps_calcules 'Uy' lu1 ;
+evut2    = evol blan manu 't' tpas1.temps_calcules 'Uy' lu2 ;
+
+si ig1 ;
+  tleg1    = table ;
+  tleg1. 2 = mot 'MARQ S ROND POIN' ;
+  tleg1. titre = table ;
+  tleg1. titre. 1 = 'avec option FUSION' ;
+  tleg1. titre. 2 = 'sans option FUSION' ;
+  titre 'Courbes traction : sans option FUSION, on ne plastifie pas a la 2e charge' ;
+  dess (evfu1 et evfu2) lege tleg1 ;
+  titre 'Evolution temporelle du deplacement' ;
+  dess (evut1 et evut2) lege tleg1 xbor 0. 9. xgra 1. ;
+fins ;
+
+fin ;
+
+ 
+ 
+
+ 
+

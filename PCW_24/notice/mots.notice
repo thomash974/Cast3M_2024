@@ -1,0 +1,89 @@
+$$$$ MOTS     NOTICE  GOUNAND   23/01/13    21:15:21     11554          
+                                             DATE     23/01/13
+
+    Operateur MOTS                           Voir aussi : PROG LECT SUIT
+    --------------                                        EVOL ENUM
+
+    LMOTS1 = MOTS  MOT1 MOT2 ... ;
+
+
+Section : Langage Base
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur MOTS cree une liste de mots de 8 caracteres.
+
+
+    Commentaire :
+    _____________
+
+    MOTi   : mots contenus dans la liste de mots (type MOT)
+
+    LMOTS1 : liste de mots (type LISTMOTS)
+
+
+    -----------------------
+    |  Sous-directive  *  |
+    -----------------------
+
+    LMOTS1 = MOTS 3*'ROUG' ;
+
+    est equivalent a : LMOTS1 = MOTS 'ROUG' 'ROUG' 'ROUG' ;
+
+
+    On peut aussi ecrire :
+
+    LMOTS1 = MOTS 2*'BLEU' 2*'VERT' 'ROUG' ;
+
+    qui equivaut a : LMOTS1 = MOTS 'BLEU' 'BLEU' 'VERT' 'VERT' 'ROUG' ;
+
+
+
+    Remarque :
+    __________
+
+    Pour eviter que l'un des mots soit pris pour un operateur, il faut
+    ecrire l'operateur MOTS en tete.
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The MOTS operator creates a list of 8-character words.
+
+
+    Contents :
+    __________
+
+    MOTi   : words included in the list of words (MOT type)
+
+    LMOTS1 : list of words (LISTMOTS type)
+
+
+    -----------------------
+    |  Subinstruction  *  |
+    -----------------------
+
+    LMOTS1 = MOTS 3*'ROUG' ;
+
+    is equivalent to : LMOTS1 = MOTS 'ROUG' 'ROUG' 'ROUG' ;
+
+
+    One can also write :
+
+    LMOTS1 = MOTS 2*'BLEU' 2*'VERT' 'ROUG' ;
+
+    instead of : LMOTS1 = MOTS 'BLEU' 'BLEU' 'VERT' 'VERT' 'ROUG' ;
+
+
+
+    Note :
+    ______
+
+    To avoid confusing one of the words with an operator,
+    write the MOTS operator at the head of the LMOTS1 syntax.
+
+$$$$
+ 

@@ -1,0 +1,483 @@
+* ======================================================================
+* BENCH_CUBE.DGIBI
+* ----------------------------------------------------------------------
+* Benchmark des optimisations PERF-RAID (UNPAS / PAS_MATE / PASAPAS /
+* PAS_DEFA) sur un cube soumis a un chargement cyclique (maillage unique).
+* Quatre familles de calcul, chacune en trois variantes :
+*   CHABOCHE    : acier 316L, E(T), T uniforme constante
+*   CHABOCHE_T  : idem avec une rampe de temperature (T change a chaque pas)
+*   MAZARS      : beton, endommagement, traction cyclique croissante
+*   MAZARS_T    : idem avec E(T) et une rampe de temperature
+* Variantes : orig  = 'PERF_RAID' FAUX (comportement d'origine)
+*             perf1 = 'PERF_RAID' VRAI, niveau 1 (resultats identiques)
+*             perf2 = 'PERF_RAID' VRAI, niveau 2 (raideur reutilisee de
+*                     facon approchee : tolerance 1E-3 sur la diagonale)
+* Sorties : console, bench_<scenario>.log, bench_synthese.log et
+* bench_avancement.log (suivi). bench_inutile.tmp est un fichier vide
+* (sert a fermer les fichiers de sortie) : il peut etre supprime.
+* Les procedures modifiees (unpas, pas_mate, pasapas, pas_defa) doivent
+* etre dans le repertoire d'execution.
+* ----------------------------------------------------------------------
+* Duree indicative (PC modeste) : 15 a 90 s par calcul a NDIV0 = 10 ;
+* 12 scenarios x NREP0 repetitions. Une famille par session si besoin.
+* ======================================================================
+IECHO0 = 0 ;
+OPTI 'ECHO' IECHO0 ;
+OPTI 'DIME' 3 'ELEM' 'CUB8' ;
+*
+* ------------------------------ Parametres ----------------------------
+* Decoupage du cube : NDIV0**3 elements (10 : 1000 elements)
+NDIV0 = 10 ;
+* Repetitions de l'ensemble des scenarios (temps minimal retenu). Les
+* repetitions alternent l'ordre des scenarios (aller puis retour) pour
+* compenser la derive des temps au cours d'une session.
+NREP0 = 2 ;
+* Critere de convergence independant du maillage (PRECISION = PREC0 /
+* NDIV0**2), precision de reference PREC0
+PREC0 = 1.E-4 ;
+* Temperature initiale, finale de la rampe (degC)
+TC0 = 20. ;
+TRAMF0 = 100. ;
+* CHABOCHE : vitesse et amplitude de deformation
+EPOINT0 = 1.E-3 ;
+EMAX0 = 0.015 ;
+* MAZARS : valeurs par defaut de la notice MATE (beton) et amplitude
+YOUNB0 = 30.E9 ;
+NUB0 = 0.2 ;
+KTRB0 = 1.E-4 ;
+ACOMB0 = 1.4 ;
+BCOMB0 = 1900. ;
+ATRAB0 = 0.8 ;
+BTRAB0 = 17000. ;
+BETAB0 = 1.06 ;
+EMAXB0 = 1.E-3 ;
+* Tolerances de comparaison des courbes force/section avec la variante
+* orig : niveau 1 (doit etre identique) et niveau 2 (approche)
+TOLN1 = 1.E-8 ;
+TOLN2 = 5.E-3 ;
+*
+* ------------------------------ Procedures ----------------------------
+DEBPROC CHRONO ;
+    TH1 = TEMP 'HORL' ;
+FINPROC TH1 ;
+*
+* Temps horloge cumule d'un operateur (somme sur les assistants, ms)
+* depuis le dernier TEMP 'ZERO', lu dans la table de TEMP 'NOEC'
+DEBPROC TOPER TNO1*'TABLE' NOM1*'MOT' ;
+    TOT1 = 0 ;
+    TH1 = TNO1 . 'TEMPS_HORLOGE' ;
+    SI (EXIS TH1 NOM1) ;
+        L1 = TH1 . NOM1 ;
+        REPETER B1 (DIME L1) ;
+            TOT1 = TOT1 + (EXTR L1 &B1) ;
+        FIN B1 ;
+    FINSI ;
+FINPROC TOT1 ;
+*
+DEBPROC PSCEN ETQS1*'MOT' MODS1*'MOT' TRPS1*'LOGIQUE' PRFS1*'LOGIQUE'
+    NIVS1*'ENTIER' ;
+    TS1 = TABL ;
+    TS1 . 'ETIQ' = ETQS1 ;
+    TS1 . 'MODE' = MODS1 ;
+    TS1 . 'TRAMP' = TRPS1 ;
+    TS1 . 'PERF' = PRFS1 ;
+    TS1 . 'NIV' = NIVS1 ;
+FINPROC TS1 ;
+*
+* Suivi : ecrit bench_avancement.log puis referme le fichier
+DEBPROC AVANCE TV1*'TABLE' K1*'ENTIER' NT1*'ENTIER' NOM1*'MOT' ETA1*'MOT' ;
+    OPTI 'SORT' 'bench_avancement.log' ;
+    SORT 'CHAI' 'AVANCEMENT DU BENCHMARK PERF-RAID' ;
+    VM1 = CHAI 'Calcul en cours :' ' ' K1 ' ' 'sur' ' ' NT1 ' ' ':' ' ' NOM1 ' ' '-' ' ' ETA1 ;
+    SORT 'CHAI' VM1 ;
+    SORT 'CHAI' 'Scenarios termines :' ;
+    REPETER BAV1 NT1 ;
+        I1 = &BAV1 ;
+        SI ('EXIS' TV1 I1) ;
+            T1 = TV1 . I1 ;
+            VN1 = T1 . 'ETIQ' ;
+            VT1 = T1 . 'HORL' ;
+            VM2 = CHAI I1*4 VT1*14 'ms' ' ' VN1 ;
+            SORT 'CHAI' VM2 ;
+        FINSI ;
+    FIN BAV1 ;
+    OPTI 'SORT' 'bench_inutile.tmp' ;
+FINPROC ;
+*
+* ------------------------------ Scenarios -----------------------------
+TSCE = TABL ;
+*                      ETIQ           MODE       TRAMP PERF  NIV
+TSCE . 1  = PSCEN 'chab_orig'    'CHABOCHE' FAUX  FAUX  1 ;
+TSCE . 2  = PSCEN 'chab_perf1'   'CHABOCHE' FAUX  VRAI  1 ;
+TSCE . 3  = PSCEN 'chab_perf2'   'CHABOCHE' FAUX  VRAI  2 ;
+TSCE . 4  = PSCEN 'chabT_orig'   'CHABOCHE' VRAI  FAUX  1 ;
+TSCE . 5  = PSCEN 'chabT_perf1'  'CHABOCHE' VRAI  VRAI  1 ;
+TSCE . 6  = PSCEN 'chabT_perf2'  'CHABOCHE' VRAI  VRAI  2 ;
+TSCE . 7  = PSCEN 'maz_orig'     'MAZARS'   FAUX  FAUX  1 ;
+TSCE . 8  = PSCEN 'maz_perf1'    'MAZARS'   FAUX  VRAI  1 ;
+TSCE . 9  = PSCEN 'maz_perf2'    'MAZARS'   FAUX  VRAI  2 ;
+TSCE . 10 = PSCEN 'mazT_orig'    'MAZARS'   VRAI  FAUX  1 ;
+TSCE . 11 = PSCEN 'mazT_perf1'   'MAZARS'   VRAI  VRAI  1 ;
+TSCE . 12 = PSCEN 'mazT_perf2'   'MAZARS'   VRAI  VRAI  2 ;
+* Scenarios a calculer (la variante orig d'une famille doit etre presente :
+* elle sert de reference). Pour un PC modeste, une famille (trois
+* scenarios) par session : par exemple LSCE = LECT 1 2 3 ;
+LSCE = LECT 1 2 3 4 5 6 7 8 9 10 11 12 ;
+NSCE0 = DIME LSCE ;
+*
+* ------------------------- Materiau CHABOCHE --------------------------
+T316L = BIBLIO '316L' 'REFE' 4 ;
+LNOMP = MOTS 'YOUN' 'NU' 'ALPH' 'R0' 'RM' 'B' 'A1' 'C1' 'A2' 'C2' ;
+*
+* ------------------------------ Chargements ---------------------------
+* CHABOCHE : traction-compression alternee +/- EMAX0 (60 pas)
+TEMAX0 = EMAX0 / EPOINT0 ;
+LAMPC0 = EMAX0 * (PROG 0. 1. -1. 1. -1. 1. -1. 1. -1. 0.) ;
+LTPSC0 = TEMAX0 * (PROG 0. 1. 3. 5. 7. 9. 11. 13. 15. 16.) ;
+EVC0 = EVOL 'MANU' 'TEMPS' LTPSC0 LAMPC0 ;
+LTCC0 = LTPSC0 RAFF (0.05 * TEMAX0) ;
+LTCC0 = LTCC0 EXTR (LECT 1 'PAS' 1 61) ;
+TFINC0 = MAXI LTCC0 ;
+* MAZARS : traction cyclique a amplitude croissante (76 pas)
+LAMPB0 = EMAXB0 * (PROG 0. 0.3 0. 0.6 0. 1. 0.) ;
+LTPSB0 = PROG 0. 3. 6. 12. 18. 28. 38. ;
+EVB0 = EVOL 'MANU' 'TEMPS' LTPSB0 LAMPB0 ;
+LTCB0 = LTPSB0 RAFF 0.5 ;
+TFINB0 = MAXI LTCB0 ;
+* MAZARS_T : module d'Young fonction de la temperature (-0.05 %/degC)
+EVY0 = EVOL 'MANU' 'T' (PROG 0. 1000.) 'YOUN'
+    (PROG YOUNB0 (0.5 * YOUNB0)) ;
+*
+* ------------------------ Calculs (repetitions) -----------------------
+TRES1 = TABL ;
+MESS '==================================================' ;
+VMSG = CHAI 'BENCHMARK PERF-RAID :' ' ' NSCE0 ' ' 'scenarios,' ' ' NREP0 ' '
+    'repetitions, maillage' ' ' NDIV0 ' ' 'x' ' ' NDIV0 ' ' 'x' ' ' NDIV0 ;
+MESS VMSG ;
+MESS '==================================================' ;
+NRUN0 = NREP0 * NSCE0 ;
+IRUN = 0 ;
+IALLER = FAUX ;
+REPETER BREP NREP0 ;
+    IREP = &BREP ;
+    IALLER = 'NON' IALLER ;
+    REPETER BSCE NSCE0 ;
+        JS = &BSCE ;
+*       ordre aller pour les repetitions impaires, retour pour les paires
+        SI ('NON' IALLER) ;
+            JS = NSCE0 + 1 - JS ;
+        FINSI ;
+        ISCE = EXTR LSCE JS ;
+        IRUN = IRUN + 1 ;
+        TS1 = TSCE . ISCE ;
+        VETQ = TS1 . 'ETIQ' ;
+        VMOD = TS1 . 'MODE' ;
+        VTRP = TS1 . 'TRAMP' ;
+        VPRF = TS1 . 'PERF' ;
+        VNIV = TS1 . 'NIV' ;
+        ICHAB = EGA VMOD 'CHABOCHE' ;
+        MESS ' ' ;
+        VMSG = CHAI '>>> Calcul' ' ' IRUN ' ' 'sur' ' ' NRUN0 ' ' '(repetition'
+            ' ' IREP ')' ' ' ':' ' ' 'scenario' ' ' ISCE ' ' VETQ ;
+        MESS VMSG ;
+        AVANCE TRES1 IRUN NRUN0 VETQ 'en_cours' ;
+*       Maillage
+        L1 = (0. 0. 0.) DROI NDIV0 (1. 0. 0.) ;
+        S1 = L1 TRAN NDIV0 (0. 1. 0.) ;
+        V1 = S1 VOLU TRAN NDIV0 (0. 0. 1.) ;
+        S2 = V1 FACE 2 ;
+        NEL1 = NBEL V1 ;
+*       Modele, materiau et temps calcules
+        SI ICHAB ;
+            MOD1 = MODE V1 'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'CHABOCHE2' ;
+            MAT1 = MATE MOD1 'YOUN' (T316L . 'YOUN') 'NU' (T316L . 'NU')
+                'ALPH' (T316L . 'ALPH') 'R0' (T316L . 'R0')
+                'RM' (T316L . 'RM') 'B' (T316L . 'B')
+                'A1' (T316L . 'A1') 'C1' (T316L . 'C1')
+                'A2' (T316L . 'A2') 'C2' (T316L . 'C2')
+                'PSI' 1. 'OMEG' 0. 'TREF' TC0 'TALP' TC0 ;
+            EV0 = EVC0 ;
+            LTCALC = LTCC0 ;
+            TFIN0 = TFINC0 ;
+        SINON ;
+            MOD1 = MODE V1 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE'
+                'ENDOMMAGEMENT' 'MAZARS' ;
+            SI VTRP ;
+                MAT1 = MATE MOD1 'YOUN' EVY0 'NU' NUB0 'KTR0' KTRB0
+                    'ACOM' ACOMB0 'BCOM' BCOMB0 'ATRA' ATRAB0
+                    'BTRA' BTRAB0 'BETA' BETAB0
+                    'ALPH' 0. 'TALP' TC0 'TREF' TC0 ;
+            SINON ;
+                MAT1 = MATE MOD1 'YOUN' YOUNB0 'NU' NUB0 'KTR0' KTRB0
+                    'ACOM' ACOMB0 'BCOM' BCOMB0 'ATRA' ATRAB0
+                    'BTRA' BTRAB0 'BETA' BETAB0 ;
+            FINSI ;
+            EV0 = EVB0 ;
+            LTCALC = LTCB0 ;
+            TFIN0 = TFINB0 ;
+        FINSI ;
+        NPAS0 = (DIME LTCALC) - 1 ;
+*       Conditions aux limites (symetries + deplacement impose en z)
+        SX0 = (V1 COOR 1) POIN 'INFE' 1.E-3 ;
+        SY0 = (V1 COOR 2) POIN 'INFE' 1.E-3 ;
+        CLUS1 = BLOQ S1 'UZ' ;
+        CLUX0 = BLOQ SX0 'UX' ;
+        CLUY0 = BLOQ SY0 'UY' ;
+        CLUS2 = BLOQ S2 'UZ' ;
+        CL0 = CLUS1 ET CLUX0 ET CLUY0 ET CLUS2 ;
+        DCLS2 = DEPI CLUS2 1. ;
+        CG1 = CHAR 'DIMP' DCLS2 EV0 ;
+*       Chargement thermique : constant (chaboche) ou rampe lineaire
+        SI (ICHAB OU VTRP) ;
+            CHT0 = MANU 'CHPO' V1 1 'T' TC0 ;
+            SI VTRP ;
+                CHT1 = MANU 'CHPO' V1 1 'T' TRAMF0 ;
+                TTT1 = TABL ;
+                TTT1 . 0 = 0. ;
+                TTT1 . 1 = TFIN0 ;
+                TCH1 = TABL ;
+                TCH1 . 0 = CHT0 ;
+                TCH1 . 1 = CHT1 ;
+                CG1 = CG1 ET (CHAR 'T' TTT1 TCH1) ;
+            SINON ;
+                CG1 = CG1 ET (CHAR 'T' CHT0) ;
+            FINSI ;
+        FINSI ;
+*       Calcul chronometre
+        TPAS1 = TABL ;
+        TPAS1 . 'MODELE' = MOD1 ;
+        TPAS1 . 'CARACTERISTIQUES' = MAT1 ;
+        TPAS1 . 'CHARGEMENT' = CG1 ;
+        TPAS1 . 'BLOCAGES_MECANIQUES' = CL0 ;
+        TPAS1 . 'TEMPS_CALCULES' = LTCALC ;
+        TPAS1 . 'PRECISION' = PREC0 / ((FLOT NDIV0) ** 2) ;
+        TPAS1 . 'PERF_RAID' = VPRF ;
+        TPAS1 . 'PERF_RAID_NIVEAU' = VNIV ;
+        MENAGE 'OBLI' ;
+        TEMP 'ZERO' ;
+        PASAPAS TPAS1 ;
+        VTHR = CHRONO ;
+        TNO = TEMP 'NOEC' ;
+        VRES0 = TOPER TNO 'RESO' ;
+        VRIG0 = TOPER TNO 'RIGI' ;
+        VHOO0 = TOPER TNO 'HOOK' ;
+        VVAR0 = TOPER TNO 'VARI' ;
+        VCOM0 = TOPER TNO 'COMP' ;
+*       Compteurs PERF-RAID
+        VNRE = -1 ;
+        VNCA = -1 ;
+        VNHK = -1 ;
+        VNMA = -1 ;
+        WTB1 = TPAS1 . 'WTABLE' ;
+        SI (EXIS WTB1 'NB_RAIDEUR_REUT') ;
+            VNRE = WTB1 . 'NB_RAIDEUR_REUT' ;
+        FINSI ;
+        SI (EXIS WTB1 'NB_RAIDEUR_CALC') ;
+            VNCA = WTB1 . 'NB_RAIDEUR_CALC' ;
+        FINSI ;
+        SI (EXIS WTB1 'NB_HOOK_EVITE') ;
+            VNHK = WTB1 . 'NB_HOOK_EVITE' ;
+        FINSI ;
+        SI (EXIS WTB1 'NB_MAT_REUT') ;
+            VNMA = WTB1 . 'NB_MAT_REUT' ;
+        FINSI ;
+*       Courbe force/section (section unite)
+        LF1 = PROG 0. ;
+        NB1 = (DIME TPAS1 . 'TEMPS') - 1 ;
+        REPETER BST NB1 ;
+            I1 = &BST ;
+            FI1 = ((TPAS1 . 'REACTIONS' . I1) REDU S2) RESU ;
+            FI1 = EXTR FI1 'FZ' ((EXTR FI1 'MAIL') POIN 1) ;
+            LF1 = LF1 ET FI1 ;
+        FIN BST ;
+*       Stockage : temps minimal et temps par operateur de ce calcul
+        SI ('NON' (EXIS TRES1 ISCE)) ;
+            TRES1 . ISCE = TABL ;
+            TRES1 . ISCE . 'HORL' = VTHR + 1 ;
+        FINSI ;
+        TR1 = TRES1 . ISCE ;
+        SI (VTHR < (TR1 . 'HORL')) ;
+            TR1 . 'HORL' = VTHR ;
+            TR1 . 'RESO' = VRES0 ;
+            TR1 . 'RIGI' = VRIG0 ;
+            TR1 . 'HOOK' = VHOO0 ;
+            TR1 . 'VARI' = VVAR0 ;
+            TR1 . 'COMP' = VCOM0 ;
+        FINSI ;
+        TR1 . 'ETIQ' = VETQ ;
+        TR1 . 'NIV' = VNIV ;
+        TR1 . 'NEL' = NEL1 ;
+        TR1 . 'NPAS' = NPAS0 ;
+        TR1 . 'COURBE' = LF1 ;
+        TR1 . 'NRE' = VNRE ;
+        TR1 . 'NCA' = VNCA ;
+        TR1 . 'NHK' = VNHK ;
+        TR1 . 'NMA' = VNMA ;
+        VMSG = CHAI '<<< Calcul' ' ' IRUN ' ' 'sur' ' ' NRUN0 ' ' ':' ' ' VETQ
+            ' ' ':' ' ' VTHR ' ' 'ms (RESO' ' ' VRES0 ' ' 'ms, raideur'
+            ' ' 'reutilisee' ' ' VNRE ' ' 'fois)' ;
+        MESS VMSG ;
+        AVANCE TRES1 IRUN NRUN0 VETQ 'termine' ;
+        MENAGE 'OBLI' ;
+    FIN BSCE ;
+FIN BREP ;
+*
+* ---------------- Resultats par scenario (reference : orig) -----------
+TREFL = TABL ;
+TREFT = TABL ;
+REPETER BSC2 NSCE0 ;
+    ISCE = EXTR LSCE &BSC2 ;
+    TS1 = TSCE . ISCE ;
+    SI ('NON' (TS1 . 'PERF')) ;
+        SI (TS1 . 'TRAMP') ;
+            VFAM = CHAI (TS1 . 'MODE') '_T' ;
+        SINON ;
+            VFAM = TS1 . 'MODE' ;
+        FINSI ;
+        TREFL . VFAM = TRES1 . ISCE . 'COURBE' ;
+        TREFT . VFAM = TRES1 . ISCE . 'HORL' ;
+    FINSI ;
+FIN BSC2 ;
+REPETER BSC3 NSCE0 ;
+    ISCE = EXTR LSCE &BSC3 ;
+    TS1 = TSCE . ISCE ;
+    TR1 = TRES1 . ISCE ;
+    VETQ = TS1 . 'ETIQ' ;
+    VNIV = TS1 . 'NIV' ;
+    SI (TS1 . 'TRAMP') ;
+        VFAM = CHAI (TS1 . 'MODE') '_T' ;
+    SINON ;
+        VFAM = TS1 . 'MODE' ;
+    FINSI ;
+    SI (TS1 . 'PERF') ;
+        VMPR = 'actif' ;
+    SINON ;
+        VMPR = 'inactif' ;
+    FINSI ;
+    VTHM = TR1 . 'HORL' ;
+    LF1 = TR1 . 'COURBE' ;
+    VERR = 0. ;
+    VACC = 0. ;
+    VMOK = 'sans_reference' ;
+    SI (EXIS TREFL VFAM) ;
+        LFREF = TREFL . VFAM ;
+        VERR = (MAXI (LF1 - LFREF) 'ABS') / (MAXI LFREF 'ABS') ;
+        VTREF = TREFT . VFAM ;
+        SI (VTHM > 0) ;
+            VACC = (FLOT VTREF) / (FLOT VTHM) ;
+        FINSI ;
+        SI (VNIV EGA 1) ;
+            VTOL = TOLN1 ;
+        SINON ;
+            VTOL = TOLN2 ;
+        FINSI ;
+        SI (VERR '>' VTOL) ;
+            VMOK = 'ECART' ;
+        SINON ;
+            VMOK = 'OK' ;
+        FINSI ;
+    FINSI ;
+    TR1 . 'FAM' = VFAM ;
+    TR1 . 'PERFM' = VMPR ;
+    TR1 . 'ACCF' = VACC ;
+    TR1 . 'ERRF' = VERR ;
+    TR1 . 'OKM' = VMOK ;
+    VSE = CHAI 'FORMAT' '(1PE10.3)' VERR ;
+    VSA = CHAI 'FORMAT' '(F6.2)' VACC ;
+    VA1 = TR1 . 'RESO' ;
+    VA2 = TR1 . 'RIGI' ;
+    VA3 = TR1 . 'HOOK' ;
+    VA4 = TR1 . 'VARI' ;
+    VA5 = TR1 . 'COMP' ;
+    VNRE = TR1 . 'NRE' ;
+    VNCA = TR1 . 'NCA' ;
+    VNHK = TR1 . 'NHK' ;
+    VNMA = TR1 . 'NMA' ;
+    NEL1 = TR1 . 'NEL' ;
+    NPAS0 = TR1 . 'NPAS' ;
+    NOMR1 = CHAI 'bench_' VETQ '.log' ;
+    OPTI 'SORT' NOMR1 ;
+    VMSG = CHAI '=== Scenario' ' ' ISCE ' ' ':' ' ' VETQ ' ' '(' VFAM ','
+        ' ' 'PERF_RAID' ' ' VMPR ',' ' ' 'niveau' ' ' VNIV ')' ' ' '===' ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+    VMSG = CHAI 'Elements :' ' ' NEL1 ' ' '; pas de temps :' ' ' NPAS0 ' '
+        '; repetitions :' ' ' NREP0 ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+    VMSG = CHAI 'Temps horloge minimal (ms) :' ' ' VTHM ' '
+        '; acceleration par rapport a orig :' ' ' VSA ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+    VMSG = CHAI 'Temps par operateur (ms, calcul le plus rapide) : RESO' ' '
+        VA1 ' ' '; RIGI' ' ' VA2 ' ' '; HOOK' ' ' VA3 ' ' '; VARI' ' ' VA4
+        ' ' '; COMP' ' ' VA5 ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+    VMSG = CHAI 'Raideur : reutilisee' ' ' VNRE ' ' 'fois, recalculee' ' '
+        VNCA ' ' 'fois ; HOOK evite' ' ' VNHK ' ' 'fois ; caracteristiques'
+        ' ' 'reutilisees' ' ' VNMA ' ' 'fois' ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+    VMSG = CHAI 'Ecart relatif de la courbe F/S avec orig :' ' ' VSE ' '
+        ':' ' ' VMOK ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+    OPTI 'SORT' 'bench_inutile.tmp' ;
+FIN BSC3 ;
+*
+* ------------------------------ Synthese ------------------------------
+OPTI 'SORT' 'bench_synthese.log' ;
+VMSG = CHAI 'BENCHMARK PERF-RAID - maillage' ' ' NDIV0 ' ' 'x' ' ' NDIV0
+    ' ' 'x' ' ' NDIV0 ' ' '; repetitions :' ' ' NREP0 ;
+MESS VMSG ;
+SORT 'CHAI' VMSG ;
+VMSG = CHAI 'Scen'*4 'ms'*12 'acc.'*19 'RESO'*27 'RIGI'*34 'HOOK'*41
+    'VARI'*48 'ecart'*59 'reut'*64 'calc'*69 'hook'*74 'mat'*78 'niv'*82
+    ' ' 'resultat' ' ' 'PERF' ' ' 'famille' ' ' 'scenario' ;
+MESS VMSG ;
+SORT 'CHAI' VMSG ;
+REPETER BSY NSCE0 ;
+    I2 = EXTR LSCE &BSY ;
+    TR1 = TRES1 . I2 ;
+    VA = TR1 . 'ETIQ' ;
+    VB = TR1 . 'FAM' ;
+    VC = TR1 . 'PERFM' ;
+    VD = TR1 . 'NIV' ;
+    VE = TR1 . 'HORL' ;
+    VF = TR1 . 'ACCF' ;
+    VG = TR1 . 'ERRF' ;
+    VH = TR1 . 'NRE' ;
+    VI = TR1 . 'NCA' ;
+    VJ = TR1 . 'NHK' ;
+    VK = TR1 . 'NMA' ;
+    VL = TR1 . 'OKM' ;
+    VO1 = TR1 . 'RESO' ;
+    VO2 = TR1 . 'RIGI' ;
+    VO3 = TR1 . 'HOOK' ;
+    VO4 = TR1 . 'VARI' ;
+    VMSG = CHAI I2*4 VE*12 'FORMAT' '(F6.2)' VF*19 VO1*27 VO2*34 VO3*41
+        VO4*48 'FORMAT' '(1PE10.3)' VG*59 VH*64 VI*69 VJ*74 VK*78 VD*82 ' '
+        VL ' ' VC ' ' VB ' ' VA ;
+    MESS VMSG ;
+    SORT 'CHAI' VMSG ;
+FIN BSY ;
+VMSG = CHAI 'ms : temps horloge minimal sur les repetitions ; acc. :'
+    ' ' 'temps de la variante orig / temps du scenario' ;
+MESS VMSG ;
+SORT 'CHAI' VMSG ;
+VMSG = CHAI 'RESO, RIGI, HOOK, VARI : temps (ms) passes dans ces'
+    ' ' 'operateurs pendant le calcul le plus rapide' ;
+MESS VMSG ;
+SORT 'CHAI' VMSG ;
+VMSG = CHAI 'reut./calc. : pas ou la raideur est reutilisee / recalculee ;'
+    ' ' 'hook : appels HOOK evites ; mat. : caracteristiques reutilisees' ;
+MESS VMSG ;
+SORT 'CHAI' VMSG ;
+OPTI 'SORT' 'bench_inutile.tmp' ;
+AVANCE TRES1 NRUN0 NRUN0 'fin' 'BENCHMARK_TERMINE' ;
+MESS '==================================================' ;
+MESS 'BENCHMARK TERMINE : voir bench_synthese.log' ;
+MESS '==================================================' ;
+*
+FIN ;

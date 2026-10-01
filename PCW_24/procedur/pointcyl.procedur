@@ -1,0 +1,38 @@
+$$$$ POINTCYL
+* POINTCYL  PROCEDUR  FD218221  20/06/17    21:15:09     10629          
+*
+*     DEFINITION D'UN POINT (OU D'UN MAILLAGE DE POINTS)
+*             PAR SES COORDONNEES CYLINDRIQUES
+*
+'DEBPROC' POINTCYL ;
+
+* Dimension de l'espace
+IDIM = 'VALE' 'DIME' ;
+
+* Gestion des 2 syntaxes (avec des FLOTTANTs ou des LISTREELs)
+'ARGU' RAYON/'LISTREEL' ;
+'SI' ('EGA' ('TYPE' RAYON) 'ANNULE') ;
+  'ARGU' RAYON*'FLOTTANT' ANGLE*'FLOTTANT' ;
+  'SI' ('EGA' IDIM 3) ;
+    'ARGU' COTE*'FLOTTANT' ;
+  'FINSI' ;
+'SINON' ;
+  'ARGU' ANGLE*'LISTREEL' ;
+  'SI' ('EGA' IDIM 3) ;
+    'ARGU' COTE*'LISTREEL' ;
+  'FINSI' ;
+'FINSI' ;
+*
+* Caclul des coordonnees cartesiennes
+X = RAYON * ('COS' ANGLE) ;
+Y = RAYON * ('SIN' ANGLE) ;
+*
+* Creation du (des) point(s)
+'SI' (IDIM 'EGA' 2) ;
+   PT = 'POIN' X Y ;
+'FINSI' ;
+'SI' (IDIM 'EGA' 3) ;
+   PT = 'POIN' X Y COTE ;
+'FINSI' ;
+*
+'FINPROC' PT ;

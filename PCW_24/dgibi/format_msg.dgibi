@@ -1,0 +1,82 @@
+* fichier : format_msg.dgibi
+************************************************
+* TEST DES TABULATIONS DANS L'OPERATEUR CHAINE *
+************************************************
+
+DEBP TEST_RESULTAT CHA*'MOT' CHB*'MOT' CHC*'MOT' CHD*'MOT' LON*'ENTIER' ;
+    LIST CHA ;
+    LIST CHB ;
+    LIST CHC ;
+    LIST CHD ;
+    SAUT 1 'LIGNE' ;
+
+    SI (NEG (DIME CHA) LON) ;
+        ERRE 5 ;
+    FINS ;
+    
+    SI (NEG (DIME CHA) LON) ;
+        ERRE 5 ;
+    FINS ;
+    
+    SI (NEG (DIME CHA) LON) ;
+        ERRE 5 ;
+    FINS ;
+    
+    SI (NEG (DIME CHA) LON) ;
+        ERRE 5 ;
+    FINS ;    
+FINP ;
+
+
+CHA1A = CHAI 'TOTO' *10 ; 
+CHA1B = CHAI 'TOTO' * 10 ;
+CHA1C = CHAI 'TOTO'* 10 ;
+CHA1D = CHAI 'TOTO'*10 ;
+TEST_RESULTAT CHA1A CHA1B CHA1C CHA1D 10 ;
+
+CHA2A = CHAI 'TOTO' /10 ;
+CHA2B = CHAI 'TOTO' / 10 ;
+CHA2C = CHAI 'TOTO'/ 10 ;
+CHA2D = CHAI 'TOTO'/ 10 ;
+TEST_RESULTAT CHA2A CHA2B CHA2C CHA2D 13 ;
+
+CHA3A = CHAI 'TOTO' <10 ;
+CHA3B = CHAI 'TOTO' < 10 ;
+CHA3C = CHAI 'TOTO'< 10 ;
+CHA3D = CHAI 'TOTO'<10 ;
+TEST_RESULTAT CHA3A CHA3B CHA3C CHA3D 10 ;
+
+CHA4A = CHAI 'TOTO' >10 ;
+CHA4B = CHAI 'TOTO' > 10 ;
+CHA4C = CHAI 'TOTO'> 10 ;
+CHA4D = CHAI 'TOTO'>10 ;
+TEST_RESULTAT CHA4A CHA4B CHA4C CHA4D 13 ;
+
+CHA5A = CHAI 'TITI' 'TOTO' <10 ;
+CHA5B = CHAI 'TITI' 'TOTO' < 10 ;
+CHA5C = CHAI 'TITI' 'TOTO'< 10 ;
+CHA5D = CHAI 'TITI' 'TOTO'<10 ;
+TEST_RESULTAT CHA5A CHA5B CHA5C CHA5D 14 ;
+
+CHA6A = CHAI 'TITI' 'TOTO' >10 ;
+CHA6B = CHAI 'TITI' 'TOTO' > 10 ;
+CHA6C = CHAI 'TITI' 'TOTO'> 10 ;
+CHA6D = CHAI 'TITI' 'TOTO'>10 ;
+TEST_RESULTAT CHA6A CHA6B CHA6C CHA6D 17 ;
+
+
+*************************************************
+* TEST DE LA SYNTAXE 'AVEC' DE L'OPERATEUR ERRE *
+*************************************************
+
+ERRE -366 'AVEC' 'test' (MOTS 'OK' 'BOO')
+                 10 (LECT 1 2) 3 4 5 6
+                 PI ((PROG 2 3)**0.5)
+                 VRAI FAUX VRAI FAUX VRAI ;
+ 
+FIN ;
+
+ 
+
+ 
+

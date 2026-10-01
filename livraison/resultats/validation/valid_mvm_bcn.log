@@ -1,0 +1,10 @@
+=== Cas 11 : mvm_bcn (endommagement) ===
+Valeurs comparees : 120
+Temps horloge (ms) : origine 869 ; niveau 1 833 ; niveau 2 971
+Acceleration par rapport a l origine : niveau 1   1.04 ; niveau 2   0.89
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 1 ; niveau 1 1 ; niveau 2 1
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 10
+Niveau 1 : raideur reutilisee 2 fois, recalculee 18 fois ; HOOK evite 58 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 2 fois, recalculee 18 fois ; HOOK evite 58 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

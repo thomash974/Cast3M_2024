@@ -1,0 +1,120 @@
+$$$$ USPOST   NOTICE  MB234859  24/02/06    21:15:04     11833          
+                                             DATE     24/02/06
+ 
+ Procedure USPOST                        Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USDEPL USEXPL USEXPL
+                                        USINIB USTMPS USURE
+ 
+         USPOST TAB1 ENT1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure de post-traitement appelee a la fin de chaque cycle 
+    d'usure. Elle calcule l'energie dissipee durant le cycle numerique 
+    (integration du cycle de fretting), le volume use durant beta cycles 
+    numeriques (integration du profil d'usure) et le nombre de cycles 
+    reels equivalent.
+
+    (Voir ci-dessous pour les indices de la table concernes)
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+    ENT1 : Objet de type ENTIER donnant le numero de la boite a 
+           considerer.
+
+  Cette procedure est appelee par USEXPL et USIMPL.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ Resultats conserves en fin de calcul
+ ------------------------------------
+
+   Indices contenant un objet de type LISTREEL donnant pour chaque 
+   cycle calcule :
+    'PRESSION_MAX_CYCLE'     : la valeur de pression max. 
+    'CISAILLEMENT_MAX_CYCLE' : la valeur de cisaillement max.
+    'ENERGIE_DISSIPEE_CYCLE' : l'energie dissipee
+    'VOLUME_USE_CYCLE'       : le volume use
+    'PROF_USEE_MAX_CYCLE'    : la profondeur usee max.
+    'LARGEUR_CONTACT_CYCLE'  : la largeur de la zone de contact
+
+   Indices contenant un objet de type TABLE ou pour chaque cycle 
+   calcule, un objet de type CHPOINT fournit :
+    'PRESSION_MOYENNE_CYCLE'   : la pression moyenne
+    'CISAILLEMENT_MOYEN_CYCLE' : le cisaillement moyen
+    'GLISSEMENT_CYCLE'         : le glissement
+
+   Indices contenant un objet de type EVOLUTION :
+    'PRESMAX_VS_CYCLES'   : pression max en fonction du cycle
+    'CISAMAX_VS_CYCLES'   : cisaillement max en fonction du cycle
+    'ED_CYCLE_VS_CYCLES'  : energie dissipee a chaque cycle en fonction 
+                            du cycle
+    'ED_TOT_VS_CYCLES'    : energie dissipee totale en fonction du cycle
+    'V_USE_TOT_VS_CYCLES' : volume use total en fonction du cycle
+    'V_USE_TOT_VS_ED_TOT' : volume use total en fonction de l'energie 
+                            dissipee
+
++----------------------------------------------------------------------+
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Post-processing procedure called at the end of each wear cycle.
+    It calculates dissipated energy during the numerical cycle (wear 
+    cycle integration), worn volume during beta numerical cycles (wear 
+    profil integration) and the number of "real" equivalent cycle.
+
+    (See below the index of the table concerned)
+ 
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+    ENT1 : ENTIER type object which gives the wear box number.
+
+  This procedure is called by USEXPL and USIMPL.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+
+ Saved results 
+ -------------
+
+   Index which contains a LISTREEL type object for each calculated
+   cycle :
+    'PRESSION_MAX_CYCLE'     : pressure max
+    'CISAILLEMENT_MAX_CYCLE' : shear max
+    'ENERGIE_DISSIPEE_CYCLE' : dissipated energy
+    'VOLUME_USE_CYCLE'       : wear volum
+    'PROF_USEE_MAX_CYCLE'    : wear depth max
+    'LARGEUR_CONTACT_CYCLE'  : width of the area of contact
+
+   Index which contains a TABLE type object and for each calculated
+   cycle a CHPOINT object type gives :
+    'PRESSION_MOYENNE_CYCLE'   : mean pressure
+    'CISAILLEMENT_MOYEN_CYCLE' : mean shear
+    'GLISSEMENT_CYCLE'         : sliding
+
+   Index which contains an EVOLUTION object type :
+    'PRESMAX_VS_CYCLES'   : max pressure versus cycle
+    'CISAMAX_VS_CYCLES'   : max shear versus cycle
+    'ED_CYCLE_VS_CYCLES'  : dissipated energy at each cycle versus 
+                            cycle
+    'ED_TOT_VS_CYCLES'    : dissipated total energy versus cycle
+    'V_USE_TOT_VS_CYCLES' : wear volum versus cycle
+    'V_USE_TOT_VS_ED_TOT' : wear total volum versus dissipated energy
+
++----------------------------------------------------------------------+
+ 

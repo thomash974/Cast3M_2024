@@ -1,0 +1,94 @@
+$$$$ SAUV     NOTICE  PV090527  24/03/07    21:15:03     11866          
+                                             DATE     24/03/07
+                                             
+    Directive SAUVER                         Voir aussi : REST   SORT
+    ----------------                         
+
+    SAUVER  ('FORMAT'      )     OBJET1 ... OBJETi  ;
+            ('LABEL'  CHA1 )
+            ('MUET'        )
+
+Section : Entree-Sortie Entree-Sortie
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    La directive SAUVER permet d'ecrire les objets OBJET1, ... OBJETi
+ sur le fichier logique IOSAU1 au format XDR (le defaut),BINAIRE ou FORMATE 
+ defini par :
+
+                OPTION SAUV (|'XDR' |) IOSAU1 ;
+                             |'FORM'| 
+                             |'BINA'|
+
+ de maniere a interrompre un calcul, pour le reprendre ulterieurement.
+ Il ne s'agit pas d'un stockage de resultats en vue d'une recombinaison
+ ulterieure.
+
+    L'ecriture se fait en incremental, c'est a dire que seuls les
+ objets n'ayant pas deja etes sauves et ceux ayant etes modifies seront
+ ecrits a la suite de ceux etant deja sur le fichier. Il est possible
+ de donner un "label" a cette partie de la sauvegarde dans la
+ perspective de relire le fichier jusqu'a ce label inclus.
+
+    Commentaire :
+    _____________
+
+
+    Tous les objets nommes, inclus ou references par les operandes
+ sont egalement sauves.
+
+    Remarque :
+    __________
+
+    L'option facultative FORMAT permet l'ecriture en formate.
+ Elle DOIT etre prealablement precisee par la directive OPTI 'SAUV'.
+ Les fichiers formates sont encombrants. Cette option n'est a utiliser
+ que pour la mise au point. L'optio XDR permet de transferer des fichiers
+ entre ordinateurs d'architectures differentes.
+
+    L'option facultative MUET demande au logiciel de ne signaler que 
+ la fin de la sauvegarde
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The SAUVER instruction enables the user to write the objects
+ OBJET1, ... OBJETi in XDR (by default) BINARY or FORMATED format 
+ on the logical file defined by :
+
+                OPTION SAUV (|'XDR' |) IOSAU1 ;
+                             |'FORM'| 
+                             |'BINA'| 
+
+ so as to be able to resume a calculation which was previously
+ interrupted. It does not consist in storing results with a purpose
+ to recombining them afterwards.
+
+    The only objects that will be written on file will be the new ones
+ or those which have been modified since the last call to SAUVER. It is
+ possible to give a "label" to this part of file in order to read it
+ until this label.
+
+
+    Contents :
+    __________
+
+    All the objects named, included or marked by the operands 
+ are saved too.
+
+    Note :
+    ________
+
+    The FORMAT option enables the user to write on formatted files. 
+ It MUST be precised in the OPTI 'SAUV' directive before saving.
+ The formatted files require memory. So this option is to be used        
+ for debugging purpose. The XDR option allow for transferring files 
+ between different architectures computers.
+ 
+    The MUET option (mute) asks the code to only precise the end of
+ the saving.
+ 
+ 

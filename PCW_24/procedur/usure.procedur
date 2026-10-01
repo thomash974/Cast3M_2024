@@ -1,0 +1,147 @@
+$$$$ USURE
+* USURE     PROCEDUR  MB234859  24/02/06    21:15:05     11833          
+***********************************************************************
+*                         PROCEDURE USURE 
+*
+* Procedure principale pour les calculs d'usure qui determine :
+*  - les grandeurs necessaires au calcul de la profondeur usee
+*  - le profil d'usure a appliquer et deplace les maillages des 
+*    surface susees (AppUsure = VRAI).
+*
+* Entrees :
+*   T1    : Table de PASAPAS
+*
+* Sortie :
+*   T1    : Table de PASAPAS avec les resultats propres a l'usure
+*
+* A Appeler dans PERSO1
+*
+************************************************************************
+'DEBP' USURE T1*'TABLE' ;
+*
+  BOITE_US = T1.'BOITES_USURE' ;
+*-----------------------------------------------------------------------
+* - PREMIER APPEL - INITIALISATIONS TABLE ET PAS DE TEMPS
+*-----------------------------------------------------------------------
+  'SI' ('EGA' T1.'PERSO1_APPEL' 1) ;
+    USINIB T1 ;
+    'SI' BOITE_US.'INFOS'.'CALCUL_PAS' ;
+      USTMPS T1 ;
+    'FINSI' ;
+  'FINSI' ;
+*-----------------------------------------------------------------------
+* - DOIT-ON CALCULER OU APPLIQUER L'USURE
+*-----------------------------------------------------------------------
+  T_inc = T1.'ESTIMATION'.'TEMPS' ; 
+  'SI' ('<EG' (T_inc '-' BOITE_US.'DONNEES'.'T_DEBUT_USURE') 1.E-15) ;
+    'QUIT' USURE ;
+  'FINSI' ;
+*
+  CycActu = BOITE_US.'INFOS'.'INDICE_CYCLE_ACTUEL' ;
+  IncActu = BOITE_US.'INFOS'.'INDICE_INCREMENT_ACTUEL' ;
+  NbIncCy = BOITE_US.'INFOS'.'NB_INCREMENTS_PAR_CYCLE' ;
+*
+  IndPas  = T1.'WTABLE'.'NSOR' ; 
+  'SI' (('EGA' CycActu 1) 'ET' ('EGA' IncActu 1)) ;
+    BOITE_US.'POST'.'INDICES_CYCLE'. CycActu = 'LECT' IndPas ;
+  'FINSI' ;
+*
+  AppUsure = 'EGA' IncActu NbIncCy ;
+*
+* Affichage (sous forme d'entier)
+  NCycle = BOITE_US.'DONNEES'.'NB_CYCLES' ;
+  NCycRe = BOITE_US.'INFOS'.'NB_CYCLES_RESTANTS' ;
+  'MESS' ' ' ; 
+  'MESS' 'Cycles a calculer :' ' 'NCycle' / Cycles restants :' ' 'NCycRe;
+  'MESS' '   -> Increment' ' 'IncActu' sur' ' 'NbIncCy ; 
+*-----------------------------------------------------------------------
+* - GLISSEMENT, CISAILLEMENT, PRESSION DE CONTACT ET ENERGIE DISSIPEE
+*-----------------------------------------------------------------------
+  USCALC T1 ; 
+*-----------------------------------------------------------------------
+* - APPLICATION DU PROFIL D'USURE
+*-----------------------------------------------------------------------
+  'SI' AppUsure ; 
+*   --------------------------------------------------------------------
+*   Schema (explicite/implicite) pour appliquer le profil d'usure
+    'SI' BOITE_US.'INFOS'.'SCH_EXPL';
+      USEXPL T1 ;
+    'SINON' ;
+      USIMPL T1 ;
+    'FINSI' ;
+*   --------------------------------------------------------------------
+*   Reste-t-il des cycles a calculer (Booleen pour quitter PASAPAS)
+    T1.'ARRET' = 'EGA' BOITE_US.'INFOS'.'NB_CYCLES_RESTANTS' 0 ;
+*   --------------------------------------------------------------------
+*   Construire et actualiser (eventuellement) les pas de temps
+    'SI' BOITE_US.'INFOS'.'CALCUL_PAS' ;
+      USTMPS T1 ;
+      ISAUV = VRAI ;
+    'SINON' ;
+      ISAUV = 'DANS' T1.'WTABLE'.'IPRESU' T1.'WTABLE'.'TEMPS0' ;
+    'FINSI' ;
+*   --------------------------------------------------------------------
+    'SI' ISAUV ;
+*     NSOR+1 car la sauvegarde s'effectue apres (on anticipe le numero)
+      IProc = IndPas + 1 ;
+      BOITE_US.'POST'.'INDICES_CYCLE'. CycActu = 
+       BOITE_US.'POST'.'INDICES_CYCLE'. CycActu 'ET' IProc ;
+    'FINSI' ;
+*   --------------------------------------------------------------------
+*   Actualiser les compteurs/faire le menage
+    'SI' ('NON' T1.'ARRET') ;
+*     Actualiser les compteurs
+      BOITE_US.'INFOS'.'INDICE_INCREMENT_ACTUEL' = 1;
+      'SI' (BOITE_US.'INFOS'.'SCH_EXPL' 'OU' BOITE_US.'INFOS'.'SCH_CONV') ;
+        CycSuiv = CycActu '+' 1 ;
+        BOITE_US.'INFOS'.'INDICE_CYCLE_ACTUEL' = CycSuiv ;
+        BOITE_US.'INFOS'.'SCH_CONV' = FAUX ;
+*       Le dernier instant de CycActu est le premier instant de CycSuiv
+        'SI' ISAUV ;
+          BOITE_US.'POST'.'INDICES_CYCLE'. CycSuiv = 'LECT' IProc;
+        'FINSI' ;
+      'FINSI' ;
+    'SINON' ;
+*     Menage de fin de calcul - Suppression d'indices
+      'REPE' BU BOITE_US.'INFOS'.'N_BOITES' ;
+        'OTER' (BOITE_US. &BU) 'GLISSEMENT' ;
+        'OTER' (BOITE_US. &BU) 'CISAILLEMENT' ;
+        'OTER' (BOITE_US. &BU) 'PRESSION_CONTACT' ;
+        'OTER' (BOITE_US. &BU) 'DENS_ENER_DISS_CYCLE' ;
+        'OTER' (BOITE_US. &BU) 'DELTAS' ;
+        'OTER' (BOITE_US. &BU) 'FORCES_TANGENTIELLES' ;
+        'OTER' (BOITE_US. &BU) 'MAIL_PSIP' ;
+      'FIN' BU;
+      'MESS'; 'MESS' '=====> FIN DE CALCUL DES' ' 'NCycle' CYCLES.';
+    'FINSI' ;
+*   --------------------------------------------------------------------
+*   Affichage du temps de calcul    
+    RunTimeE = 'TEMPS' 'HORL' ; 'TEMP' 'ZERO' ;
+    CyclTime = 'FLOT' RunTimeE '/' 1000. ; 
+    'SI' ('EXIS' T1 'RUN_TIME') ;
+      DILRT = 'DIME' T1.'RUN_TIME' ;
+      RunTimeP = 'EXTR' T1.'RUN_TIME' DILRT ;
+      RunTimeF = RunTimeP '+' CyclTime ; 
+      T1.'RUN_TIME'   = T1.'RUN_TIME'   'ET' RunTimeF ; 
+      T1.'CYCLE_TIME' = T1.'CYCLE_TIME' 'ET' CyclTime; 
+    'SINON' ;
+      RunTimeF = CyclTime ;
+      T1.'RUN_TIME'   = 'PROG' RunTimeF ; 
+      T1.'CYCLE_TIME' = 'PROG' CyclTime ; 
+    'FINSI' ;
+    HH   = 'ENTI' 'INFE'  (CyclTime '/' 3600.) ; HC = HH '*' 3600. ; 
+    MM   = 'ENTI' 'INFE' ((CyclTime '-' HC) '/' 60) ; MC = MM '*' 60. ;
+    SS   = 'ENTI' 'PROC'  (CyclTime '-' HC '-' MC) ; 
+    CHA1 = 'CHAI' HH' h' ' 'MM' min' ' 'SS's.' ;
+    HH   = 'ENTI' 'INFE'  (RunTimeF '/' 3600.) ; HC = HH '*' 3600. ; 
+    MM   = 'ENTI' 'INFE' ((RunTimeF '-' HC) '/' 60) ; MC = MM '*' 60. ;
+    SS   = 'ENTI' 'PROC'  (RunTimeF '-' HC '-' MC) ; 
+    CHA2 = 'CHAI' HH' h' ' 'MM' min' ' 'SS's.' ;
+    MESS ' ' ; MESS ' - Cycle Time =' ' 'CHA1;
+    MESS ' ' ; MESS ' - Total Time =' ' 'CHA2;
+  'SINON' ;
+    BOITE_US.'INFOS'.'INDICE_INCREMENT_ACTUEL' = IncActu '+' 1 ;
+  'FINSI' ; 
+*-----------------------------------------------------------------------
+'FINP' T1; 
+ 

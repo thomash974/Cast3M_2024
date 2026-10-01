@@ -1,0 +1,186 @@
+* fichier : super3.dgibi
+* section : thermique conduction convection
+*----------------------------------------------------------------------*
+*                     S U P E R 3 . D G I B I                          *
+*----------------------------------------------------------------------*
+* Objet :                                                              
+* -------
+*
+*    Exemple d'utilisation du SUPERELEMENT en thermique stationnaire
+* sur un probleme avec conduction & convection.
+*
+*    Resolution du probleme de thermique lineaire avec conduction
+* et convection sur 2 elements finis, puis condensation statique du
+* probleme sur l'element #2 en un superelement et resolution.
+* Comparaison des solutions obtenues avec et sans le superelement.
+*
+*    Pour etre didactique, l'exemple est scinde en 2 parties :
+*       - la 1ere partie ne comporte que de la conduction thermique ;
+*       - la 2nd comporte de la conduction et de la convection.
+*
+*    Voir illustration ci-dessous pour description du probleme traite.
+*
+* Description :
+* -------------
+*
+* Type de calcul : Thermique stationnaire conduction + convection
+* Mode de calcul : 2D
+* Type d'element : QUA8
+* Chargement     : Temperature et flux imposes,
+*                  Echange par convection avec milieu a Text
+* Reference      : Comparaison des solutions avec et sans superelement
+* Objectif       : Ecart relatif < 1.e-12
+*
+* Ilustration :
+* -------------
+*
+*    Flux impose
+*    -----------
+*      q = 250
+*      ^ ^ ^ ^
+*      | | | |
+*      _______ 
+*     |       | |>
+*     |       | | 
+*     |  s2   | |>   Echange par convection
+*     |       | |    ----------------------
+*     |-------| |>     h = 20, Text = 20
+*     |       | | 
+*     |  s1   | |>
+*     |       | |
+*     |_______| |>
+*      x x x x
+*      T = 20
+*  -------------------
+*  Temperature imposee
+*
+*----------------------------------------------------------------------*
+*
+* Pour affichage, mettre IG1 a vrai :
+ig1      = faux ;
+
+*------------------------------ Maillage ------------------------------*
+
+opti dime 2 elem qua8 ; 
+  
+* 1er domaine :
+l1       = (0 0) droi 1 (1 0) ; 
+s1       = l1 tran 1 (0 1) ; 
+l2       = s1 cote 2 ; 
+l3       = s1 cote 3 ; 
+  
+* 2e domaine :
+s2       = l3 tran 1 (0 1) ; 
+l5       = s2 cote 4 ; 
+l6       = s2 cote 3 ; 
+
+* Affichage :
+si ig1 ;
+  trac (s1 et s2) qual ;
+fins ;
+  
+* Domaine complete :
+s0       = s1 et s2 ; 
+  
+*----------------------------- Conduction -----------------------------*
+
+* Modele - Caracteristiques :
+mo1      = mode s1 thermique ; 
+mo2      = mode s2 thermique ; 
+ma1      = mate mo1 'K' 25. 'RHO' 7.3 'C' 500. ; 
+ma2      = mate mo2 'K' 25. 'RHO' 7.3 'C' 500. ; 
+  
+* CL - Chargement (flux) :
+cl1      = bloq T l1 ; 
+dcl1     = depi cl1 20. ; 
+q1       = flux mo2 l6 250. ; 
+  
+* Resolution probleme sans SUPE (reference) :
+k1       = cond mo1 ma1 ; 
+k2       = cond mo2 ma2 ; 
+cht1     = reso (k1 et K2 et cl1) (dcl1 et q1) ; 
+
+si ig1 ;
+  trac cht1 s0 titr 'Solution pb. conduction sans SUPE' ; 
+fins ;
+
+* Resolution probleme conduction avec SUPE :
+su1      = supe rigidite k2 l3 ; 
+ksu1     = extr su1 rigi ; 
+qsu1     = supe charge su1 q1 ; 
+chtsu1   = reso (k1 et ksu1 et cl1) (dcl1 et qsu1) ; 
+
+* Affichage solution sur partie non condensee et comparaison reference :
+si ig1 ;
+  titr 'Solution pb. conduction avec SUPE sur partie non condensee' ;
+  trac chtsu1 s1 ;
+  titr 'Difference solutions pb. conduction avec/sans SUPE sur partie non condensee' ;
+  trac ((redu cht1 s1) - chtsu1) s1 ;
+fins ;
+
+* Reconstruction solution complete : 
+chtsu1   = supe depla su1 chtsu1 q1 ;
+
+* Affichage solution complete et comparaison reference :
+si ig1 ;
+  trac chtsu1 s0 titr 'Solution pb. conduction avec SUPE' ;
+  trac (cht1 - chtsu1) s0 titr 'Difference solutions pb. conduction avec/sans SUPE' ;
+fins ;
+
+*---------------------- Conduction + Convection -----------------------*
+
+* Modele - Caracteristiques :
+moc1     = mode l2 thermique convection ; 
+moc2     = mode l5 thermique convection ; 
+mac1     = mate moc1 h 20. ; 
+mac2     = mate moc2 h 20. ; 
+  
+* Flux de convection :
+qc1      = conv moc1 mac1 'T' 20. ; 
+qc2      = conv moc2 mac2 'T' 20. ; 
+
+* Resolution probleme conduction + convection sans SUPE (reference) :
+kc1      = cond moc1 mac1 ; 
+kc2      = cond moc2 mac2 ; 
+cht2     = reso (k1 et K2 et cl1 et kc1 et kc2) (dcl1 et q1 et qc1 et qc2) ; 
+si ig1 ;
+  trac cht2 s0 titr 'Solution pb. conduction+convection sans SUPE' ; 
+fins ;
+
+* Resolution probleme conduction + convection avec SUPE :
+su2      = supe rigidite (k2 et kc2) l3 ;
+ksu2     = extr su2 rigi ; 
+qsu2     = supe charge su2 (q1 et qc2) ; 
+chtsu2   = reso (cl1 et k1 et kc1 et ksu2) (dcl1 et qc1 et qsu2) ; 
+
+* Affichage solution sur partie non condensee et comparaison reference :
+si ig1 ;
+  titr 'Solution pb. conduction+convection avec SUPE sur partie non condensee' ;
+  trac chtsu2 s1 ; 
+  titr 'Difference solutions pb. conduction+convection avec/sans SUPE sur partie non condensee' ;
+  trac ((cht2 redu s1) - chtsu2) s1 ;
+fins ;
+
+* Reconstruction solution complete : 
+chtsu2   = supe depla su2 chtsu2 (q1 et qc2) ;
+
+* Affichage solution complete et comparaison reference :
+si ig1 ;
+  trac chtsu2 s0 titr 'Solution pb. conduction+convection avec SUPE' ;
+  trac (cht2 - chtsu2) s0 titr 'Difference pb. conduction+convection solutions avec/sans SUPE' ;
+fins ;
+
+*------------------------- Test de validation -------------------------*
+
+err1     = maxi abs (cht1 - chtsu1) / (maxi abs cht1) ;
+err2     = maxi abs (cht2 - chtsu2) / (maxi abs cht2) ;
+err0     = (prog err1 err2) maxi ;
+
+list err1 ;
+list err2 ;
+si (err0 > 1.e-12) ;
+ erre 5 ;
+fins ;
+fin ;
+ 
+

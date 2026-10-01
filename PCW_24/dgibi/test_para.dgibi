@@ -1,0 +1,183 @@
+* fichier : test_para.dgibi
+************************************************************************
+* Section : Maillage Autres
+************************************************************************
+'OPTI' 'ECHO' 0 ;
+'OPTI' 'TRAC' 'PSC';
+************************************************************************
+* NOM         : test_para
+* DESCRIPTION : Test de "PARA N1 P1 P2 P3" avec N1 > 0
+*               Verification & Validation (analytique)
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : kk2000
+*               mél : kk2000@cea.fr
+**********************************************************************
+* VERSION    : v1, 31/01/2020, version initiale
+* HISTORIQUE : v1, 31/01/2020, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+
+DEBP parametres_para P1*'POINT' P2*'POINT' P3*'POINT' c*'ENTIER';
+  _dis = 0.5 * ( (COOR c P3) - (COOR c P1) );
+  _v = -0.25 * ( ((COOR c P1) - (COOR c P2)) + ((COOR c P3) - (COOR c P2)) );
+  _in = (COOR c P1) + _dis;
+FINP _dis _v _in;
+
+DEBP r_valeur LRACP_x*'LISTREEL' LRACP_y*'LISTREEL' LRACP_z/'LISTREEL';
+  valeur_correcte = 0;
+  prec_racp = (VALE 'PREC') * 1.E4;
+  
+  REPE i (DIME LRACP_x);
+    racp_x = EXTR LRACP_x &i;
+    REPE j (DIME LRACP_y);
+      racp_y = EXTR LRACP_y &j;
+      SI (EXIS LRACP_z);
+        REPE k (DIME LRACP_z);
+          racp_z = EXTR LRACP_z &k;
+          SI( ((ABS (racp_x - racp_y)) '<EG' prec_racp) ET 
+              ((ABS (racp_y - racp_z)) '<EG' prec_racp) ET
+              ((ABS (racp_x - racp_z)) '<EG' prec_racp) );
+            valeur_correcte = racp_x;
+            QUIT i;
+          FINSI;
+        FIN k;
+      SINON;
+          SI((ABS (racp_x - racp_y)) '<EG' prec_racp);
+            valeur_correcte = racp_x;
+            QUIT i;
+          FINSI;
+      FINSI;
+    FIN j;
+  FIN i;
+  
+  SI (valeur_correcte 'EGA' 0);
+    ERRE 21;
+  FINSI;
+FINP valeur_correcte;
+
+
+DEBP verification_dl P1*'POINT' P2*'POINT' P3*'POINT' Nb_elem*'ENTIER' arc1*'MAILLAGE' test*'MOT     ';
+
+* Recuperation des parametres de la parabole.
+* ces parametres sont utilise dans la source de l'operateur : ligne.eso
+  XDIS XV XIN = parametres_para P1 P2 P3 1;
+  YDIS YV YIN = parametres_para P1 P2 P3 2;
+  para_a = (4. * XV * XV) + (4. * YV * YV);
+  para_b = (-4. * XV * XDIS) + (-4. * YV * YDIS);
+  para_c = (XDIS * XDIS) + (YDIS * YDIS);
+  SI ((VALE 'DIME') EGA 3);
+    ZDIS ZV ZIN = parametres_para P1 P2 P3 3;
+    para_a = para_a + (4. * ZV * ZV);
+    para_b = para_b + (-4. * ZV * ZDIS);
+    para_c = para_c + (ZDIS * ZDIS);
+  FINSI;
+  
+* On opere le changement de variable pour l'integration. 
+* Plus d'information sur le changement de variable est disponible dans la source ligne.eso
+  Beta = -1. * ((para_b ** 2) - (4. * para_a * para_c)) / (4. * para_a);
+  Alpha = para_b / (2. * para_a);
+  dpdx_2 = Beta / ((ABS para_a) ** 0.5);
+
+* On integre entre x0=x(PARA=-1) et x1=x(PARA=1)
+  x0 = ((ABS (para_a / Beta)) ** 0.5) * (-1. + Alpha);
+  x1 = ((ABS (para_a / Beta)) ** 0.5) * (1. + Alpha);
+  dl_x0 = (0.5 * x0 * (((x0 * x0) + 1.) ** 0.5)) + (0.5 * (ASIH x0));
+  dl_x1 = (0.5 * x1 * (((x1 * x1) + 1.) ** 0.5)) + (0.5 * (ASIH x1));
+  longueur_para = dpdx_2 * (dl_x1 - dl_x0);
+
+* On boucle sur chaque point de la parabole.
+* On calcule la longueur curviligne de chaque element.
+* On sort en erreur si celle-ci n'est pas constante.
+  er_tol = 1.E4 * longueur_para * (VALE PREC) ;
+  dl_ok = longueur_para / Nb_elem;
+  P0 = -1.;
+  REPE i Nb_elem;
+  
+    Point_noeud = arc1 'POIN' (&i + 1);
+
+    x = COOR 1 Point_noeud;
+    y = COOR 2 Point_noeud;
+    
+    LRACP_x = RACP (XIN + XV - x) XDIS (-1. * XV);
+    LRACP_y = RACP (YIN + YV - y) YDIS (-1. * YV);
+    
+    SI ((VALE 'DIME') EGA 3);
+      z = COOR 3 Point_noeud;
+      LRACP_z = RACP (ZIN + ZV - z) ZDIS (-1. * ZV);
+      P1 = r_valeur LRACP_x LRACP_y LRACP_z;
+    SINON;
+      P1 = r_valeur LRACP_x LRACP_y;
+    FINSI;
+    
+    x0 = ((ABS (para_a / Beta)) ** 0.5) * (P0 + Alpha);
+    x1 = ((ABS (para_a / Beta)) ** 0.5) * (P1 + Alpha);
+    dl_x0 = (0.5 * x0 * (((x0 * x0) + 1.) ** 0.5)) + (0.5 * (ASIH x0));
+    dl_x1 = (0.5 * x1 * (((x1 * x1) + 1.) ** 0.5)) + (0.5 * (ASIH x1));
+
+    dl = dpdx_2 * (dl_x1 - dl_x0);
+    SI((ABS (dl - dl_ok)) '>' er_tol);
+      MESS 'ERREUR dans :' test;
+      ERRE 'Densite des elements non constante';
+    FINSI;
+    
+    P0 = P1;
+
+  FIN i;
+
+FINP;
+
+OPTI DIME 2 ELEM SEG2 ;
+P1 = 2. 0. ;
+P2 = -20. 1. ;
+P3 = 0. 3. ;
+Nb_elem = 10;
+arc1 = PARA Nb_elem P1 P2 P3 ;
+verification_dl P1 P2 P3 Nb_elem arc1 'test 1 - DIME 2 ELEM SEG2';
+TRAC arc1;
+
+OPTI DIME 2 ELEM SEG2 ;
+P1 = 5. 0. ;
+P2 = 0. 2. ;
+P3 = 0. 7. ;
+Nb_elem = 20;
+arc1 = PARA Nb_elem P1 P2 P3 ;
+verification_dl P1 P2 P3 Nb_elem arc1 'test 2 - DIME 2 ELEM SEG2';
+TRAC arc1;
+
+OPTI DIME 2 ELEM SEG3 ;
+P1 = 2. 0. ;
+P2 = 2. 3. ;
+P3 = 0. 3. ;
+Nb_elem = 5;
+arc1 = PARA Nb_elem P1 P2 P3 ;
+verification_dl P1 P2 P3 (Nb_elem * 2) (CHAN 'SEG2' arc1) 'test 3 - DIME 2 ELEM SEG3';
+TRAC arc1;
+
+OPTI DIME 3 ELEM SEG2 ;
+P1 = 2. 0.  0. ;
+P2 = 0. 4. -8. ;
+P3 = 0. 0.  3. ;
+Nb_elem = 10;
+arc1 = PARA Nb_elem P1 P2 P3 ;
+verification_dl P1 P2 P3 Nb_elem arc1 'test 4 - DIME 3 ELEM SEG2';
+TRAC arc1;
+
+OPTI DIME 3 ELEM SEG3 ;
+P1 = -2. 0. 0. ;
+P2 =  0. 4. 8. ;
+P3 =  0. 0. 3. ;
+Nb_elem = 3;
+arc1 = PARA Nb_elem P1 P2 P3 ;
+verification_dl P1 P2 P3 (Nb_elem * 2) (CHAN 'SEG2' arc1) 'test 5 - DIME 3 ELEM SEG3';
+TRAC arc1;
+
+fin;
+ 
+

@@ -1,0 +1,10 @@
+=== Cas 13 : betdynlmt (endommagement + dynamique, beton) ===
+Valeurs comparees : 120
+Temps horloge (ms) : origine 260 ; niveau 1 317 ; niveau 2 287
+Acceleration par rapport a l origine : niveau 1   0.82 ; niveau 2   0.91
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 10
+Niveau 1 : raideur reutilisee 19 fois, recalculee 1 fois ; HOOK evite 52 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 19 fois, recalculee 1 fois ; HOOK evite 52 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

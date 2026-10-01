@@ -1,0 +1,64 @@
+$$$$ @PALETTE NOTICE  BP208322  20/07/02    21:15:01     10633          
+                                             DATE     20/07/02
+
+
+    Procedure @PALETTE   
+    ------------------
+    
+Section : Post-traitement
+===============================================================   
+    LMOT1 = @PALETTE NCOUL1;
+    
+FRAN===========================================================   
+    Objet :
+    -------    
+    Cette procedure construit une palette de noms de couleurs Cast3M
+    pour leur application a des evolutions par exemple.    
+    
+    Entrees :
+    ---------    
+    NCOUL1   : nombre de couleurs (type ENTIER) compris entre 1 et 20
+
+    Sorties :
+    ---------    
+    LMOT1    : LISTMOTS compose de NCOUL couleurs differentes.
+    
+    Exemple :
+    ---------       
+    ...
+    evol1  = COUL evol1 (@PALETTE (DIME evol1));
+    DESS evol1;
+    ...
+    
+    
+ANGL============================================================
+    Description :
+    -------------
+
+    This procedure gives a list of Cast3M color names which can be  
+    attributed to evolutions for their drawing by example.
+
+    
+ANGL===========================================================   
+    Input :
+    -------
+    NCOUL1   : number of colors (ENTIER type) between 1 and 20
+
+    Output :
+    --------
+    LMOT1    : LISTMOTS composed of NCOUL different colors.
+
+    Example :
+    ---------     
+    ...
+    evol1  = COUL evol1 (@PALETTE (DIME evol1));
+    DESS evol1;
+    ...
+
+$$$$
+
+    
+ 
+ 
+ 
+ 

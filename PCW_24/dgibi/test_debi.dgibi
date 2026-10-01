@@ -1,0 +1,90 @@
+* fichier :  tedebi.dgibi
+************************************************************************
+* Section : Poreux
+************************************************************************
+
+*******************************************************
+*           Test tedebi.dgibi: Jeux de données        *
+*           ---------------------------------         *
+*******************************************************
+
+* SI GRAPH = N PAS DE GRAPHIQUE AFFICHE
+* SINON SI GRAPH DIFFERENT DE N TOUS
+* LES GRAPHIQUES SONT AFFICHES
+
+GRAPH = 'N' ;
+
+SAUT PAGE;
+SI (NEG GRAPH 'N') ;
+  OPTI ECHO 1   ;
+  OPTI TRAC PSC ;
+SINO ;
+  OPTI ECHO 1   ;
+FINSI ;
+
+*______________________________________________________
+* TEST TEDEBI
+*
+* verification du fonctionnement correct de DEBI
+*______________________________________________________
+TITRE 'VERIFICATION DU FONCTIONNEMENT DE DEBIT';
+OPTION DIME 2 ELEM QUA8 MODE PLAN DEFO  ;
+
+*______________________________________________________
+*------------------ DEFINITION DE LA GEOMETRIE --------
+*______________________________________________________
+*
+*
+SI (NEG GRAPH 'N');
+  TRAC (L1 ET O) 'QUAL' ;
+FINSI;
+
+XL=10. ;
+XD = 0.2 ;
+NX = 5 ;
+NY = 2;
+P1 = 0. 0.;
+P2 = XL 0. ;
+L1 = P1 D NX P2 ;
+SU = TRAN NY L1 (0. 1.) ;
+*______________________________________________________
+* DEFINITION DU MODELE
+
+MO1 = MODE SU POREUX  ;
+
+*______________________________________________________
+*------- APPEL A DEBIT                    -------------
+DD = DEBIT MO1 XD L1 ;
+*______________________________________________________
+*------- CALCUL DE LA RESULTANTE          -------------
+RR = RESU DD ;
+GEO = EXTR RR 'MAIL';
+PR = POINT GEO 1 ;
+VAD= EXTR RR 'FP' PR;
+
+VREF = XL * XD;
+
+*______________________________________________________
+*--------- CODE DE BON FONCTIONNEMENT -----------------
+*______________________________________________________
+
+ERR = (ABS(VREF - VAD))/VREF ;
+SI (ERR < 1.E-6);
+  ERRE 0;
+SINON;
+  ERRE 5;
+FINSI;
+
+FIN;
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+

@@ -1,0 +1,166 @@
+* fichier : @solvmec_03.dgibi
+************************************************************************
+* Test du mini solveur mecanique (procedure @SOLVMEC)                  *
+* - eprouvette entaillee en traction                                   *
+* - comportement visco-elastique                                       *
+* - calcul en petits deplacements                                      *
+*                                                                      *
+* On compare les resultats a ceux de la procedure PASAPAS              *
+************************************************************************
+
+
+
+** Options generales
+OPTI 'DIME' 2 'ELEM' 'QUA4' 'MODE' 'PLAN' 'CONT' 'ECHO' 0 ;
+
+
+** Geometrie : barre rectangulaire l x h avec une
+*  entaille circulaire de largeur le et profondeur pe
+l  = 1.0 ;
+h  = 0.1 ;
+le = 0.1 * l ;
+pe = 0.1 * h ;
+
+
+** Maillage
+ne = 51 ;
+* barre rectangulaire
+p0 = 0. 0. ;
+p1 = l  0. ;
+lb = DROI ne p0 p1 ;
+mai = lb TRAN 3 (0. h) ;
+ld = mai COTE 2 ;
+lh = mai COTE 3 ;
+lg = mai COTE 4 ;
+* deplacement des noeuds pour l'entaille circulaire
+p2 = ((l - le) / 2.) h ;
+p3 = ((l + le) / 2.) h ;
+re = (pe / 2.) + (le * le / (8. * pe)) ;
+p4 = (l / 2.) (h - pe + re) ;
+xh yh = COOR lh ;
+pmil = xh POIN 'COMPRIS' (COOR 1 p2) (COOR 1 p3) ;
+DEPL pmil 'PROJ' 'CYLI' (0. 1.) 'CERC' p4 p2 ;
+cmai = CONT mai ;
+*****TRAC mai 'TITR' 'Maillage' ;
+
+
+** Modele et caracteristiques materiau
+mo = MODE mai 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 'FLUAGE' 'NORTON' ;
+ma = MATE mo 'YOUN' 1.E9 'NU' 0.3 'SMAX' 0. 'AF1' 3.E-13 'AF2' 1.2 'AF3' 1. ;
+
+
+** Blocages
+clg = BLOQ 'UX' lg ;
+clb = BLOQ 'UY' lb ;
+cld = BLOQ 'UX' ld ;
+cl  = clg ET clb ET cld ;
+
+
+** Chargement : deplacement impose (essai de relaxation)
+uimp = 5.E-3 ;
+fuim = DEPI cld uimp ;
+ev1  = EVOL 'MANU' 'Temps' (PROG 0. 100. 1000.) 'Coef' (PROG 0. 1. 1.) ;
+cha  = CHAR 'DIMP' fuim ev1 ;
+
+
+** Resolutions avec PASAPAS et @SOLVMEC
+tab1 = TABL ;
+tab1 . 'MODELE'                   = mo ;
+tab1 . 'CARACTERISTIQUES'         = ma ;
+tab1 . 'BLOCAGES_MECANIQUES'      = cl ;
+tab1 . 'CHARGEMENT'               = cha ;
+tab1 . 'TEMPS_CALCULES'           = PROG 10. 'PAS' 10. 1000. ;
+tab2 = COPI tab1 ;
+
+TEMP 'ZERO' ;
+PASAPAS tab1 ;
+tpp = TEMP 'HORL' ;
+
+TEMP 'ZERO' ;
+@SOLVMEC tab2 ;
+tms = TEMP 'HORL' ;
+
+
+** Performances
+MESS ;
+MESS 'Duree d''execution (ms)' ;
+MESS '----------------------' ;
+MESS 'PASAPAS  :' ' ' tpp ;
+MESS '@SOLVMEC :' ' ' tms ;
+MESS ;
+
+
+** Post traitement : courbes    F     (resultante des reactions a gauche) vs Temps
+*                            EPSE max (def. plas. eq. max)                vs Temps
+n1 = DIME (tab2 . 'TEMPS') ;
+ltp  = PROG ;
+lr1  = PROG ;
+lr2  = PROG ;
+le1  = PROG ;
+le2  = PROG ;
+lerr = PROG ;
+lere = PROG ;
+REPE b1 n1 ;
+* temps
+  ltp = ltp ET (tab1 . 'TEMPS' . (&b1 - 1)) ;
+* effort de reaction
+  r1 = tab1 . 'REACTIONS' . (&b1 - 1) ;
+  r2 = tab2 . 'REACTIONS' . (&b1 - 1) ;
+  SI (EGA &b1 1) ;
+    rr1 = 0. ;
+    rr2 = 0. ;
+  SINON ;
+    rr1 = -1. * (@TOTAL r1 lg 'FX') ;
+    rr2 = -1. * (@TOTAL r2 lg 'FX') ;
+    lerr = lerr ET (ABS ((rr1 - rr2) / rr1)) ;
+  FINSI ;
+  lr1 = lr1 ET rr1 ;
+  lr2 = lr2 ET rr2 ;
+* deformation plastique equivalente
+  vi1 = tab1 . 'VARIABLES_INTERNES' . (&b1 - 1) ;
+  vi2 = tab2 . 'VARIABLES_INTERNES' . (&b1 - 1) ;
+  epqmax1 = MAXI (EXCO 'EPSE' vi1) ;
+  epqmax2 = MAXI (EXCO 'EPSE' vi2) ;
+  le1 = le1 ET epqmax1 ;
+  le2 = le2 ET epqmax2 ;
+  SI (epqmax1 > 1.E-10) ;
+    lere = lere ET (ABS ((epqmax1 - epqmax2) / epqmax1)) ;
+  FINSI ;
+FIN b1 ;
+* ecarts relatifs max
+err = MAXI 'ABS' lerr ;
+ere = MAXI 'ABS' lere ;
+MESS ;
+MESS 'Ecarts relatifs max' ;
+MESS '-------------------' ;
+MESS 'Defo. plast. eq. max :' ' ' ere ;
+MESS 'Reaction             :' ' ' err ;
+MESS ;
+* trace des courbes
+tleg = TABL ;
+tleg . 'TITRE'     = TABL ;
+tleg . 'TITRE' . 1 = CHAI 'Pasapas' ;
+tleg . 'TITRE' . 2 = CHAI 'Mini solveur' ;
+tleg . 2 = MOT 'MARQ ROND NOLI' ;
+eve1 = EVOL        'MANU' 'Temps' ltp 'EPSE max' le1 ;
+eve2 = EVOL 'ROUG' 'MANU' 'Temps' ltp 'EPSE max' le2 ;
+*****DESS (eve1 ET eve2) 'TITR' 'EPSE max vs Temps' 'LEGE' tleg 'NO' ;
+evr1 = EVOL        'MANU' 'Temps' ltp 'Reaction' lr1 ;
+evr2 = EVOL 'ROUG' 'MANU' 'Temps' ltp 'Reaction' lr2 ;
+*****DESS (evr1 ET evr2) 'TITR' 'Force vs Temps' 'LEGE' tleg 'NE' ;
+
+** Test et erreur si ecart trop important
+SI ((ere > 1.E-5) OU (err > 1.E-4)) ;
+  ERRE 'Ecart trop important entre les resultats de @SOLVMEC et de PASAPAS' ;
+FINSI ;
+
+FIN ;
+
+ 
+
+ 
+
+ 
+
+ 
+

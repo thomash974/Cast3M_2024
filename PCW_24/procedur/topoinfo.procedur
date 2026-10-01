@@ -1,0 +1,94 @@
+$$$$ TOPOINFO
+* TOPOINFO  PROCEDUR  FD218221  23/11/29    21:15:09     11799          
+* TOPOINFO  PROCEDUR  CB215821  21/04/15    14:10:01     9715
+
+************************************************************************
+** Procedure called by TOPOPTIM for giving information and remarks
+** just before the optimization loop.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 1.0 2021/04/15
+************************************************************************
+
+DEBP TOPOINFO tab0*'TABLE' ;
+
+* Input data
+* **********
+
+wtab0 = tab0.'WTABLE' ;
+bool0 = wtab0.'BOOL' ;
+
+* Informations
+* ************
+
+MESS 'Informations sur l''optimisation topologique :' ;
+MESS '=============================================' ;
+SI (NEG wtab0.'CYCLE' 1) ;
+    MESS '  - Poursuite / reprise d''une optimisation topologique' ;
+FINS ;
+SI bool0.'PASAPAS' ;
+    MESS '  - Resolution non lineaire (via la procedure PASAPAS)' ;
+SINO ;
+    MESS '  - Resolution lineaire (via l''operateur RESO)' ;
+FINS ;
+SI (bool0.'MECANIQUE' ET bool0.'THERMIQUE') ;
+    MESS '    d''un probleme thermo-mecanique' ;
+SINO ;
+    SI bool0.'MECANIQUE' ;
+        MESS '    d''un probleme mecanique' ;
+    FINS ;
+    SI bool0.'THERMIQUE' ;
+        MESS '    d''un probleme thermique' ;
+    FINS ;
+FINS ;
+SI bool0.'CAS_MULTIPLES' ;
+    MESS '    avec de multiples (' wtab0.'NB_CAS' ') cas de charge' ;
+    SI bool0.'RESTRICTIONS' ;
+        MESS '    et des restrictions geometriques' ;
+    FINS ;
+SINO ;
+    SI bool0.'RESTRICTIONS' ;
+        MESS '    avec des restrictions geometriques' ;
+    FINS ;
+FINS ;
+SI bool0.'MECANISME' ;
+    MESS '  - Maximisation des deplacements de sortie d''un mecanisme';
+FINS ;
+SI (bool0.'MECANIQUE' ET ((ABS tab0.'POIDS_ENERGIE_DEFO') > tab0.'PRECISION')) ;
+    MESS '  - Minimisation de l''energie de deformation elastique';
+FINS ;
+SI (bool0.'THERMIQUE' ET ((ABS tab0.'POIDS_ENERGIE_DEFO') > tab0.'PRECISION')) ;
+    MESS '  - Minimisation de la quantite de chaleur' ;
+FINS ;
+MESS '  - Contrainte sur la fraction volumique de ' tab0.'FRACTION_VOLUME' ;
+SI bool0.'ZONE_FIGEE' ;
+    MESS '    avec une portion du domaine initial figee' ;
+FINS ;
+* Filter type
+SI (EGA tab0.'FILTRE' 'MATRICE') ;
+    MESS '  - Filtre utilisant une matrice de filtrage (generee par MFIL)' ;
+SINO ;
+    MESS '  - Filtre classique (en Gibiane)' ;
+FINS ;
+SI tab0.'PROCEDURE_TOPOPERS' ;
+    MESS '  - Appel d''une procedure utilisateur (TOPOPERS)' ;
+FINS ;
+SI (NEG (VALE 'RESO') 'ITER') ;
+    MESS '        ' ;
+    MESS 'Remarque :' ;
+    MESS '==========' ;
+    MESS '  - L''option de resolution iterative n''est pas activee.' ;
+    MESS '    Activez la pour de meilleures performances.' ;
+FINS ;
+MESS '        ' ;
+SI (NON bool0.'PASAPAS') ;
+    MESS ' Cycle |   Objective  |  Max change  |Penalty fac. P| GSF factor Q | Nb. elem.' ;
+FINS ;
+
+FINP ;
+
+$$$$
+ 

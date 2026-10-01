@@ -1,0 +1,109 @@
+* fichier : proi3.dgibi
+'OPTI' echo 0 ;
+************************************************************************
+* NOM         : PROI3
+* DESCRIPTION : Cas-test de la gestion des soucis et du critere de
+*               rattrapage dans PROI.
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stephane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mel : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 15/02/2019, version initiale
+* HISTORIQUE : v1, 15/02/2019, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+interact = faux ;
+graph    = faux ;
+*
+'OPTION' 'DIME' 2 'ELEM' 'QUA4'  ;
+*
+p0 = 0. 1. ; p1 = 0. 0. ; p2 = 1. 1. ;
+*
+n1 = 2 ;
+c1 = 'CERC' n1 p1 p0 p2 ;
+d1 = 'COUT' c1 p0 ;
+x1 y1 = 'COOR' d1 ;
+x0 y0 = 'COOR' p0 ;
+r1 = '**' ('+' ('**' ('-' x1 x0) 2) ('**' ('-' y1 y0) 2)) 0.5 ;
+'SI' graph ; 'TRAC' r1 d1 ; 'FINS' ;
+cr1 = 'CHAN' 'CHAM' r1 d1 ;
+*
+n2 = 3 ;
+c2 = 'CERC' n2 p1 p0 p2 ;
+d2 = 'COUT' c2 p0 'COUL' roug ;
+'SI' graph ; 'TRAC' (d1 'ET' d2) ; 'FINS' ;
+*
+vcrit = 1.d-5 ;
+*
+lcrit = faux ;
+'REPE' iicrit 20 ;
+   icrit = &iicrit ;
+   souci 0 ;
+   r12 = 'PROI' d2 cr1 vcrit ;
+   'SI' (souci) ;
+      'MESS' 'Souci' ' ' icrit ' ! vcrit=' vcrit ;
+      vcrit = '*' vcrit 2. ;
+   'SINO' ;
+      lcrit = vrai ;
+      'QUIT' iicrit ;
+   'FINS' ;
+'FIN' iicrit ;
+'SI' lcrit ;
+   mr12 = 'MAXI' r12 'ABS' ;
+   'MESS' 'Projection reussie vcrit=' vcrit ' icrit=' icrit
+      ' maxi R=' mr12  ;
+   'SI' graph ; 'TRAC' r12 d2 ; 'FINS' ;
+'SINO' ;
+   'MESS' 'Projection ratee vcrit=' vcrit ' icrit=' icrit ;
+'FINS' ;   
+*
+* Test 
+*
+* Au 2019/0218, on a :
+* Projection reussie vcrit= 8.19200E-02     icrit=   14    maxi R= 1.0731
+*
+vcritr = 8.5e-2 ; icritr = 15 ; mr12r = 1. '+' vcritr ;
+*
+lok = lcrit ;
+*
+'SI' lcrit ;
+   'SI' ('>' vcrit vcritr) ;
+      'MESS' ('CHAI' '!!!  vcrit=' vcrit ' > vcritr=' vcritr) ;
+      lok = lok 'ET' faux ;
+   'FINS' ;      
+   'SI' ('>' icrit icritr) ;
+      'MESS' ('CHAI' '!!!  icrit=' icrit ' > icritr=' icritr) ;
+      lok = lok 'ET' faux ;
+   'FINS' ;      
+   'SI' ('>' mr12 mr12r) ;
+      'MESS' ('CHAI' '!!!  mr12=' mr12 ' > mr12r=' mr12r) ;
+      lok = lok 'ET' faux ;
+   'FINS' ;      
+'FINS' ;
+*
+'SAUT' 1 'LIGNE' ;
+'SI' lok ;
+   'MESSAGE' 'Tout sest bien passe' ;
+'SINON' ;
+   'MESSAGE' '!!! Il y a eu des erreurs' ;
+'FINSI' ;   
+'SAUT' 1 'LIGNE' ;
+*
+'SI' interact ;
+   'OPTION' 'DONN' 5 'ECHO' 1 ;
+'FINSI' ;   
+'SI' ('NON' lok) ;
+   'ERREUR' 5 ;
+'FINSI' ;   
+*
+* End of dgibi file PROI3
+*
+'FIN' ;
+
+ 
+

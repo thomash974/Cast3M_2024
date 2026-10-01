@@ -1,0 +1,84 @@
+$$$$ EXCP     NOTICE  CB215821  19/02/25    21:16:08     10119          
+                                             DATE     19/02/25
+
+    Operateur EXCP                           Voir aussi : PMAT PHAJ
+    --------------                                        PROP RESO
+
+      CHP3 = 'EXCP' MOD1 MAT1 QLINT PROP0 CHP1 CHP2 ;
+
+
+Section : Changement_De_Phase Changement_De_Phase
+
+FRAN==========================================================
+
+    Objet :
+    _______
+
+    L'operateur 'EXCP'  calcule  la   chaleur  latente   qu'il  faudrait
+    consommer  pour finir  de  changer de  phase.  Ce resultat  est  mis
+    sous  forme directement exploitable  par  l'operateur 'RESO'.
+    
+    Cet operateur est automatiquement appele dans la procedure TRANSNON.
+
+
+      Commentaire :
+      _____________
+
+      MOD1  : objet de type MMODEL contenant une formulation de type
+             'CHANGEMENT_PHASE'.
+
+      MAT1 :  objet MCHAML des caracteristiques. La composante  'PRIM'
+              est  attendue constante par SOUS-ZONE.
+
+      PROP0 : objet de type MCHAML contenant les proportions de phases
+              initiales.
+
+      QLINT : objet de type MCHAML contenant la quantite latente
+              integree sur l'element (aux NOEUDS) avec l'operateur 'SOUR'.
+
+      CHP1  : objet CHPOINT contenant les inconnues initiales.
+
+      CHP2  : objet CHPOINT contenant l'increment des inconnues et les
+              reactions 'LX' sur les blocages (si sortie de 'RESO').
+
+      CHP3  : objet CHPOINT des chaleurs latentes exprimees sur les
+              multiplicateurs de lagrange ('LX') a injecter comme argument
+              de l'operateur 'RESO'.
+
+ANGL==========================================================
+
+    Description :
+    ____________
+
+    The 'EXCP' operator computes the latent heat needed to change phase.
+    Values  are  given  in  a  format  directly  useable  by  the 'RESO'
+    operator. 
+    This operator is automatically called by TRANSNON procedure.
+
+
+      Contents :
+      _________
+
+      MOD1  : MMODEL type objet containing a 'CHANGEMENT_PHASE' formulation.
+
+      MAT1 :  MCHAML type objet representing material datas. The 'PRIM'
+              componentis expected to be constant for each SUB-MODEL.
+
+      PROP0 : MCHAML type objet containing initial phase proportion
+
+      QLINT : MCHAML type objet containing the latent quantity integrated
+              on the element (at NODES support) with the 'SOUR' operator.
+
+      CHP1  : CHPOINT type objet containing initial values of unknowns.
+
+      CHP2  : CHPOINT type objet containing the unknowns increment and
+              the 'LX' reactions on stiffness matrices associated to the
+              phase change (if it comes from 'RESO' operator).
+
+      CHP3  : CHPOINT type objet representing latent heat which are set
+              at Lagrange multipliers to be used by 'RESO' operator.
+
+$$$$
+
+
+ 

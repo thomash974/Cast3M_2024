@@ -1,0 +1,697 @@
+* fichier :  metallurgie_07.dgibi
+************************************************************************
+* Section : Thermique Metallurgie
+************************************************************************
+*__________________________________________________________________*
+*   TEST METALLURGIE_07                                            *
+*                                                                  *
+*   CALCUL DES PROPORTIONS DE PHASE METALLURGIQUE                  *
+*   CALCUL DE LA DEFORMATION THERMIQUE METALLURGIQUE               *
+*   TEMPERATURE IMPOSEE DURANT TOUT LE CALCUL                      *
+*                                                                  *
+*   Un modele THERMO-METALLURGIQUE + MECANIQUE est cree            *
+*   en 2D Axisymetrique                                            *
+*                                                                  *
+*   Utilisation de PASAPAS et de procedures utilisateur :          *
+*      - Procedure PARATHER : + Mise a jour du materiaux THERMIQUE *
+*                               avec la proportion de phase.       *
+*                                                                  *
+*      - Procedure REEV_THE : Mise a jour des proportions de phase *
+*                             pour le modele de MELANGE            *
+*                                                                  *
+*   Le modele metallurgique contient 5 phases ayant des cinetiques *
+*   de transformation differentes                                  *
+*      - Metal de Base (MB)                                        *
+*      - Austenite                                                 *
+*      - Martensite                                                *
+*      - Bainite                                                   *
+*      - Ferrite                                                   *
+*__________________________________________________________________*
+*   MAILLAGE :                                                     *
+*    - Eprouvette cylindrique de hauteur 100mm et de rayon 12,5mm  *
+*      P4 _____ P3                                                 *
+*        |     |    ^                                              *
+*        |     |    |                                              *
+*        |     |    |                                              *
+*        |     |    | h0      Y                                    *
+*        |     |    |         ^                                    *
+*        |     |    |         |                                    *
+*      P1 _____ P2  v         o --> X                              *
+*                                                                  *
+*        <-----> r0                                                *
+*      Origine du repere : P1                                      *
+*                                                                  *
+*   CHARGEMENT :                                                   *
+*    - Rampe de temperature lineaire de 20°C  a 900°C a 5°C/s      *
+*    - Maintient a 900°C durant 60s                                *
+*    - Rampe de temperature lineaire de 900°C a 20°C  a -10°C/s    *
+*                                                                  *
+*   CL :                                                           *
+*    - Blocage de la temperature (imposee partout)                 *
+*    - Blocage 'UZ' de la ligne reliant P1 et P2                   *
+*    - Blocage 'UR' de la ligne reliant P1 et P4                   *
+*__________________________________________________________________*
+
+'OPTI' 'DIME' 2   'MODE' 'AXIS' 'ELEM' 'QUA4' ;
+'OPTI' 'TRAC' PSC 'EPTR'  10 ;
+
+************************************************************************
+*  Parametrage du Jeu de Donnees
+************************************************************************
+* Parametrage MAILLAGE
+h0      = 100.; 'COMM' 'hauteur du cylindre'              ;
+r0      = 12.5; 'COMM' 'rayon du cylindre'                ;
+
+* Parametrage THERMIQUE
+TMIN    =  20.; 'COMM' 'Temperature ambiante'             ;
+TMAX    = 900.; 'COMM' 'Temperature du palier isotherme'  ;
+VCHAUFF =   5.; 'COMM' 'vitesse de chauffage'             ;
+VCHAUFF =   5.; 'COMM' 'Vitesse de chauffage       [°C/s]';
+VREFROI = -10.; 'COMM' 'Vitesse de refroidissement [°C/s]';
+PALLIER =  60.; 'COMM' 'Duree du palier isotherme  [s]'   ;
+
+* Parametrage METALLURGIE (Proportions initiales de phases)
+MB_ini  = 0.1 ;
+MART_ini= 0.2 ;
+BAIN_ini= 0.3 ;
+FERR_ini= 0.4 ;
+AUST_ini= 0.0 ;
+
+* Parametrage DISCRETISATION
+dens0   = 10.0 ; 'COMM' 'densite du maillage'        ;
+DT      = 0.25  ; 'COMM' 'pas de temps pour le calcul';
+
+************************************************************************
+*  Pour faire des beaux DESSINS
+************************************************************************
+* LISTMOTS contenant les couleurs
+  LESCOUL = 'MOTS' 'VIOL' 'VERT' 'CYAN' 'BRIQ' 'BOUT' 'JAUN' 'OLIV'
+                   'ORAN' 'ROUG' 'BLEU' 'BRUN' 'CARA' 'GRIS' 'NOIR' ;
+  NBCOUL  = 'DIME'  LESCOUL ;
+
+* LISTMOTS contenant les marques dans DESS
+  LESMARQ = 'MOTS' 'CROI' 'PLUS' 'MOIN' 'BARR' 'ETOI' 'CARR'
+                   'LOSA' 'ROND' 'TRID' 'TRIU' 'TRIL' 'TRIR';
+  NBMARQ  = 'DIME'  LESMARQ ;
+************************************************************************
+
+************************************************************************
+* Debut de la procedure PARATHER
+************************************************************************
+'DEBP' PARATHER  PRECED*'TABLE' TPS1*'FLOTTANT';
+************************************************************************
+* PROCEDURE PARATHER :
+*   DESCRIPTION :
+*   -------------
+*   Cette procedure permet de modifier le materiaux avant l'appel a
+*   VARI 'NUAG' dans TRANSNON.
+*     - Les composantes K, C et RHO sont une moyenne arithmethique
+*       ponderee par la fraction de phase des Ki, Ci et RHOi
+*   L'indice ETAB.'MAT_TOT' est remplace
+*   L'indice ETAB . 'CHARGEMENT' est remplace
+*
+*   ENTREES :
+*   ---------
+*   - PRECED : TABLE complete de PASAPAS
+*   - TPS1   : Temps courant
+*
+*   SORTIES :
+*   ---------
+*   - Aucune
+*
+************************************************************************
+
+*I - Mise a jour du materiau Thermique avec les proportions de phases
+   ETAB    = PRECED.'WTABLE';
+   MOD1    = ETAB.'MOD_TOT' ;
+   T1      = ETAB.'THER_COURANT' ;
+   T1      ='CHAN' 'CHAM' T1 MOD1 'RIGIDITE' 'CARACTERISTIQUES';
+
+   MAT_ORIG= ETAB.'MAT_TOT';
+   COMPORIG='EXTR' MAT_ORIG 'COMP';
+   NBCOMP  ='DIME' COMPORIG;
+
+   MAT0 ='VIDE' 'MCHAML';
+   REPE SURCOM NBCOMP;
+     II     = &SURCOM;
+     LACOMP ='EXTR' COMPORIG II;
+     SI(('NEG' LACOMP 'K') 'ET' ('NEG' LACOMP 'RHO') 'ET' ('NEG' LACOMP 'C'));
+        MAT0 = MAT0 'ET' ('EXCO' MAT_ORIG LACOMP LACOMP);
+     FINS;
+   FIN SURCOM;
+
+*  Instanciation du materiaux de chaque phase
+   MATPHAS ='REDU'  MOD1 MATPHAS ;
+   MAT2    ='VARI' 'NUAG' MOD1 MATPHAS T1 'RIGIDITE';
+
+*  On fait ensuite la moyenne qui nous interesse (Ponderation par la proportion de phase)
+   MCHPHA  = PRECED.'ESTIMATION'.'PROPORTIONS_PHASES';
+
+   MCHPHA  ='CHAN' 'CONS' MCHPHA 'THE1'              ;
+   MCHPHA  ='REDU'  MCHPHA ETAB.'MOD_COND'           ;
+   MCHPHA  ='CHAN' 'RIGIDITE' MCHPHA MOD1            ;
+   MCHPHA  ='CHAN' 'TYPE' MCHPHA 'CARACTERISTIQUES'  ;
+
+   MOPROP1 ='EXTR'  MCHPHA 'COMP'                    ;
+   MOMAT2  ='EXTR'  MAT2   'COMP'                    ;
+
+   MCHK    ='CHAN' 'TYPE' ('VIDE' 'MCHAML') 'CARACTERISTIQUES' ;
+   MCHR    ='CHAN' 'TYPE' ('VIDE' 'MCHAML') 'CARACTERISTIQUES' ;
+   MCHC    ='CHAN' 'TYPE' ('VIDE' 'MCHAML') 'CARACTERISTIQUES' ;
+
+* Boucle sur les phases
+   NBPHA   ='DIME' MOPROP1;
+   REPE SURP NBPHA;
+     IP    = &SURP ;
+     PROPIP='EXCO' MCHPHA ('EXTR' MOPROP1 IP) 'SCAL' ; 'COMM' 'Prop de la phase numero IP' ;
+
+*    Moyenne sur les K
+     IB    = IP;
+     RATIO ='EXCO' MAT2 ('EXTR' MOMAT2 IB) 'SCAL';
+     MCHK  =(PROPIP * RATIO) + MCHK ;
+
+*    Moyenne sur les RHO
+     IB    = IB + NBPHA;
+     RATIO2='EXCO' MAT2 ('EXTR' MOMAT2 IB) 'SCAL';
+     MCHR  =(PROPIP * RATIO2) + MCHR ;
+
+*    Moyenne sur les CP
+     IB    = IB + NBPHA;
+     RATIO3='EXCO' MAT2 ('EXTR' MOMAT2 IB) 'SCAL';
+     MCHC  =(PROPIP * RATIO3) + MCHC ;
+   FIN SURP;
+
+   MCHK    ='CHAN' 'COMP' 'K'   MCHK ;
+   MCHR    ='CHAN' 'COMP' 'RHO' MCHR ;
+   MCHC    ='CHAN' 'COMP' 'C'   MCHC ;
+
+*  REMPLACEMENT DU MATERIAUX
+   ETAB.'MAT_TOT'= MCHK 'ET' MCHR 'ET' MCHC 'ET' MAT0 ;
+
+
+'FINP';
+************************************************************************
+* Fin de la procedure PARATHER
+************************************************************************
+
+
+************************************************************************
+* Debut de la procedure PARATHER
+************************************************************************
+'DEBP' REEV_THE  PRECED*'TABLE' N1*'ENTIER';
+************************************************************************
+* PROCEDURE REEV_THE :
+*   DESCRIPTION :
+*   -------------
+*   Cette procedure met a jour le materiau pour le modele de MELANGE
+*    - Passage des proportions de phases de la METALLURGIE a la MECANIQUE
+*    - AMELIORATION POSSIBLE : Que ce soit fait automatiquement...
+*        + Changement du CONSTITUANT automatiquement
+*        + Projection si demandé (TAB1.'PROJECTION' = VRAI ;)
+*
+*   ENTREES :
+*   ---------
+*   - PRECED : TABLE complete de PASAPAS
+*   - N1     : Numero d'appel (initialisation ou apres THERMIQUE)
+*
+*   SORTIES :
+*   ---------
+*   - Aucune
+*
+************************************************************************
+   WTAB    = PRECED.'WTABLE';
+   MODAUTR ='ENLE' WTAB.'MODELE' 'FORM' 'MELANGE';
+   MATAUTR ='REDU' WTAB.'CARACTERISTIQUES' MODAUTR;
+   
+   MCHPHA  = PRECED.'ESTIMATION'.'PROPORTIONS_PHASES';
+
+*  Passage des PROPORTIONS_PHASES sur le modele de MELANGE (Sans PROJECTION)
+   MCHPMEL  ='CHAN' 'CONS' MCHPHA 'MEL1';
+   MCHPMEL  ='CHAN' MCHPMEL 'TYPE' 'CARACTERISTIQUES';
+
+*  REMPLACEMENT DU MATERIAUX DANS WTAB
+   WTAB.'CARACTERISTIQUES'=MCHPMEL 'ET' MATAUTR ;
+'FINP';
+************************************************************************
+* Fin de la procedure REEV_THE
+************************************************************************
+
+
+************************************************************************
+*MAILLAGE
+************************************************************************
+axes    = @repere (0. 0.) ('PROG' 25. 25.) 'ROUG' ;
+P1      ='POIN' 0. 0. ;
+P2      ='POIN' r0 0. ;
+P3      ='POIN' r0 h0 ;
+P4      ='POIN' 0. h0 ;
+
+L1      ='DROI' P1 P2 'DINI' dens0 'DFIN' dens0 ;
+L2      ='DROI' P2 P3 'DINI' dens0 'DFIN' dens0 ;
+L3      ='DROI' P3 P4 'DINI' dens0 'DFIN' dens0 ;
+L4      ='DROI' P4 P1 'DINI' dens0 'DFIN' dens0 ;
+
+MAILT   ='DALL' L1 L2 L3 L4 ;
+'TRAC' 'QUAL' MAILT;
+
+************************************************************************
+* Definition des MODELES
+************************************************************************
+MODTHE  ='MODE' MAILT   'THERMIQUE' 'CONDUCTION' 'QUA4' 'CONS' 'THE1' ;
+
+TPHASE  = TABL;
+* LISTMOTS utiles pour la metallurgie
+*  1- Metal de base 100% initialement
+*  2- Martensite
+*  3- Bainite
+*  4- Ferrite
+*  5- Austenite
+TPHASE.'PHASES'  ='MOTS' 'MB  ' 'MART' 'BAIN' 'FERR' 'AUST'               ;
+TPHASE.'REACTIFS'='MOTS' 'MB  ' 'MART' 'BAIN' 'FERR' 'AUST' 'AUST' 'AUST' ;
+TPHASE.'PRODUITS'='MOTS' 'AUST' 'AUST' 'AUST' 'AUST' 'MART' 'BAIN' 'FERR' ;
+TPHASE.'TYPE'    ='MOTS' 'LEBL' 'LEBL' 'LEBL' 'LEBL' 'KOIS' 'LEBL' 'LEBL' ;
+
+NBCOMP  ='DIME' TPHASE.'PHASES';
+
+MODCP1  ='MODE' MAILT 'METALLURGIE' 'PHASES'   TPHASE.'PHASES'
+                                    'REACTIFS' TPHASE.'REACTIFS'
+                                    'PRODUITS' TPHASE.'PRODUITS'
+                                    'TYPE'     TPHASE.'TYPE'
+                                    'CONS'    'MET1';
+
+MOMMB   ='MODE' MAILT  'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'PARFAIT' 'CONS' 'MEC1' 'PHASE' 'MB'  ;
+MOMMART ='MODE' MAILT  'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'PARFAIT' 'CONS' 'MEC2' 'PHASE' 'MART';
+MOMBAIN ='MODE' MAILT  'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'PARFAIT' 'CONS' 'MEC3' 'PHASE' 'BAIN';
+MOMFERR ='MODE' MAILT  'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'PARFAIT' 'CONS' 'MEC4' 'PHASE' 'FERR';
+MOMAUST ='MODE' MAILT  'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'PARFAIT' 'CONS' 'MEC5' 'PHASE' 'AUST';
+
+MODMEC  = MOMMB  'ET' MOMMART 'ET' MOMBAIN 'ET' MOMFERR 'ET' MOMAUST ;
+MOMELMEC='MODE' MAILT  'MELANGE' 'PARALLELE' MODMEC 'CONS' 'MEL1' ;
+
+MODTOT  = MODTHE 'ET' MODCP1 'ET'  MODMEC 'ET' MOMELMEC ;
+
+*******************************************************************************
+* Definition des materiaux des phases pures (THERMIQUE & MECANIQUE)
+*******************************************************************************
+MCHK   ='VIDE' 'MCHAML'          ; 'COMM' 'Conductivite thermique'             ;
+MCHRHO ='VIDE' 'MCHAML'          ; 'COMM' 'Masse volumique'                    ;
+MCHC   ='VIDE' 'MCHAML'          ; 'COMM' 'Capacite calorifique'               ;
+CTYP   ='MOT'  'CARACTERISTIQUES';
+
+********************
+* 1- Metal de base *
+********************
+IPAHS  = 1;
+ICOUL  = @MOD  IPAHS NBCOUL;
+COUL1  ='EXTR' LESCOUL ICOUL;
+CPHAS  ='CHAI' 'K' IPAHS;
+LTKP1  ='PROG' 0 55 113 162 191 243 293 392
+               457 507 605 655 756 795 840 856
+               900 950 1000 1101 1202 1303 1400 1500
+               1502 1600   ;
+LKP1   ='PROG' 0.0376 0.0389 0.0401 0.0407 0.0407 0.0404 0.0398 0.038
+               0.0364 0.0352 0.0329 0.0317 0.0291 0.0273 0.0252 0.0248
+               0.0253 0.0261 0.027 0.0283 0.0299 0.0314 0.0328 0.0343
+               0.05 0.05;
+EVKP1  ='EVOL' COUL1 'MANU' 'T' LTKP1 CPHAS LKP1;
+MCHK   = MCHK  'ET' ('MANU' 'CHML' MODTHE CPHAS EVKP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'R' IPAHS;
+LTRHOP1='PROG' 0 20 100 200 300 400
+               500 600 700 800 900 1440
+               2500 ;
+LRHOP1 ='PROG' 7852.D-9 7852.D-9 7815.D-9 7778.D-9 7741.D-9 7705.D-9
+               7668.D-9 7633.D-9 7595.D-9 7562.D-9 7527.D-9 7345.D-9
+               7011.D-9 ;
+EVRHOP1='EVOL' COUL1 'MANU' 'T' LTRHOP1 CPHAS LRHOP1;
+MCHRHO = MCHRHO'ET' ('MANU' 'CHML' MODTHE CPHAS EVRHOP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'C' IPAHS;
+LTCP1  ='PROG' 21 50 150 200 250 300 350 450 550
+               650 700 750 850 1000 1200 1300 1400 1440
+               1465 1490 1540 1590 1615 1640 2500 ;
+LCP1   ='PROG' 460.5 485.6 519.1 531.6 556.7 573.5 598.6 661.4 749.3
+               845.6 1431.6 950.2 900 845.6 800 815 840 850
+               1210 1840 2470 1840 1210 840 707 ;
+EVCP1  ='EVOL' COUL1 'MANU' 'T' LTCP1 CPHAS LCP1;
+MCHC   = MCHC  'ET' ('MANU' 'CHML' MODTHE CPHAS EVCP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'ALP' IPAHS;
+LTALP1 ='PROG' 20. 'PAS' 1. 700. ;
+LALP1  = 16.1D-6 * (LTALP1 ** 0) ;
+EVALP1 ='EVOL' COUL1 'MANU' 'T' LTALP1 'ALPH' LALP1;
+
+*****************
+* 2- Martensite *
+*****************
+IPAHS  = 2;
+ICOUL  = @MOD  IPAHS NBCOUL;
+COUL1  ='EXTR' LESCOUL ICOUL;
+CPHAS  ='CHAI' 'K' IPAHS;
+EVKP1  ='EVOL' COUL1 'MANU' 'T' LTKP1 CPHAS LKP1;
+MCHK   = MCHK  'ET' ('MANU' 'CHML' MODTHE CPHAS EVKP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'R' IPAHS;
+EVRHOP1='EVOL' COUL1 'MANU' 'T' LTRHOP1 CPHAS LRHOP1;
+MCHRHO = MCHRHO'ET' ('MANU' 'CHML' MODTHE CPHAS EVRHOP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'C' IPAHS;
+EVCP1  ='EVOL' COUL1 'MANU' 'T' LTCP1 CPHAS LCP1;
+MCHC   = MCHC  'ET' ('MANU' 'CHML' MODTHE CPHAS EVCP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'ALP' IPAHS;
+LALP2  = LALP1 ;
+EVALP2 ='EVOL' COUL1 'MANU' 'T' LTALP1 'ALPH' LALP1;
+
+**************
+* 3- Bainite *
+**************
+IPAHS  = 3;
+ICOUL  = @MOD  IPAHS NBCOUL;
+COUL1  ='EXTR' LESCOUL ICOUL;
+CPHAS  ='CHAI' 'K' IPAHS;
+EVKP1  ='EVOL' COUL1  'MANU' 'T' LTKP1 CPHAS LKP1;
+MCHK   = MCHK  'ET' ('MANU' 'CHML' MODTHE CPHAS EVKP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'R' IPAHS;
+EVRHOP1='EVOL' COUL1  'MANU' 'T' LTRHOP1 CPHAS LRHOP1;
+MCHRHO = MCHRHO'ET' ('MANU' 'CHML' MODTHE CPHAS EVRHOP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'C' IPAHS;
+EVCP1  ='EVOL' COUL1  'MANU' 'T' LTCP1 CPHAS LCP1;
+MCHC   = MCHC  'ET' ('MANU' 'CHML' MODTHE CPHAS EVCP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'ALP' IPAHS;
+EVALP3 ='EVOL' COUL1  'MANU' 'T' LTALP1 'ALPH' LALP1;
+
+**************
+* 4- Ferrite *
+**************
+IPAHS  = 4;
+ICOUL  = @MOD  IPAHS NBCOUL;
+COUL1  ='EXTR' LESCOUL ICOUL;
+CPHAS  ='CHAI' 'K' IPAHS;
+EVKP1  ='EVOL' COUL1  'MANU' 'T' LTKP1 CPHAS LKP1;
+MCHK   = MCHK  'ET' ('MANU' 'CHML' MODTHE CPHAS EVKP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'R' IPAHS;
+EVRHOP1='EVOL' COUL1  'MANU' 'T' LTRHOP1 CPHAS LRHOP1;
+MCHRHO = MCHRHO'ET' ('MANU' 'CHML' MODTHE CPHAS EVRHOP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'C' IPAHS;
+EVCP1  ='EVOL' COUL1  'MANU' 'T' LTCP1 CPHAS LCP1;
+MCHC   = MCHC  'ET' ('MANU' 'CHML' MODTHE CPHAS EVCP1 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'ALP' IPAHS;
+EVALP4 ='EVOL' COUL1  'MANU' 'T' LTALP1 'ALPH' LALP1;
+
+****************
+* 5- Austenite *
+****************
+IPAHS  = 5;
+ICOUL  = @MOD  IPAHS NBCOUL;
+COUL1  ='EXTR' LESCOUL ICOUL;
+CPHAS  ='CHAI' 'K' IPAHS;
+LTKP5  ='PROG' 0    20 100 200 400 600 800 856
+               900 1000 1200 1500 1502 1600   ;
+LKP5   ='PROG' 0.0121 0.0124 0.0136 0.015 0.018 0.021 0.0239 0.0248
+               0.0254 0.0269 0.0298 0.0343 0.05 0.05;
+EVKP5  ='EVOL' COUL1  'MANU' 'T' LTKP5 CPHAS LKP5;
+MCHK         = MCHK  'ET' ('MANU' 'CHML' MODTHE CPHAS EVKP5 'TYPE' CTYP) ;
+
+CPHAS  ='CHAI' 'R' IPAHS;
+LTRHOP5='PROG' 0 20 100 200 300 400
+               500 600 700 800 900 1440
+               2500 ;
+LRHOP5 ='PROG' 7852.D-9 7841.D-9 7794.D-9 7736.D-9 7680.D-9 7624.D-9
+               7569.D-9 7514.D-9 7458.D-9 7408.D-9 7356.D-9 7087.D-9
+               6613.D-9 ;
+EVRHOP5='EVOL' COUL1  'MANU' 'T' LTRHOP5 CPHAS LRHOP5;
+MCHRHO       = MCHRHO'ET' ('MANU' 'CHML' MODTHE CPHAS EVRHOP5 'TYPE' CTYP);
+
+
+CPHAS  ='CHAI' 'C' IPAHS;
+LTCP5  ='PROG' 21   50   150  200  250  300  350  475  575  675  800
+               950  1000 1100 1200 1300 1400 1440 1465 1490 1540 1590
+               1615 1640 2500 ;
+LCP5   ='PROG' 460.5 485.6 519.1 531.6 556.7 573.5 598.6 652 671 685 715
+               742 750 774 795 815 840 850 1210 1840 2470 1840
+               1210 840 707 ;
+EVCP5  ='EVOL' COUL1  'MANU' 'T' LTCP5 CPHAS LCP5;
+MCHC         = MCHC  'ET' ('MANU' 'CHML' MODTHE CPHAS EVCP5 'TYPE' CTYP) ;
+
+
+CPHAS  ='CHAI' 'ALP' IPAHS;
+LTALP5 ='PROG' 600. 'PAS' 1. 1000. ;
+LALP5  = 22.6D-6 * (LTALP5 ** 0.)  ;
+EVALP5 ='EVOL' COUL1  'MANU' 'T' LTALP5 'ALPH' LALP5;
+
+
+TDESS1           ='TABL' ;
+TDESS1 . 'TITRE' ='TABL' ;
+'REPE' SURPHA NBCOMP;
+   NOMP ='EXTR' TPHASE.'PHASES' &SURPHA;
+*  TDESS1 . &SURPHA           ='CHAI' 'MARQ ' LAMAR ' REGU';
+   TDESS1 . 'TITRE' . &SURPHA = NOMP;
+'FIN'  SURPHA;
+EVALP  = EVALP1 'ET' EVALP2 'ET' EVALP3 'ET' EVALP4 'ET' EVALP5 ;
+'DESS' EVALP 'LEGE' TDESS1 'TITR' 'Evolution des APLHA de chaque phase en fonction de la temperature';
+
+*******************************************************************************
+* Proprietes pour la metallurgie : DEBUT
+*******************************************************************************
+PROG_T   ='PROG'  716.  802. ;
+PROG_TPO ='PROG' -1.D-6 0.   ;
+PROG_PEQ ='PROG'  0.    1.   ;
+PROG_F   ='PROG'  0.    1.   ;
+PROG_TAU ='PROG' 12.    0.5  ;
+
+*1ere transformation : 'MB'   --> 'AUST'
+  PEQ1 ='EVOL' 'MANU' 'T'   PROG_T   'PEQ1' PROG_PEQ ;
+  F1   ='EVOL' 'MANU' 'TPOI'PROG_TPO 'F1'   PROG_F   ;
+  TAU1 ='EVOL' 'MANU' 'T'   PROG_T   'TAU1' PROG_TAU ;
+
+*2eme transformation : 'MART' --> 'AUST' parametres identiques a la premiere
+  PEQ2 ='EVOL' 'MANU' 'T'   PROG_T   'PEQ2' PROG_PEQ ;
+  F2   ='EVOL' 'MANU' 'TPOI'PROG_TPO 'F2'   PROG_F   ;
+  TAU2 ='EVOL' 'MANU' 'T'   PROG_T   'TAU2' PROG_TAU ;
+
+*3eme transformation : 'BAIN' --> 'AUST' parametres identiques a la premiere
+  PEQ3 ='EVOL' 'MANU' 'T'   PROG_T   'PEQ3' PROG_PEQ ;
+  F3   ='EVOL' 'MANU' 'TPOI'PROG_TPO 'F3'   PROG_F   ;
+  TAU3 ='EVOL' 'MANU' 'T'   PROG_T   'TAU3' PROG_TAU ;
+
+*4eme transformation : 'FERR' --> 'AUST' parametres identiques a la premiere
+  PEQ4 ='EVOL' 'MANU' 'T'   PROG_T   'PEQ4' PROG_PEQ ;
+  F4   ='EVOL' 'MANU' 'TPOI'PROG_TPO 'F4'   PROG_F   ;
+  TAU4 ='EVOL' 'MANU' 'T'   PROG_T   'TAU4' PROG_TAU ;
+
+*5eme transformation : 'AUST' --> 'MART'
+  MS5  = 380.   ;
+  KM5  = 0.0247 ;
+
+*6eme transformation : 'AUST' --> 'BAIN'
+  PEQ6 ='EVOL' 'MANU' 'T'    ('PROG' 375 380 405 600)
+                      'PEQ6' ('PROG' 0.  1.  1.  0.  );
+  F6   ='EVOL' 'MANU' 'TPOI' ('PROG' -100. -80.  -60.  -50.  -40.  -30.  -25.  -20. -18.  -15.  -12.  -10. -9.   -5.  -1.   -0.05    0.D0    1.D-6)
+                      'F6'   ('PROG'  0.005 1.573 2.857 3.417 3.982 4.583 4.833 5.26 5.472 6.033 7.675 11.4 18.45 17.1 0.328 0.00238 0.00238 0.   ) ;
+  TAU6 ='EVOL' 'MANU' 'T'    ('PROG' 375  380)
+                      'TAU6' ('PROG' 1.D6 20 );
+
+*7eme transformation : 'AUST' --> 'FERR'
+  PEQ7 ='EVOL' 'MANU' 'T'    ('PROG' 625 630 730 735 )
+                      'PEQ7' ('PROG' 0   1   1   0   );
+  F7   ='EVOL' 'MANU' 'TPOI' ('PROG' -8.5  -6.2 -4.7  0.  1.D-6)
+                      'F7'   ('PROG'  0.001 0.13 1.5  1.5 0.   );
+  TAU7 ='EVOL' 'MANU' 'T'    ('PROG' 625  630 )
+                      'TAU7' ('PROG' 1.D6 5   );
+************************************************************************
+* Definition de la metallurgie : FIN
+************************************************************************
+
+************************************************************************
+* GRANDEURS initiales
+************************************************************************
+*TEMPERATURE
+ CHPTINI = MANU 'CHPO' MAILT 1 'T' TMIN 'NATU' 'DIFFUS' ;
+ 
+ CTYP    ='CHAI' 'VARIABLES_INTERNES';
+ CHPINI  ='MANU' 'CHML' MODCP1 'MB  ' MB_ini 'MART' MART_ini 'BAIN' BAIN_ini 'FERR' FERR_ini 'AUST' AUST_ini 'TYPE' CTYP 'NOEUD' ;
+
+************************************************************************
+* CARACTERISTIQUES MATERIAUX
+************************************************************************
+ MATPHAS = MCHK 'ET' MCHRHO 'ET' MCHC                                      ;
+ MATTHE  ='MATE' MODTHE 'K'    0.D0   'RHO' 0.D0 'C' 0.D0                  ;
+ 
+ MAMMB   ='MATE' MOMMB   'YOUN' 180.E9 'NU'  0.28 'SIGY' 280.E6 'ALPH' EVALP1 'TREF' 20.  'TALP' 20. ;
+ MAMMART ='MATE' MOMMART 'YOUN' 190.E9 'NU'  0.29 'SIGY' 290.E6 'ALPH' EVALP2 'TREF' 20.  'TALP' 20. ;
+ MAMBAIN ='MATE' MOMBAIN 'YOUN' 200.E9 'NU'  0.30 'SIGY' 200.E6 'ALPH' EVALP3 'TREF' 20.  'TALP' 20. ;
+ MAMFERR ='MATE' MOMFERR 'YOUN' 210.E9 'NU'  0.31 'SIGY' 210.E6 'ALPH' EVALP4 'TREF' 20.  'TALP' 20. ;
+ MAMAUST ='MATE' MOMAUST 'YOUN' 220.E9 'NU'  0.32 'SIGY' 220.E6 'ALPH' EVALP5 'TREF' 450. 'TALP' 20. ;
+ 
+ MATMEC  = MAMMB 'ET' MAMMART 'ET' MAMBAIN 'ET' MAMFERR 'ET' MAMAUST ;
+ 
+ MATCP1  ='MATE' MODCP1 'PEQ1' PEQ1 'TAU1' TAU1 'F1' F1
+                        'PEQ2' PEQ2 'TAU2' TAU2 'F2' F2
+                        'PEQ3' PEQ3 'TAU3' TAU3 'F3' F3
+                        'PEQ4' PEQ4 'TAU4' TAU4 'F4' F4
+                        'MS5'  MS5  'KM5'  KM5
+                        'PEQ6' PEQ6 'TAU6' TAU6 'F6' F6
+                        'PEQ7' PEQ7 'TAU7' TAU7 'F7' F7 ;
+
+* Definition du materiau pour le modele de melange mecanique (les proportions de phase)
+ MAMELMEC  ='CHAN' 'CONS' CHPINI 'MEL1';
+ MAMELMEC  ='CHAN'  MAMELMEC 'TYPE' 'CARACTERISTIQUES';
+ MATTOT  = MATTHE 'ET' MATCP1 'ET' MAMELMEC 'ET' MATMEC ;
+
+************************************************************************
+* CONDITIONS aux LIMITES
+************************************************************************
+* TEMPERATURE IMPOSE PARTOUT
+ CLTHE   = BLOQ 'T' MAILT ;
+ TIMPO   = DEPI 1.  CLTHE ;
+
+* CHARGEMENT THERMIQUE 'T'
+ TPS0    = 0.D0;
+ TPS1    = TPS0 + ((TMAX-TMIN) / VCHAUFF);
+ TPS2    = TPS1 +   PALLIER ;
+ TPS3    = TPS2 + ((TMIN-TMAX) / VREFROI);
+ 
+ LTPSCHA ='PROG'  TPS0 TPS1 TPS2 TPS3 ;
+ LTCHA   ='PROG'  TMIN TMIN TMAX TMIN ;
+ EVT     ='EVOL' 'MANU' LTPSCHA LTCHA ;
+ CHAR1   ='CHAR' 'TIMP' TIMPO EVT     ;
+'DESS' EVT 'TITR' 'Chargement en temperature imposee au cours du temps';
+
+* BLOCAGE MECANIQUE
+ CLMEC1  = BLOQ 'UZ' L1      ;
+ CLMEC2  = BLOQ 'UR' L4      ;
+ CLMEC   = CLMEC1 'ET' CLMEC2;
+
+*CHARGEMENT Total
+ CHARTOT = CHAR1 ;
+
+************************************************************************
+* DEFINITION DE LA TABLE PASAPAS
+************************************************************************
+ LTCAL1  ='PROG' TPS0 'PAS' DT TPS2 ;
+ 
+ TPASAP                                  ='TABL'                 ;
+ TPASAP.'MODELE'                         = MODTOT                ;
+ TPASAP.'CARACTERISTIQUES'               = MATTOT                ;
+ TPASAP.'BLOCAGES_THERMIQUES'            = CLTHE                 ;
+ TPASAP.'BLOCAGES_MECANIQUES'            = CLMEC                 ;
+ TPASAP.'CHARGEMENT'                     = CHARTOT               ;
+ TPASAP.'TEMPS_CALCULES'                 = LTCAL1                ;
+ 
+ TPASAP.'TEMPS'                          ='TABL'                 ;
+ TPASAP.'TEMPS'                      . 0 ='EXTR' LTCAL1 1        ;
+ TPASAP.'TEMPERATURES'                   ='TABL'                 ;
+ TPASAP.'TEMPERATURES'               . 0 = CHPTINI               ;
+ TPASAP.'PROPORTIONS_PHASES'             ='TABL'                 ;
+ TPASAP.'PROPORTIONS_PHASES'         . 0 = CHPINI                ;
+
+* Indices divers
+ TPASAP.'PROCESSEURS'                    ='MOT' 'MONO_PROCESSEUR';
+*TPASAP.'FTOL'                           = 1.D-5                 ;
+
+* PROCEDURES Utilisateurs
+ TPASAP.'PROCEDURE_PARATHER'             = VRAI                  ; 'COMM' 'MELANGE THERMIQUE a la MANO' ;
+ TPASAP.'PROCEDURE_REEV_THE'             = VRAI                  ; 'COMM' 'Mise a jour des props de phases pour le MELANGE en MECANIQUE'  ;
+
+ PASAPAS TPASAP ;
+ 
+* Reprise de calcul pour verifier la dilatation THERMIQUE
+ LTCAL1  ='PROG' TPS2 'PAS' DT TPS3 ;
+ TPASAP.'TEMPS_CALCULES'                 = LTCAL1                ;
+ PASAPAS TPASAP ;
+
+************************************************************************
+* POST-TRAITEMENT
+************************************************************************
+ fic_sauv ='CHAI' 'COUPLAGE_THERO-METALLURGIQUE-MECANIQUE.sauv' ;
+'OPTI' 'SAUV' fic_sauv ;
+'SAUV' ;
+
+* Initialisations pour le POST-TRAITEMENT
+ LISCOM ='EXTR' CHPINI 'COMP';
+ NBCOMP ='DIME' LISCOM       ;
+ TABPHA ='TABL';
+'REPE' SURPHA NBCOMP;
+   TABPHA . &SURPHA ='VIDE' 'LISTREEL';
+'FIN' SURPHA;
+
+ LTPS ='VIDE' 'LISTREEL';
+ LVMI ='VIDE' 'LISTREEL';
+ LUZ1 ='VIDE' 'LISTREEL';
+ LT1  ='VIDE' 'LISTREEL';
+'REPE' BLOC0 ('DIME' TPASAP.'TEMPS')                ;
+   I    = &BLOC0  - 1                            ;
+   CHT  = TPASAP.'TEMPERATURES'               . I;
+   CHPHA= TPASAP.'PROPORTIONS_PHASES'         . I;
+   CHSIG= TPASAP.'CONTRAINTES'                . I;
+   DEP1 = TPASAP.'DEPLACEMENTS'               . I;
+   
+   LTPS = LTPS 'ET' (TPASAP.'TEMPS'  . I)        ;
+   VMI1 ='VMIS' MODTOT CHSIG                     ;
+   LVMI = LVMI 'ET' ('EXTR' VMI1 'SCAL' 1 1 1)   ;
+   LUZ1 = LUZ1 'ET' ('EXTR' DEP1 'UZ'   P3   )   ;
+   LT1  = LT1  'ET' ('EXTR' CHT  'T'    P3   )   ;
+
+* Extraction pour chaque phase de la valeur courante
+  'REPE' SURPHA NBCOMP;
+     NOMP       ='EXTR' TPHASE.'PHASES' &SURPHA;
+     TABPHA. &SURPHA = TABPHA. &SURPHA 'ET' ('EXTR' CHPHA NOMP 1 1 1);
+  'FIN' SURPHA;
+'FIN' BLOC0 ;
+
+*Reconstitution des EVOL
+ EVTOTa ='VIDE' 'EVOLUTIO';
+ EVOPHAS='VIDE' 'EVOLUTIO';
+ CPPHAS ='CHAN' 'CHPO' CHPHA MODTOT;
+
+'REPE' SURPHA NBCOMP;
+   NOMP             ='EXTR' TPHASE.'PHASES' &SURPHA;
+   ICOUL            = @MOD  &SURPHA NBCOUL;
+   COUL1            ='EXTR' LESCOUL ICOUL;
+   Lpi              = TABPHA. &SURPHA ;
+   TABPHA . &SURPHA ='EVOL' COUL1 'MANU' 'TEMP' LTPS NOMP Lpi;
+   EVTOTa           = EVTOTa 'ET' TABPHA . &SURPHA ;
+   IMARQ            = @MOD   &SURPHA NBMARQ;
+   LAMAR            ='EXTR'  IMARQ LESMARQ;
+   EVOPHAS          = EVOPHAS 'ET' ('EVOL' COUL1 'CHPO' CPPHAS NOMP L2);
+'FIN'  SURPHA;
+
+ EVTOTa  = 'CHAN' 'NOMORD' EVTOTa 'PROP';
+'DESS' EVTOTa  'LEGE' TDESS1 'TITR' ('CHAI' 'Evolution des Props en fonction du temps' ) 'YBOR' 0. 1. ;
+
+ EVOPHAS = 'CHAN' 'NOMORD' EVOPHAS 'PROP';
+'DESS' EVOPHAS 'LEGE' TDESS1 'TITR' ('CHAI' 'Props a Temps final' ) 'YBOR' 0. 1. ;
+
+ ICOUL   = ICOUL + 1          ;
+ ICOUL   = @MOD  ICOUL NBCOUL ;
+ COUL1   ='EXTR' LESCOUL ICOUL;
+ EVOVMI  ='EVOL' COUL1 'MANU' 'TEMP' LTPS 'VMIS' LVMI;
+'DESS' EVOVMI 'TITR' ('CHAI' 'Evolution de VMIS en fonction du temps' ) ;
+
+ ICOUL   = ICOUL + 1          ;
+ ICOUL   = @MOD  ICOUL NBCOUL ;
+ COUL1   ='EXTR' LESCOUL ICOUL;
+ EVOUZ1  ='EVOL' COUL1 'MANU' 'TEMP' LTPS 'UZP3' LUZ1;
+'DESS' EVOUZ1 'TITR' ('CHAI' 'Evolution de UZ au point P3 en fonction du temps' ) 'AXES' ;
+
+ ICOUL   = ICOUL + 1          ;
+ ICOUL   = @MOD  ICOUL NBCOUL ;
+ COUL1   ='EXTR' LESCOUL ICOUL;
+ EVOUZ2  ='EVOL' COUL1 'MANU' 'T' LT1 'EPZ' (LUZ1 / h0 * 100);
+'DESS' EVOUZ2 'TITR' ('CHAI' 'Evolution de EPZ (%) au point P3 en fonction de la temperature' ) 'XBOR' 0. 1000. 'AXES';
+
+'TEMP' 'IMPR' 'PROC';
+'TEMP' 'IMPR' 'BOUC';
+
+FIN ;
+ 
+
+ 
+

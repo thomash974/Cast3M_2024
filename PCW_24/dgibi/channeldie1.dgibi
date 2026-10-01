@@ -1,0 +1,241 @@
+* fichier : channeldie1.dgibi
+* Section : Mecanique Elastique
+*----------------------------------------------------------------------*
+*                  C H A N N E L D I E 1 . D G I B I                   *
+*----------------------------------------------------------------------*
+* Objet :                                                              
+* -------
+*
+*    Cas-test de validation des elements BBAR pour les CUB8 et PRI6.
+*
+*    Calcul elastique de la compression d'un lopin de metal place dans
+* une matrice l'empechant de se dilater lateralement (lopin coince dans
+* un "canal", d'ou "channel die").
+*
+*    Validation du calcul par comparaison a la solution analytique.
+*
+*    Un 2nd chargement en deplacement impose sur la face superieure,
+* non uniforme en espace (varaition quadratique), permet de valider
+* l'integration dans les elements en verifiant que la pression est 
+* est bien sous-integree (champ constant dans l'element), ainsi que
+* l'equilibre (F-Bsig).
+*
+*    Verification du fonctionnement de l'operateur MASSE.
+*
+*    Verification et validation de l'operateur KSIG en deplacements.
+*
+* Description :
+* -------------
+*
+* Type de calcul : Mecanique Elastique
+* Mode de calcul : 3D
+* Type d'element : CUB8, PRI6
+* Chargement     : Deplacement impose
+*
+*----------------------------------------------------------------------*
+opti dime 3 mode TRID elem CUB8 ;
+
+* Pour affichages, mettre ig1 a VRAI :
+ig1      = faux ;
+
+*------------------------------ MAILLAGE ------------------------------*
+
+* Points :
+p1       = 0. 0. 0. ;
+p2       = 100. 0. 0. ;
+p3       = 100. 100. 0. ;
+p4       = 0. 100. 0. ;
+p5       = 0. 0. 100. ;
+
+* Contour base :
+ne1      = 5 ;
+li1      = d ne1 p1 p2 ;
+li2      = d ne1 p2 p3 ;
+li3      = d ne1 p3 p4 ;
+li4      = d ne1 p4 p1 ;
+
+* Surface et Volume :
+sur1     = dall li1 li2 li3 li4 'PLAN' ;
+sur2     = (sur1 plus p2) chan tri3 ;
+sur1     = sur1 et sur2 ;
+elim sur1 1.e-3 ;
+vol1     = volu tran sur1 p5 ne1 ;
+
+si ig1 ;
+  trac cach vol1 titr 'Maillage lopin' ;
+fins ;
+
+*--------------------- MODELE / CARACTERISTIQUES ----------------------*
+
+* Valeurs modules d'elasticite :
+ym1      = 1.5e11 ;
+nu1      = 0.499 ;
+
+* Modele et caracteristiques mecaniques :
+mod1     = modele vol1 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 'BBAR' ;
+mat1     = mate mod1 'YOUNG' 1.5e11 'NU' nu1 'RHO' 7.6e3 ;
+
+* Matrice de raideur :
+rig1     = rigi mod1 mat1 ;
+mas1     = mass mod1 mat1 ;
+
+*----------------------- CONDITIONS AUX LIMITES -----------------------*
+
+* Definition des points d'interet :
+ptx0     = (vol1 coor 1) poin mini ;
+pty0     = (vol1 coor 2) poin mini ;
+ptz0     = sur1 ;
+ptz1     = vol1 face 2 ;
+clx0     = bloq ux ptx0 ;
+cly0     = bloq uy pty0 ;
+clz0     = bloq uz ptz0 ;
+clz1     = bloq uz ptz1 ;
+cl0      = clx0 et cly0 et clz0 et clz1 ;
+
+* Affichages points CL :
+si ig1 ;
+  trac ((ptx0 coul roug) et (aret vol1)) titr 'Points Ux = 0' ;
+  trac ((pty0 coul roug) et (aret vol1)) titr 'Points Uy = 0' ;
+  trac ((ptz0 coul roug) et (ptz1 coul rouge) et (aret vol1)) titr 'Points Uz = 0 (surfaces bloquees par matrice)' ;
+fins ;
+
+*----------------------------- CHARGEMENT -----------------------------*
+
+* Deplacement impose essai channel die :
+Uy1      = -0.1 ;
+pty1     = (vol1 coor 2) poin maxi ;
+cly1     = bloq uy pty1 ;
+dcl1     = depi cly1 Uy1 ;
+
+* Deplacement impose non homogene :
+ptx1     = (vol1 coor 1) poin maxi ;
+clx1     = bloq ux ptx1 ;
+chy1     = ptz1 coor 2 ;
+Uz1      = (((-0.01 * (chy1 - 100.)) ** 2) / -100.) nomc uz ;
+dcl2     = depi clz1 Uz1 ;
+
+si ig1 ;
+  trac ((pty1 coul vert) et (aret vol1)) titr 'Points deplacement Uy impose essai channel die' ;
+  trac Uz1 ptz1 titr '2nd chargement : deplacement non homogene' ;
+fins ;
+
+*---------------------------- DEPLACEMENTS ----------------------------*
+
+* Solution analytique au point P3:
+UxAna1   = -1. * nu1 / (1. - nu1) * Uy1 ;
+
+* Solution Castem au point P3: uycas.
+deptot   = reso (rig1 et cl0 et cly1) dcl1 ;
+dep2     = reso (rig1 et cl0 et cly1 et clx1) dcl2 ;
+
+* deplacement Ux au point P3 :
+UxSim1   = extr deptot 'UX' p3 ;
+
+* Deformee :
+def0     = defo deptot (aret vol1) 0. blan ; 
+def1     = defo deptot (aret vol1) 100 roug ; 
+mot1     = chai format '(F7.4)' 'deformee (vue de dessus) : Ux =' UxSim1 ;
+
+si ig1 ;
+  trac (0 0 1.e6) (def0 et def1) titr mot1 ;
+fins ;
+
+opti oeil (1.e6 -1.e6 0.8e6) ;
+
+* Calcul de l'erreur sur le déplacement.
+err1     = abs (( UxAna1 - UxSim1 ) / ( UxAna1 )) ;
+
+*---------------------------- CONTRAINTES -----------------------------*
+
+* Solution analytique: 
+syyana1  = ym1 / (1. - (nu1 * nu1)) * uy1 / 100. ;
+szzana1  = nu1 * syyana1 ;
+prana1   = syyana1 + szzana1 / 3. ;
+
+* Solution Castem : pression maximale = maxpres1.
+sig1     = sigma mod1 deptot mat1 ;
+
+* Validation KSIG avec BBAR :
+ksg1     = ksigm mod1 sig1 ;
+depto2   = reso (rig1 et ksg1 et cl0 et cly1) dcl1 ;
+err6     = maxi abs (deptot - depto2) avec (mots ux uy uz) ;
+
+* Affichage :
+si ig1 ;
+  trac sig1 mod1 titr 'Champ de contrainte' ;
+fins ;
+
+* Calcul de la pression :
+syySim1  = exco 'SMYY' sig1 'P' ;
+szzSim1  = exco 'SMZZ' sig1 'P' ;
+prSim1   = (syySim1 + szzSim1) / 3. ;
+syySim1  = mini syySim1 ;
+szzSim1  = mini szzSim1 ;
+prSim1   = mini prSim1 ;
+
+* Calcul de l'erreur sur les contraintes :
+err2     = ((syyana1 - syySim1) / syyana1) + ((szzana1 - szzSim1) / szzana1) + ((prana1 - prSim1) / prana1) ;
+err2     = abs err2 ;
+
+* Verification integration pression chargement non homogene :
+sig2     = sigm mod1 mat1 dep2 ;
+p2 I2 I3 = inva mod1 sig2 ;
+* Dans prismes :
+el1      = (vol1 elem pri6) elem 1 ;
+model1   = redu mod1 el1 ;
+pmax1 pmin1 = (maxi (redu p2 model1)) (mini (redu p2 model1)) ;
+err3     = (maxi abs (pmax1 - pmin1)) / (maxi abs pmax1) ;
+* Dans hexaedres :
+el2      = (vol1 elem cub8) elem 1 ;
+model2   = redu mod1 el2 ;
+pmax2 pmin2 = (maxi (redu p2 model2)) (mini (redu p2 model2)) ;
+err4     = (maxi abs (pmax2 - pmin2)) / (maxi abs pmax2) ;
+
+* Verification equilibre chargement non homogene :
+bsg2     = bsig mod1 sig2 ;
+rea2     = reac (cl0 et cly1 et clx1) dep2 ;
+res2     = rea2 - bsg2 ;
+err5     = (maxi abs res2) / (maxi abs rea2) ;
+
+* Affichages solution chargement non homogene :
+si ig1 ;
+  trac (defo vol1 dep2 2.e3) cach titr ' Deformee chargement non homogene' ;
+  trac sig2 mod1 titr ' Contraintes chargement non homogene' ;
+
+* Affichage valeur champs aux points d'integration :
+  list (redu sig2 model1) ;
+  list (redu p2   model1) ;
+  list (redu sig2 model2) ;
+  list (redu p2   model2) ;
+fins ;
+
+*----------------------------- VALIDATION -----------------------------*
+
+* Affichages :
+opti echo 0 ; saut 1 lign ;
+mess (chai format '(F6.2)' ' > Erreur relative deplacement au point P3 =' err1) ;
+mess (chai format '(F6.2)' ' > Erreur relative contraintes et pression =' err2) ;
+opti echo 1 ; saut 1 lign ;
+
+* Test de validation:
+err0     = maxi abs (prog err1 err2 err3 err4 err5 err6) ;
+prec0    = (vale prec) ** 0.5 * 10. ;
+list err0 ;
+list err1 ;
+list err2 ;
+list err3 ;
+list err4 ;
+list err5 ;
+list err6 ;
+list prec0 ;
+si ( err0 >eg prec0 ) ;
+  erreur 5 ;
+finsi ;
+
+fin;
+ 
+
+ 
+
+ 
+

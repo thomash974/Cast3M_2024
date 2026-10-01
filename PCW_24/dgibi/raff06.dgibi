@@ -1,0 +1,69 @@
+* fichier : raff06.dgibi
+* section : Mathematiques Fonctions
+*----------------------------------------------------------------------*
+*                             RAFF06.DGIBI                             *
+*----------------------------------------------------------------------*
+*
+* Objet : 
+* -------
+* 
+* Test de validation de l'operateur RAFF dans le cas du raffinement
+* d'un LISTRELL.
+*
+*
+* Description :
+* -------------
+* 
+* On teste differents cas de raffinement de LISTREELs.
+* La validation des resultats est laissee a l'utilisateur (uniquement
+* validation fonctionnelle).
+* 
+* Le test de gestion des erreurs est court-cicuite.
+* Pour l'activer, mettre ITERR1 a VRAI.
+*
+*----------------------------------------------------------------------*
+ITERR1 = faux ;
+*
+* Raffinement d'un listreel vide :
+lre1 = prog ;
+lre2 = raff lre1 2 ;
+list lre2 ;
+list (lre1 ega lre2) ;
+
+* Raffinement d'un listreel d'une valeur :
+lre1 = prog 1. ;
+lre2 = raff lre1 2 ;
+list lre2 ;
+list (lre1 ega lre2) ;
+
+* Raffinement d'un listreel de plus d'une valeur :
+lre1 = prog 1. 2. 5. ;
+lre2 = raff lre1  2 ;
+list lre2 ;
+
+lre2 = raff lre1 -5 ;
+list lre2 ;
+
+lre1 = prog -1. -2. -5. ;
+lre2 = raff lre1  2 ;
+list lre2 ;
+
+lre2 = raff lre1 -5 ;
+list lre2 ;
+
+* Raffinement avec une serie de valeurs identiques dans le LISTREEL :
+lre1 = prog 1. 2. 2. 5. 3. -10. ;
+lre2 = raff lre1  3 ;
+list lre2 ;
+
+lre2 = raff lre1 -2 ;
+list lre2 ;
+
+* Gestion des erreurs :
+SI ITERR1 ;
+  lre2 = raff lre1 0 ;
+FINS ;
+
+fin ;
+ 
+

@@ -1,0 +1,82 @@
+$$$$ @RSCV    NOTICE  CB215821  19/11/18    21:15:02     10383          
+                                             DATE     19/11/18
+Section : Mathematiques Autres
+
+*----------------------------------------------------------------------
+*      CETTE METHODE A ETE MISE GRACIEUSEMENT
+*      A DISPOSITION DE  LA COMMUNAUTE CAST3M
+*      PAR TAMASKOVICS N.
+*     (Freiberg Institut für Geotechnik )
+*----------------------------------------------------------------------
+
+    Methode @RSCV                           Voir aussi:@RSTH @RRST @RRSV
+    -------------                                      @RRSR @RSCS
+
+    LRE2 = RS%'SCV'  LRE1  DBG1;
+
+FRAN==============================================================
+
+    Objet :
+    _______
+
+    La methode @RSCV forme partie du objet @RSTH et est appelee avec
+    l'abbreviation %'SCV'.
+
+
+    Commentaire :
+    _____________
+
+    La methode @RSCV converti les donnees dans le LISTREEL LRE1 pour
+    les valeurs des elements focales d'un Random Set en un format
+    compatible avec une evolution.
+
+    LRE2 : liste des valeurs pour les elements focales en format
+           compatible avec une evolution
+
+    LRE1 : liste des valeurs pour les elements focales
+
+    DBG1 : Argument optionel de type ENTIER indiquant le niveau du 
+           deboggage (DBG1 manquant ouDBG1=0, pas de deboggage)
+
+
+    Exemple :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+ANGL==============================================================
+
+    Description :
+    _____________
+
+    The method @RSCV belongs to the object @RSTH and is called with
+    the abbreviation %'SCV'.
+
+
+    Contents :
+    __________
+
+    The method @RSCV converts the values in the list LRE1 for the
+    values of focal elements of a Random Set into a format compatible
+    with evolutions
+
+    LRE2 : list of values for the focal elements of a Random Set in a
+           format compatible with evolutions
+
+    LRE1 : list of values for the focal elements of a Random Set
+
+    DBG1 : An optional argument with a value of type ENTIER indicating
+           the debugging level (DBG1 missing or DBG1=0, no debugging)
+
+
+    Example :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+$$$$
+ 

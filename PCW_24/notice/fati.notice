@@ -1,0 +1,106 @@
+$$$$ FATI     NOTICE  KICH      22/12/01    21:15:01     11466          
+                                             DATE     22/12/01
+    Operateur FATI                            Voir aussi : PASAPAS
+    --------------                                           
+
+    TAB1 = 'TABLE' 'PASAPAS' ;
+    TAB1.'MODELE' = MO1 ;
+    ...
+    'PASAPAS' TAB1 ;
+    CHAR1 = 'CHAR' TAB1.'TEMPS' TAB1.'CONTRAINTES' ; 
+    
+    CHE2 = 'MANU' 'CHML' MO1 'APAP' -0.33 'BPAP' 8.e7
+          'ADVK' -0.34 'BDVK' 8.1e7 'ASIN' -0.35 'BSIN' 8.2e7
+          'ACRO' -0.36 'BCRO' 8.3e7 'A_DC' -0.37 'B_DC' 8.4e7
+          'TYPE' 'CARACTERISTIQUES' 'STRESSES' ;
+
+    CHE3 = 'FATI' MO1 CHAR1 CHE2 (REEL1 REEL2 MOT4 'SEUIL' |MOT5 );
+                                                           |REEL3
+
+    (MOT4 : 'TOUS','DVKP','PAPA','SINE','CROS','DC','VMIS')
+    (MOT5 : 'TOUS')
+    
+    'TRAC' MO1 CHE3 ;
+ 
+    EV5 = 'EXTR' CHE3 'PTAU' IZO IEL IGA ;
+    'DESS' EV5 ;
+    'OPTI' 'SORT' 'test.csv' ;
+    'SORT' 'EXCE' EV5 ; 
+
+
+Section : Mecanique Rupture
+
+FRAN===========================================================
+    Objet :
+    -------
+
+    En utilisant le mot cle 'TOUS', l'operateur FATI produit 
+    CHE3 dont les composantes correspondent à 
+    l'évaluation de différents critères de fatigue :
+    DANG VAN, PAPADOPOULOS, SINES, CROSSLAND, DC et VON MISES
+    a partir des resultats d'un calcul de cycle de chargement
+    avec PASAPAS.
+    On peut preciser les bornes du cycle avec REEL1 < REEL2.
+
+    Si on précise 'DVKP' ou 'PAPA' ou 'SINE' ou 'CROS' ou 'DC'
+    la 1ere composante de CHE3 est l'évaluation du critere,
+    la 2nde de nom 'PTAU' est, lorsque le critere évalué
+    est supérieur à une valeur donnée qui est -0.2 par defaut
+    modifiable à l'aide du mot-clé 'SEUIL' suivi de 'TOUS' 
+    ou d'un réel, une paire de courbes 
+    dont la 1ere est le trajet du deviateur ('DVKP' ou 'PAPA')
+    ou se réduit au point critique ('SINE', 'CROS' ou 'DC')
+    et la 2nde la droite de DANG VAN dans le plan (P, TAU),
+    dont les coefficients sont 'A***' et 'B***' 
+    spécifiés par CHE2.
+    Ces courbes peuvent être exportees vers EXCEL.
+
+    Commentaire :
+    _____________
+
+    MOD1 : type MODELE
+    CHAR1 : type CHARGEMENT
+    CHE2 : type MCHAML, titre/type CARACTERISTIQUES
+    MOT4, MOT5 : type MOT
+    CHE3 : type MCHAML, titre/type FATIGUE
+    EV5 :  type EVOLUTION
+    REEL1, REEL2, REEL3 : type FLOTTANT
+
+ANGL=============================================================
+    Description :
+    ------------
+
+    When the word 'TOUS' is specified, the operator FATI creates
+    CHE3 which compounds collect the evaluation of various
+    fatigue criteria : DANG VAN, PAPADOPOULOS, SINES, CROSSLAND,
+    DC and VON MISES, from the results of a loading cycle yielded
+    by PASAPAS.
+    REEL1 < REEL2 enable to set the beginning and the end 
+    of the cycle.
+
+    If either 'DVKP' or 'PAPA' or 'SINE' or 'CROS' or 'DC' is 
+    specified, the 1st compound of CHE3 is the selected criteria, 
+    the 2nd one under the label 'PTAU' is, whenever the criteria
+    is greater than -0.2, or a real value which may be given after
+    the keyword 'SEUIL' if not the keyword 'TOUS' for any value,
+    a pair of curves, the 1st one is the path of the 
+    stress deviator ('DVKP' or 'PAPA') or a critical point
+    ('SINE', 'CROS' or 'DC'), and the 2nd one is the DANG VAN
+    line which coefficients are 'A***' and 'B***' given in CHE2.
+    One may export theses curves into EXCEL. 
+
+    Remarks :
+    _________
+
+    MOD1 : type MODELE
+    CHAR1 : type CHARGEMENT
+    CHE2 : type MCHAML, title/type CARACTERISTIQUES
+    MOT4, MOT5 : type MOT
+    CHE3 : type MCHAML, title/type FATIGUE
+    EV5 :  type EVOLUTION
+    REEL1, REEL2, REEL3 : type FLOTTANT
+$$$$
+
+ 
+ 
+ 

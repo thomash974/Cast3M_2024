@@ -1,0 +1,6 @@
+=== Scenario 3 : chab_perf2 (CHABOCHE, PERF_RAID actif, niveau 2) ===
+Elements : 1000 ; pas de temps : 60 ; repetitions : 2
+Temps horloge minimal (ms) : 9775 ; acceleration par rapport a orig :   1.68
+Temps par operateur (ms, calcul le plus rapide) : RESO 1566 ; RIGI 4 ; HOOK 0 ; VARI 0 ; COMP 3715
+Raideur : reutilisee 59 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 61 fois
+Ecart relatif de la courbe F/S avec orig :  0.000E+00 : OK

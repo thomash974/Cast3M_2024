@@ -1,0 +1,80 @@
+$$$$ PROL     NOTICE  PASCAL    21/03/09    21:15:07     10917          
+                                             DATE     21/03/09
+
+    Operateur PROL                           Voir aussi : IPOL, VARI
+    --------------
+    
+Section : Mathematiques Autres
+==============================================================
+    EVOL2  =  PROL | (BORN) |  EVOL1  FLOT1  (FLOT2)  ;
+                   |  LINE  |
+
+FRAN==========================================================
+    Objet :
+    -------
+
+        L'operateur PROL prolonge une fonction definie par un objet
+    evolution (EVOL1) en un (ou deux) point(s) des abscisses situe(s)
+    hors de son intervalle de definition (liste des abscisses).
+
+        Le prolongement est effectue en prenant la valeur a la borne
+    de l'intervalle de definition la plus proche (option BORN) ou en
+    extrapolant lineairement la fonction (option LINE).
+
+
+    Commentaire :
+    -------------
+
+    EVOL1  : objet EVOLUTION, fonction que l'on souhaite prolonger
+             hors de son domaine de definition.
+
+    FLOT1  : objet FLOTTANT, valeur des abscisses a laquelle on
+             souhaite prolonger la fonction.
+
+    FLOT2  : objet FLOTTANT, valeur des abscisses a laquelle on
+             souhaite prolonger la fonction.
+
+    EVOL2  : objet EVOLUTION, prolongement de EVOL1 en FLOT1
+             (et FLOT2).
+
+
+    Remarques :
+    -----------
+        Si FLOT1 (ou FLOT2) est dans l'intervalle de definition de
+    EVOL1, alors il est ignore.
+
+
+ANGL==========================================================
+    Description :
+    -------------
+
+        The PROL operator extends a function defined by the EVOLUTION
+    EVOL1 at one (or two) abscissa(s) out of its definition domain
+    (list of abscissas).
+
+        The extension is achieved by taking the function value at the
+    closest bound of the definition domain (BORN option) or by
+    extrapolating linearly the fonction (LINE option) from this bound.
+    
+    
+    Contents :
+    ----------
+
+    EVOL1  : EVOLUTION type object, function to extend.
+
+    FLOT1  : FLOTTANT type object, abscissa to which to extend EVOL1.
+
+    FLOT2  : FLOTTANT type object, abscissa to which to extend EVOL1.
+
+    OBJ1   : EVOLUTION type object, extension of EVOL1 to FLOT1 (and FLOT2).
+
+
+    Remarks :
+    ---------
+
+        If FLOT1 (or FLOT2) is in the definition domain of EVOL1, then FLOT1
+    (or FLOT2) is ignored.
+
+
+$$$$
+ 

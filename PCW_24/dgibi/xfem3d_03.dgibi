@@ -1,0 +1,426 @@
+* fichier : xfem3d_03.dgibi
+************************************************************************
+* Section : Mecanique Rupture
+************************************************************************
+************************************************************************
+*          Cas-test propose par F. MERAY, modifié par JB251061         *
+*                                                                      *
+*    VERIFICATION QUE LE TERME DE FROTTEMENT EST BIEN NUL AVEC UNE     *
+*                    FORCE DE FROTTEMENT NULLE                         *
+*                                                                      *
+************************************************************************
+************************************************************************
+
+
+*******************************************************
+********************** Options ************************
+*******************************************************
+
+OPTI DIME 3 ELEM CUB8 MODE TRID ;
+
+BTRAC = FAUX ;
+OEIL1 = -100. -100. 50. ;
+
+* PARAMETRES MATERIAUX
+YOUN1 = 2.1E5 ;
+NU1 = 0.3 ;
+RHO1 = 7.8E-9 ;
+
+*******************************************************
+**************        MAILLAGES        ****************
+*******************************************************
+
+* DEFINITION D'UNE BASE ORTHONORMEE DIRECTE
+EX = 1. 0. 0. ;
+EY = 0. 1. 0. ;
+EZ = 0. 0. 1. ;
+
+* PARAMETRES DU MAILLAGE X-FEM
+
+* DISCRETISATION X-FEM
+MULT1 = 3. ;
+DX = 0.02*MULT1 ;
+DY = 0.02*MULT1 ;
+DZ = 0.02*MULT1 ;
+
+* DECALAGE ENTRE LA POSITION DE LA FISSURE ET LE CENTRE DU VOLUME X-FEM
+SHIFT = 4. ;
+
+* CENTRE DU VOLUME X-FEM
+CXMODL = (0.60 + (SHIFT * DX)) ;
+CYMODL = 0. ;
+CZMODL = 0.13 ;
+
+* TAILLE DU VOLUME X-FEM
+LX = 0.8 ;
+LY = 0.8 ;
+LZ = 0.26 ;
+
+
+* PARAMETRES DU MAILLAGE DE LA FISSURE CIRCULAIRE
+
+* DISCRETISATION DE LA FISSURE
+DXCRACK = DX / 1. ;
+
+* RAYON DE LA FISSURE
+A0 = 0.20 ;
+
+* INCLINAISON
+BETA = +75. ;
+
+
+*******************************************************
+************** MAILLAGE : VOLUME X-FEM ****************
+*******************************************************
+
+* * POINTS NECESSAIRES A LA CONSTRUCTION DU VOLUME X-FEM
+PB1 = (CXMODL-(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL+(0.5*LZ)) ;
+PB2 = (CXMODL+(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL+(0.5*LZ)) ;
+PB3 = (CXMODL-(SHIFT*DX)-DX) (CYMODL+(0.5*LY)) (CZMODL+(0.5*LZ)) ;
+PB4 = (CXMODL-(SHIFT*DX)+(1.*DX)) (CYMODL+(0.5*LY)) (CZMODL+(0.5*LZ)) ;
+* RAFFINEMENT 1 DU MAILLAGE EN SURFACE
+PB5 = (CXMODL-(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)+(3.*DZ)) ;
+PB6 = (CXMODL+(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)+(3.*DZ)) ;
+PB7 = (CXMODL-(SHIFT*DX)-DX) (CYMODL+(0.5*LY))
+      (CZMODL-(0.5*LZ)+(3.*DZ)) ;
+PB8 = (CXMODL-(SHIFT*DX)+(1.*DX)) (CYMODL+(0.5*LY)) 
+      (CZMODL-(0.5*LZ)+(3.*DZ)) ;
+* RAFFINEMENT 2 DU MAILLAGE EN SURFACE
+PB9 = (CXMODL-(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)+(0.5*DZ)) ;
+PB10 = (CXMODL+(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)+(0.5*DZ)) ;
+PB11 = (CXMODL-(SHIFT*DX)-DX) (CYMODL+(0.5*LY))
+       (CZMODL-(0.5*LZ)+(0.5*DZ)) ;
+PB12 = (CXMODL-(SHIFT*DX)+(1.*DX)) (CYMODL+(0.5*LY))
+       (CZMODL-(0.5*LZ)+(0.5*DZ)) ;
+* RAFFINEMENT 3 DU MAILLAGE EN SURFACE
+PB13 = (CXMODL-(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)+(0.25*DZ)) ;
+PB14 = (CXMODL+(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)+(0.25*DZ)) ;
+PB15 = (CXMODL-(SHIFT*DX)-DX) (CYMODL+(0.5*LY))
+       (CZMODL-(0.5*LZ)+(0.25*DZ)) ;
+PB16 = (CXMODL-(SHIFT*DX)+(1.*DX)) (CYMODL+(0.5*LY))
+       (CZMODL-(0.5*LZ)+(0.25*DZ)) ;
+
+PB17 = (CXMODL+(0.5*LX)) (CYMODL-(0.5*LY)) (CZMODL+(0.5*LZ)) ;
+PB18 = (CXMODL-(0.5*LX)) (CYMODL+(0.5*LY)) (CZMODL-(0.5*LZ)) ;
+
+* DEFINITION DES DROITES NECESSAIRES AU MAILLAGE 
+DRB11 = PB1 DROI PB3 'DINI' DX 'DFIN' DX ; 
+DRB12 = PB3 DROI PB4 'DINI' (0.5*DX) 'DFIN' (0.5*DX) ; 
+DRB13 = PB4 DROI PB2 'DINI' DX 'DFIN' DX ; 
+DRB1 = DRB11 ET DRB12 ET DRB13 ;
+DRB21 = PB5 DROI PB7 'DINI' DX 'DFIN' DX ; 
+DRB22 = PB7 DROI PB8 'DINI' (0.5*DX) 'DFIN' (0.5*DX) ; 
+DRB23 = PB8 DROI PB6 'DINI' DX 'DFIN' DX ; 
+DRB2 = DRB21 ET DRB22 ET DRB23 ;
+DRB31 = PB9 DROI PB11 'DINI' DX 'DFIN' DX ; 
+DRB32 = PB11 DROI PB12 'DINI' (0.5*DX) 'DFIN' (0.5*DX) ; 
+DRB33 = PB12 DROI PB10 'DINI' DX 'DFIN' DX ; 
+DRB3 = DRB31 ET DRB32 ET DRB33 ;
+DRB41 = PB13 DROI PB15 'DINI' DX 'DFIN' DX ; 
+DRB42 = PB15 DROI PB16 'DINI' (0.5*DX) 'DFIN' (0.5*DX) ; 
+DRB43 = PB16 DROI PB14 'DINI' DX 'DFIN' DX ; 
+DRB4 = DRB41 ET DRB42 ET DRB43 ;
+
+
+* MAILLAGE SURFACE
+LZ1 = MESU (PB1 DROI PB5 'DINI' DZ 'DFIN' DZ) ;
+LZ2 = MESU (PB5 DROI PB9 'DINI' DZ 'DFIN' DZ) ;
+LZ3 = MESU (PB9 DROI PB13 'DINI' DZ 'DFIN' DZ) ;
+LZ4 = MESU (PB13 DROI PB18 'DINI' DZ 'DFIN' DZ) ;
+
+SB11 = DRB1 TRAN 'DINI' DZ 'DFIN' DZ (-1*LZ1*EZ) COUL 'JAUNE' ;
+SB12 = DRB2 TRAN 'DINI' (0.5*DZ) 'DFIN' (0.5*DZ) (-1*LZ2*EZ) ;
+SB13 = DRB3 TRAN 'DINI' (0.25*DZ) 'DFIN' (0.25*DZ) (-1*LZ3*EZ) ;
+SB14 = DRB4 TRAN 'DINI' (0.125*DZ) 'DFIN' (0.125*DZ) (-1*LZ4*EZ) ;
+
+SB1 = SB11 ET SB12 ET SB13 ET SB14 ;
+ELIM SB1 (1.E-3*DX) ;
+
+
+* MAILLAGE VOLUME
+LY1 = MESU (PB2 DROI PB17 'DINI' DY 'DFIN' DY) ;
+
+VOL1 = SB1 VOLU 'TRAN' 'DINI' DY 'DFIN' DY (-1*LY1*EY) COUL 'BLEU' ;
+
+* DEFINITION DU CONTOUR ET DE L'ENVELOPPE
+CON1 = ARET VOL1 ;
+ENV1 = ENVE VOL1 COUL 'BLEU' ;
+
+
+*******************************************************
+*******     MAILLAGE : FISSURE CIRCULAIRE     *********
+*******************************************************
+
+&ELEM = VALE 'ELEM' ;
+OPTI ELEM TRI3 ;
+
+* POINTS NECESSAIRES A LA CONSTRUCTION DE LA FISSURE
+DENS (DXCRACK) ;
+CF = (CXMODL-(SHIFT*DX)) CYMODL (CZMODL-(0.5*LZ)) ;
+PF1 = (CXMODL-(SHIFT*DX)) (CYMODL-A0) (CZMODL-(0.5*LZ)) ;
+PF2 = (CXMODL-(SHIFT*DX)) (CYMODL+A0) (CZMODL-(0.5*LZ)) ;
+PF3 = (CXMODL-(SHIFT*DX)) CYMODL (CZMODL-(0.5*LZ)+A0) ;
+PF4 = (CXMODL-(SHIFT*DX)) (CYMODL-A0*(COS(45)))
+      (CZMODL-(0.5*LZ)+(A0*(SIN(45)))) ;
+PF5 = (CXMODL-(SHIFT*DX)) (CYMODL+A0*(COS(45)))
+      (CZMODL-(0.5*LZ)+(A0*(SIN(45)))) ;
+
+LF1 = (PF1 DROI CF) DROI PF2 ;
+
+* DEFINITION DU FRONT DE FISSURE
+LF2 = CERC 'CENTR' PF2 CF PF5 ;
+LF3 = CERC 'CENTR' PF5 CF PF3 ;
+LF4 = CERC 'CENTR' PF3 CF PF4 ;
+LF5 = CERC 'CENTR' PF4 CF PF1 ;
+LCRACK = LF2 ET LF3 ET LF4 ET LF5 ;
+
+* ROTATION DE L'ANGLE BETA
+LCRACK = LCRACK TOUR BETA PF1 PF2 ;
+
+ELIM (LF1 ET LCRACK) (1.E-6 * DX) ;
+FRONT1 = LCRACK COUL 'ORAN' ;
+
+* MAILLAGE DE LA FISSURE
+CRACK1 = SURF (LF1 ET LCRACK) 'PLAN' COUL 'ROUG' ;
+
+*FRONT1 = INVE FRONT1 ;
+*CRACK1 = ORIE CRACK1 (-1*EZ) ;
+
+* ON REPASSE EN CUB8
+OPTI ELEM &ELEM ;
+
+
+*******************************************************
+************** GENERATION DES LEVEL-SETS **************
+*******************************************************
+
+* DEFINITION / MISE A JOUR DES LEVEL-SETS
+PSI1 PHI1 = PSIP VOL1 CRACK1 'DEUX' FRONT1 ;
+
+* TRACE DES LEVEL-SETS
+SI BTRAC ;
+ OPTI ISOV SURF ;
+* ISOVALEUR POUR LE TRACE DES LEVEL-SETS
+ ISOV1 = 2.E-2 * (PROG -10. PAS 0.5 10.) ;
+ TRAC PHI1 VOL1 ISOV1 OEIL1 TITR 'LEVEL SET PHI1' ;
+ TRAC PSI1 VOL1 ISOV1 OEIL1 COUP (0. 0. 0.) EZ EX
+      TITR 'LEVEL SET PSI1' ;
+FINSI ;
+
+
+********************************************************
+******************* MODELE & MATERIAU ******************
+********************************************************
+
+MOD1 = MODE VOL1 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 'XC8R' ;
+MAT1 = MATE MOD1 'YOUN' YOUN1 'NU' NU1 'RHO' RHO1 ;
+* TRIE LES ELEMENTS D'UN MODELE XFEM ET SORT UN MCHAML
+* D'ENRICHISSEMENT EN FONCTION DE LA VALEUR DES LEVEL-SETS.
+CHE1X = TRIE MOD1 PSI1 PHI1 ;
+* CONSTRUCTION DES BLOCAGES DES DDL XFEM NON ACTIFS DANS
+* LES ELEMENTS DE TRANSITION.
+REL1X = RELA MOD1 ;
+
+
+********************************************************
+***** DEFINITION DU REPERE LOCAL LIE A LA FISSURE ******
+********************************************************
+
+* PROCEDURE LOCABA3D
+DEBP LOCABA3D MOD_INT*MMODEL ;
+
+** DETERMINATION DES NORMALES AU MAILLAGE DE LA FISSURE (CHPO) 
+ CHN = VSUR MOD_INT 'NORM' ;
+ MO1 = 'EXTRAIRE' CHN 'COMP' ;
+ MO2 = 'MOTS' 'NX  ' 'NY  ' 'NZ  ' ;
+ CHN = 'CHANGER' 'CHPO' MOD_INT CHN 'MOYE' ;
+ CHN = 'NOMC' CHN MO1 MO2 ;
+ CHN = -1. * CHN ;
+
+
+** DEFINITION DE PARAMETRES
+ CHT1 = 0. * CHN ; CHT2 = 0. * CHN ;
+ MXN1 = 'MOTS' 'NX  ' ; MYN1 = 'MOTS' 'NY  ' ; MZN1 = 'MOTS' 'NZ  ' ;
+ MXV1 = 'MOTS' 'V1X ' ; MYV1 = 'MOTS' 'V1Y ' ; MZV1 = 'MOTS' 'V1Z ' ;
+ MXV2 = 'MOTS' 'V2X ' ; MYV2 = 'MOTS' 'V2Y ' ; MZV2 = 'MOTS' 'V2Z ' ;
+ MXT1 = 'MOTS' 'T1X ' ; MYT1 = 'MOTS' 'T1Y ' ; MZT1 = 'MOTS' 'T1Z ' ;
+ MXT2 = 'MOTS' 'T2X ' ; MYT2 = 'MOTS' 'T2Y ' ; MZT2 = 'MOTS' 'T2Z ' ;
+ MSCA = 'MOTS' 'SCAL ' ;
+
+
+** CREATION DES VECTEURS EX ET EY
+ CRACK = 'EXTRAIRE' MOD_INT 'MAIL' ;
+ CHV1 = MANU 'CHPO' CRACK 3 'V1X ' 1. 'V1Y ' 0. 'V1Z ' 0. ;
+ CHV2 = MANU 'CHPO' CRACK 3 'V2X ' 0. 'V2Y ' 1. 'V2Z ' 0. ;
+
+
+** CALCUL DE LA PREMIERE TANGENTE T1 
+* CREATION D UN VECTEUR ALEATOIRE -> PREMIER POSSIBILITE : EX
+ XN1 = 'NOMC' 'NX  ' ('EXCO' 'NX  ' CHN) ;
+ YN1 = 'NOMC' 'NY  ' ('EXCO' 'NY  ' CHN) ;
+ ZN1 = 'NOMC' 'NZ  ' ('EXCO' 'NZ  ' CHN) ;
+ XV1 = 'NOMC' 'V1X ' ('EXCO' 'V1X ' CHV1) ;
+ YV1 = 'NOMC' 'V1Y ' ('EXCO' 'V1Y ' CHV1) ;
+ ZV1 = 'NOMC' 'V1Z ' ('EXCO' 'V1Z ' CHV1) ;
+* PRODUIT VECTORIEL
+ XT1_EX =(YN1 '*' ZV1 MYN1 MZV1 MXT1) '-' (ZN1 '*' YV1 MZN1 MYV1 MXT1) ;
+ YT1_EX =(ZN1 * XV1 MZN1 MXV1 MYT1) '-' (XN1 * ZV1 MXN1 MZV1 MYT1) ;
+ ZT1_EX =(XN1 * YV1 MXN1 MYV1 MZT1) '-' (YN1 * XV1 MYN1 MXV1 MZT1) ;
+ CHT1_EX = XT1_EX '+' YT1_EX '+' ZT1_EX ;
+
+* CREATION D UN VECTEUR ALEATOIRE -> DEUXIEME POSSIBILITE : EY
+ XN1 = 'NOMC' 'NX  ' ('EXCO' 'NX  ' CHN) ;
+ YN1 = 'NOMC' 'NY  ' ('EXCO' 'NY  ' CHN) ;
+ ZN1 = 'NOMC' 'NZ  ' ('EXCO' 'NZ  ' CHN) ;
+ XV2 = 'NOMC' 'V2X ' ('EXCO' 'V2X ' CHV2) ;
+ YV2 = 'NOMC' 'V2Y ' ('EXCO' 'V2Y ' CHV2) ;
+ ZV2 = 'NOMC' 'V2Z ' ('EXCO' 'V2Z ' CHV2) ;
+* PRODUIT VECTORIEL
+ XT1_EY =(YN1 '*' ZV2 MYN1 MZV2 MXT1) '-' (ZN1 '*' YV2 MZN1 MYV2 MXT1) ;
+ YT1_EY =(ZN1 * XV2 MZN1 MXV2 MYT1) '-' (XN1 * ZV2 MXN1 MZV2 MYT1) ;
+ ZT1_EY =(XN1 * YV2 MXN1 MYV2 MZT1) '-' (YN1 * XV2 MYN1 MXV2 MZT1) ;
+ CHT1_EY = XT1_EY '+' YT1_EY '+' ZT1_EY ;
+
+
+*** ON VERIFIE QUE CHT1_EX NON COLINAIRE A CHN (PRODUIT VECTORIEL NUL)
+ M1 = 'EXTRAIRE' CHT1_EX 'COMP' ;
+ N1 = (('PSCAL' CHT1_EX CHT1_EX M1 M1)**0.5) ;
+ MASQ_EY = MASQ N1 'INFERIEUR' 10.E-6 ;
+ MASQ_EX = -1 * (MASQ_EY - 1.) ;
+
+
+*** CONSTRUCTION DE CHT1
+ XT1 = (MASQ_EX '*' XT1_EX MSCA MXT1 MXT1) '+' 
+       (MASQ_EY '*' XT1_EY MSCA MXT1 MXT1) ;
+ YT1 = (MASQ_EX '*' YT1_EX MSCA MYT1 MYT1) '+' 
+       (MASQ_EY '*' YT1_EY MSCA MYT1 MYT1) ;
+ ZT1 = (MASQ_EX '*' ZT1_EX MSCA MZT1 MZT1) '+' 
+       (MASQ_EY '*' ZT1_EY MSCA MZT1 MZT1) ;
+ CHT1 = XT1 '+' YT1 '+' ZT1 ;
+* NORMALISATION DE CHT1
+ M1 = 'EXTRAIRE' CHT1 'COMP' ;
+ CHT1 = CHT1 '/' (('PSCAL' CHT1 CHT1 M1 M1)**0.5) ;
+
+
+** CALCUL DE LA DEUXIEME TANGENTE CHT2 
+*  => PRODUIT VECTORIEL ENTRE CHN ET CHT1
+ XT1 = 'NOMC' 'T1X ' ('EXCO' 'T1X ' CHT1) ;
+ YT1 = 'NOMC' 'T1Y ' ('EXCO' 'T1Y ' CHT1) ;
+ ZT1 = 'NOMC' 'T1Z ' ('EXCO' 'T1Z ' CHT1) ;
+* PRODUIT VECTORIEL
+ XT2 = (YN1 '*' ZT1 MYN1 MZT1 MXT2) '-' (ZN1 '*' YT1 MZN1 MYT1 MXT2) ;
+ YT2 = (ZN1 * XT1 MZN1 MXT1 MYT2) '-' (XN1 * ZT1 MXN1 MZT1 MYT2) ;
+ ZT2 = (XN1 * YT1 MXN1 MYT1 MZT2) '-' (YN1 * XT1 MYN1 MXT1 MZT2) ;
+ CHT2 = XT2 '+' YT2 '+' ZT2 ;
+* NORMALISATION DE T2
+ M2 = 'EXTRAIRE' CHT2 'COMP' ;
+ CHT2 = CHT2 '/' (('PSCAL' CHT2 CHT2 M2 M2)**0.5) ;
+
+FINP CHN CHT1 CHT2 ;
+
+* CONSTRUCTION REPERE LOCAL
+MOD_INT = MODE CRACK1 'MECANIQUE' 'ZCO3' ;
+* APPEL DE LA VERSION MODIFIEE DE LOCABA3D (LOCBA3D2)
+CHN CHT1 CHT2 = LOCABA3D MOD_INT ;
+CHN = 1. * CHN ;
+CHT1 = 1. * CHT1 ;
+CHT2 = 1. * CHT2 ;
+
+* AFFICHAGE REPERE LOCAL
+VN = VECT CHN 'NX  ' 'NY  ' 'NZ  ' JAUNE ;
+VT1 = VECT CHT1 'T1X ' 'T1Y ' 'T1Z ' BLANC ;
+VT2 = VECT CHT2 'T2X ' 'T2Y ' 'T2Z ' BLEU ;
+VLOC = (VN ET VT1 ET VT2) ;
+SI BTRAC ;
+ TRAC VLOC CRACK1 OEIL1 TITR 'REPERE LOCAL' ;
+FINSI ;
+
+
+********************************************************
+*************** CONDITIONS AUX LIMITES *****************
+********************************************************
+
+X Y Z = COOR ENV1 ;
+PINF = Z POIN 'MINI' ;
+PSUP = Z POIN 'MAXI' ;
+ESUP = ENV1 ELEM 'APPUYE' PSUP ;
+
+BLOQ1 = BLOQ 'DEPL' PINF ;
+FORTOT = PRES 'MASS' MOD1 1. ESUP ;
+
+SI BTRAC ;
+ TRAC (VECT FORTOT 'FORC') VOL1 OEIL1 TITR 'Chargement' ;
+FINSI ;
+
+
+********************************************************
+*** CONSTRUCTION DES DIFFERENTES MATRICES DE RAIDEUR ***
+********************************************************
+
+* RIGIDITE FORMULATION XFEM 1 CHAMP
+K1 = RIGI MOD1 MAT1 ;
+
+* RIGIDITE TOTALE
+KTOT = K1 ET BLOQ1 ET REL1X ;
+
+
+*******************************************************
+********************** Resolution *********************
+*******************************************************
+
+U1 = RESO KTOT FORTOT ;
+
+
+*******************************************************
+******************** Calcul des FICs ******************
+*******************************************************
+
+* CREATION D'UN CHAMP DE SAUT DE DEPLACEMENT TANGENT A LA FISSURE
+X Y Z = COOR CRACK1 ;
+WSAUT = MANU 'CHPO' CRACK1 (MOTS 'AX' 'AZ') (PROG 0. 0.) ;
+WSAUT = WSAUT + (NOMC 'AY' X) ;
+
+* CREATION D'UN CHAMP DE VECTEUR CONTRAINTE NORMAL A LA FISSURE
+VOL2 = CRACK1 VOLU 1 'TRAN' (1. 0. 0.) ;
+MOD2 = MODE VOL2 'MECANIQUE' ;
+PRES1 = PRES 'MASS' MOD2 1.E3 CRACK1 ;
+PREFIS = NOMC (MOTS 'FX' 'FY' 'FZ') (MOTS 'SMX' 'SMY' 'SMZ') PRES1 ;
+
+SUPTAB = TABL ;
+SUPTAB . 'OBJECTIF' = MOT 'DECOUPLAGE' ;
+SUPTAB . 'PSI' = PSI1 ;
+SUPTAB . 'PHI' = PHI1 ;
+SUPTAB . 'FRONT_FISSURE' = FRONT1 ;
+SUPTAB . 'MODELE' = MOD1 ;
+SUPTAB . 'CARACTERISTIQUES' = MAT1 ;
+SUPTAB . 'SOLUTION_RESO' = U1 ;
+SUPTAB . 'CHARGEMENTS_MECANIQUES' = FORTOT ;
+SUPTAB . 'COUCHE' = 2 ;
+SUPTABF = COPI SUPTAB ;
+SUPTABF.'MODELE_FISSURE' = MOD_INT ;
+SUPTABF.'DEPLACEMENT_FISSURE' = WSAUT ;
+SUPTABF.'PRESSION_FISSURE' = PREFIS ;
+
+G_THETA SUPTAB ;
+G_THETA SUPTABF ;
+
+CHPO1 = SUPTAB.'CHPO_RESULTATS' ;
+CHPO1F = SUPTABF.'CHPO_RESULTATS' ;
+
+REPE IMOD 3 ;
+    FIC = CHAI 'K' &IMOD ;
+    KREF = EVOL 'BLEU' 'CHPO' CHPO1 FIC FRONT1 ;
+    KFROT = EVOL 'VERT' 'CHPO' CHPO1F FIC FRONT1 ;
+    ERR1 = INTG (KFROT - KREF) 'ABS' ;
+    CRIT1 = (INTG KREF 'ABS') * 1.E-5 ;
+    SI BTRAC ;
+        DESS (KREF ET KFROT) ;
+    FINSI ;
+    SI (ERR1 > CRIT1) ;
+        ERRE 5 ;
+    FINSI ;
+FIN IMOD ;
+
+FIN ;
+ 
+

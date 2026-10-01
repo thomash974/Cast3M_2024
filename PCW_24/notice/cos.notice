@@ -1,0 +1,77 @@
+$$$$ COS      NOTICE  PASCAL    22/07/13    21:15:04     11409          
+                                             DATE     22/07/13
+
+      RESU1 = 'COS'   OBJET1 (MOT1) ;
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur COS                            Voir aussi :      SIN  TAN
+    -------------                                         ACOS ASIN ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH ATAH
+                                                          
+    Objet :
+    _______
+
+    L'operateur COS calcule le cosinus de l'objet OBJET1.
+    Les valeurs de OBJET1 doivent etre exprimees en degres.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remarque :
+    __________
+      
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+
+ANGL====================================================================
+
+    Operator  COS                            See also :        SIN  TAN
+    -------------                                         ACOS ASIN ATG
+                                                          COSH SINH TANH
+                                                          ACOH ASIH ATAH
+                                                          
+    Description :
+    ____________
+
+    The COS operator calculates the cosine of the OBJET1 object.
+    The values of OBJET1 must be expressed in degrees.
+    
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+      
+      
+    Remark :
+    _______
+      
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$ 
+ 

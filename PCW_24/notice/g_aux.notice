@@ -1,0 +1,42 @@
+$$$$ G_AUX    NOTICE  PV        20/11/05    09:56:37     10770          
+                                             DATE     20/11/05
+
+    Procedure G_AUX                          Voir aussi : G_THETA
+    ---------------
+
+    CH_AUX = G_AUX SUPTAB BOOL OBJUTI ;
+
+
+Section : Mecanique Rupture
+
+FRAN==========================================================
+    Objet :
+    _______
+
+  Cette procedure calcule les champs auxiliaires nécessaires à G_THETA
+  afin de déterminer les facteurs d'intensités des contraintes via l'option
+  'DECOUPLAGE' (voir procédure G_THETA).
+
+    En entree
+    ---------
+
+    SUPTAB = Objet de type TABLE dont les indices sont des              
+             objets de type MOT (a ecrire en toutes lettres).
+             Pour voir quels sont les indices obligatoires, voir
+                         la notice de la procédure G_THETA.
+                         
+        BOOL = Objet de type TABLE contenant les booléens utiles aux divers
+               tests effectués au cours du déroulement de G_THETA.
+                   
+        OBJUTI = Objet de type TABLE contenant divers objets utiles au cours
+                 du calcul. Cette table permet de conserver en mémoire des
+                         objets créés dans les divers procédures appelées par G_THETA.
+
+
+    En sortie :
+    -----------
+
+    CH_AUX = Objet de type TABLE contenant les champs auxiliaires nécessaires
+                 pour calculer les facteurs d'intensité des contraintes.
+                         
+ 

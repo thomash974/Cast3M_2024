@@ -1,0 +1,301 @@
+* fichier : ns_clim.dgibi
+************************************************************************
+* Section : Fluides Permanent
+* Section : Fluides Stokes
+* Section : Fluides Convection
+************************************************************************
+* NOM         : NS_CLIM
+* DESCRIPTION : Calcul du problème de Navier-Stokes illustrant
+*               l'importance de l'intégration par parties sur les
+*               conditions aux limites.
+*               Navier-Stokes problem with a focus on the integration by
+*               parts' influence on the boundary conditions. 
+*               + interactive GUI (interact = vrai)
+*               + slide generation for the lecture notes (transp = vrai)
+*
+*
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 25/09/2007, version initiale
+* HISTORIQUE : v1, 25/09/2007, création
+************************************************************************
+*
+'OPTION' 'DIME' 2 ;
+interact = FAUX ;
+transp   = VRAI ;
+*
+'DEBPROC' CALCUL ;
+'ARGUMENT' ifor*'ENTIER' ;
+'ARGUMENT' iRe*'ENTIER' ;
+'ARGUMENT' ikonv*'ENTIER' ;
+'ARGUMENT' ilapn*'ENTIER' ;
+'ARGUMENT' itrac*'ENTIER' ;
+'ARGUMENT' lnclk/'LOGIQUE' ;
+*
+'SI' ('NON' ('EXISTE' lnclk)) ;
+   lnclk = FAUX ;
+'FINSI' ;   
+*
+'OPTI' 'ELEM' 'QUA4' ;
+*
+nmail = 10 ;
+kvit = 'QUAF' ;
+kpre = 'CENTREP1' ;
+*
+lRe = 'PROG' 1. 200.  ;
+Re = 'EXTRAIRE' lRe iRe ;
+'SI' ('EGA' ikonv 1) ;
+   mkonv = 'NOCONS' ;
+'SINON' ;
+   mkonv = 'CONS' ;
+'FINSI' ;      
+'SI' ('EGA' ilapn 1) ;
+   mlapn = 'MUCONS' ;
+'SINON' ;
+   mlapn = 'FTAU' ;
+'FINSI' ;      
+*
+* Maillage
+*
+p0 = 0. 0. ; p1 = 1. 0. ;
+lt = 'DROIT' nmail p0 p1 ;
+mt  = 'TRANSLATION' lt nmail (0. 1.) ;
+*mt  = 'TRANSLATION' lt nmail (0. iang) ;
+cmt = 'CONTOUR' mt ;
+bas dro hau gau = 'COTE' mt ;
+hau = 'INVERSE' hau ;
+_bas = 'CHANGER' bas 'QUAF' ; _dro = 'CHANGER' dro 'QUAF' ;
+_hau = 'CHANGER' hau 'QUAF' ; _gau = 'CHANGER' gau 'QUAF' ;
+_mt  = 'CHANGER' mt 'QUAF' ;
+'ELIMINATION' (_mt 'ET' _bas 'ET' _gau 'ET' _dro 'ET' _hau) 1.D-6 ;
+$mt = 'MODE' _mt 'NAVIER_STOKES' kvit ;
+$gau = 'MODE' _gau 'NAVIER_STOKES' kvit ;
+$dro = 'MODE' _dro 'NAVIER_STOKES' kvit ;
+$hau = 'MODE' _hau 'NAVIER_STOKES' kvit ;
+$bas = 'MODE' _bas 'NAVIER_STOKES' kvit ;
+mt = 'DOMA' $mt 'MAILLAGE' ; gau = 'DOMA' $gau 'MAILLAGE' ;
+dro = 'DOMA' $dro 'MAILLAGE' ; hau = 'DOMA' $hau 'MAILLAGE' ;
+bas = 'DOMA' $bas 'MAILLAGE' ;
+cmt = bas 'ET' dro 'ET' hau 'ET' gau ;
+mpres = 'DOMA' $mt kpre ;
+mp1 = 'ELEM' mpres 1 ;
+*
+* Conditions aux limites
+*
+xhau  = 'COORDONNEE' 1 ('DOMA' $hau 'CENTRE') ;
+fxhau = 'NOMC' 'UX' ('SIN' ('*' xhau 180.)) 'NATURE' 'DISCRET' ;
+fyhau = 'NOMC' 'UY' ('SIN' ('*' xhau 360.)) 'NATURE' 'DISCRET' ;
+xh  = 'COORDONNEE' 1 hau ;
+fyh = 'SIN' ('*' xh 360.) ;
+*
+fxhau = 'NOMC' 'UX' ('SIN' ('*' xhau 180.)) 'NATURE' 'DISCRET' ;
+fyhau = 'NOMC' 'UY' ('SIN' ('*' xhau 360.)) 'NATURE' 'DISCRET' ;
+mdiri = bas 'ET' dro 'ET' gau ;
+mux = mdiri ;
+muy = mdiri ;
+'SI' ('EGA' ifor 1) ;
+   fhau  = 'KCHT' $hau 'VECT' 'CENTRE' fxhau ;
+   fh    = '*' fyh 0. ;
+*   muy = muy 'ET' hau ;
+'FINSI' ;   
+'SI' ('EGA' ifor 2) ;
+   fhau  = 'KCHT' $hau 'VECT' 'CENTRE' fyhau ;
+   fh    = fyh ;
+*   mux   = mux 'ET' hau ;
+'FINSI' ;   
+'SI' ('EGA' ifor 3) ;
+   fhau  = 'KCHT' $hau 'VECT' 'CENTRE' (fxhau 'ET' fyhau) ;
+   fh    = fyh ;
+'FINSI' ;   
+*
+* table EQEX 
+*
+rv = 'EQEX' 'NITER' 15 'OMEGA' 0.5D0 'ITMA' 1
+     'OPTI' 'EF' 'IMPL' 'CENTREE' kpre
+     'ZONE' $mt 'OPER' 'KBBT' 1. 'INCO' 'UN' 'PN' 
+     'OPTI' 'EF' 'IMPL' 'CENTREE' mlapn
+     'ZONE' $mt 'OPER' 'LAPN' 1. 'INCO' 'UN'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $hau 'OPER' 'TOIM' fhau 'INCO' 'UN'
+     'CLIM' 'UN' 'UIMP' mux 0.
+     'CLIM' 'UN' 'VIMP' muy 0.
+      ;
+*'SI' ('EGA' ifor 1) ;
+*rv = 'EQEX' rv      
+*     'CLIM' 'PN' 'TIMP' mp1 0. ;
+*'FINSI' ;
+      
+rv = 'EQEX' rv      
+     'OPTI' 'EF' 'IMPL' 'CENTREE' mkonv
+     'ZONE' $mt 'OPER' 'KONV' Re 'UN' 0. 'INCO' 'UN' ;
+*
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' (0. 0.) ;
+rv . 'INCO' . 'PN'  = 'KCHT' $mt 'SCAL' kpre 0. ;
+*
+EXEC rv ;
+*
+un = rv . 'INCO' . 'UN' ;
+pn = rv . 'INCO' . 'PN' ;
+maxun = 'MAXIMUM' un 'ABS' ;
+*
+*amp = '/' 1.2 nmail ;
+*vn = 'VECT' un amp 'DEPL' 'JAUN' ;
+fn = 'VECT' fhau 'DEPL' 'ROUG' ;
+vn = 'VECT' un 'DEPL' 'JAUN' ;
+*vtot = vn 'ET' fn ;
+vtot = vn ;
+ppn = 'ELNO' $mt pn kpre ;
+*
+* Post-traitement
+*
+'SI' ('EGA' itrac 1) ;
+   tit = 'CHAINE' 'Vitesses' ' ' kvit ' -- Pression' ' ' kpre ;
+   'SI' lnclk ;
+      'TRACER' ppn mt cmt vtot 'TITR' tit 'NCLK' ;
+   'SINON' ;      
+      'TRACER' ppn mt cmt vtot 'TITR' tit  ;
+   'FINSI' ;      
+'FINSI' ;
+'SI' ('EGA' itrac 2) ;
+   tit = 'CHAINE' 'Vitesses' ' ' kvit ' -- Pression' ' ' kpre ;
+   'SI' lnclk ;
+      'TRACER' vtot mt 'TITR' tit 'NCLK' ;
+   'SINON' ;      
+      'TRACER' vtot mt 'TITR' tit ;
+   'FINSI' ;      
+'FINSI' ;
+'SI' ('EGA' itrac 3) ;
+   tit = 'CHAINE' 'Vitesses' ' ' kvit ' -- Pression' ' ' kpre ;
+   'SI' lnclk ;
+      'TRACER' ppn mt 'TITR' tit 'NCLK' ;
+   'SINON' ;      
+      'TRACER' ppn mt 'TITR' tit ;
+   'FINSI' ;      
+'FINSI' ;   
+'SI' ('EGA' itrac 4) ;
+   evux = 'EVOL' 'CHPO' un 'UX' hau ;
+   evuy = 'EVOL' 'CHPO' un 'UY' hau ;
+   evtot = ('COULEUR' evux 'JAUN') 'ET' ('COULEUR' evuy 'TURQ') ;
+*
+   tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+   tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+   tabt . 2 = 'CHAINE' 'MARQ CARR' ;
+   tabt . 'TITRE' . 1 = 'CHAINE' 'UX' ;
+   tabt . 'TITRE' . 2 = 'CHAINE' 'UY' ;
+   'SI' lnclk ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'U'
+                'TITR' ('CHAINE' 'U(x)')
+                'LEGE' tabt 'NCLK' ;
+   'SINON' ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'U'
+                'TITR' ('CHAINE' 'U(x)')
+                'LEGE' tabt ;
+   'FINSI' ;             
+'FINSI' ;   
+'SI' ('EGA' itrac 5) ;
+   evp  = 'EVOL' 'CHPO' ppn 'SCAL' hau ;
+   evf  = 'EVOL' 'CHPO' fh 'SCAL' hau ;
+   evtot = ('COULEUR' evp 'JAUN') 'ET' ('COULEUR' evf 'TURQ') ;
+*
+   tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+   tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+   tabt . 2 = 'CHAINE' 'MARQ CARR' ;
+   tabt . 'TITRE' . 1 = 'CHAINE' 'P' ;
+   tabt . 'TITRE' . 2 = 'CHAINE' 'FY' ;
+   'SI' lnclk ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'F'
+                'TITR' ('CHAINE' 'F(x)')
+                'LEGE' tabt 'NCLK' ;
+   'SINON' ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'F'
+                'TITR' ('CHAINE' 'F(x)')
+                'LEGE' tabt ;
+   'FINSI' ;             
+'FINSI' ;   
+'FINPROC' maxun ;
+*
+'SI' interact ;
+*
+* Table contenant les choix des menus
+*
+tfo = 'TABLE' ;
+tfo . 1 = 'FX' ; tfo . 2 = 'FY' ; tfo . 3 = 'FXY' ;
+ntfo = 'DIME' tfo ; itfo = 1 ;
+*
+tRe = 'TABLE' ;
+tRe . 1 = 'Re=1.' ; tRe . 2 = 'Re=200' ;
+*tRe . 3 = 'Re=500' ;
+ntRe = 'DIME' tRe ; itRe = 1 ;
+*
+tko = 'TABLE' ;
+tko . 1 = 'NOCONS' ; tko . 2 = 'CONS' ;
+ntko = 'DIME' tko ; itko = 1 ;
+*
+tla = 'TABLE' ;
+tla . 1 = 'MUCONS' ; tla . 2 = 'FTAU' ;
+ntla = 'DIME' tla ; itla = 1 ;
+*
+ttr = 'TABLE' ;
+ttr . 1 = 'Vit-Pres' ; ttr . 2 = 'Vit' ; ttr . 3 = 'CHAINE' 'Pres' ;
+ttr . 4 = 'Vit(hau)' ; ttr . 5 = 'For(hau)' ;
+nttr = 'DIME' ttr ; ittr = 1 ;
+*
+* Boucle d'affichage
+*
+'REPETER' bouc ;
+   maxun = CALCUL itfo itRe itko itla ittr VRAI ;
+   cha = 'CHAINE' 'Stokes force sur hau ; max. vit = ' maxun ;
+   ret = 'MENU' cha (tfo . itfo) (tRe . itRe) (tko . itko)
+                    (tla . itla) (ttr . ittr) ;
+   'SI' ('EGA' ret 'Quitter') ;
+      'QUITTER' bouc ;
+   'FINSI';
+   'SI' ('EGA' ret (tfo . itfo)) ; itfo = '+' itfo 1 ; 'FINSI' ;
+   'SI' (itfo > ntfo) ; itfo = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tRe . itRe)) ; itRe = '+' itRe 1 ; 'FINSI' ;
+   'SI' (itRe > ntRe) ; itRe = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tko . itko)) ; itko = '+' itko 1 ; 'FINSI' ;
+   'SI' (itko > ntko) ; itko = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tla . itla)) ; itla = '+' itla 1 ; 'FINSI' ;
+   'SI' (itla > ntla) ; itla = 1 ; 'FINSI';
+   'SI' ('EGA' ret (ttr . ittr)) ; ittr = '+' ittr 1 ; 'FINSI' ;
+   'SI' (ittr > nttr) ; ittr = 1 ; 'FINSI';
+'FIN' bouc ;
+'FINS' ;
+*
+* Mes transparents 
+*
+'SI' transp ;
+'OPTI' 'TRAC' 'PS' ;
+   CALCUL 3 2 1 1 2 ;
+   CALCUL 3 2 2 1 2 ;
+*
+   CALCUL 3 2 1 1 2 ;
+   CALCUL 3 2 1 2 2 ;
+*
+
+'FINSI' ;   
+*
+'SI' interact ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;   
+*
+* End of dgibi file NS_CLIM
+*
+'FIN' ;
+
+ 
+

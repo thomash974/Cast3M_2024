@@ -1,0 +1,71 @@
+$$$$ LEGENDE  NOTICE  SP204843  22/12/19    21:15:04     11530          
+                                             DATE     22/12/19
+
+      TAB1  =  LEGENDE  |  NUAG1  MOT1  ('FORMAT'  MOT2)  ;
+                        |  EVOL1 ;
+
+Section : Post-traitement Affichage
+FRAN====================================================================
+
+    Procedure LEGENDE                                  Voir aussi : DESS
+    -----------------
+
+    Objet :
+    ______
+
+    La procedure LEGENDE renvoie une table de legende pour l'operateur DESS
+    permettant d'afficher les titres des EVOLUTIONs contenues dans l'objet
+    NUAG1 correspondant aux differentes valeurs de la composante MOT1 ou
+    une table contenant en titre les etiquettes des ordonnees de EVOL1.
+
+
+    Commentaire :
+    ____________
+
+    NUAG1  : Objet NUAGE possedant une composante de type EVOLUTION et
+             d'autres de type FLOTTANT ou ENTIER.
+
+    MOT1   : Objet MOT, nom de la composante selon laquelle definir les
+             titres des differentes EVOLUTIONS.
+
+    MOT2   : Objet MOT, format FORTRAN pour les valeurs des titres.
+
+    EVOL1  : Objet EVOLUTION dont on veut une table de legendes.
+
+    TAB1   : Objet TABLE, table de legende a fournir a l'operateur DESS.
+
+  
+ANGL====================================================================
+
+    Procedure LEGENDE                                    See also : DESS
+    -----------------
+
+    Description :
+    ____________
+
+    The LEGENDE procedur returns a table of legend used by operator DESS
+    to display a title for each EVOLUTION contained in the object NUAG1
+    and corresponding to the different values of the component MOT1 or
+    a table with titles corresponding to the labels of EVOL1 ordinates.
+
+    Contents :
+    _________
+
+    NUAG1  : NUAGE type object, with a component of EVOLUTION type and
+             other components of ENTIER or FLOTTANT type.
+
+    MOT1   : MOT type object, name of the component according to which
+             define the titles of the differents EVOLUTION to display.
+
+    MOT2   : MOT type object, FORTRAN format for displaying the values
+             involved in the EVOLUTION titles.
+
+    EVOL1  : EVOLUTION type object for which to build a legend table.
+
+    TAB1   : TABLE type object, legend table to give to operator DESS.
+
+$$$$ 
+ 
+ 
+ 
+ 

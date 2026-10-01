@@ -1,0 +1,85 @@
+$$$$ CAPI     NOTICE  FD218221  20/12/17    21:15:06     10820          
+                                             DATE     20/12/17
+
+    Operateur CAPI                           Voir aussi : CAPI
+    --------------
+
+    CH2 =  CAPI |  -     | MODL1 CH1 DEP1 (DEP2);
+                | 'JAUM' |
+                | 'UTIL' |
+
+Section : Mecanique Resolution
+
+FRAN==========================================================
+    Objet :
+    _______
+
+ 1. Par defaut (pas de mot-cle), l'operateur CAPI transforme :
+    - un champ de contraintes de Cauchy 
+      en un champ de contraintes de Piola-Kirchhoff de seconde espece 
+    - ou un champ de deformations d'Almansi-Euler 
+      en un champ de deformations de Green-Lagrange.
+      
+ 2. En presence du mot-cle 'JAUM' (Jaummann), l'operateur CAPI effectue  
+    un changement de repere sur le champ pour passer du repere  
+    general au repere corotationnel.
+    
+ 3. En presence du mot-cle 'UTIL' (utilisateur), CAPI ne fait rien.
+
+
+   Commentaire :
+   _____________
+
+   MODL1: objet de type MMODEL.
+
+   CH1  : champ de contraintes/deformation avant transformation 
+          (type MCHAML, sous-type CONTRAINTES/DEFORMATIONS)
+
+   DEP1 : champ de deplacements qui permet de passer de la configuration
+          de reference a la configuration actuelle (type CHPOINT)
+
+   DEP2 : pour la XFEM, champ de deplacements qui permet de passer 
+          de la configuration ou la fissure est fermee
+          a la configuration de reference (type CHPOINT)
+
+   CH2  : champ de contraintes apres transformation
+          (type MCHAML, sous-type CONTRAINTES/DEFORMATIONS)
+
+
+ANGL==========================================================
+    Description :
+    _____________
+
+ 1. By default (no keyword), the CAPI operator transforms :
+    - a Cauchy stress field
+      into a second kind Piola-Kirchhoff stress field 
+    - or an Almansi-Euler strain field 
+      into a Green-Lagrange strain field.
+      
+ 2. When 'JAUM' keyword is givent (Jaumann), the CAPI operator change
+    only the system of coordinates from the general one to the 
+    corotationnel system. 
+    
+ 3. When 'UTIL' is given (user), CAPI do nothing.
+    
+
+   Contents :
+   __________
+
+   MODL1: MMODEL type object
+
+   CH1  : Stress/Strain field before transformation
+          (MCHAML type, CONTRAINTES/DEFORMATIONS subtype).
+
+   DEP1 : displacement field for moving from the reference
+          configuration to the current configuration (CHPOINT type)
+
+   DEP2 : for the XFEM, displacement field for moving from the closed
+          crack configuration to the reference configuration 
+          (CHPOINT type)
+
+   CH2  : Stress/Strain field after transformation
+          (MCHAML type, CONTRAINTES/DEFORMATIONS subtype).
+
+ 
+ 

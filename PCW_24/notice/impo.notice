@@ -1,0 +1,128 @@
+$$$$ IMPO     NOTICE  PASCAL    21/06/08    21:15:00     10793          
+                                             DATE     21/06/08
+
+    Operateur IMPOSE                         Voir aussi : RELA EXCI
+    ----------------                                      EXTR MODE
+
+Section : Maillage Autres
+Section : Mecanique Limites
+Section : Multi-physique Multi-physique
+
+==========================================================
+Syntaxe 1 :
+-----------
+    MAIL1     = 'IMPO' 'IMPA' 'MAIT'  LI1  'ESCL' | LI2 | ;
+                                                  | P1  |
+
+FRAN==========================================================
+    Objet :
+    _______
+
+      LI1 , LI2 : maillages des frontieres en vis a vis qui definissent
+                  en 2D les lignes de contact.
+
+      P1        : point (POI1) representatif du projectile indeformable. 
+
+      MAIL1     : objet maillage resultant contenant des elements de type 22.
+
+    L'option 'IMPA' 'MAIT' 'ESCL' donne l'ensemble des liens possibles
+    entre les points au cours d'un impact entre deux lignes ou
+    entre une ligne et un projectile rigide supporte par un point.
+    Ces liens ne seront pas  forcement realises mais ils sont representes
+    au sein d'un objet de type 'MAILLAGE' contenant les points physiques
+    lies (3 dans le cas d'un contact ligne-ligne, 2 dans le cas d'un contact 
+    ligne-point) et les deux points supports des deux multiplicateurs de
+    Lagrange. On suppose que LI1 est maitre et que LI2 ou P1 sont esclaves.
+
+ANGL==========================================================
+    Description :
+    _____________
+
+      LI1 , LI2 : meshes of the two contact-lines in 2D
+
+      P1        : point (POI1) which represent the rigid projectile.
+
+      MAIL1     : object type 'MAILLAGE' created (elements type 22).
+
+    The keywords 'IMPA' 'MAIL' 'ESCL' give all the possible links 
+    between two lines or one line and a rigid projectile assumed to be
+    a point. These links are not necessary active but they are collected
+    into an object type 'MAILLAGE' which contains the physical points (3 
+    in case of a contact betwwen two lines, 2 in case of a contact between 
+    a line and a point) and the two points which supports the Lagrange 
+    multipliers. We suppose that LI1 is the master line and and LI2 or P1 
+    are the slave line or node.
+
+==========================================================
+Syntaxe 2 :
+-----------
+    RIG1      = 'IMPO' 'IMPA' MAIL1 ...
+                  ... (|               'VECT' VECT1             |
+                       | 'HEMI' FLOT1  'VECT' VECT1             |
+                       | 'PLAT' FLOT2  'VECT' VECT1             |
+                       | 'CONE' FLOT3 'ANGL' FLOT4 'VECT' VECT1 |) ;
+
+FRAN==========================================================
+    Objet :
+    _______
+
+      MAIL1 : objet maillage resultant contenant des elements de type 22
+
+      FLOT1 : rayon du projectile hemispherique (P1 est sur la sphere 
+              sur l'axe du cone)
+
+      FLOT2 : largeur du projectile plat (P1 est sur la surface
+              au centre du carre)
+
+      FLOT3 : largeur du projectile conique (P1 est sur la pointe
+              du cone)
+
+      FLOT4 : angle du projectile conique (par raaport a l'axe de rotation)
+
+      VECT1 : objet de type vecteur definissant l'axe du projectile.
+
+      RIG1  : objet rigidite contenant les matrices des relations d'egalite.
+
+    L'option 'IMPA' seule permet de construire l'objet de type 'RIGIDITE'
+    contenant la matrice des relations de non penetration entre les noeuds
+    pour lesquels on detecte un contact sur la configuration actuelle.  
+    Dans le cas d'un projectile rigide de type POI1 on peut definir trois
+    formes : 'HEMI' (hemispherique), 'PLAT' ou 'CONE' (conique). La 
+    definition d'un vecteur indiquant la direction du point materiel est
+    indispensable.
+
+    Les coefficients de la matrices sont relatifs a la configuration actuelle.
+    Ils correspondent a une linearisation des equations de non penetration.
+
+ANGL==========================================================
+    Description :
+    _____________
+
+      MAIL1 : object type 'MAILLAGE' (elements type 22).
+
+      FLOT1 : radius of the hemispherical projectile (P1 is on the spherical
+              nose on the projectile axis).
+
+      FLOT2 : length of the flat projetile (P1 is at the centre of the nose).
+
+      FLOT3 : length of the conical projectile (P1 is at the end of the cone).
+
+      FLOT4 : angle of conical projectile (projectile axis).
+
+      VECT1 : axis of the projectile (object type 'POINT').
+
+      RIG1  : object type 'RIGIDITE' created (link conditions).
+
+    The keyword 'IMPA' alone creates an object type 'RIGIDITE' which 
+    contains the matrix of link conditions (impenetrability) between 
+    the nodes for which a contact is detected. In case of a rigid projectile
+    (POI1) three noses are available : 'HEMI' (hemispherical), 'PLAT' (flat)
+    or 'CONE' (conical). The definition of the axis of the projectile is
+    necessary.
+
+    The coefficients of the matrix are given for the actual configuration.
+    They represent a linearization of the impenetrability conditions.
+
+==============================================================
+ 
+ 

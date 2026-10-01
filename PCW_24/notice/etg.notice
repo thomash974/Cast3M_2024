@@ -1,0 +1,50 @@
+$$$$ ETG      NOTICE  GOUNAND   23/01/13    21:15:18     11554          
+                                             DATE     23/01/13
+
+
+Section : Langage Objets
+Section : Mathematiques Autres
+
+FRAN==========================================================
+    Operateur ETG                           Voir aussi : ET TABL PART
+    -------------                                        ENUM
+
+
+
+ANGL==========================================================
+    Operator  ETG                           See also : ET TABL PART
+    -------------                                      ENUM
+
+
+
+==============================================================
+    OBJET2 = 'ETG'  ( TAB1  )  ;
+                    ( LOBJ1 )
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur ETG construit l'objet OBJET2 representant le resultat
+    de la fusion (operateur 'ET') de la collection d'objets contenus :
+    - soit dans la table TAB1 de 'SOUSTYPE' 'ESCLAVE' ;
+    - soit dans la liste d'objets LOBJ1.
+
+    La table TAB1 ou la liste d'objets LOBJ1 ne doivent contenir que
+    des objets de type :
+ANGL==========================================================
+    Description :
+    ____________
+
+    The ETG operator constructs the OBJET2 object which results from
+    the fusion ('ET' operator) of all the objects stored in:
+    - either the table TAB1 with 'SOUSTYPE' 'ESCLAVE' ;
+    - or the list of objects LOBJ1.
+
+    Table TAB1 or LOBJ1 may contain solely objects of type:
+==============================================================
+    'CHPOINT', 'RIGIDITE', 'LOGIQUE' , 'MCHAML', 'MMODEL', 'MAILLAGE',
+    'MATRIK' , 'FLOTTANT', 'EVOLUTIO', 'ENTIER', 'MOT'   , 'CHARGEME'.
+
+$$$$
+ 

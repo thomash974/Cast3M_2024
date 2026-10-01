@@ -1,0 +1,38 @@
+$$$$ OU       NOTICE  PV090527  23/12/18    21:15:04     11810          
+                                             DATE     23/12/18
+                                             
+    Operateur OU                             Voir aussi :
+    ------------
+
+    LOGR =  OU  LOG1  LOG2 (LOG3 ...);
+
+
+Section : Mathematiques Logique
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur OU travaille sur deux propositions logiques LOG1 et LOG2
+(type LOGIQUE). Le resultat est la disjonction de ces propositions.
+
+    Plus de deux logiques peuvent fournis. En ce cas le résultat est le
+disjonction sur leur ensemble.
+
+    Le resultat LOGR est de type LOGIQUE.
+
+ANGL==========================================================
+    Description :
+    ____________
+
+    The OU operator works on two logical propositions : LOG1 and
+ LOG2 (LOGIQUE type). The result is the separation of these
+ propositions.
+
+    More than two logicals can be given. In that case the result is the
+disjonction on their whole.
+
+    The LOGR result is of LOGIQUE type.
+
+ 
+ 

@@ -1,0 +1,173 @@
+* fichier waam0.dgibi
+* section : maillage
+*----------------------------------------------------------------------*
+*                         W A A M 0 . D G I B I                        *
+*----------------------------------------------------------------------*
+* Objet :                                                              
+* -------
+*
+*  Ce Dgibi a pour but de tester le fonctionnement des procedures :
+*      - SOUDAGE : definition d'une sequence de fabrication additive
+*                  ou de soudage ;
+*      - WAAM    : maillage d'une sequence de fabrication additive. 
+*  Les affichages permettent de verifier les resultats.
+*
+*  Trois sequences de fabrication "academiques" sont simulees :
+*      - le depot d'un mur rectiligne ;
+*      - la realisation d'un tube ;
+*      - la realisation d'une "forme libre".
+*
+*----------------------------------------------------------------------*
+opti dime 3 elem cub8 ;
+
+* Pour activer les affichages, mettre IG1 a VRAI ;
+ig1      = faux ;
+
+*opti trac psc eptr 5 ;
+
+*---------------------- Sequences de fabrication ----------------------*
+
+* Parametres de fabrication :
+debi1    = pi*0.6e-3*0.6e-3*10./60. ;
+larg1    = 6.e-3 ;
+
+* TAB1   : Table de fabrication du mur
+tab1                        = tabl ;
+tab1.vitesse_de_soudage     = 10.e-3 ;
+tab1.vitesse_de_deplacement = 20.e-3 ;
+tab1.puissance_de_soudage   = 3.e3 ;
+tab1.debit_de_fil           = debi1 ;
+
+* TAB2   : table de fabrication du tube
+tab2                        = tabl ;
+tab2.vitesse_de_soudage     = 10.e-3 ;
+tab2.vitesse_de_deplacement = 20.e-3 ;
+tab2.puissance_de_soudage   = 3.e3 ;
+tab2.debit_de_fil           = debi1 ;
+
+* TAB3   : table de fabrication de la forme libre
+tab3                        = tabl ;
+tab3.vitesse_de_soudage     = 10.e-3 ;
+tab3.vitesse_de_deplacement = 20.e-3 ;
+tab3.puissance_de_soudage   = 3.e3 ;
+tab3.debit_de_fil           = debi1 ;
+
+* Point de soudure initial :
+soudage tab1 point 1. ;
+soudage tab2 point 1. puis 6.e3 ;
+soudage tab3 point 1. puis 6.e3 ;
+
+* Repetition sequence de 2 passes en AR :
+nb1      = 5 ;
+repe b1 nb1 ;
+  
+* Vitesse + lente a la 1ere passe :
+  si (&b1 ega 1) ;
+    soudage tab1 passe droi (+100.e-3 0 0) vite 5.e-3 puis 4.e3 debi (0.5*debi1) ;
+    lign1    = tab1.trajectoire ;
+    p1       = (50.e-3 50.e-3 0) ;
+    p2       = (0      50.e-3 0) ;
+  sino ;
+    soudage tab1 passe droi (+100.e-3 0 0) ;
+  fins ;
+  dh1      = debi1 / (tab1.vitesse_de_soudage) / larg1 ;
+
+* 1er deplacement vertical :
+  soudage tab1 depla droi (0 0 dh1) vite 16.e-3 ;
+  
+* Passe retour option MAIL (pour tester) :
+  pc1      = tab1.trajectoire poin (nbno tab1.trajectoire) ;
+  pl1      = lign1 poin 1 ;
+  lign2    = lign1 plus (pc1 moin pl1) ;
+  lign2    = lign2 syme point pc1 ;
+  elim (pc1 et lign2) 1.e-6 ;
+  soudage tab1 passe mail lign2 ;
+
+* Passes du tube :
+  si (&b1 ega 1) ;
+    repe b2 4 ;
+      soudage tab2 passe cerc p1 p2 10 vite 5.e-3 puis 5.e3 ;
+      P1  p2   = p1  p2 tour (0 0 0) (0 0 1) 90. ;
+    fin b2 ;
+  sino ;
+    repe b2 4 ;
+      soudage tab2 passe cerc p1 p2 10 ;
+      P1  p2   = p1  p2 tour (0 0 0) (0 0 1) 90. ;
+    fin b2 ;
+  fins ;
+  dh2      = debi1 / (tab2.vitesse_de_soudage) / larg1 ;
+
+* Dernier deplacement vertical si pas derniere sequence :
+  si (&b1 neg nb1) ;
+    soudage tab1 depla droi (0 0 dh1) ;
+    soudage tab2 depla droi (0 0 dh2) ;
+    soudage tab2 depla cerc p1 p2 1 ;
+    P1  p2   = p1  p2 tour (0 0 0) (0 0 1) 90. ;
+  fins ;
+
+* Passes forme libre :
+  soudage tab3 passe droi (0 -100.e-3 0) ;
+  soudage tab3 passe cerc (20.e-3 -20.e-3 0.) (20.e-3 0. 0.) 10 ;
+  soudage tab3 passe droi (+100.e-3 0 0) ;
+  soudage tab3 passe cerc (20.e-3 +20.e-3 0.) (0. 20.e-3 0.) 10 ;
+  soudage tab3 passe droi (0 +100.e-3 0) ;
+  soudage tab3 passe droi (+120.e-3 -120.e-3 0) ;
+  soudage tab3 depla droi (0 0 0) abso ;
+  soudage tab3 depla droi (&b1*(0 0 dh1)) ;
+  
+fin b1 ;
+soudage tab1 point 30. puis 0. ;
+
+si ig1 ;
+
+* Mur :
+trac tab1.trajectoire           titr 'trajectoire sequence mur' ;
+dess tab1.evolution_deplacement titr 'deplacement sequence mur' ;
+dess tab1.evolution_puissance   titr 'puissance sequence mur' ;
+dess tab1.evolution_debit       titr 'debit sequence mur' ;
+
+* Tube :
+trac tab2.trajectoire           titr 'trajectoire sequence tube' ;
+dess tab2.evolution_deplacement titr 'deplacement sequence tube' ;
+dess tab2.evolution_puissance   titr 'puissance sequence tube' ;
+dess tab2.evolution_debit       titr 'debit sequence tube' ;
+
+* Forme libre :
+trac tab3.trajectoire           titr 'trajectoire sequence UN' ;
+dess tab3.evolution_deplacement titr 'deplacement sequence UN' ;
+dess tab3.evolution_puissance   titr 'puissance sequence UN' ;
+dess tab3.evolution_debit       titr 'debit sequence UN' ;
+dess tab3.evolution_puissance   titr 'puissance sequence UN' ;
+
+fins ;
+
+*------------------------- Maillage avec WAAM -------------------------*
+
+* Mur :
+tab21    = waam tab1 mail pas 5.e-3 larg larg1 dens 2.e-3 ;
+elim tab21.maillage 1.e-5 ;
+
+* Tube :
+tab22    = waam tab2 mail pas 5.e-3 larg larg1 dens 2.e-3 ;
+elim tab22.maillage 1.e-5 ;
+
+* Forme libre :
+tab32    = waam tab3 mail pas 5.e-3 larg larg1 dens 2.e-3 ;
+elim tab32.maillage 1.e-5 ;
+
+si ig1 ;
+  trac cach tab21.maillage titr 'Maillage du mur' ;
+  trac cach tab22.maillage titr 'Maillage du tube' ;
+  trac cach tab32.maillage titr 'Maillage de la forme libre' ;
+
+  waam tab21 visu cach (tab1.trajectoire) ;
+  waam tab22 visu cach (tab2.trajectoire) ;
+  waam tab32 visu cach (tab3.trajectoire) ;
+fins ;
+
+*------------------   F I N   W A A M 0 . D G I B I   -----------------*
+fin ;
+
+
+ 
+

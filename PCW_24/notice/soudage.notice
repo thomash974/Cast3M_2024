@@ -1,0 +1,749 @@
+$$$$ SOUDAGE  NOTICE  SP204843  23/07/03    21:15:03     11697          
+                                             DATE     23/07/03
+  
+=======================================================================
+    Procedure SOUDAGE                        Voir aussi : WAAM
+    =================
+
+
+FRAN===================================================================
+CHAP{1ere Fonction : specification d'une sequence de soudage}
+PART{Specification generale}
+
+    Objet :
+    -------
+
+        La procedure SOUDAGE permet de definir une sequence de soudage,
+    dont la description est stockee dans une table qui contient aussi
+    des donnees d'entree, principalement des parametres relatifs au
+    procede de soudage (vitesse de soudage, puissance, debit de fil...).
+
+        La procedure possede 3 options :
+        - POINT : pour definir un point de soudure ;
+        - PASSE : pour definir une passe de soudage ;
+        - DEPLA : pour definir un deplacement de l'outil.
+        La specification de la sequence de soudage se fait par des appels
+    successifs a la procedure en combinant ces differentes options.
+
+       En sortie, la table contient des donnees servant a la definition
+    d'un calcul de soudage (evolution de la puissance thermique au cours
+    du temps, trajectoire de l'outil, etc.)
+
+    Sa syntaxe generale est :
+
+ANGL===================================================================
+CHAP{1st Function: to specify a welding sequence}
+PART{General specification}
+
+    Description :
+    -------------
+
+        The SOUDAGE (welding) procedure is helpfull to specify a welding
+    sequence, which description is stored in a table which also contains
+    global input data, mainly relative to the welding process (welding
+    speed, filler wire speed, power supplied...)
+
+        The procedure has 3 options:
+        - POINT : to define a welding point,
+        - PASSE : to define a welding pass,
+        - DEPLA : to define the motion of the tool without welding.
+        The specification of the welding sequence is achieved by calling
+    successively the SOUDAGE procedure while combining these 3 options.
+
+        Its outputs are used to prescribe loadings for the calculation
+    of the welding process (time evolution of the thermal power, welding
+    path, etc.).
+
+    Its general syntax is:
+
+=======================================================================
+    SOUDAGE TAB1 | POINT  ... ;
+                 | PASSE  
+                 | DEPLA  
+
+FRAN===================================================================
+    Remarque : la procedure SOUDAGE ne fonctionne qu'en dimension 3.
+    ----------
+
+ANGL===================================================================
+    Remark : The SOUDAGE procedur only works in 3 dimensions.
+    --------
+
+FRAN===================================================================
+PART{Donnees d'entree}
+
+    TAB1 . VITESSE_DE_SOUDAGE      : objet FLOTTANT, vitesse de soudage
+
+    TAB1 . PUISSANCE_DE_SOUDAGE    : objet FLOTTANT, puissance thermique
+                                     de soudage
+
+    TAB1 . DIAMETRE_DE_FIL         : objet FLOTTANT, diametre du fil de
+                                     metal d'apport
+
+    TAB1 . VITESSE_DE_FIL          : objet FLOTTANT, vitesse de devidement
+                                     du fil de metal d'apport
+
+    TAB1 . DEBIT_DE_FIL            : objet FLOTTANT, debit volumique de
+                                     fil de metal d'apport (ignore si
+                                     les indices VITESSE_DE_FIL et
+                                     DIAMETRE_DE_FIL sont renseignes)
+
+    TAB1 . VITESSE_DE_DEPLACEMENT  : objet FLOTTANT, vitesse de deplacement
+                                     de la torche sans soudage (par defaut,
+                                     egal a VITESSE_DE_SOUDAGE)
+
+    TAB1 . POINT_DE_DEPART         : objet POINT, origine de la sequence
+                                     de soudage ((0 0 0) par defaut)
+
+    TAB1 . TEMPS_DE_COUPURE        : objet FLOTTANT, temps de mise a zero
+                                     ou a valeur nominale de la puissance
+                                     de soudage (0,1 par defaut)
+
+    TAB1 . LARGEUR_DE_PASSE        : objet FLOTTANT, largeur d'une passe
+                                     (requis pour appel option DEPLA COUCHE) 
+
+
+ANGL===================================================================
+PART{Global Input Data}
+
+    TAB1 . VITESSE_DE_SOUDAGE      : FLOTTANT type object, welding speed
+
+    TAB1 . PUISSANCE_DE_SOUDAGE    : FLOTTANT type object, welding thermal
+                                     power
+
+    TAB1 . DIAMETRE_DE_FIL         : FLOTTANT type object, filler wire diameter
+
+    TAB1 . VITESSE_DE_FIL          : FLOTTANT type object, filler wire speed
+
+    TAB1 . DEBIT_DE_FIL            : FLOTTANT type object, filler volumic flow
+                                    (ignored if indexes DIAMETRE_DE_FIL and
+                                     VITESSE_DE_FIL are given)
+                                    
+
+    TAB1 . VITESSE_DE_DEPLACEMENT  : FLOTTANT type object, welding tool travel
+                                     speed when not welding (by default, equal
+                                     to VITESSE_DE_SOUDAGE
+
+    TAB1 . POINT_DE_DEPART         : POINT type object, welding sequence
+                                     starting point ((0 0 0) by default)
+
+    TAB1 . TEMPS_DE_COUPURE        : FLOTTANT type object, time to set to zero
+                                     or to maximal value the welding power
+                                     (0.1 by default)
+
+    TAB1 . LARGEUR_DE_PASSE        : FLOTTANT type object, welding pass width
+                                     (required for the DEPLA COUCHE option)
+
+
+FRAN===================================================================
+PART{Option POINT}
+
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+PART{POINT Option}
+
+    Syntax :
+    --------
+
+=======================================================================
+    SOUDAGE TAB1 'POINT' FLOT1 ('PUIS' FLOT2) ('DEBI' FLOT3) ('EVEN' MOT1 (FLOT4))' ;
+
+FRAN===================================================================
+    Commentaire :
+    -------------
+
+    FLOT1   : objet FLOTTANT, duree de realisation du point de soudure
+
+    FLOT2   : objet FLOTTANT, puissance thermique utilisee pour la
+              realisation de ce point de soudure. Ne modifie pas la
+              valeur fournie dans TAB1.'PUISSANCE_DE_SOUDAGE'
+
+    FLOT3   : objet FLOTTANT, debit de fil utilise pour la realisation
+              de ce point de soudure. Ne modifie pas la valeur fournie
+              dans TAB1.'DEBIT_DE_FIL'
+
+    MOT1    : objet MOT, evenement relatif a la realisation de ce point
+              de soudure.
+
+    FLOT4   : objet FLOTTANT, duree du transitoire genere par cet evenement
+              (pas de transitoire par defaut).
+
+
+ANGL===================================================================
+    Contents :
+    ----------
+
+    FLOT1   : objet FLOTTANT, duration of the welding point
+
+    FLOT2   : objet FLOTTANT, thermal power used to achieve that welding
+              point. Do not modify TAB1.'PUISSANCE_DE_SOUDAGE'
+
+    FLOT3   : objet FLOTTANT, filler volumic flow used to achieve
+              that welding point. Do not modify TAB1.'DEBIT_DE_FIL'
+    
+    MOT1    : MOT type object, event occuring during the achievement of this
+              welding point.
+
+    FLOT4   : FLOTTANT type object, transient duration caused by this event
+              (by default, no transient)
+
+
+FRAN===================================================================
+PART{Option PASSE}
+
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+PART{PASSE Option}
+
+    Syntax :
+    --------
+
+=======================================================================
+    SOUDAGE TAB1 'PASSE' | 'DROI' P1         | ('RELA') ('VITE' FLOT1) ...
+                         | 'CERC' P1 P2 (N1) |  'ABSO'
+                         | 'MAIL' LIGN1 
+
+    ... ('PUIS' FLOT2) ('DEBI' FLOT3) ('EVEN' MOT1 (FLOT4))' ;
+
+FRAN===================================================================
+    Objet :
+    -------
+
+       L'option PASSE permet de specifier la realisation d'une passe
+    partant du point courant et suivant :
+       - DROI : une ligne droite jusqu'au point P1 ;
+       - CERC : un arc de cercle de centre P2 jusqu'au point P1 ;
+       - MAIL : la ligne de maillage LIGN1.
+       
+
+    Commentaire :
+    -------------
+
+    P1      : objet POINT, extremite finale de la passe
+
+    P2      : objet POINT, centre du cercle
+
+    N1      : objet ENTIER, nombre de segments discretisant l'arc de cercle
+              (par defaut, valeur calculee pour avoir 5 degres d'angle
+               entre deux segments).
+
+    LIGN1   : objet MAILLAGE, ligne de maillage orientee representant
+              la trajectoire de la passe
+
+    'RELA'  : objet MOT, indique que les coordonnees des points sont fournies
+              relativement au point courant
+
+    'ABSO'  : objet MOT, indique que les coordonnees des points sont fournies
+              dans le repere general de coordonnees
+
+    FLOT1   : objet FLOTTANT, vitesse de soudage utilisee pour la
+              realisation de cette passe. Ne modifie pas la
+              valeur fournie dans TAB1.'VITESSE_DE_SOUDAGE'
+
+    FLOT2   : objet FLOTTANT, puissance thermique utilisee pour la
+              realisation de cette passe. Ne modifie pas la
+              valeur fournie dans TAB1.'PUISSANCE_DE_SOUDAGE'
+
+    FLOT3   : objet FLOTTANT, debit de fil utilise pour la realisation
+              cette passe soudure. Ne modifie pas la valeur fournie
+              dans TAB1.'DEBIT_DE_FIL'
+    
+    MOT1    : objet MOT, evenement relatif a la realisation de cette passe.
+
+    FLOT4   : objet FLOTTANT, duree du transitoire genere par cet evenement
+              (pas de transitoire par defaut).
+
+
+ANGL===================================================================
+    Description :
+    -------------
+
+       The PASSE option specifies a welding pass that starts from the
+    current point and goes along :
+       - DROI : a straight line to point P1,
+       - CERC : a circle arc of center P2 to point P1,
+       - MAIL : a meshed line LIGN1.
+
+
+    Contents :
+    ----------
+
+    P1      : POINT type object, end point of the welding pass
+
+    P2      : POINT type object, circle center point
+
+    N1      : ENTIER type object, number of segment for the circle arc
+              discretization (by default, value computed to get an angle
+              of about 5 degres between 2 segments)
+
+    LIGN1   : MAILLAGE type object, meshed oriented line that represents
+              the pass trajectory
+
+    'RELA'  : MOT type object, key word to speficy that point coordinates
+              are given relatively to the current point
+
+    'ABSO'  : MOT type object, key word to speficy that point coordinates
+              are given in the global coordinate system
+
+    FLOT1   : FLOTTANT type object, welding speed used to achieve that
+              welding pass. Do not modify TAB1.'VITESSE_DE_SOUDAGE'.
+
+    FLOT2   : FLOTTANT type object, welding power used to achieve that
+              welding pass. Do not modify TAB1.'PUISSANCE_DE_SOUDAGE'.
+
+    FLOT3   : FLOTTANT type object, filler volumic flow used to
+              achieve that welding pass. Do not modify TAB1.'DEBIT_DE_FIL'
+
+    MOT1    : MOT type object, event occuring during the achievement of
+              this pass.
+
+    FLOT4   : FLOTTANT type object, transient duration caused by this event
+              (by default, no transient).
+
+    
+FRAN===================================================================
+PART{Option DEPLA}
+
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+PART{DEPLA Option}
+
+    Syntax :
+    --------
+
+=======================================================================
+    SOUDAGE TAB1 'DEPLA' | 'DROI' P1         | ('RELA') ('VITE' FLOT1) ('EVEN' MOT1 (FLOT5))' ;
+                         | 'CERC' P1 P2 (N1) |  'ABSO'
+                         | 'MAIL' LIGN1 ;
+                         | 'COUCHE' ('VITE' FLOT2) ('DEBI' FLOT3)...
+                           ... ('PAUSE' FLOT4) ('EVEN' MOT1 (FLOT5))' ;
+
+FRAN===================================================================
+    Objet :
+    -------
+
+       L'option DEPLA permet de specifier un deplacement de l'outil
+    partant du point courant et suivant :
+       - DROI : une ligne droite jusqu'au point P1 ;
+       - CERC : un arc de cercle de centre P2 jusqu'au point P1 ;
+       - MAIL : la ligne de maillage LIGN1.
+
+       Lors de la realisation d'un depot multi-couches, l'option COUCHE
+    permet de deplacer l'outil verticalement sur la couche superieure.
+    Pour cela, l'indice 'LARGEUR_DE_PASSE' doit etre renseigne. Cette
+    option suppose que les couches sont empilees suivant l'axe (O,z).
+    Si l'epaisseur de la couche suivante est differente de celle courante,
+    il faut alors preciser le vitesse de depot (option VITE) et le debit
+    de matiere (option DEBI) puisqu'on se deplace de la hauteur de la
+    prochaine couche realisee (l'outil se situe a la surface sup. de la
+    couche realisee).
+    
+
+    Commentaire :
+    -------------
+
+    P1      : objet POINT, extremite finale du deplacement
+
+    P2      : objet POINT, centre du cercle
+
+    N1      : objet ENTIER, nombre de segments discretisant l'arc de cercle
+              (par defaut, valeur calculee pour avoir 5 degres d'angle
+               entre deux segments).
+
+    LIGN1   : objet MAILLAGE, ligne de maillage orientee representant
+              la trajectoire du deplacement
+
+    'RELA'  : objet MOT, indique que les coordonnees des points sont fournies
+              relativement au point courant
+
+    'ABSO'  : objet MOT, indique que les coordonnees des points sont fournies
+              dans le repere general de coordonnees
+
+    FLOT1   : objet FLOTTANT, vitesse utilisee pour ce deplecement. Ne modifie
+              pas la valeur fournie dans TAB1.'VITESSE_DE_DEPLACEMENT'
+
+    FLOT2   : objet FLOTTANT, vitesse de soudage pour la realisation de la
+              prochaine couche.
+
+    FLOT3   : objet FLOTTANT, debit de matiere pour la realisation de la
+              prochaine couche.
+
+    FLOT4   : objet FLOTTANT, temps de pause lors du changement de couche
+              (par default, calcule a partir de la VITESSE_DE_DEPLACEMENT
+              et de l'epaisseur de la couche)
+
+    MOT1    : objet MOT, evenement au cours de ce deplacement.
+
+    FLOT5   : objet FLOTTANT, duree du transitoire genere par cet evenement
+              (pas de transitoire par defaut).
+
+
+ANGL===================================================================
+    Description :
+    -------------
+
+       The DEPLA option specifies a displacement of the welding tool
+    that starts from the current point and goes along :
+       - DROI : a straight line to point P1,
+       - CERC : a circle arc of center P2 to point P1,
+       - MAIL : a meshed line LIGN1.
+
+       In case of multiple layer manufacturing, the COUCHE (layer) option
+    moves the current point to the upper layer. The index 'LARGEUR_DE_PASSE'
+    is then mandatory. This option assumes that the layers are stacked
+    according to the 3rd axis of coordinates (O,z). If the thickness of the
+    next layer is different from the last one achieved, one must specify the
+    wedlding speed (VITE option), as well as the volumic flow (DEBI option)
+    used for achieving the next layer in order to compute its thickess and
+    move at its surface since the tool is supposed to be at the upper surface
+    of each layer.
+    
+
+    Contents :
+    ----------
+
+    P1      : POINT type object, end point of the displacement
+
+    P2      : POINT type object, circle center point
+
+    N1      : ENTIER type object, number of segment for the circle arc
+              discretization (by default, value computed to get an angle
+              of about 5 degres between 2 segments)
+
+    LIGN1   : MAILLAGE type object, meshed line of the displacement trajectory
+
+    'RELA'  : MOT type object, key word to speficy that point coordinates
+              are given relatively to the current point
+
+    'ABSO'  : MOT type object, key word to speficy that point coordinates
+              are given in the global coordinate system
+
+    FLOT1   : FLOTTANT type object, displacement speed.
+              Do not modify TAB1.'VITESSE_DE_SOUDAGE'.
+
+    FLOT2   : FLOTTANT type object, next layer welding speed.
+
+    FLOT3   : FLOTTANT type object, next layer volumic flow of filler material.
+
+    FLOT4   : FLOTTANT type object, duration of the displacement to move
+              to the upper layer (by default, that duration is computed
+              according to the prescribed displacement speed value).
+
+    MOT1    : MOT type object, event occuring during this displacement.
+
+    FLOT5   : FLOTTANT type object, transient duration caused by this event
+              (by default, no transient).
+
+    
+FRAN===================================================================
+PART{Donnees en sortie}
+
+    TAB1 . TRAJECTOIRE             : objet MAILLAGE, ligne orientee decrivant
+                                     la trajectoire de la torche de soudage.
+                                     Les segments de couleur rouge representent
+                                     les passes de soudage, les segments de
+                                     couleur verte, les deplacements.
+
+         . EVOLUTION_DEPLACEMENT   : objet EVOLUTION, evolution temporelle
+                                     du deplacement de la torche de soudage
+                                     sur sa trajectoire.
+
+         . EVOLUTION_PUISSANCE     : objet EVOLUTION, evolution temporelle
+                                     de la puissance thermique delivree.
+
+         . EVOLUTION_DEBIT         : objet EVOLUTION, evolution temporelle
+                                     du debit de fil de metal d'apport.
+
+         . EVENEMENTS              : objet TABLE, indexee de 1 au nombre
+                                     total d'evenements, chaque index etant
+                                     lui-meme une table contenant 2 indices :
+                                     . NOM   : objet MOT, nom de l'evenement
+                                     . TEMPS : objet LISTREEL, l'instant au
+                                               moment de l'evenement et, si
+                                               precise, l'instant a la fin
+                                               de son transitoire.
+
+    
+    Donnees pour la procedure WAAM :
+    --------------------------------
+
+         . POINTS                  : objet TABLE, contient les differents
+                                     points de soudure specifies
+
+         . POINTS . i . POINT      : objet POINT, lieu geometrique du point
+                      . INSTANTS   : objet LISTREEL, instants de debut et
+                                     de fin de realisation du point de soudure
+                      . PUISSANCE  : objet FLOTTANT, puissance de soudage
+                                     utilisee pour le point de soudure
+                      . DEBIT      : objet FLOTTANT, debit de fil de metal
+                                     d'apport utilise pour le point de soudure
+
+         . PASSES                  : objet TABLE, contient les differentes
+                                     passes de soudage specifiees
+
+         . PASSES . i . MAILLAGE   : objet MAILLAGE, trajectoire de la passe
+                      . GEOMETRIE  : objet MOT, valant DROITE, CERCLE ou
+                                     MAILLAGE en fonction de l'option choisie
+                      . CENTRE     : objet POINT, si geometrie CERC, centre
+                                     du cercle, indice inexistant sinon.
+                      . INSTANTS   : objet LISTREEL, instants de debut et
+                                     de fin de realisation de la passe
+                      . VITESSE    : objet FLOTTANT, vitesse de soudage
+                                     utilisee pour la passe
+                      . PUISSANCE  : objet FLOTTANT, puissance de soudage
+                                     utilisee pour la passe
+                      . DEBIT      : objet FLOTTANT, debit de fil de metal
+                                     d'apport utilise pour la passe
+
+
+ANGL===================================================================
+PART{Output Data}
+
+    TAB1 . TRAJECTOIRE             : MAILLAGE type object, welding tool
+                                     trajectory. Red lines represents welding
+                                     passes, green lines, displacements.
+
+         . EVOLUTION_DEPLACEMENT   : EVOLUTION type object, time evolution
+                                     of the welding tool motion.
+
+         . EVOLUTION_PUISSANCE     : EVOLUTION type object, time evolution
+                                     of the welding thermal power.
+
+         . EVOLUTION_DEBIT         : EVOLUTION type object, time evolution
+                                     of the filler volumic flow.
+
+         . EVENEMENTS              : TABLE object type, indexed from one to
+                                     the total number of events, each index
+                                     being a also table with 2 sub-index :
+                                     . NOM   : MOT object, event name
+                                     . TEMPS : LISTREEL object, the instant
+                                               when the event occurs and, if
+                                               given, the instant at the end
+                                               of the transient.
+                                    
+
+    Data for the procedure WAAM :
+    -----------------------------
+
+         . POINTS                  : TABLE type object, sum up the specified
+                                     welding points
+
+         . POINTS . i . POINT      : POINT type object, ith welding point 
+                      . INSTANTS   : LISTREEL type object, beginning and endding
+                                     instants of the welding point realization
+                      . PUISSANCE  : FLOTTANT type object, welding thermal power
+                                     used for that welding point
+                      . DEBIT      : FLOTTANT type object, filler volumic flow
+                                     used for that welding point
+
+         . PASSES                  : TABLE type object, sum up the specified
+                                     welding passes
+
+         . PASSES . i . MAILLAGE   : MAILLAGE type object, ith welding pass
+                                     trajectory 
+                      . GEOMETRIE  : MOT type object, equal to DROITE, CERCLE
+                                     or MAILLAGE according to the used option
+                      . CENTRE     : POINT type object, if CERCLE option used,
+                                     circle center point
+                      . INSTANTS   : LISTREEL type object, beginning and endding
+                                     instants of the welding point realization
+                      . VITESSE    : FLOTTANT type object, welding speed 
+                                     used for that welding point
+                      . PUISSANCE  : FLOTTANT type object, welding thermal power
+                                     used for that welding point
+                      . DEBIT      : FLOTTANT type object, filler volumic flow
+                                     used for that welding point
+
+
+FRAN===================================================================
+CHAP{2nd Fonction : sequencage de l'apport de matiere}
+
+    Objet :
+    -------
+
+        La procedure SOUDAGE permet de sequencer dans le temps l'apparition
+    des elements du maillage de cordons de soudure. Ce sequencage definit
+    la discretisation spatio-temporelle de l'apport de matiere d'une
+    simulation numerique du soudage.
+
+        On distingue le maillage de chaque cordon par sa COULEUR. Certains
+    cordons peuvent avoir la meme couleur mais leurs maillages ne doivent
+    alors pas avoir de noeud en commun.
+
+        On suppose que chaque cordon correspond a une passe de soudage et
+    que l'ordonnancement des passes respecte l'ordre des couleurs defini
+    par l'operateur COUL : passe 1 = cordon de couleur 1, passe 2 = cordon
+    de couleur 2, et ainsi de suite.
+
+        Si l'ordonnancement des couleurs des cordons ne respecte pas cet
+    ordre, alors il doit etre precise (voir syntaxe).
+
+
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+CHAP{2nd function: to sequence the filler material deposit}
+
+    Description:
+    -------------
+
+        The SOUDAGE procedure is used to sequence over time the apparition
+    of the finite elements of the mesh of weld beads in a numerical welding
+    simulation. This sequence defines the time-space discretization of the
+    filler material addition.
+
+        We identify the weld beads by their color. If two weld beads have
+    the same color, then they must not have any nodes in common.
+
+        We assume that each weld bead corresponds to one welding pass.
+    Moreover, we assume that the ordering of the welding passes follows the
+    ordering of the colors as defined in the COUL operator : 1st pass =
+    weld bead of color 1, 2nd pass = weld bead of color 2, and so on.
+
+        If the color ordering of the weld beads do not follow this one,
+    then it must be specified (see syntax).
+
+    Syntax :
+    --------
+
+=======================================================================
+    TAB2     = SOUDAGE TAB1 'MAIL' GEO1 (| LENT1 ) 'PAS' FLOT1 ('TEMP' (FLOT2)) ;
+                                        (| LMOT1 )
+
+FRAN===================================================================
+    Commentaire :
+    -------------
+
+    Entrees :
+    ---------
+
+    TAB1     : objet TABLE, sequence de soudage definit avec la procedure
+               soudage (1ere fonction).
+
+    GEO1     : objet MAILLAGE, maillage des cordons de soudure.
+
+    LENT1    : objet LISTENTIER, liste des numeros de couleur des cordons 
+               dans l'ordre de realisation des passes.
+
+    LMOT1    : objet LISTMOTS, liste des couleurs des cordons dans l'ordre
+               de realisation des passes.
+
+    FLOT1    : objet FLOTTANT, pas de discretisation en espace de l'apport
+               de matiere (le long de la trajectoire de soudage).
+
+    FLOT2    : objet FLOTTANT, pas des temps de calcul des passes de soudage.
+               Par defaut, (1/3pi) du temps de parcours du 1er pas de
+               discretization en espace.
+
+    Sorties :
+    ---------
+
+    TAB2 . MAILLAGE           : objet MAILLAGE, maillage final de la sequence
+
+    TAB2 . EVOLUTION_MAILLAGE : objet TABLE definissant le sequencage
+                                temporel de l'apport de matiere
+
+         . EVOLUTION_MAILLAGE . TEMPS    : objet TABLE contenant en indice
+                                           les instants du sequencage de
+                                           l'apport de matiere (0 a N)
+
+         . EVOLUTION_MAILLAGE . MAILLAGE : objet TABLE contenant en indice les
+                                           maillages associes aux differents
+                                           instants de l'indice TEMPS
+
+         . EVOLUTION_MAILLAGE . TEMPS    . i : objet FLOTTANT, (i+1)eme instant
+                                               de la sequence
+ 
+         . EVOLUTION_MAILLAGE . MAILLAGE . i : objet MAILLAGE, maillage utilise
+                                               a partir de l'instant correspondant
+                                               dans la table des TEMPS
+
+    TAB2 . TEMPS_CALCULES     : objet LISTREEL, liste des temps de calculs
+                                fournie par l'option TEMP.
+
+    TAB2 . TEMPS_EVENEMENTS   : objet LISTREEL, liste des instants relatifs
+                                aux evenements, s'il y en a de defini.
+
+    TAB2 . INDEX_EVENEMENTS   : objet LISTENTI, liste des numeros des evenements
+                                associes aux instants de la liste ci-dessus.
+
+
+    Remarque : dans la liste des TEMPS_CALCULES, le pas de temps est deraffine
+    ---------- progressivement selon une suite geometrique de raison 2 lorsque
+               la puissance thermique est nulle (deplacement ou pause).
+                 
+
+ANGL===================================================================
+    Contents :
+    ----------
+    
+    Inputs :
+    --------
+
+    TAB1     : TABLE type object, welding sequence defined with the 1st
+               function of the procedure SOUDAGE.
+
+    GEO1     : MAILLAGE type object, mesh of the weld beads.
+
+    LENT1    : LISTENTIER type object, list of the color numbers of the weld
+               beads following the ordering of the welding passes.
+
+    LMOT1    : LISTMOTS type object, list of the colors of the weld beads
+               following the ordering of the welding passes.
+
+    FLOT1    : FLOTTANT type object, discretization step in space of filler
+               material deposit along the welding trajectory.
+
+    FLOT2    : FLOTTANT type object, calculation time step during welding pass.
+               By default, (1/3pi) of travel time of the 1st discretization
+               step of the filler material deposit.
+
+    Outputs :
+    ---------
+
+    TAB2 . MAILLAGE           : MAILLAGE type object, welding sequence final mesh
+
+    TAB2 . EVOLUTION_MAILLAGE : TABLE defining the time evolution of the mesh
+
+         . EVOLUTION_MAILLAGE . TEMPS    : TABLE containing the time steps of the
+                                           mesh evolution (from 0 to N)
+
+         . EVOLUTION_MAILLAGE . MAILLAGE : TABLE containing the mesh used
+                                           at each time step
+
+         . EVOLUTION_MAILLAGE . TEMPS    . i : FLOTTANT type object, (i+1)th time
+                                               step of the mesh evolution
+ 
+         . EVOLUTION_MAILLAGE . MAILLAGE . i : MAILLAGE type object, mesh
+                                               at the corresponding time step
+                                               in the TEMPS table
+
+    TAB2 . TEMPS_CALCULES     : LISTREEL type object, list of calculation time
+                                steps provided by the TEMP option.
+
+    TAB2 . TEMPS_EVENEMENTS   : LISTREEL type object, list of moments relative
+                                to the events, if some are defined.
+
+    TAB2 . INDEX_EVENEMENTS   : LISTENTI type object, liste of the event number
+                                associated to the instants defined here-above.
+
+    Note : in the list TEMP_CALCULES, the time steps are progressively increased
+    ------ according to the values of the geometric series of reason 2 when
+           the thermal power is shut down (displacement or pause periods).
+                 
+
+$$$$
+ 
+ 
+ 
+ 
+ 
+ 
+ 

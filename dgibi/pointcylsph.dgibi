@@ -1,0 +1,86 @@
+* fichier : pointcylsph.dgibi
+** Petit test simple sur les procedures POINTCYL et POINTSPH
+
+** Precision pour les comparaisons de POINTs (critere de distance)
+dprec = 'VALE' 'PREC' ; 'LISTER' dprec ;
+
+** En 1D
+'OPTION' 'DIME' 1 ;
+
+pt1 = POINT 0. 'DENS' 1. ;
+pt2 = POINT 0. 'DENS' 2. ;
+
+SI ('>' (DIST pt1 pt2) dprec) ;
+  ERRE 5 ;
+FINSI ;
+
+** En 2D
+OPTI 'DIME' 2 ;
+
+* POINTCYL syntaxe avec des FLOTTANTs
+p1 = POINTCYL 0. 0. ;
+p2 = POINTCYL 4. 80. ;
+p3 = POINTCYL 1. 280. ;
+p4 = POINTCYL 3. 180. ;
+p5 = POINTCYL 2. 120. ;
+mp1 = p1 ET p2 ET p3 ET p4 ET p5 ;
+
+* POINTCYL syntaxe avec des LISTREELs
+mp2 = POINTCYL (PROG 0. 4. 1. 3. 2.) (PROG 0. 80. 280. 180. 120.) ;
+
+* test d'egalite des points engendres
+REPE b1 (NBEL mp1) ;
+  pt1 = mp1 POIN &b1 ;
+  pt2 = mp2 POIN &b1 ;
+  SI ('>' (DIST pt1 pt2) dprec) ;
+    ERRE 5 ;
+  FINSI ;
+FIN b1 ;
+
+** En 3D
+OPTI 'DIME' 3 ;
+
+* POINTCYL syntaxe avec des FLOTTANTs
+p1 = POINTCYL 0. 0. 0. ;
+p2 = POINTCYL 4. 80. 12. ;
+p3 = POINTCYL 1. 280. -1. ;
+p4 = POINTCYL 3. 180. 42. ;
+p5 = POINTCYL 2. 120. -7. ;
+mp1 = p1 ET p2 ET p3 ET p4 ET p5 ;
+
+* POINTCYL syntaxe avec des LISTREELs
+mp2 = POINTCYL (PROG 0. 4. 1. 3. 2.) (PROG 0. 80. 280. 180. 120.) (PROG 0. 12. -1. 42. -7.) ;
+
+* test d'egalite des points engendres
+REPE b1 (NBEL mp1) ;
+  pt1 = mp1 POIN &b1 ;
+  pt2 = mp2 POIN &b1 ;
+  SI ('>' (DIST pt1 pt2) dprec) ;
+    ERRE 5 ;
+  FINSI ;
+FIN b1 ;
+
+* POINTSPH syntaxe avec des FLOTTANTs
+p1 = POINTSPH 0. 0. 0. ;
+p2 = POINTSPH 4. 80. 12. ;
+p3 = POINTSPH 1. 280. -80. ;
+p4 = POINTSPH 3. 180. 76. ;
+p5 = POINTSPH 2. 120. -12. ;
+mp1 = p1 ET p2 ET p3 ET p4 ET p5 ;
+
+* POINSPHE syntaxe avec des LISTREELs
+mp2 = POINTSPH (PROG 0. 4. 1. 3. 2.) (PROG 0. 80. 280. 180. 120.) (PROG 0. 12. -80. 76. -12.) ;
+
+* test d'egalite des points engendres
+REPE b1 (NBEL mp1) ;
+  pt1 = mp1 POIN &b1 ;
+  pt2 = mp2 POIN &b1 ;
+  SI ('>' (DIST pt1 pt2) dprec) ;
+    ERRE 5 ;
+  FINSI ;
+FIN b1 ;
+
+FIN ;
+
+ 
+

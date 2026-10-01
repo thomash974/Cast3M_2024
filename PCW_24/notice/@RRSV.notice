@@ -1,0 +1,78 @@
+$$$$ @RRSV    NOTICE  CB215821  19/11/18    21:15:01     10383          
+                                             DATE     19/11/18
+Section : Mathematiques Autres
+
+*----------------------------------------------------------------------
+*      CETTE METHODE A ETE MISE GRACIEUSEMENT
+*      A DISPOSITION DE  LA COMMUNAUTE CAST3M
+*      PAR TAMASKOVICS N.
+*     (Freiberg Institut für Geotechnik )
+*----------------------------------------------------------------------
+
+    Methode @RRSV                           Voir aussi:@RSTH @RRST
+    -------------                                      @RRSR @RSCS @RSCV
+
+    RS%'RSV'  ENT1  DBG1 ;
+
+FRAN==============================================================
+
+    Objet :
+    _______
+
+    La methode @RRSV forme partie du objet @RSTH et est appelee avec
+    l'abbreviation %'RSV'.
+
+
+    Commentaire :
+    _____________
+
+    La methode @RRSV extrait le valeur des paramètres du random set
+    avec le nombre serielle ENT1 et introduit les valeurs dans la
+    table %'RT' pour chaque paramètre avec un index .'RSV'
+
+    ENT1 : nombre serielle ENT1 de la variation des paramètres
+           du Random Set
+
+    DBG1 : Argument optionel de type ENTIER indiquant le niveau du 
+           deboggage (DBG1 manquant ouDBG1=0, pas de deboggage)
+
+
+    Exemple :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+ANGL==============================================================
+
+    Description :
+    _____________
+
+    The method @RRSV belongs to the object @RSTH and is called with
+    the abbreviation %'RSV'.
+
+
+    Contents :
+    __________
+
+    The method @RRSV extracts the value of the parameters for the
+    Random Set with the serial number ENT1 and introduces the values
+    into the table %'RT' for each parameter with the entry .'RSV'
+
+    ENT1 : serial number ENT1 of the parameter variation in the
+           Random Set
+
+    DBG1 : An optional argument with a value of type ENTIER indicating
+           the debugging level (DBG1 missing or DBG1=0, no debugging)
+
+
+    Example :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+$$$$
+ 

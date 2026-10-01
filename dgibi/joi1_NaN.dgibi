@@ -1,0 +1,131 @@
+
+*      TEST   RESSORT - JOINT Mohr Coulomb - RESSORT en série pour vérification 
+*      plan contact yOz <=> direction normale = Ux
+*      -|
+*      -|_________.__________._________.<= Uimposé en compression et vertical
+*      -| ressort   JOI1 MC    ressort
+*      -|
+*
+*
+*==================================  MAILLAGE ======================================
+
+  'OPTI' 'ELEM' 'SEG2' 'DIME' 3 'MODE' 'TRID' ;
+*  'OPTI' 'EPSILON' 'LINEAIRE'                 ;
+  MUR0 = 0. 0. 0. ;
+  MUR_HAUT = 0. 0.  1. ; comm 'juste pour visu encastrement';
+  MUR_BAS  = 0. 0. -1. ; comm 'juste pour visu encastrement';
+  ptA  = 1. 0. 0. ;
+  ptB  = 2. 0. 0. ;
+  ptC  = 3. 0. 0. ;
+  LE_MUR  = (MUR_HAUT DROI 1 MUR0 DROI 1 MUR_BAS) 'COUL' BLEU;
+  RESS1   = MUR0 DROI 1 ptA;
+  LEJOINT = (ptA DROI 1 ptB) COUL ROUG;
+  RESS2   = ptB DROI 1 ptC;
+  MAIL_TOT = RESS1 et RESS2 et LEJOINT;
+  MAILVISU = MAIL_TOT et LE_MUR; 
+  
+*==================================  MODELE ET MATERIAU ====================================== 
+
+* ressorts de type poutres linéaires (==> meme pb de NaN en compression du joint)
+  MOD_RES1 = MODE RESS1 MECANIQUE ELASTIQUE ISOTROPE POUT;
+  MOD_RES2 = MODE RESS2 MECANIQUE ELASTIQUE ISOTROPE POUT;
+  MOD_JOIN = MODE LEJOINT MECANIQUE ELASTIQUE ORTHOTROPE PLASTIQUE 'COULOMB' JOI1;
+  dir1 = 1. 0. 0.; 
+  dir2 = 0. 1. 0.;
+  MAT_RES1 = MATE MOD_RES1 'YOUN' 1.E10 'NU' 0.3 'SECT' 1E-4  'SECY' 1E-4  'SECZ' 1E-4  'INRY' 1E-4 'INRZ' 1E-4  'TORS' 1E-4 'VECT' (0. 1. 0.);
+  MAT_RES2 = MATE MOD_RES2 'YOUN' 1.E10 'NU' 0.3 'SECT' 1E-4  'SECY' 1E-4  'SECZ' 1E-4  'INRY' 1E-4 'INRZ' 1E-4  'TORS' 1E-4 'VECT' (0. 1. 0.);
+* frottement 0.5 ==> FRIC = 27 degrés
+  MAT_JOIN = MATE MOD_JOIN 'DIRECTION' dir1 dir2  'TYPE' 1.   'QT  ' 1.E3   'FNE ' 1.E9  'COHE' 0.  'FTRC' 0.
+*** 
+***      'KN' 1.0E3  'KS1'  1.E6  'KS2' 1.E6  'QN' 1.E6 'QS1' 1.E6 'QS2' 1.E6   'FRIC' 27.; COMM 'CAUSE ERREUR : KN=QT ==> division par 0 ';
+***
+    'KN' 1.0001E3  'KS1'  1.E6  'KS2' 1.E6  'QN' 1.E6 'QS1' 1.E6 'QS2' 1.E6   'FRIC' 27.;
+
+  
+*==================================  CONDITIONS AUX LIMITES ET CHARGEMENT ======================================  
+  
+  BLO_MUR = BLOQ 'DEPL' 'ROTA' MUR0;
+  BLO_C_X = BLOQ 'UX' ptC;
+  BLO_C_Y = BLOQ 'UY' ptC;
+  BLO_C_Z = BLOQ 'UZ' ptC;
+  BLO_ROTA = BLOQ 'ROTA' MAIL_TOT;
+
+* pilotage point ptC en déplacement : compression et cyclage vertical puis réouverture
+  DIMP_X  = 1.E-6 * (PROG 0.  0.1 -0.1 -0.2  -0.2 -0.2 -0.2 -0.2 -0.2 -0.2 -0.2 -0.2  0.  0.1); 
+*  DIMP_X  = 1.E-6 * (PROG 0.  0.1 0.15 0.2   0.2   0.2  0.2  0.2  0.2  0.2  0.2  0.2  0. -0.1); 
+  
+  DIMP_Z  = 3.E-5 * (PROG 0.  0.    0.   0.   0.1   0.2  0.1  0.  -0.1 -0.2 -0.1   0.  0.  0. );
+  DIMP_Y  = PROG (DIME DIMP_X) * 0.;
+  L_TEMPS = PROG 0. PAS 1.  (DIME (DIMP_X) - 1);
+   
+  EVOL_X  = EVOL MANU 'TEMPS' L_TEMPS 'UX' DIMP_X 'COUL' ROUG;
+  CHAR_UX = CHAR 'DIMP' (DEPI BLO_C_X 1.) EVOL_X;
+  
+  EVOL_Y  = EVOL MANU 'TEMPS' L_TEMPS 'UY' DIMP_Y 'COUL' NOIR;
+  CHAR_UY = CHAR 'DIMP' (DEPI BLO_C_Y 1.) EVOL_Y; 
+  
+  EVOL_Z  = EVOL MANU 'TEMPS' L_TEMPS 'UZ' DIMP_Z 'COUL' BLEU;
+  CHAR_UZ = CHAR 'DIMP' (DEPI BLO_C_Z 1.) EVOL_Z; 
+  
+  CHjeuINI = MANU 'CHML' MOD_JOIN 'EXX' -1.E-5  'TYPE' 'DEFORMATION' ;
+  EVO_JEU = EVOL MANU 'TEMPS' (PROG 0. 1.E-3 100.) 'JEU' (PROG 0. 1. 1.);
+  CHAR_JEU = CHAR 'DEFI' CHjeuINI EVO_JEU;
+  
+*==================================  RESOLUTION PASAPAS ======================================   
+  
+    TAB1 = TABLE;
+    TAB1 . 'MODELE'              = MOD_RES1 et MOD_RES2 et MOD_JOIN;
+    TAB1 . 'CARACTERISTIQUES'    = MAT_RES1 et MAT_RES2 et MAT_JOIN;
+    TAB1 . 'BLOCAGES_MECANIQUES' = BLO_C_X et BLO_C_Y et BLO_C_Z et BLO_MUR et BLO_ROTA;
+    TAB1 . 'CHARGEMENT'          = CHAR_UX et CHAR_UY et CHAR_UZ ;
+* et CHAR_JEU;
+* TAB1 . TEMPS_CALCULES      = PROG 0. 1. 2. 3. ;
+    TAB1 . TEMPS_CALCULES      = L_TEMPS;
+    TAB1 . GRANDS_DEPLACEMENTS = FAUX;
+    PASAPAS TAB1;
+  
+  
+*==================================  VISUALISATION ======================================   
+
+si faux; 
+ opti trac X;
+  
+* maillage
+  OEIL1 = 0. -10. 0.;
+  TRAC OEIL1 MAILVISU 'TITR' 'MAILLAGE RESSORT - JOINT Coulomb - RESSORT en 3D';
+  
+* courbes chargements
+  DESS (EVOL_X  et EVOL_Z) TITR 'Deplacement normal (ROUGE) imposé au point C et deplacement vertical (BLEU)';
+
+* déformées successives
+  @CARTOON TAB1 MAIL_TOT (BLO_C_X et BLO_C_Z) OEIL1   ;
+
+* état du joint (si 2 = en compression)
+  EVO_ETAT = EVOL 'TEMP' TAB1 'VARIABLES_INTERNES' 'STAT' 3 1 1;
+  DESS EVO_ETAT TITR 'ETAT DU CONTACT : 1=ouvert / 2=compression';
+
+* jeu axial (attention variables internes pas toujours claires, a priori PLA3 #####)
+  EVO_JEU = EVOL 'TEMP' TAB1 'VARIABLES_INTERNES' 'PLA3' 3 1 1;
+  DESS EVO_JEU TITR 'jeu dans le joint';
+  
+* glissement dans le joint  % temps
+  EVO_GLI = EVOL 'TEMP' TAB1 'VARIABLES_INTERNES' 'PLA2'  3 1 1;
+  DESS EVO_GLI TITR 'glissement dans le joint';
+  
+* force normale dans le joint % temps
+  EVO_FX = EVOL 'TEMP' TAB1 'CONTRAINTES' 'EFFX' 3 1 1;
+  DESS EVO_FX TITR 'contrainte normale dans le joint'; 
+  
+* force verticale dans le joint % temps
+  EVO_FZ = EVOL 'TEMP' TAB1 'CONTRAINTES' 'EFFZ'  3 1 1;
+  DESS EVO_FZ TITR 'contrainte de cisaillement vertical dans le joint';  
+  
+finsi;
+  
+*================================== 
+FIN;  
+  
+  
+  
+ 
+

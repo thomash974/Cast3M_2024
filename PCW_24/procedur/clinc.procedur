@@ -1,0 +1,86 @@
+$$$$ CLINC
+* CLINC     PROCEDUR  SERRE     21/12/07    21:15:01     11208          
+'DEBP' CLINC rxt*'TABLE' rtf*'TABLE' TKAS*'LOGIQUE'
+             NIC*'MOT' Nj*'MOT' NICM*'MOT';
+*
+* Imposition des conditions aux limites de Dirichlet sur les champs scalaires
+* aux Entrées / Sorties du domaine fluide
+*
+* E/  RXT  : TABLE    : Données de execrxt
+* E/  RTF  : TABLE    : Description d'une équation scalaire
+* E/  TKAS : LOGIQUE  : Vrai si le // est actif 
+* E/  NIC  : MOT      : Nom de l'inconnue scalaire
+* E/  NJ   : MOT      : Nom de l'indice de Breches . i ou Sorties . i
+*                      contenant la valeur à imposer
+* E/  NICM : MOT      : Indice dans tic du pas précédent
+*
+*  /S rtf . 'CLIM' : CHPO : Vecteur des conditions aux limites
+*  /S chp1         : CHPO : Delta des conditions aux limites
+*
+TBT = rxt . 'TBT' ;
+TIC = rxt . 'TIC' ;
+GEO = rxt . 'GEO' ;
+cpv matxx = 'KOPS' 'MATRIK' ;
+chp1  = 'VIDE' 'CHPOINT'/'DISCRET' ;
+mail1 = 'VIDE' 'MAILLAGE'/'POI1' ;
+'MESS' ' CLINC, inconnue' ' ' NIC ' ,' ' ' Nj ' ' NICM ;
+*
+'SI' ((TBT.'TPAROIF') 'ET' ('EGA' NIC 'TF')) ;
+   TBPW         = 'REDU' (tic . 'TP') GEO . 'paroif' ;
+   tic . 'TBPW' = 'KCHT' GEO . '$paroif' 'SCAL' 'SOMMET' TBPW ;
+   TBFW         = 'REDU' (tic . NIC) GEO . 'paroif' ;
+   tic . 'TBFW' = 'KCHT' GEO . '$paroif' 'SCAL' 'SOMMET' TBFW ;
+'FINS' ;
+*
+* Prise en compte des Entrées et des Sorties
+'SI' (TBT . 'TTsortie') ;
+  NBR = 'DIME' rxt . 'Sorties' ;
+  ibr = 'INDE' rxt . 'Sorties' ;
+  'REPE' BBRS NBR ;
+     Briches  = rxt . 'Sorties' . (ibr . &BBRS) ;
+     brecheis = Briches . 'srechei' ;
+* On ne fait rien pour un clapet de décharge
+* ou en extraction (ventilation forcée)
+     'SI' ('NON' Briches . 'TTOUT') ;
+     cpv = cpv 'ET'
+     ('MANU' 'CHPO' brecheis 1 NIC (Briches . Nj) 'NATURE' 'DISCRET') ;
+     'FINS' ;
+  'FIN' BBRS ;
+'FINS' ;
+'SI' TBT . 'TTbreche' ;
+   cpv = cpv 'ET' tic . 'Breches' . NIC ;
+'FINS' ;
+*
+* Prise en compte du //
+'SI' (TBT . 'TTbreche' 'OU' TBT . 'TTsortie') ;
+   'SI' (TKAS 'ET' ('EXIS' rtf 'CLIM')) ;
+     rtf . 'CLIM' = rtf . 'CLIM' '+' cpv ;
+   'SINO' ;
+     rtf . 'CLIM' = cpv ;
+   'FINS' ;
+   mail1 = 'EXTR' cpv 'MAIL' ;
+'FINS' ;
+*
+* Prise en compte des recomineurs
+'SI' (TBT . 'TRECOMB') ;
+   cpvrec = rxt . 'TIC' . 'RECOMB' . NIC ;
+   'SI' (TBT.'TTbreche' ou TBT.'TTsortie') ;
+      rtf . 'CLIM' = rtf . 'CLIM' '+' cpvrec ;
+   'SINO' ;
+      rtf . 'CLIM' = cpvrec ;
+   'FINS' ;
+   cpv   = cpv '+' cpvrec ; 
+   mail1 = 'EXTR' cpv 'MAIL' ;
+'FINS' ;
+*
+* Delta dû aux conditions aux limites
+npts = 'NBEL' mail1 ;
+'SI' ('NEG' npts 0) ;
+   chp1 = ('NOMC' cpv 'SCAL') '-' ('REDU' tic . nicm mail1) ;
+'FINS' ;
+*
+'FINP' chp1 ;
+
+ 
+ 
+ 

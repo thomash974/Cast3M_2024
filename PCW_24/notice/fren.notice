@@ -1,0 +1,61 @@
+$$$$ FREN     NOTICE  JB251061  21/12/07    21:15:02     11213          
+                                             DATE     21/12/07
+
+    Operateur FRENET                         Voir aussi :
+    ----------------
+
+    CHPO1 = FREN LIG1 ;
+
+Section : Mathematiques Autres
+
+FRAN===========================================================
+    Objet :
+    _______
+
+    L'operateur FRENET construit le repere de Frenet d'un maillage LIG1 de SEG2
+    ou de SEG3.
+
+    Commentaire :
+    _____________
+
+    LIG1   : courbe dont on veut le repere de Frenet (type MAILLAGE)
+
+    CHPO1  : repere de Frenet (type CHPOINT), la tangente etant definie par les
+    composantes TX, TY (et TZ en 3D), la normale par les composantes NX, NY
+    (et NZ en 3D) et la binormale par les composantes BX, BY (et BZ en 3D)
+
+    Remarque : la courbe LIG1 peut ne pas etre connexe, cependant chacune de ses
+    composantes connexe doit etre convenablement orientee.
+
+    Remarque : dans le cas d'une courbe ouverte, la tangente est determinee a
+    chaque extremite par la direction du segment correspondant. En 3D, on
+    determine alors la binormale a partir de celle calculee au point adjacent
+    par orthonormalisation, et la normale s'en deduit. Le repere est par
+    consequent moins bon aux extremites.
+
+ANGL===========================================================
+    Description :
+    ____________
+
+    The FRENET operator constructs the Frenet frame of a mesh LIG1 made up of
+    either SEG2 or SEG3 elements.
+
+    Comment :
+    _________
+
+    LIG1   : curve whose Frenet frame is sought (MAILLAGE type)
+
+    CHPO1  : Frenet frame (CHPOINT type), the tangent being defined by the
+    components TX, TY (and TZ in 3D), the normal by the components NX, NY
+    (and NZ in 3D) and the binormal by the components BX, BY (and BZ in 3D)
+
+    Remark : the curve LIG1 may not be connected, but each of its connected
+    component must be correctly oriented.
+    
+    Remark : when the curve is open, the tangent at each endpoint is determined
+    using the direction of the corresponding segment. In 3D, the binormal is
+    determined from the one computed at the adjacent point by the Gram-Schmidt
+    process, and the normal follows. The frame is thus less accurate at the
+    endpoints.
+
+$$$$ 

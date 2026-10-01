@@ -1,0 +1,10 @@
+=== Cas 9 : relaxendo (relaxation + endommagement + thermique) ===
+Valeurs comparees : 36
+Temps horloge (ms) : origine 268 ; niveau 1 265 ; niveau 2 277
+Acceleration par rapport a l origine : niveau 1   1.01 ; niveau 2   0.97
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 1 ; niveau 1 1 ; niveau 2 1
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 21
+Niveau 1 : raideur reutilisee 0 fois, recalculee 6 fois ; HOOK evite 20 fois ; caracteristiques reutilisees 1 fois
+Niveau 2 : raideur reutilisee 5 fois, recalculee 1 fois ; HOOK evite 20 fois ; caracteristiques reutilisees 1 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  5.321E-11
+RESULTAT : niveau 1 OK ; niveau 2 OK

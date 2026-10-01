@@ -1,0 +1,207 @@
+* fichier : paraton.dgibi
+************************************************************************
+* Section : Fluides Permanent
+* Section : Fluides Diffusion
+************************************************************************
+* NOM         : PARATON.DGIBI
+* DESCRIPTION : Laplacian on a domain with a spike
+*
+*
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 11/10/2011, version initiale
+* HISTORIQUE : v1, 11/10/2011, création
+************************************************************************
+*
+'OPTION' 'DIME' 2 'ELEM' 'TRI3' 'MODE' 'PLAN' ;
+graph    = FAUX ;
+interact = FAUX ;
+*
+* MODIF procedure :
+* Utility for creating mesh and 'NAVIER_STOKES' model object.
+* All meshes that will be used for Fluid Mechanics Modeling (including
+* post-treatment) must be given to MODIF.
+* MODIF must be called only once ! (because of the use of ELIM operator)
+*
+* Usage :
+* mail1 mod1 mail2 mod2 ... = MODIF MOT1 mail1 mail2 ...
+* where : maili is a MAILLAGE object
+*         modi  is a 'NAVIER_STOKES' MODEL object
+*         MOT1 is a discretization name ('LINE' or 'MACRO' or 'QUAF')
+*   
+'DEBPROC' MODIF discr*'MOT';
+tmailq = 'TABLE' 'ESCLAVE' ;
+tmodns = 'TABLE' ;
+'REPETER' barg ;
+*   Read an optional mesh argument
+*   On lit un éventuel argument
+   'ARGUMENT' mail/'MAILLAGE';
+   'SI' ('EXISTE' mail) ;
+      mailq = 'CHANGER' mail 'QUAF' ;
+      tmailq . &barg = mailq ;
+      tmodns . &barg = 'MODE' mailq 'NAVIER_STOKES' discr ;
+   'SINON' ;
+      'QUITTER' barg;
+   'FINSI' ;
+'FIN' barg ;
+*   Elimination of geometrically-coincident points created with
+*     'CHANGER' 'QUAF'
+'ELIMINATION' ('ET' tmailq) 1.D-6 ;
+*     Output the resulting mesh and models
+'REPETER' bsort ('DIME' tmodns) ;
+   modns = tmodns . &bsort ;
+   mail  = 'DOMA' modns 'MAILLAGE' ;
+   'RESPRO' mail modns ;
+'FIN' bsort ;
+'FINPROC' ;
+*
+* Mesh
+*
+ang   = 0. ; epsi = 0.5 '*' ('TAN' ('/' ang 2.)) ;
+* Points
+pA = epsi 0. ; pB = 1. 0. ; pC = 1. 1. ; pD = 0. 1. ;
+pE = 0. 0.5  ; pF = 1. 0.5 ;
+dpeti = 0.01 ;
+dgran = 0.2 ;
+* Distance to point pE
+pcont = pA 'ET' pB 'ET' pC 'ET' pD 'ET' pE 'ET' pF ;
+xpc ypc = 'COORDONNEE' pcont ;
+xpe ype = 'COORDONNEE' pE ;
+dpe = '**' ('+' ('**' ('-' xpc xpe) 2)  ('**' ('-' ypc ype) 2)) 0.5 ;
+* Wanted Element density
+wed = '+' ('*' dpe ('/' ('-' dgran dpeti) ('MAXIMUM' dpe))) dpeti ;
+dA = 'EXTRAIRE' wed 'SCAL' pA ;
+dB = 'EXTRAIRE' wed 'SCAL' pB ;
+dC = 'EXTRAIRE' wed 'SCAL' pC ;
+dD = 'EXTRAIRE' wed 'SCAL' pD ;
+dE = 'EXTRAIRE' wed 'SCAL' pE ;
+dF = 'EXTRAIRE' wed 'SCAL' pF ;
+* Lines
+dAB = 'DROIT' pA pB 'DINI' dA 'DFIN' dB ;
+dBF = 'DROIT' pB pF 'DINI' dB 'DFIN' dF ;
+dFE = 'DROIT' pF pE 'DINI' dF 'DFIN' dE ;
+dEA = 'DROIT' pE pA 'DINI' dE 'DFIN' dA ;
+dFC = 'DROIT' pF pC 'DINI' dF 'DFIN' dC ;
+dCD = 'DROIT' pC pD 'DINI' dC 'DFIN' dD ;
+dDE = 'DROIT' pD pE 'DINI' dD 'DFIN' dE ;
+dBC = dBF 'ET' dFC ;
+dEA = 'COULEUR' dEA 'BLEU' ; dAB = 'COULEUR' dAB 'BLEU' ;
+dCD = 'COULEUR' dCD 'ROUG' ;
+* Surface
+cmt1 = dAB 'ET' dBF 'ET' dFE 'ET' dEA ;
+cmt2 = ('INVERSE' dFE) 'ET' dFC 'ET' dCD 'ET' dDE ;
+mt1  = 'SURFACE' wed cmt1 ;
+mt2  = 'SURFACE' wed cmt2 ;
+mt = mt1 'ET' mt2 ;
+* Navier_Stokes model objects
+mt $mt dAB $dAB dBC $dBC dCD $dCD dDE $dDE dEA $dEA dFE $dFE =
+   MODIF 'LINE' mt dAB dBC dCD dDE dEA dFE ;
+'SI' graph ;
+   'SI' ('EGA' ang 0. 1.e-6) ;
+* Plot mesh
+      cm = ('COULEUR' (dEA 'ET' dAB) 'BLEU') 'ET' dBC
+         'ET' ('COULEUR' dCD 'ROUG') 'ET' ('COULEUR' dDE 'VERT') ;
+      'TRACER' cm ;
+      'TRACER' mt ;
+   'SINON' ;      
+* Plot symmetrized mesh
+      cm = ('COULEUR' (dEA 'ET' dAB) 'BLEU') 'ET' dBC
+         'ET' ('COULEUR' dCD 'ROUG') ;
+      mts cms = 'SYMETRIE' mt cm 'DROIT' pD pE ;
+      cmtt = cm 'ET' cms ;
+      mtt  = mt 'ET' mts ;
+      'ELIMINATION' mtt 1.D-6 ;
+      'TRACER' cmtt ;
+      'TRACER' mtt ;
+   'FINSI' ;      
+'FINSI' ;
+*
+* Discretization
+*
+rv = 'EQEX'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $mt 'OPER' 'LAPN' 1. 'INCO' 'VN' ;
+* Boundary condition
+mv0 = dEA 'ET' dAB ;
+cv0 = 'MANUEL' 'CHPO' mv0 1 'SCAL' 0. 'NATURE' 'DIFFUS' ;
+mvy = dBC ;
+cvy = 'COORDONNEE' 2 mvy ;
+cvy = 'CHANGER' cvy 'ATTRIBUT' 'NATURE' 'DIFFUS' ;
+mv1 = dCD ;
+cv1 = 'MANUEL' 'CHPO' mv1 1 'SCAL' 1. 'NATURE' 'DIFFUS' ;
+mvt = mv0 'ET' mvy 'ET' mv1 ;
+cvt = cv0 'ET' cvy 'ET' cv1 ;
+rv = 'EQEX' rv 'CLIM' 'VN' 'TIMP' mvt cvt ;
+* Unknown initialization
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'VN' = 'KCHT' $mt 'SCAL' 'SOMMET' 0. ;
+*
+* Solution
+*
+EXEC rv ;
+*
+* Post-treatment
+*
+vn = rv . 'INCO' . 'VN' ;
+vn = 'CHANGER' 'ATTRIBUT' vn 'NATURE' 'DIFFUS' ;
+'SI' graph ;
+   'SI' ('EGA' ang 0.0 1.D-6) ;
+* Plot solution
+      cmt = 'CONTOUR' mt ;
+      'OPTI' 'ISOV' 'SULI' ;
+      'TRACER' vn mt cmt 60 ;
+      dAD = 'INVERSE' ('ET' dDE dEA) ;
+      dEF = 'INVERSE' dFE ;
+      evad = 'EVOL' 'ROUG' 'CHPO' vn dAD ;
+      evef = 'EVOL' 'BLEU' 'CHPO' vn dEF ;
+      evt = evad 'ET' evef ;
+      tabev = 'TABLE' ;
+      tabev . 1 = 'CHAINE' 'MARQ CROI REGU' ;
+      tabev . 2 = 'CHAINE' 'MARQ CARR REGU' ;
+      'DESSIN' evt 'TITX' 'abs.curv.' 'TITY' 'Pot.' 'CARR' tabev ;
+   'SINON' ;      
+* Plot symmetrized solution
+      mts vns = 'SYMETRIE' mt vn 'DROIT' pD pE ;
+      mtt = mt 'ET' mts ;
+      vnt = vn 'ET' vns ;
+      'ELIMINATION' mtt 1.D-6 ;
+      cmtt = 'CONTOUR' mtt ;
+      'OPTI' 'ISOV' 'SULI' ;
+      'TRACER' vnt mtt cmtt 20 ;
+   'FINSI' ;      
+'FINSI' ;
+*
+ok = VRAI ;
+*
+'SI' ('NON' ok) ;
+   'MESSAGE' ('CHAINE' 'Il y a eu des erreurs') ;
+   'ERREUR' 5 ;
+'SINON' ;
+   'MESSAGE' ('CHAINE' 'Tout sest bien passe !') ;
+'FINSI' ;
+*
+'SI' interact ;
+   'OPTION' 'ECHO' 1 ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;
+*
+* End of dgibi file PARATON
+*
+'FIN' ;
+
+ 
+
+ 
+

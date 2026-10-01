@@ -1,0 +1,142 @@
+$$$$ REPIX
+* REPIX     PROCEDUR  GOUNAND   22/11/22    21:15:03     11504          
+'DEBPROC' REPIX   ;
+'ARGU' RV*'TABLE' ;
+*====================================================================
+* REPIX enlève de la table créée par EQEX les objets MATRIK et MATRAK
+*--------------------------------------------------------------------
+* Les objets MATRIK indésirables se trouvent
+* 1) aux indices 'TABRES', 'MATASS', 'MAPREC' de la table stockee à
+*    l'indice 'METHINV'
+* 2) aux indices 'MATC', 'MATG', 'MATP' et 'METHINV' de la table
+*    stockée à l'indice 'PRESSION' ou 'PROJ';
+* 3) à l'indice 'MATESI' des tables de sous types 'DOMAINE' stockées
+* dans la table rangée à l'indice 'DOMINC';
+* 4) à l'indice 'MATESI' de la table stockée à l'indice 'DOMAINE';
+* 5) à l'indice 'MATELM' des tables de sous type 'KIZX'.
+*====================================================================
+'SI' ('EXIS' RV 'SOUSTYPE' ) ;
+   'SI' ('NEG' RV . 'SOUSTYPE' 'EQEX' ) ;
+      'QUIT' REPIX ;
+   'FINS' ;
+'SINO' ;
+   'QUIT' REPIX ;
+'FINS' ;
+ TAB1 = 'INDEX' RV ;
+ NOP1 = 'DIME' TAB1 ;
+'SI' ('EGA' NOP1 0) ;
+   'QUIT' REPIX ;
+'FINS' ;
+*
+*-----------------
+'REPE' BOU1 NOP1 ;
+*-----------------
+*
+    IND1 = MOT TAB1 . &BOU1 ;
+*
+*- Cas 1)
+*
+   'SI' ('EGA' IND1 'METHINV') ;
+      RVM = RV . 'METHINV' ;
+      TRVM = 'TYPE' RVM ;
+      'SI' ('EGA' TRVM 'TABLE   ' ) ;
+         'SI' ('EXIS' RVM 'TABRES') ; 'OUBL' RVM 'TABRES' ; 'FINS' ;
+         'SI' ('EXIS' RVM 'MATASS') ; 'OUBL' RVM 'MATASS' ; 'FINS' ;
+         'SI' ('EXIS' RVM 'MAPREC') ; 'OUBL' RVM 'MAPREC' ; 'FINS' ;
+      'FINS' ;
+   'FINS' ;
+*
+*- Cas 2)
+*
+   'SI' ('OU' ('EGA' IND1  'PRESSION' ) ('EGA' IND1  'PROJ' )) ;
+       RVP = RV . IND1 ;
+       TRVP = 'TYPE' RVP ;
+      'SI' ('EGA' TRVP 'TABLE   ' ) ;
+*         'SI' ('EXIS' OBJ1 'SOUSTYPE' ) ;
+*            'SI' ('EGA' OBJ1 . 'SOUSTYPE' 'EQPR' ) ;
+*               'SI' ('EXIS' OBJ1 'MATC' ) ;
+*                   OBJ1 . 'MATC' = 0 ;
+*               'FINS' ;
+*            'FINS' ;
+*         'FINS' ;
+         'SI' ('EXIS' RVP 'METHINV') ;
+            RVPM = RVP . 'METHINV' ;
+            TRVPM = 'TYPE' RVPM ;
+            'SI' ('EGA' TRVPM 'TABLE   ' ) ;
+               'SI' ('EXIS' RVPM 'TABRES') ; 'OUBL' RVPM 'TABRES' ;
+               'FINS' ;
+               'SI' ('EXIS' RVPM 'MATASS') ; 'OUBL' RVPM 'MATASS' ;
+               'FINS' ;
+               'SI' ('EXIS' RVPM 'MAPREC') ; 'OUBL' RVPM 'MAPREC' ;
+               'FINS' ;
+            'FINS' ;
+         'FINS' ;
+         'SI' ('EXIS' RVP 'MATP') ; 'OUBL' RVP 'MATP' ; 'FINS' ;
+         'SI' ('EXIS' RVP 'MATC') ; 'OUBL' RVP 'MATC' ; 'FINS' ;
+         'SI' ('EXIS' RVP 'MATG') ; 'OUBL' RVP 'MATG' ; 'FINS' ;
+      'FINS' ;
+       ITERER BOU1 ;
+   'FINS' ;
+*
+*- Cas 3)
+*
+   'SI' ('EGA' IND1 'DOMINC' ) ;
+      TAB2 = 'INDEX' ( RV . IND1 ) ;
+      NOP2 = 'DIME' TAB2 ;
+      'SI' ('NEG' NOP2 0) ;
+         'REPE' BOU2 NOP2 ;
+              IND2 = MOT TAB2 . &BOU2 ;
+              'SI' ('NEG' IND2  'SOUSTYPE' ) ;
+                 OBJ2 = RV . IND1 . IND2 ;
+                 TYP2 = 'TYPE' OBJ2 ;
+                 'SI' ('EGA' TYP2 'TABLE   ' ) ;
+                    'SI' ('EXIS' OBJ2 'SOUSTYPE' ) ;
+                       'SI' ('EGA' OBJ2 . 'SOUSTYPE' 'DOMAINE' ) ;
+                          OBJ2 . 'MATESI' = 0 ;
+                       'FINS' ;
+                    'FINS' ;
+                 'FINS' ;
+              'FINS' ;
+         'FIN' BOU2 ;
+      'FINS' ;
+       ITERER BOU1 ;
+   'FINS' ;
+*
+*- Cas 4)
+*
+   'SI' ('EGA' IND1  'DOMAINE' ) ;
+       OBJ1 = RV . IND1 ;
+       TYP1 = 'TYPE' OBJ1 ;
+      'SI' ('EGA' TYP1 'TABLE   ' ) ;
+         'SI' ('EXIS' OBJ1 'SOUSTYPE' ) ;
+            'SI' ('EGA' OBJ1 . 'SOUSTYPE' 'DOMAINE' ) ;
+               'SI' ('EXIS' OBJ1 'MATESI' ) ;
+                   OBJ1 . 'MATESI' = 0 ;
+               'FINS' ;
+            'FINS' ;
+         'FINS' ;
+      'FINS' ;
+       ITERER BOU1 ;
+   'FINS' ;
+*
+*- Cas 5)
+*
+   'SI' ('NEG' IND1  'SOUSTYPE' ) ;
+       OBJ1 = RV . IND1 ;
+       TYP1 = 'TYPE' OBJ1 ;
+      'SI' ('EGA' TYP1 'TABLE   ' ) ;
+         'SI' ('EXIS' OBJ1 'SOUSTYPE' ) ;
+            'SI' ('EGA' OBJ1 . 'SOUSTYPE' 'KIZX' ) ;
+                OBJ1 . 'MATELM' = 0 ;
+            'FINS' ;
+         'FINS' ;
+      'FINS' ;
+       ITERER BOU1 ;
+   'FINS' ;
+*
+*-----------
+'FIN' BOU1 ;
+*-----------
+*
+'FINPROC' ;
+ 

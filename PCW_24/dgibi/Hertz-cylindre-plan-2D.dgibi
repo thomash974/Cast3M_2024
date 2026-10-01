@@ -1,0 +1,234 @@
+*=======================================================================
+*
+* Modelisation d'un contact cylindre-plan en 2D
+* Comparaison du champ de pression calcule a celui issu de la theorie 
+* developpee par Hertz.
+*
+*=======================================================================
+*                         OPTION DE CALCUL                             =
+*=======================================================================
+OPTI DIME 2 ELEM QUA4 MODE PLAN DEFO ;
+OPTI DENS 2.E-4 ;
+OPTI TRAC PSC ;
+*=======================================================================
+*                  INITIALISATION DE LA TABLE RESULTATS                =
+*=======================================================================
+LCOULEUR = 'MOTS' 'ROUG' 'VERT' 'DEFA' 'ORAN' ;
+LMARQUES = 'MOTS' 'CROI' 'PLUS' 'MOIN' 'BARR' ;
+LFORCONT = 'MOTS' 'MESC' 'SYME' 'FAIB' 'MORT' ;
+NBRFORMU = 'DIME' LFORCONT ;
+TPOST = 'TABLE' ; 
+TPOST.'FORMULATION' = LFORCONT ;
+TLEG1 = 'TABLE' ;
+TLEG1.'TITRE' = 'TABLE' ;
+TLEG1.'TITRE'. 1 = MOT 'Analytique' ;
+TLEG1. 1 = ' ' ;
+TLEG2 = 'TABLE' ;
+TLEG2.'TITRE' = 'TABLE' ;
+TLEG2.'TITRE'. 1 = MOT 'Analytique' ;
+TLEG2. 1 = ' ' ;
+'REPE' B1 NBRFORMU ;
+  INDD = &B1 + 1 ;
+  FOCON = 'EXTR' LFORCONT &B1 ;
+  TPOST.FOCON = 'TABLE' ;
+  MARQZ = 'CHAI' 'MARQ' ' S ' ' ' ('EXTR' LMARQUES &B1) ;
+  TLEG1.'TITRE'. INDD = 'CHAI' 'CYLI_'FOCON ;
+  TLEG1. INDD = MARQZ ;
+  TLEG2.'TITRE'. INDD = 'CHAI' 'PLAN_'FOCON ;
+  TLEG2. INDD = MARQZ ;
+  COULZ = 'EXTR' LCOULEUR &B1 ;
+  TPOST.FOCON.'COLOR' = COULZ ;
+'FIN' B1 ;
+*=======================================================================
+*                                MAILLAGE                              =
+*=======================================================================
+* ---------------------- DIMENSIONS DES OBJETS ------------------------*
+Rcyli = 0.5*100.E-3 ;
+Hbloc = 1.5*Rcyli ;
+Lbloc = 1.5*Rcyli ;
+*
+* ---------------------- MAILLAGE DU CYLINDRE -------------------------*
+DENSZ = 1.E-3 ;
+PC0 = 0. RCyli ;
+PC1 = 0. 0. ;
+PC2 = RCyli RCyli ;
+PC3 = -1.*RCyli RCyli ;
+*
+* Quart de cylindre droit
+Lcy1 = CERC PC1 PC0 PC2 'DINI' DENSZ 'DFIN' (2*DENSZ) ;
+Lcy2 = DROI PC1 PC0 'DINI' DENSZ 'DFIN' (2*DENSZ) ;
+Lcy3 = DROI PC0 PC2 'DINI' (2*DENSZ) 'DFIN' (2*DENSZ) ;
+LCdr = Lcy1 'ET' Lcy3 'ET' Lcy2 ;
+SCdr = 'SURF' LCdr 'PLAN' ;
+*
+* Quart de cylindre gauche
+Lcy4 = CERC PC3 PC0 PC1 'DINI' (2*DENSZ) 'DFIN' DENSZ ;
+Lcy5 = DROI PC0 PC3 'DINI' (2*DENSZ) 'DFIN' (4*DENSZ) ;
+LCga = Lcy4 'ET' Lcy2 'ET' Lcy5 ;
+SCga = 'SURF' LCga 'PLAN' ;
+SCyl = SCdr 'ET' Scga ;
+CylCont = Lcy4'ET' Lcy1 ;
+*
+Lcyls = ('COOR' 2 SCyl) 'POIN' 'MAXI' ;
+Lcyls = ('CONT' SCyl) 'ELEM' 'APPUYE' 'STRICTEMENT' Lcyls ;
+*
+* ------------------------ MAILLAGE DU PLAN ---------------------------*
+PP0 = 0. 0. ;
+PP1 = 0. (-0.5*Hbloc) ;
+*
+DENSP = 0.7*DENSZ ;
+Lpla = 'DROI' PP0 PP1 'DINI' DENSP 'DFIN' (2*DENSP) ; 
+* Partie droite du plan
+Spdr = Lpla 'TRAN' (+1*Lbloc 0.) 'DINI' DENSP 'DFIN' (2*DENSP) ;
+* Partie gauche du plan
+Spga = Lpla 'TRAN' (-1*Lbloc 0.) 'DINI' DENSP 'DFIN' (2*DENSP) ;
+Spla = Spdr 'ET' Spga ;
+PTSZ = ('COOR' 2 Spla) 'POIN' 'MAXI' ;
+PlaCont = ('CONT' Spla) 'ELEM' 'APPUYE' 'STRICTEMENT' PTSZ ;
+*-
+LELTP = 'MANU' 'CHPO' Placont 1 'SCAL' 0. ;
+'REPE' BELT ('NBEL' Placont) ;
+  ELTZ = Placont 'ELEM' &BELT ;
+  LELT = 'MESU' ELTZ ;
+  LELTP = LELTP + ('MANU' 'CHPO' ELTZ 1 'SCAL' (LELT*0.5)) ; 
+'FIN' BELT ;
+*-
+LELTC = 'MANU' 'CHPO' Cylcont 1 'SCAL' 0. ;
+'REPE' BELT ('NBEL' Cylcont) ;
+  ELTZ = Cylcont 'ELEM' &BELT ;
+  LELT = 'MESU' ELTZ ;
+  LELTC = LELTC + ('MANU' 'CHPO' ELTZ 1 'SCAL' (LELT*0.5)) ; 
+'FIN' BELT ;
+*=======================================================================
+*                        MODELES ET MATERIAUX                          =
+*=======================================================================
+YOUC = 210.E9 ; NUC = 0.3 ;
+MOD1 = 'MODE' SCyl 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' ;
+MAT1 = 'MATE' MOD1 'YOUN' YOUC 'NU' NUC ;
+*
+YOUP = 70.E9 ; NUP = 0.3 ;
+MOD2 = 'MODE' Spla 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' ;
+MAT2 = 'MATE' MOD2 'YOUN' YOUP 'NU' NUP ;
+*=======================================================================
+*                      CONDITIONS AUX LIMITES                          =
+*=======================================================================
+PBLOY = ('COOR' 2 SPla) 'POIN' 'MINI' ;
+BL0 = 'BLOQ' PBLOY 'UY' ;
+PPLMX = ('COOR' 1 SPla) 'POIN' 'MINI' ;
+BL1 = 'BLOQ' PPLMX 'UX' ;
+PPLPX = ('COOR' 1 SPla) 'POIN' 'MAXI' ;
+BL2 = 'BLOQ' PPLPX 'UX' ;
+BL3 = 'RELA' 'ENSE' Lcyls 'UY' ;
+CLTOT = BL0 'ET' BL1 'ET' BL2 'ET' BL3 ;
+*=======================================================================
+*                             CHARGEMENT                               =
+*=======================================================================
+* Force appliquee par unite de longueur (N/m)
+FNOR = 70.E4 / 1.E-2 ;
+*
+ValpresN = FNOR '/' (1 '*' ('MESU' Lcyls)) ;
+PRE1 = 'PRES' 'MASS' MOD1 ValpresN Lcyls ; 
+*
+EVO1 = 'EVOL' 'MANU' 'TEMPS' (PROG 0. 1.) 'COEF' ('PROG' 0. 1.) ;
+CHA1 = 'CHAR' 'MECA' PRE1 EVO1 ;
+MSGZ = 'CHAI' 'FORCE EQU. A UNE PRESSION=' ('SOMT' (EXCO PRE1 FY FY)) 
+                ' N/m';
+MESS MSGZ ;
+*=======================================================================
+*                          MODELE DE CONTACT                           =
+*=======================================================================
+LTPS = 'PROG' 0 PAS 0.10 1.00 ;
+EVPLAN = 'VIDE' 'EVOLUTIO' ;
+EVCYLI = 'VIDE' 'EVOLUTIO' ;
+'REPE' BFORMU NBRFORMU ;
+*
+  FORMCONT = 'EXTR' LFORCONT &BFORMU ;
+  MCO1 = 'MODE' PlaCont 'CONTACT' CylCont FORMCONT ;
+*=======================================================================
+*                             RESOLUTION                               =
+*=======================================================================
+  TAB1 = 'TABLE' ;
+  TAB1.'MODELE'              = MOD1 ET MOD2 'ET' MCO1 ;
+  TAB1.'CARACTERISTIQUES'    = MAT1 ET MAT2 ;
+  TAB1.'CHARGEMENT'          = CHA1 ;
+  TAB1.'BLOCAGES_MECANIQUES' = CLTOT ;
+  TAB1.'TEMPS_CALCULES'      = LTPS ; 
+  TAB1.'TEMPS_SAUVES'        = LTPS ; 
+  PASAPAS TAB1 ;
+*
+*=======================================================================
+*                       SOLUTION CALCULEE                              =
+*=======================================================================
+  NPAS = 'DIME' (TAB1.'TEMPS') - 1 ;
+  REAZ = TAB1.'REACTIONS'. NPAS ;
+  COLZ = TPOST . FORMCONT.'COLOR' ;
+*
+  REAPLA = ('REDU' REAZ Placont) '/' LELTP ;
+  ERPR = 'EVOL' 'CHPO' REAPLA 'FY' ('INVE' PlaCont) ;
+  ERPR = 'EXTR' ERPR 'COUR' 1 ;
+  XABS = 'EXTR' ERPR 'ABSC' ;
+  XDEC = (('MAXI' XABS) '+' ('MINI' XABS)) '/' 2 ;
+  XNEW = XABS '-' XDEC ;
+  EPREPL = 'EVOL' COLZ 'MANU' XNEW ('EXTR' ERPR 'ORDO') ;
+*
+  REACYL = ('REDU' REAZ Cylcont) '/' LELTC ;
+  ERPR = 'EVOL' 'CHPO' REACYL 'FY' CylCont ;
+  ERPR = 'EXTR' ERPR 'COUR' 1 ;
+  XABS = 'EXTR' ERPR 'ABSC' ;
+  XDEC = (('MAXI' XABS) '+' ('MINI' XABS)) '/' 2 ;
+  XNEW = XABS '-' XDEC ;
+  EPRECY = 'EVOL' COLZ 'MANU' XNEW ('EXTR' ERPR 'ORDO') ;
+*
+  EVCYLI = EVCYLI 'ET' EPRECY ;
+  EVPLAN = EVPLAN 'ET' EPREPL ;
+*
+  'SI' ('EGA' FORMCONT 'FAIB') ;
+    PMFAIB = 'MAXI' 'ABS' ('EXTR' EPRECY 'ORDO') ;
+  'FINSI' ; 
+*
+'FIN' BFORMU ;
+*=======================================================================
+*                       SOLUTION ANALYTIQUE                            =
+*=======================================================================
+* Module d'Young equivalent
+EETC = (1. - (NUC**2)) / YOUC ; 
+EETP = (1. - (NUP**2)) / YOUP ; 
+EETT = EETC + EETP ;
+EETOI = 1./EETT ;
+*
+* Rayon equivalent
+REQC = 1./RCyli ;
+REQP = 0. ;
+REQT = REQC + REQP ;
+RETOI = 1./REQT ;
+*
+* Pression maximale
+PMREF = ((FNOR*EETOI)/(pi*RETOI)) ** 0.5 ;
+*
+* Demi-largeur de la zone de contact
+DLCON = ((4.*FNOR*RETOI)/(pi*EETOI)) ** 0.5 ;
+*
+* Profil de pression dans la zone de contact
+LABSC = 'PROG' (-1.*DLCON) PAS (DLCON/100) 0. PAS (DLCON/100) DLCON ;
+LPRES = ((1 - ((LABSC/DLCON)**2)) ** 0.5) * PMREF ;
+EVPRE = 'EVOL' 'TURQ' 'MANU' 'Abscisse(m)' LABSC 'Pression(Pa)' LPRES ;
+*=======================================================================
+*                     COMPARAISON DES SOLUTIONS                        =
+*=======================================================================
+TITZ = 'CHAI' 'Pression cylindre' ;
+DESS (EVPRE 'ET' EVCYLI) 'LEGE' TLEG1 'NE' 'XBOR' (-2.*DLCON) (2.*DLCON)
+  'TITX' 'Abscisse(m)' 'TITY' 'Press. contact(Pa)' ;
+TITZ = 'CHAI' 'Pression plan' ;
+DESS (EVPRE 'ET' EVPLAN) 'LEGE' TLEG2 'NE' 'XBOR' (-2.*DLCON) (2.*DLCON)
+  'TITX' 'Abscisse(m)' 'TITY' 'Press. contact(Pa)' ;
+*
+* Erreur relative
+ERRREL = 'ABS' ((PMREF - PMFAIB) / PMREF) ;
+'SI' ('>EG' ERRREL 0.03) ;
+  'MESS' 'ERREUR SUR LA VALEUR MAX DE LA PRESSION' ;
+  'ERRE' 5 ;
+'FINSI' ;
+*
+'FIN' ;
+ 
+

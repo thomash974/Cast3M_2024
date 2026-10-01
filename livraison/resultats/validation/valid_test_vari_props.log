@@ -1,0 +1,10 @@
+=== Cas 18 : test_vari_props (proprietes variables) ===
+Valeurs comparees : 72
+Temps horloge (ms) : origine 296 ; niveau 1 274 ; niveau 2 289
+Acceleration par rapport a l origine : niveau 1   1.08 ; niveau 2   1.02
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 0
+Niveau 1 : raideur reutilisee 0 fois, recalculee 0 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 0 fois, recalculee 0 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

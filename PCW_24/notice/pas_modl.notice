@@ -1,0 +1,271 @@
+$$$$ PAS_MODL NOTICE  PASCAL    22/04/13    21:15:03     11339          
+                                             DATE     22/04/13
+
+
+    Procedure PAS_MODL   
+    ------------------
+
+    
+Section : Mecanique Resolution
+===============================================================   
+    PAS_MODL TAB1 ;
+
+    
+FRAN===========================================================   
+    Objet :
+    -------
+
+    Cette procedure est une procedure interne de PASAPAS.
+    Elle initialise et met a jour les sous-indices relatifs aux
+    modeles de l'indice WTABLE de la table PASAPAS, ainsi que
+    les sous-indices relatifs a leurs caracteristiques.
+    
+    
+ANGL============================================================
+    Description :
+    -------------
+
+    This procedure is internal procedure of PASAPAS.
+    It initializes and updates the indexes relative to the models
+    in the PASAPAS sub-table WTABLE, as well as the indexes relative 
+    to their characteristics.
+
+    
+FRAN===========================================================   
+    Commentaire :
+    -------------
+
+    TAB1 est la table PASAPAS.
+
+
+    Entrees :
+    ---------
+
+    En entree, PAS_MODL utilise les indices suivants :
+
+    TAB1.WTABLE.'MODELE'           : objet MMODEL, par defaut,
+                                     modele de PASAPAS (TAB1.MODELE)
+
+    TAB1.WTABLE.'CARACTERISTIQUES' : objet MCHAML, caracteristiques
+                                     du modele (TAB1.'CARACTERISTIQUES'
+                                     par defaut)
+
+
+    Sorties :
+    ---------
+
+    En sortie, PAS_MODL initialise ou met a jour les indices suivants :
+
+    TAB1.WTABLE.'MODELE_COURANT' : objet MMODEL, modele avec lequel
+                                   PAS_MODL a instancie la table au
+                                   precedent appel.
+ 
+
+    Indices utiles a TRANSNON :
+    ---------------------------
+
+    TAB1.WTABLE.'THE1'        : objet LOGIQUE, presence d'une formulation
+                                THERMIQUE
+
+    TAB1.WTABLE.'MOD_THE'     : objet MMODEL, modeles THERMIQUE
+
+    TAB1.WTABLE.'MAT_THE'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_THE'
+
+    TAB1.WTABLE.'THM1'        : objet LOGIQUE, presence d'une formulation
+                                THERMOHYDRIQUE
+
+    TAB1.WTABLE.'MOD_THM'     : objet MMODEL, modeles THERMOHYDRIQUE 
+
+    TAB1.WTABLE.'MAT_THM'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_THM'
+
+    TAB1.WTABLE.'FOR_THER'    : objet LOGIQUE, presence d'une formulation
+                                THERMIQUE ou THERMOHYDRIQUE
+
+    TAB1.WTABLE.'MOD_T'       : objet MMODEL, modeles THERMIQUE et
+                                THERMOHYDRIQUE
+
+    TAB1.WTABLE.'MAT_T'       : objet MCHAML, champ de caracteristiques
+                                du modele 'MOD_T'
+
+    TAB1.WTABLE.'CONVECTION'  : objet LOGIQUE, presence de CONVECTION
+
+    TAB1.WTABLE.'MOD_CON'     : objet MMODEL, modeles THERMIQUE CONVECTION
+
+    TAB1.WTABLE.'MAT_CON'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_CON'
+
+    TAB1.WTABLE.'RAYO'        : objet LOGIQUE, presence de RAYONNEMENT
+
+    TAB1.WTABLE.'MOD_RAY'     : objet MMODEL, modeles de RAYONNEMENT
+
+    TAB1.WTABLE.'MAT_RAY'     : objet MCHAML, champ de caracteristiques
+                                de 'MAT_RAY'
+
+    TAB1.WTABLE.'ADVECTION'   : objet LOGIQUE, presence d'advection
+
+    TAB1.WTABLE.'MOD_ADV'     : objet MMODEL, modeles d'advection
+
+    TAB1.WTABLE.'MAT_ADV'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_ADV'
+
+    TAB1.WTABLE.'CONDUCTION'  : objet LOGIQUE, presence de CONDUCTION
+
+    TAB1.WTABLE.'MOD_COND'    : objet MMODEL, modeles THERMIQUE CONDUCTION
+
+    TAB1.WTABLE.'MAT_COND'    : objet MCHAML, champ de caracteristiques
+                                de 'MOD_COND'
+
+    TAB1.WTABLE.'SOURCE_Q'    : objet LOGIQUE, presence de SOURCE THERMIQUE
+
+    TAB1.WTABLE.'MOD_SOQ'     : objet MMODEL, modeles THERMIQUE SOURCE
+
+    TAB1.WTABLE.'MAT_SOQ'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_SOQ'
+
+    TAB1.WTABLE.'FOR_DIFF'    : objet LOGIQUE, presence d'une formulation
+                                DIFFUSION
+
+    TAB1.WTABLE.'MOD_DIF'     : objet MMODEL, modeles de DIFFUSION
+
+    TAB1.WTABLE.'MAT_DIF'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_DIF'
+
+    TAB1.WTABLE.'FOR_METALLU' : objet LOGIQUE, presence d'une formulation
+                                METALLURGIE
+
+    TAB1.WTABLE.'MOD_MET'     : objet MMODEL, modeles METALLURGIE
+
+    TAB1.WTABLE.'MAT_MET'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_MET'
+
+    TAB1.WTABLE.'PHASE'       : objet LOGIQUE, presence d'une formulation
+                                CHANGEMENT_PHASE
+
+    TAB1.WTABLE.'MOD_PHA'     : objet MMODEL, modeles CHANGEMENT_PHASE
+
+    TAB1.WTABLE.'MAT_PHA'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_PHA'
+
+
+    TAB1.WTABLE.'MOD_TOT'     : objet MMODEL, ensemble des modeles THERMIQUE,
+                                THERMOHYDRIQUE, DIFFUSION, METALLURGIE et
+                                CHANGEMENT_PHASE
+
+    TAB1.WTABLE.'MAT_TOT'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_TOT'
+
+
+    Indices utiles a UNPAS :
+    ------------------------
+
+    TAB1.WTABLE.'MEC1'        : objet LOGIQUE, presence d'une formulation
+                                MECANIQUE
+
+    TAB1.WTABLE.'MOD_MEC'     : objet MMODEL, modeles MECANIQUE
+
+    TAB1.WTABLE.'MAT_MEC'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_MEC'
+
+    TAB1.WTABLE.'CONTACT'     : objet LOGIQUE, presence d'une formulation
+                                CONTACT
+
+    TAB1.WTABLE.'MODCONTA'    : objet MMODEL, modeles de CONTACT
+
+    TAB1.WTABLE.'MATCONTA'    : objet MCHAML, champ de caracteristiques
+                                de 'MODCONTA'
+
+    TAB1.WTABLE.'CAFROTTE'    : objet LOGIQUE, presence de CONTACT FROTTEMENT
+
+    TAB1.WTABLE.'ADHERENCE'   : objet LOGIQUE, presence de CONTACT ADHERENT
+
+    TAB1.WTABLE.'POR1'        : objet LOGIQUE, presence d'une formulation
+                                POREUX
+
+    TAB1.WTABLE.'MOD_POR'     : objet MMODEL, modeles POREUX
+
+    TAB1.WTABLE.'MAT_POR'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_POR'
+
+    TAB1.WTABLE.'MOD_CHA'     : objet MMODEL, modeles CHARGEMENT
+
+    TAB1.WTABLE.'MAT_CHA'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_CHA'
+
+    TAB1.WTABLE.'MOD_PRE'     : objet MMODEL, modeles CHARGEMENT PRESSION
+
+    TAB1.WTABLE.'MAT_PRE'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_PRE'
+
+    TAB1.WTABLE.'MOD_LIA'     : objet MMODEL, modeles de LIAISON
+
+    TAB1.WTABLE.'MAT_LIA'     : objet MCHAML, champ de caracteristiques
+                                de 'MOD_LIA'
+
+
+    TAB1.WTABLE.'FOR_MECA'    : objet LOGIQUE, presence d'une formulation
+                                MECANIQUE, POREUX ou CHARGEMENT
+
+    TAB1.WTABLE.'MO_TOT'      = objet MMODEL, modeles MECANIQUE, POREUX
+                                CHARGEMENT et LIAISON
+
+    TAB1.WTABLE.'MA_TOT'      : objet MCHAML, champ de caracteristiques
+                                de MO_TOT
+
+    TAB1.WTABLE.'MOD_REF'     = MO_TOT ;
+
+    TAB1.WTABLE.'MO_TOT_PREC' = MO_TOT ;
+
+    TAB1.WTABLE.'NLOC'        : objet LOGIQUE, presence de modeles
+                                NON_LOCAL
+
+    TAB1.WTABLE.'NON_LOCAL'   : objet MOT, type d'approche en non-local
+
+    TAB1.WTABLE.'NLOC_MODL'   : objet MMODEL, modeles non-locaux
+
+
+
+ANGL===========================================================   
+    Contents :
+    ----------
+
+    TAB1 is the data input table of PASAPAS.
+
+
+    INPUTS :
+    --------
+
+    PAS_MODL uses the following index of TAB1:
+
+    TAB1.WTABLE.'MODELE'           : MMODEL type object, by default,
+                                     the PASAPAS model (TAB1.'MODELE')
+
+    TAB1.WTABLE.'CARACTERISTIQUES' : MCHAML type object, model
+                                     characteristics (by default,
+                                     TAB1.'CARACTERISTIQUES')
+
+
+    OUTPUTS :
+    ---------
+
+    PAS_MODL initializes or updates the following index of TAB1:
+
+
+    TAB1.WTABLE.'MODELE_COURANT' : MMODEL type object, model used by
+                                   the procedure the last call to set
+                                   the output table.
+
+
+    For the other outputs, see the french manual page.
+                                   ------------------
+
+
+
+$$$$
+
+    
+ 
+ 
+ 
+ 

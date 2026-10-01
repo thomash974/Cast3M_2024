@@ -1,0 +1,537 @@
+* fichier waam3.dgibi
+* section : thermique conduction convection
+*----------------------------------------------------------------------*
+*                         W A A M 3 . D G I B I                        *
+*----------------------------------------------------------------------*
+* Objet :                                                              
+* -------
+*
+*    Exemple de simulation thermique d'un depot de matiere par WAAM.
+* L'exemple simule la realisation d'un "mur" sur la tranche d'une tole
+* en acier inox (donnees 316L issues de la litterature, ref. fournie).
+*
+*    On modelise la conduction, la convection avec le milieu ambiant
+* et la source de chaleur selon une distribution gaussienne.
+*
+*    L'apport de matiere est defini a l'aide d'un chargement de nom MODE
+* qui decrit l'evolution du modele au cours du temps. Un chargement de
+* nom MATE definit celle de ses caracteristiques.
+*
+*    La modelisation fait appel aux procedures SOUDAGE et WAAM pour
+* definir la sequence de soudage et la mailler.
+*
+* Description :
+* -------------
+*
+* Type de calcul : Thermique Transitoire
+* Mode de calcul : 3D
+* Type d'element : CUB8
+* Chargement     : Source de chaleur, Convection, Apport de matiere
+*
+*----------------------------------------------------------------------*
+*
+opti dime 3 elem cub8 ;
+
+icomplet = faux ;
+
+ig1      = faux ;
+*opti trac psc eptr 5 ;
+ig1      = ig1 ou (ega (vale trac) 'PSC') ;
+
+*----------------------- Parametres du probleme -----------------------*
+
+* Parametres geometrie :
+* lw1    : longueur de passe 
+* ew1    : epaisseur de passe (largeur)
+* as1    : longueur du support
+* bs1    : profondeur du support (largeur)
+* es1    : epaisseur du support
+* de1    : densite maillage cordons
+* tol1   : tolerance geometrique
+lw1      =  50.e-3 ;
+ew1      =   5.e-3 ;
+as1      = 200.e-3 ;
+bs1      =  50.e-3 ;
+es1      =  20.e-3 ;
+de1      =   1.25e-3 ;
+de2      = ew1 ;
+tol1     = 1.e-6 * de1 ;
+
+* Parametres apport de chaleur :
+* Us1    : tension electrique de soudage (V) 1ere couche
+* Us2    : tension electrique de soudage (V) couches suivantes 
+* Is1    : intensite electrique soudage (A) 1ere couche
+* Is2    : intensite electrique soudage (A) couches suivantes
+* Vs1    : vitesse de soudage (m/s)
+* Eta1   : rendement de la source
+* Rg1    : rayon de la distribution Gaussienne
+Us1      =  15.0 ;
+Us2      =  13.0 ;
+Is1      = 120. ;
+Is2      = 100. ;
+Vs1      = 0.30 / 60. ;
+Eta1     = 0.8 ;
+Rg1      = ((2. / 3.) ** 0.5) * ew1 ;
+
+* Parametres apport de matiere :
+* dfil1  : diametre file (m)
+* vfil1  : vitesse defilement fil (m/s) 1ere passe
+* vfil2  : vitesse defilement fil (m/s) autres passes
+dfil1    =  1.2e-3 ;
+vfil1    =  3.2 / 60. ;
+vfil2    =  2.5 / 60. ;
+
+* Parametres sequence soudage :
+* dtini1 : delai initial avant debut deplacement torche
+* delai1 : delai entre 2 passes de WAAM
+* nbpass1: nombre de passes 
+dtini1   =   0.8 ;
+delai1   = 300. ;
+nbpass1  =   4 ;
+
+* Parametres conditions thermiques initiales et aux limites :
+* Tini1  : temperature initiale (degC)
+* Tc1    : temperature de convection (degC)
+* h1     : coefficient d'echange convectif (W/m2)
+Tini1    = 20. ;
+Tc1      = 20. ;
+h1       = 20. ;
+
+*-------------------------- Proprietes 316 L --------------------------*
+* Ref. : 
+* Camille Cambon, Issam Bendaoud, Sebastien Rouquette, Fabien Soulie.
+* “Influence of the first weld bead on strain and stress states in wire+arc additive manufacturing”.
+* The 12th International Seminar ”Numerical Analysis of Weldability”,
+* Institute for Materials Science, Joining and Forming (IMAT),Sep 2018, Seggau, Austria.
+* hal-01954354 https://hal.archives-ouvertes.fr/hal-01954354 
+*
+* Donnees fournies par la procedure BIBLIO :
+t316L    = biblio 316L refe 2 ;
+
+* rho1   : masse volumique (kg/m3) (pas dans ref. biblio)
+rho1     = 7760. ;
+* Tfus1  : temperature de changement de phase solide-liquide (degC)
+* Qlat1  : chaleur latente de fusion de l'acier (J/m3)
+* k1     : conductivite thermique (W/m/K) en fonction de la temperature
+Tfus1    = t316L.tfus ;
+Qlat1    = t316L.qlat ;
+k1       = t316L.k ;
+si ig1 ;
+  dess k1 titr 'Conductivite thermique 316L (W/m/K)' ;
+fins ;
+
+* Cp1    : capacite thermique massique (J/m3) en fonction de la temperature
+* On la derive de l'enthalpie :
+enth1    = t316L.enth ;
+lh0      = extr enth1 ordo ;
+lh1      = lh0 enle (dime lh0) ;
+lh2      = lh0 enle 1 ;
+dhdt1    = (lh2 - lh1) / 100. ;
+lc0      = dhdt1 / rho1 ;
+lt0      = prog 50. pas 100. 1450. ;
+cp0      = evol manu 'T' lt0 'C' lc0 ;
+idx0     = posi (maxi lc0) dans lc0 ;
+lc2      = lc0 enle idx0 ;
+lt2      = lt0 enle idx0 ;
+cp2      = evol oran manu 'T' lt2 'C' lc2 ;
+cp1      = cp2 ;
+si ig1 ;
+  tleg1    = table ;
+  tleg1 . titre = table ;
+  tleg1 . titre . 1 = 'Cp derivee publi.' ;
+  tleg1 . titre . 2 = 'Cp utilisee' ;
+  dess (cp0 et cp1) titr ' Capacite thermique massique 316L (J/m3)' lege tleg1 ;
+fins ;
+
+
+*------- Sequence de fabrication : appel a la procedure SOUDAGE -------*
+
+* Puissances thermique (1 : 1ere couche, 2 : couches suivantes) :
+Qtot1    = Is1 * Us1 ;
+Qtot2    = Is2 * Us2 ;
+
+* Debits de matiere :
+debi1    = 0.25 * dfil1 * dfil1 * pi * vfil1 ;
+debi2    = 0.25 * dfil1 * dfil1 * pi * vfil2 ;
+
+* Table de la procedure SOUDAGE
+tfab1                        = tabl ;
+tfab1.vitesse_de_soudage     = Vs1 ;
+tfab1.puissance_de_soudage   = Qtot2 ;
+tfab1.diametre_de_fil        = dfil1 ;
+tfab1.vitesse_de_fil         = vfil2 ;
+tfab1.largeur_de_passe       = ew1 ;
+
+* Définition de la sequence de fabrication :
+soudage tfab1 point dtini1 puis Qtot1 debi debi1 ;
+si (nbpass1 mult 2) ;
+  nb1      = nbpass1 / 2 ;
+sino ;
+  nb1      = (nbpass1 - 1) / 2 ;
+fins ;
+uw1      = lw1 0 0 ;
+uw2      = -1. * uw1 ;
+vw1      = 0 ew1 0 ;
+vw2      = -1. * vw1 ;
+repe b1 nb1 ;
+  si (&b1 ega 1) ;
+    soudage tfab1 passe droi uw1 puis Qtot1 debi debi1 ;
+    soudage tfab1 depla droi vw1 pause delai1 ;
+    soudage tfab1 passe droi uw2 puis Qtot1 debi debi1 ;
+    soudage tfab1 depla couche debi debi2 pause delai1 ;
+  sino ;
+    soudage tfab1 passe droi uw1 ;
+    si (&b1 mult 2) ;
+      soudage tfab1 depla droi vw2 pause delai1 ;
+    sino ;
+      soudage tfab1 depla droi vw1 pause delai1 ;
+    fins ;
+    soudage tfab1 passe droi uw2 ;
+    soudage tfab1 depla couche pause delai1 ;
+  fins ;
+fin b1 ;
+soudage tfab1 point 600. puis 0. debi 0. ;
+
+si ig1 ;
+  trac tfab1.trajectoire           titr 'trajectoire fabrication' ;
+  dess tfab1.evolution_deplacement titr 'evolution deplacement fabrication' ;
+  dess tfab1.evolution_puissance   titr 'evolution puissance thermique fabrication' ;
+  dess tfab1.evolution_debit       titr 'evolution debit apport de matiere fabrication' ;
+fins ;
+
+*------------------------- Maillage du depot --------------------------*
+
+* Maillage fin du depôt : appel a la procedure WAAM
+xpas1    = 0.5 * ew1 ;
+twam1    = waam tfab1 mail pas xpas1 dens de1 temp (2./pi*xpas1/Vs1) ;
+mail1    = twam1.maillage ;
+elim mail1 tol1 ;
+
+* Tables d'evolution du maillage :
+ttps1    = twam1.evolution_maillage.temps ;
+tmail1   = twam1.evolution_maillage.maillage ;
+
+* Maillage grossier du depot :
+zp1      = (tmail1.0 coor 3) maxi ;
+p1       = mail1 poin proc (0 -1 -1) ;
+p2       = mail1 poin proc (1  0  0) ;
+p3       = mail1 poin proc (0 +1 -1) ;
+p4       = mail1 poin proc (0 -1 zp1) ;
+p5       = mail1 poin proc (0 -1 1) ;
+v1       = ((p1 droi 2 P3) tran p2 dini ew1 dfin ew1) volu tran 1 (p4 moin p1) ;
+si (nb1 > 1) ;
+  s2       = v1 face 2 ;
+  v2       = s2 volu tran (nb1 - 1) (p5 moin p4) ;
+sino ;
+  v2       = vide maillage ;
+fins ;
+mail2    = v1 et v2 ;
+mail2    = mail2 coul gris ;
+
+* Fusion des noeuds des maillages fin et grossier :
+elim (mail1 et mail2) tol1 ;
+
+si ig1 ;
+  trac face mail1 titr 'Maillage fin du depot' ;
+  trac face mail2 titr 'Maillage grossier du depot' ;
+  waam twam1 visu cach tfab1.trajectoire ;
+fins ;
+
+*-------------------- Maillage de la tole support ---------------------*
+
+xmin1    = (mail1 coor 1) mini ;
+ymin1    = (mail1 coor 2) mini ;
+zmin1    = (mail1 coor 3) mini ;
+xmax1    = (mail1 coor 1) maxi ;
+ymax1    = (mail1 coor 2) maxi ;
+zmax1    = (mail1 coor 3) maxi ;
+ptz0     = (mail1 coor 3) poin infe (zmin1 + tol1) ;
+sz0      = (enve mail1) elem appu stri ptz0 ;
+
+* Contour base du depot : 
+ps1      = sz0 poin proc (-1 -1 zmin1) ;
+ps2      = sz0 poin proc (+1 -1 zmin1) ;
+ps3      = sz0 poin proc (+1 +1 zmin1) ;
+ps4      = sz0 poin proc (-1 +1 zmin1) ;
+csi1     = (cont sz0) elem comp ps1 ps1 ;
+
+* Contour base support : partie raffinee conforme (maillage fin) 
+ps5      = ps1 moin (ew1 0 0) moin (0 ew1 0) ;
+ps6      = ps2 plus (ew1 0 0) moin (0 ew1 0) ;
+ps7      = ps3 plus (ew1 0 0) plus (0 ew1 0) ;
+ps8      = ps4 moin (ew1 0 0) plus (0 ew1 0) ;
+cse1     = (ps5 droi ps6 dini de1 dfin de1)
+        et (ps6 droi ps7 dini de1 dfin de1)
+        et (ps7 droi ps8 dini de1 dfin de1)
+        et (ps8 droi ps5 dini de1 dfin de1) ;
+
+* Maillage raffinee du support :
+sz1      = surf plan (cse1 et csi1) ;
+vsup1    = (sz0 et sz1) volu tran (0 0 (0. - ew1)) dini de1 dfin de1 ;
+
+* Contour base support : partie deraffinee non conforme (maillage grossier)
+dx1      = 0.5 * (as1 - (xmax1 - xmin1)) ;
+dy1      = 0.5 * (bs1 - (ymax1 - ymin1)) ;
+ps9      = ps1 moin (dx1 0 0) moin (0 dy1 0) ;
+ps10     = ps2 plus (dx1 0 0) moin (0 dy1 0) ;
+ps11     = ps3 plus (dx1 0 0) plus (0 dy1 0) ;
+ps12     = ps4 moin (dx1 0 0) plus (0 dy1 0) ;
+cse2     = (ps9  droi ps10 dini de2 dfin de2)
+        et (ps10 droi ps11 dini de2 dfin de2)
+        et (ps11 droi ps12 dini de2 dfin de2)
+        et (ps12 droi ps9  dini de2 dfin de2) ;
+
+* Maillage grossier du support :
+sz2      = surf plan cse2 ;
+vsup2    = sz2 volu tran (0 0 (0. - es1)) dini de2 dfin de2 ;
+vsup2    = vsup2 coul gris ;
+
+* Separation partie non conforme adaptee et remanante :
+* Vsup1  : partie du support maille finement 
+* Vsup2  : support maille "grossierement" 
+vsupx    = vsup2 incl vsup1 volu bary ;
+vsup0    = vsup2 diff vsupx ;
+vsup0    = vsup0 coul turq ;
+
+* Assemblage maillages depot et support :
+mail1    = mail1 et vsup1 ;
+mail0    = mail1 et vsup0 ;
+mail2    = mail2 et vsupx ;
+elim mail2 tol1 ;
+elim (mail1 et mail2) tol1 ;
+
+si ig1 ;
+  trac face mail0 titre 'Maillage fin avec support complet' ;
+  trac face mail1 titre 'Maillage fin avec partie support conforme' ;
+  trac face mail2 titre 'Maillage grossier a substituer a la partie raffinee' ;
+fins ;
+
+* Assemblage maillages fins depot et support :
+repe b1 (dime tmail1) ;
+  i0       = &b1 - 1 ;
+  tmail1 . i0 = (tmail1.i0) et vsup1 ;
+fin b1 ;
+
+*------- Adaptation en maillage : appel a  la procedure ADAPTE --------*
+
+* Chargement de modeles pour ADAPTE :
+tmod0    = table ;
+i0       = 0 ;
+repe b1 (dime ttps1) ;
+  geoi1    = tmail1 . i0 ;
+  tmod0 . i0 = mode geoi1 thermique ;
+  i0       = i0 + 1 ;
+fin b1 ;
+cgmod0   = char mode ttps1 tmod0 ;
+
+* Definition du chargement de trajectoire
+evqt1    = tfab1.evolution_puissance ;
+ltraj1   = tfab1.trajectoire ;
+evxs1    = tfab1.evolution_deplacement ;
+chxs1    = coor ltraj1 curv ;
+cgxs1    = char traj chxs1 evxs1 ;
+
+* Chargement pour ADAPTE :
+char1    = cgmod0 et cgxs1 ;
+
+* Adaptation du maillage au cours du deplacement le long de la trajectoire 
+*char2 ladap1 = adapte 'MAIL' mail2 char1 'DIST' (0.01*pi) 'TRAJ' 11.e-3 ;
+char2 ladap1 = adapte 'MAIL' mail2 char1 'DIST' 5.e-3 ;
+
+* Extraction table temps et maillage et chargement BLOT :
+ttps3 tmail3 = extr char2 mail tabl ;
+cgblot1   = extr char2 blot ;
+
+* Affichage de l'adaptation :
+si faux ;
+  nb1      = dime ttps3 ;
+  dep0     = manu chpo (tmail3.(nb1-1)) ux 0. uy 0. uz 0. ;
+  def1     = vide deforme ;
+  repe b1 (dime ttps3) ;
+    tpsi1    = ttps3 . (&b1 - 1) ;
+    maili3   = tire char2 mail tpsi1 ;
+    defi1    = defo maili3 (redu dep0 maili3) 0. ;
+    def1     = def1 et defi1 ;
+*    trac face maili3 ;
+  fin b1 ;
+  trac face anim def1 titr 'Adaptation' ;
+fins ;
+
+*----------- Accrochage DDL thermique parties non conformes -----------*
+
+* Surfaces interfaces maillages support non-conformes :
+sinte0   = (enve vsup0) inte (enve vsupx) ;
+sinte1   = (enve vsup1) diff (sz0 et sz1) ;
+
+* Relations DDL parties non conformes support :
+trig5    = table ;
+i0       = 0 ;
+repe b1 (dime ttps3) ;
+  tpsi1    = ttps3 . i0 ;
+  geoi1    = tire char2 mail tpsi1 ;
+  si1      = (enve geoi1) inte sinte1 ;
+* Il ne faut pas accrocher les points deja accroches par ADAPTE
+* ptsi1 : point deja accroches par ADAPTE
+* si2   : element de si1 dont les points sont deja accroches
+  rigi1    = tire cgblot1 blot tpsi1 ;
+  ptsi1    = extr rigi1 mail nomu ;
+  si2      = si1 elem appu larg ptsi1 nove ;
+  si1      = si1 diff si2 ;
+*trac (si1 et (aret geoi1) et (extr rigi1 mail nomu)) ;
+  si (non (vide si1)) ;
+    rigi1    = si1 rela accro vsup0 (mots 'T') ;
+  sino ;
+    rigi1    = vide rigidite ;
+  fins ;
+  trig5 . i0 = rigi1 ;
+  i0       = i0 + 1 ;
+fin b1 ;
+cgblot2  = char blot ttps3 trig5 ;
+
+*--------------------- Modele / Caracteristique -----------------------*
+
+* Tables d'evolution des modeles et caracteristiques :
+nb1      = dime ttps3 ;
+ltps3    = prog ;
+lmod1    = enum ;
+lmod2    = enum ;
+lmod3    = enum ;
+lmat1    = enum ;
+lmat2    = enum ;
+lmat3    = enum ;
+i0       = 0 ;
+repe b1 nb1 ;
+  tpsi1    = ttps3 . i0 ;
+  ltps3    = ltps3 et tpsi1 ;
+  geoi1    = tire char2 mail tpsi1 ;
+
+* Conduction dans le massif adapte :
+  geoi1    = geoi1 et vsup0 ;
+*trac geoi1 face ;
+  modi1    = mode geoi1 thermique ;
+  mati1    = mate modi1 rho rho1 k k1 'C' cp1 'TINI' Tini1 ;
+  lmod1    = lmod1 et modi1 ;
+  lmat1    = lmat1 et mati1 ;
+
+* Convection a la surface du massif adapte 
+* (il faut retirer les surfaces a l'interface des parties non conformes) :
+  rigi1    = tire (cgblot1 et cgblot2) blot tpsi1 ;
+  ptsi1    = extr rigi1 mail nomu ;
+  sintei1  = (enve geoi1) elem appu stri ptsi1 ;
+  geoi2    = (enve geoi1) diff sintei1 ;
+*trac (enve geoi2) ;
+  modi2    = mode geoi2 thermique convection ;
+  mati2    = mate modi2 'H' h1 'TC' Tc1 ;
+  lmod2    = lmod2 et modi2 ;
+  lmat2    = lmat2 et mati2 ;
+
+* Source thermique dans le massif adapte :
+  modi3    = mode geoi1 thermique source gaussienne ;
+  mati3    = mate modi3 qtot evqt1 orig cgxs1 rgau Rg1 ;
+  lmod3    = lmod3 et modi3 ;
+  lmat3    = lmat3 et mati3 ;
+
+  i0       = i0 + 1 ;
+fin b1 ;
+
+* Chargements MODE / MATE :
+cgmod1   = char mode ltps3 lmod1 ;
+cgmod2   = char mode ltps3 lmod2 ;
+cgmod3   = char mode ltps3 lmod3 ;
+cgmod0   = cgmod1 et cgmod2 et cgmod3 ;
+
+cgmat1   = char mate ltps3 lmat1 ;
+cgmat2   = char mate ltps3 lmat2 ;
+cgmat3   = char mate ltps3 lmat3 ;
+cgmat0   = cgmat1 et cgmat2 et cgmat3 ;
+
+list resu (extr cgmod0 lobj 1) ; 
+list resu (extr cgmod0 lobj) ; 
+list resu (extr cgmod0 lree 1) ; 
+list resu (extr cgmod0 lree) ; 
+
+*------------------------- Resolution PASAPAS -------------------------*
+
+ltca0    = twam1.temps_calcules ;
+si (non icomplet) ;
+  ltca1    = ltca0 extr (lect 1 pas 1 21) ;
+sino ;
+  ltca1    = ltca0 ;
+fins ;
+list ltca1 ;
+
+tab1                         = table ;
+tab1.modele                  = cgmod0 ;
+tab1.caracteristiques        = cgmat0 ;
+tab1.blocages_thermiques     = cgblot1 et cgblot2 ;
+tab1.temps_calcules          = ltca1 ;
+tab1.temps_adaptation_modele = ladap1 ;
+
+temp zero ;
+
+pasapas tab1 ;
+
+* Affichage temps de calcul : 
+duree1   = temp horl ;
+duree1   = (duree1 / 1000) ;
+dmin1    = (duree1  / 60) ;
+dsec1    = duree1  - (60 * dmin1) ;
+mot1     = chai '*****  DUREE DU CALCUL (s) :' dmin1 ' min' dsec1 ' s' ;
+mess mot1 ;
+
+si icomplet ;
+  opti sauv 'waam3.sauv' ;
+  sauv ;
+fins ;
+
+*------------------------ Petit post-traitement -----------------------*
+
+si ig1 ;
+
+* Animation du champ de temperature :
+if1      = (dime tab1.temps) - 1 ;
+modf1    = tab1.modeles.if1 ;
+mailf1   = (extr modf1 mate conduction) extr mail ;
+dep0     = manu chpo mailf1 3 ux 0. uy 0. uz 0. ;
+def1     = vide deforme ;
+liso1    = prog 0. 50. 100. PAS 150. 1450. ;
+vtra1    = vale trac ;
+si (ega vtra1 'PSC') ;
+  opti ftra 'Temperature_waam3_Anim.ps' ;
+fins ;
+repe b1 if1 ;
+  modi1    = tab1.modeles.(&b1-1) ;
+  maili1   = (extr modi1 mate conduction) extr mail ;
+  chti1    = tab1.temperatures.(&b1-1) ;
+  defoi1   = defo maili1 dep0 chti1 ;
+  def1     = def1 et defoi1 ;
+  si (ega vtra1 'PSC') ;
+    mot1     = chai format '(F6.1)' 'Temperature (degC) au temps (s) :' (tab1.temps.(&b1-1)) ;
+    trac chti1 maili1 liso1 titr mot1 ;
+  fins ;
+fin b1 ;
+si (neg vtra1 'PSC') ;
+  trac anim def1 liso1 ;
+fins ;
+
+fins ;
+
+*----------------------- Test de non regression -----------------------*
+
+ttest1   = tab1.temps.19 ;
+temp1    = peche tab1 temperatures ttest1 ipol ;
+tmaxref1 = 1648.5 ;
+tmax1    = maxi abs temp1 ;
+si ((abs (tmax1 - tmaxref1)) > 1.) ;
+  erre 5 ;
+fins ;
+
+si icomplet ; sauv ; fins ;
+
+*------------------   F I N   W A A M 3 . D G I B I   -----------------*
+fin ;
+
+ 
+ 
+ 
+

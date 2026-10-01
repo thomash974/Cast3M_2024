@@ -1,0 +1,46 @@
+$$$$ UTIL     NOTICE  PV090527  23/04/05    21:15:04     11650          
+                                             DATE     23/04/05
+                  
+    Directive UTILISATEUR                    Voir aussi :
+    ---------------------                    
+
+      UTIL    MOT1  MONFICHIER  ;
+                       
+
+Section : Langage Base
+
+FRAN==========================================================
+
+   La directive UTILISATEUR n'est plus utilisee
+
+ Les procedures et notices sont maintenant directement lues dans des fichiers 
+ eponymes appartenant aux repertoires specifies par les variables 
+ d'environnement CASTEM_PROCEDUR24 et CASTEM_NOTICE24.
+  
+ Par defaut et dans l'ordre, ce sont:
+ Le repertoire courant
+ Le repertoire ./procedur
+ Le repertoire d'installation
+ 
+ Exemple de fichier de procedure:
+
+
+ANGL==========================================================
+
+ Procedur and notice are now directly acquired from eponym files located in
+ directories specified by the environment variables CASTEM_PROCEDUR24 and CASTEM_NOTICE24.
+  
+ By default they are:
+ The current directory
+ The directory ./procedur
+ The installation directory
+
+       Example of user's file:
+
+================================================================
+    $$$$ MAPRO1
+    DEBPROC  MAPRO1 i*.....
+    .....
+    FINPRO  J...;
+
+ 

@@ -1,0 +1,66 @@
+$$$$ MPMA     NOTICE  PV090527  23/03/09    21:15:06     11619          
+                                             DATE     23/03/09
+FRAN==========================================================
+
+  Operateur MPMA                           Voir aussi : JPMA   JPMM
+ANGL==========================================================
+
+  Operator  MPMA                           See also   : JPMA   JPMM
+==============================================================
+        -----------------  
+             LRRE1 = MPMA MOD1 FLOT1;
+
+
+
+FRAN==========================================================
+        Objet :
+        -------
+
+        MPMA donne la matrice qui sert a calculer le potentiel vecteur A
+        sur les elements d'une geometrie dans le plan XY avec une epaisseur donnee selon Z.
+        Pour une geometrie donnee, il faut appeler MPMA une fois et ensuite utiliser JPMA
+        avec la densite de courant pour calculer le potentiel vecteur.    
+        
+
+        Commentaire :
+        -------------
+ 
+           MOD1   modele ou la densite de courant est appliquee 
+           FLOT1  epaisseur du modele (REEL)
+
+        en sortie :
+
+           LREE1   matrice d'interactions entre les elements utilisee par JPMA
+
+
+       Remarques
+       ---------
+
+      - le maillage du modele doit etre constitue d'un seul type d'elements
+ANGL==========================================================
+        Purpose:
+        -------
+
+        MPMA constructs the matrix used for vector potential A computation on the elements
+        of an XY geometry whith Z thickness.                                                   
+        For a given geometry MPMA must be called once and then use JPMA with the density    
+        of current to calculate the vector potential.                                
+        
+
+        Comment :
+        ---------
+ 
+           MOD1   Model where the density of current is applied 
+           FLOT1  Model thickness (REEL)         
+
+        Output:     
+
+           LREE1   Interaction matrix beetween the elements used by JPMA           
+
+
+       Remarks : 
+       ---------
+
+      - Model mesh must have only one element type.                                    
+ 
+ 

@@ -1,0 +1,608 @@
+*----------------------------------------------------------------------*
+*
+*  Objet : 
+*    controler le probleme (solution non physique) observé
+*    lors de la re-ouverture du JOI1 dans la simulation avec 
+*    Cast3M 2019 de la compression du modele
+*    simplife du ressort a lames SM_1_2 (stage 2020 )
+*
+*  Test d'écrasement du système de maintien assemblage REP :
+*   JOI1 Mohr-Coulomb avec glissements et décollements sur lame plastique
+*
+*  Correction par PV le 26/04/2024 pour obtenir une solution physique
+*  en utilisant l'augmentation automatique pour limiter les increments 
+*  de deformation
+*
+*----------------------------------------------------------------------*
+
+
+*=== OPTIONS ==========================================================*
+
+  'OPTI' 'DIME' 3                                                      ;
+  'OPTI' 'MODE' 'TRIDIM'                                               ;
+  'OPTI' 'ELEM' 'CUB8'                                                 ;
+  'OPTI' 'DENS' 1.E-3                                                  ;
+  'OPTI' 'DENS' 9.37500E-04                                            ;
+  'OPTI' 'TRAC' 'PSC'                                                  ;
+  
+  LOGITRAC = FAUX;   comm 'à reactiver si besoin visu';                ;
+  
+* - pas de temps = 1 s
+* 18.09.23  passage à 10sec OK pour analyse/cas test rapide
+  PAS_C = 10.;
+  
+  OEIL_Z = 0.90E+06 -0.11E+07  0.70E+06                                ;
+  O_1    = 0.90E+06 -3.30E+06  0.70E+06                                ;
+
+* Titres
+  STR_Z3  = 'MOT' 'SYST.MAINT. - SM_1_2' ;
+  NOM_ESS = 'MOT' 'Essai EDF' ;
+
+
+*=== PARAMETRES =======================================================*
+
+*--- Ressort
+* Angle de la partie inclinee (degres)
+  A_INCL = 41.3                                                        ;
+* 1/2 largeur de la plaque de compression BB
+  C6130 = 1.81920E-01                                                  ;
+  C6132 = 6.50000E-03                                                  ;
+  BB = (0.5 * C6130) + C6132                                           ;
+* Materiau A718
+  YOUN1 = 2.000E+11                                                    ;
+  NU1   = 2.900E-01                                                    ;
+  ALPH1 = 1.390E-05                                                    ;
+  RHO1  = 8.210E+03                                                    ;
+*  PROGX = 'PROG'
+*           0.000E+00 4.850E-03 5.700E-03 6.100E-03 6.400E-03 6.800E-03
+*           7.400E-03 8.600E-03 1.000E-02 1.200E-02 1.500E-02 1.900E-02
+*           2.390E-02 2.870E-02 4.720E-02 8.520E-02 1.218E-01 1.528E-01
+*           1.761E-01 10.1761                                           ;
+*  PROGY = 'PROG'
+*           0.000E+00 9.700E+08 1.090E+09 1.128E+09 1.146E+09 1.165E+09
+*           1.185E+09 1.212E+09 1.229E+09 1.246E+09 1.265E+09 1.285E+09
+*           1.306E+09 1.328E+09 1.383E+09 1.484E+09 1.564E+09 1.622E+09
+*           1.664E+09 1.968975E+10                                      ;
+  PROGX = 'PROG'
+           0.000E+00  (5.700E-03-4.850E-03) (6.100E-03-4.850E-03)
+(6.400E-03-4.850E-03) (6.800E-03-4.850E-03)
+           (7.400E-03-4.850E-03) (8.600E-03-4.850E-03)
+(1.000E-02-4.850E-03)
+(1.200E-02-4.850E-03) (1.500E-02-4.850E-03) (1.900E-02-4.850E-03)
+           (2.390E-02-4.850E-03) (2.870E-02-4.850E-03)
+(4.720E-02-4.850E-03)
+(8.520E-02-4.850E-03) (1.218E-01-4.850E-03) (1.528E-01-4.850E-03)
+           (1.761E-01-4.850E-03) (10.1761-4.850E-03)              ;
+  PROGY = 'PROG'
+            9.700E+08 1.090E+09 1.128E+09 1.146E+09 1.165E+09
+           1.185E+09 1.212E+09 1.229E+09 1.246E+09 1.265E+09 1.285E+09
+           1.306E+09 1.328E+09 1.383E+09 1.484E+09 1.564E+09 1.622E+09
+           1.664E+09 1.968975E+10                                      ;
+  TRAC1 = 'EVOL' 'TURQ' 'MANU' 'EPS.TOT.R' PROGX 'SIG.R' PROGY         ;
+* Section poutre
+  SECT5 = (2.73000E-04 + 1.38320E-04) / 2.                             ;
+  SECR5 = (5./6.) * SECT5                                              ;
+  INRY5 = (3.19922E-10 + 4.16113E-11) / 2.                             ;
+  INRZ5 = (7.53571E-09 + 3.81809E-09) / 2.                             ;
+  TORS5 = (7.85563E-09 + 3.85970E-09) / 2.                             ;
+  'MESS' 'INRY moyen' ' ' INRY5                                        ;
+  'MESS' 'INRZ moyen' ' ' INRZ5                                        ;
+  'MESS' 'TORS moyen' ' ' TORS5                                        ;
+  EP_M  = (3.75E-3 + 1.9E-3) / 2.                                      ;
+  DY5   = EP_M / 2. * (3./4.)                                          ;
+  LA_T  = 18.2E-3 * 4.                                                 ;
+  DZ5   = LA_T / 2. * (3./4.)                                          ;
+
+*--- Plaque
+* Rotation RY de la plaque vers l'avant : AP_Y > 0 
+  AP_Y = 10.                                                           ;
+* Rotation RX de la plaque sur le cote : AP_X = 0 
+  AP_X = 0.                                                            ;
+
+*--- Element de liaison JOI1
+  DIR1 =
+    ((COS AP_X)*(SIN AP_Y))  (-1.*(SIN AP_X))  ((COS AP_X)*(COS AP_Y)) ;
+  DIR2 =
+     (COS AP_Y)                0.               (-1.*(SIN AP_Y))       ;
+  COFRO1 = 0.44000                                                     ;
+  PHI1 = 'ATG' COFRO1                                                  ;
+
+
+*=== MAILLAGE =========================================================*
+
+*--- Ressort
+* Base
+  RE_P1 = 0.           0.           0.                                 ;
+  RE_P2 = 2.66500E-02  0.           0.                                 ;
+  RE_L1 = 'DROI' RE_P1 RE_P2                                           ;
+*  MESH_Z = RE_L1 'COUL' 'ROUG'                                         ;
+*  TITR_Z = 'CHAI' 'Base Ressort RE_L1'                                 ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+
+* Coude
+  RE_O1 = 2.66500E-02  0.           1.25000E-02                        ;
+  RE_P3 = RE_P2 'TOUR' (-1.*A_INCL) RE_O1 (RE_O1 'PLUS' (0. 1. 0.))    ;
+  RE_L2 = 'CERC' RE_P2 RE_O1 RE_P3                                     ;
+*  MESH_Z = RE_L2 'COUL' 'ROUG'                                         ;
+*  TITR_Z = 'CHAI' 'Coude Ressort RE_L2'                                ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+*  MESH_Z = RE_L1 'ET' (RE_L2 'COUL' 'ROUG')                            ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+
+* Partie inclinee
+  RE_P4 = 1.18000E-01  0.           7.42462E-02                        ;
+  RE_L3 = 'DROI' RE_P3 RE_P4                                           ;
+*  MESH_Z = RE_L3 'COUL' 'ROUG'                                         ;
+*  TITR_Z = 'CHAI' 'Partie inclinee Ressort RE_L3'                      ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+*  MESH_Z = RE_L1 'ET' RE_L2 'ET' (RE_L3 'COUL' 'ROUG')                 ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+
+* Maillage Ressort
+  RE_ME = RE_L1 'ET' RE_L2 'ET' RE_L3                                  ;
+
+*--- Plaque
+* Bord de la plaque // X
+  PL_Z = 'COOR' 3 RE_P4                                                ;
+  PL_XP2 = 1.78760E-01                                                 ;
+  PL_P2 =  PL_XP2             0.                  PL_Z                 ;
+  PL_P1 = (PL_XP2 - (2.*BB))  0.                  PL_Z                 ;
+  PL_L1 = 'DROI' 1 PL_P1 PL_P2                                         ;
+*  MESH_Z = PL_L1 'COUL' 'ROUG'                                         ;
+*  TITR_Z = 'CHAI' 'Bord // X Plaque PL_L1'                             ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+*  MESH_Z = RE_ME 'ET' (PL_L1 'COUL' 'ROUG')                            ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+
+* Rotation du bord de la plaque // X
+  PL_O1 =  PL_XP2            (-1. * BB)           PL_Z                 ;
+  PL_O2 =  PL_XP2             BB                  PL_Z                 ;
+  PL_L1 = PL_L1 'TOUR' AP_Y PL_O1 PL_O2                                ;
+  PL_P1 = PL_L1 'POIN' 'INITIAL'                                       ;
+  PL_P2 = PL_L1 'POIN' 'FINAL'                                         ;
+*  MESH_Z = PL_L1 'COUL' 'ROUG'                                         ;
+*  TITR_Z = 'CHAI' 'Bord Plaque PL_L1 apres rot. AP_Y' ' ' AP_Y ' deg'  ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z                                  ;
+*  MESH_Z = RE_ME 'ET' (PL_L1 'COUL' 'ROUG')                            ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z                                  ;
+
+* Surface plaque
+  V_EXTRU = 0.               ( 2. * BB)           0.                   ;
+  PL_S1 = PL_L1 'TRAN' 1 V_EXTRU                                       ;
+*  MESH_Z = PL_S1 'COUL' 'ROUG'                                         ;
+*  TITR_Z = 'CHAI' 'Plaque PL_S1 apres rot. AP_Y' ' ' AP_Y ' deg'   ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+*  MESH_Z = RE_ME 'ET' (PL_S1 'COUL' 'ROUG')                            ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+
+* Maillage Plaque
+  PL_ME = PL_S1                                                        ;
+
+*--- Element de liaison JOI1
+* Points d'accrochage du JOI1
+* - sur le ressort : RE_J1 = RE_P4
+* - sur la plaque  : PL_J1 = proj. RE_P4 sur la plaque dans la dir. Uimp (Z)
+  RE_J1 = RE_P4                                                        ;
+  PL_J1 = RE_P4 'PROJ' 'CYLI' (0. 0. 1.) 'PLAN'
+              (PL_ME 'POIN' 'PROC' PL_P1)
+              (PL_ME 'POIN' 'PROC' PL_P2)
+              (PL_ME 'POIN' 'PROC' (PL_P1 'PLUS' V_EXTRU))             ;
+* Distance entre RE_J1 et PL_J1
+  D_I = ( ((('COOR' 1 PL_J1) - ('COOR' 1 RE_J1))**2) +
+          ((('COOR' 2 PL_J1) - ('COOR' 2 RE_J1))**2) +
+          ((('COOR' 3 PL_J1) - ('COOR' 3 RE_J1))**2)  )**0.5           ;
+* Maillage du JOI1
+  JO_ME = 'DROI' 1 RE_J1 PL_J1                                         ;
+  TITR_Z = 'CHAI' 'Jeu initial dans le JOI1' ' ' D_I ' m'              ;
+  MESH_Z = RE_ME 'ET' (PL_S1 'COUL' 'ROUG') 'ET' (JO_ME 'COUL' 'JAUN') ;
+*  'TRAC' 'QUAL' 'TITRE' TITR_Z MESH_Z OEIL_Z                           ;
+  
+
+*=== MODELE ET MATERIAU ===============================================*
+
+*--- Ressort
+  RE_MO = 'MODE' RE_ME 'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 'POUT'
+                       'CONS' 'SM_1_2'                                 ;
+
+  RE_MA = ('MATE' RE_MO 'YOUN' YOUN1 'NU' NU1  'ALPH' ALPH1
+                        'RHO ' RHO1  'ECRO' TRAC1) 'ET'
+          ('CARA' RE_MO 'SECT' SECT5 'SECY' SECR5 'SECZ' SECR5
+                        'INRY' INRY5 'INRZ' INRZ5 'TORS' TORS5
+                        'DX'   0.    'DY'   DY5   'DZ'   DZ5)          ;
+
+*--- Element de liaison JOI1
+  JO_MO = 'MODE' JO_ME 'MECANIQUE' 'ELASTIQUE' 'ORTHOTROPE'
+                                   'PLASTIQUE' 'COULOMB'
+                                   'JOI1' 'CONS' 'JO_SM12'             ;
+
+*  valeurs bidons sur mass jx jy jz pour pouvoir calculer une masse
+  JO_MA = 'MATE' JO_MO 'DIRECTION'   DIR1   DIR2
+                       'KN'   1.E8   'KS1'  1.E8   'KS2'  1.E8
+                       'QN'   1.E-7  'QS1'  1.E-7  'QS2'  1.E-7
+                       'FRIC' PHI1   'TYPE' 1
+                       'FNE'  1.E20  'QT'   1.E7  'COHE' 0. 'MASS' rho1 'JX' 1 'JY' 1 'JZ' 1;
+
+*--- Assemblage
+  MODTOT = RE_MO 'ET' JO_MO                                            ;
+  MATTOT = RE_MA 'ET' JO_MA                                            ;
+* 'MESS' 'Modele total'; 'LIST' MODTOT                                 ;
+* 'MESS' 'Materiau total'; 'LIST' MATTOT                               ;
+
+
+*=== CONDITIONS AUX LIMITES ===========================================*
+
+*--- Maillages supports des CL sur l'ensemble inferieur
+
+* Base du ressort
+  CL_ME1 = RE_L1                                                       ;
+
+* Point de pilotage des deplacements de la base du ressort
+* et qui recoit la raideur inferieure du bati (point de liaison entre la
+* plaque inferieure support de l'embout et la partie inferieure du bati)
+* DZ_INF = 20 cm : distance verticale entre CL_ME1 et CL_ME2
+  DZ_INF = 20.E-2                                                      ;
+  CL_ME2 = 0.                 0.                 (-1.*DZ_INF)          ;
+
+* Ensemble inferieur CL_ME1 et CL_ME2 soumis a un mouvement de corps rigide
+  CL_ME3 = CL_ME1 'ET' CL_ME2                                          ;
+
+*--- CL sur l'ensemble inferieur
+
+* Blocage du deplacement axial du point de pilotage
+* la partie inferieure du bati est supposee totalement rigide
+* dans la direction de compression des ressorts : UZ(CL_ME2) = 0
+  CL1 = 'BLOQ' 'UZ' CL_ME2                                             ;
+
+* Relation de corps rigide sur CL_ME3
+  CL2 = 'RELA' 'CORI' 'DEPL' 'ROTA' CL_ME3                             ;
+
+* Relation d'ensemble en UZ sur 'CL_ME3'
+* pour eviter le basculement de l'ensemble (embout + ressort)
+  CL3 = 'RELA' 'ENSE' 'UZ' CL_ME3                                      ;
+
+* Blocage de la rotation RZ du bati inferieur
+* place sur CL_ME2
+  CL4 = 'BLOQ' 'RZ' CL_ME2                                             ;
+
+* Blocage du deplacement UX du bati inferieur
+* placee sur CL_ME2
+  CL5 = 'BLOQ' 'UX' CL_ME2                                             ;
+
+* Raideur externe en deplacement UY du bati inferieur
+* placee sur CL_ME2
+  KUI_BATI = 20.E4                                                     ;
+  RE6 = 'APPU' 'UY' KUI_BATI CL_ME2                                    ;
+
+*--- Maillages supports des CL sur l'ensemble superieur
+
+* Ensemble superieur regroupant la plaque de compression PL_ME
+* et le point d'accrochage du JOI1 a la plaque PL_J1
+* soumis a un mouvement de corps rigide
+  CL_ME4 = PL_ME 'ET' PL_J1                                            ;
+
+*--- CL sur l'ensemble superieur
+
+* Relation de corps rigide sur CL_ME4
+  CL7 = 'RELA' 'CORI' 'DEPL' 'ROTA' CL_ME4                             ;
+
+* Blocage de la plaque PL_ME sauf en UZ
+* et/ou UX et/ou UY selon l'inclinaison de l'axe de poussee 
+* 1. Axe de poussee vertical  (AU_X = 0. ; AU_Y = 0.)
+* => deplacement UZ seulement (UX et UY bloques)
+  CL8 = 'BLOQ' 'UX' 'UY' 'RX' 'RY' 'RZ' PL_ME                          ;
+
+*--- Assemblage
+* Rigidite CL
+  CLTOT = CL1 'ET' CL2 'ET' CL3 'ET' CL4 'ET'
+          CL5 'ET' CL7 'ET' CL8                                        ;
+
+* Rigidite constante externe
+  RCTOT = RE6                                                          ;
+
+
+*=== CHARGEMENT =======================================================*
+
+*--- Chargement en deplacement impose de l'essai de compression EDF
+
+* Depl.vertical imp. maxi et mini des cycles
+  TAB_UV    = 'TABLE'                                                  ;
+  TAB_UV.0  =  0.                                                      ;
+  TAB_UV.1  = 40.E-3                                                   ;
+  TAB_UV.2  =  0.                                                      ;
+  TAB_UV.3  = 35.E-3                                                   ;
+  TAB_UV.4  =  0.                                                      ;
+
+* Vitesse de charge/decharge = 5.E-3 m/min
+  VIMP = 5.E-3 / 60.                                                   ;
+
+* Pas de temps : t(i) = t(i-1) + (|u(i)-u(i-1)|/Vit.)
+  TAB_TE   = 'TABLE'                                                   ;
+  TAB_TE.0 =  0.                                                       ;
+  'REPE' B_TE (('DIME' TAB_UV) - 1)                                    ;
+    TAB_TE. &B_TE = TAB_TE. (&B_TE - 1) +
+      (('ABS' (TAB_UV. &B_TE - TAB_UV. (&B_TE - 1))) / VIMP)           ;
+  'FIN' B_TE                                                           ;
+
+* Evolution temporelle du chargement en deplacement impose
+* avec axe de poussee vertical (AU_X = 0. ; AU_Y = 0.)
+* Le debut de la montee en charge a lieu a t = 1.E-1s 
+* de facon a ce que, si le poids propre est pris en compte, il se mette en place
+* avant (entre t = 1.E-4s et t = 1E-2s). On neglige l'ecart de 0.1s
+* par rapport a la duree totale (90.s) de la montee a UV1 sur la vitesse
+* de montee qui est par consequent legerement plus rapide que 5mm/min
+  L_TPS = 'PROG' 0. 1.E-1                                              ;
+  L_COZ = 'PROG' 0. 0.                                                 ;
+  'REPE' B_TE (('DIME' TAB_UV) - 1)                                    ;
+    L_TPS = L_TPS 'ET' ('PROG' TAB_TE . &B_TE)                         ;
+    L_COZ = L_COZ 'ET' ('PROG' TAB_UV . &B_TE)                         ;
+  'FIN' B_TE                                                           ;
+* Prise en compte du signe du deplacement : vers -Z
+  L_COZ = -1. * L_COZ                                                  ;
+  EUZIMP = 'EVOL' TURQ 'MANU' 'TEMPS' L_TPS 'COEF' L_COZ               ;
+  TITR_Z = 'CHAI' 'UZ impose en fn du temps'                           ;
+  'DESS' EUZIMP 'TITR' TITR_Z                                          ;
+
+* Chargement UZ impose a la plaque
+  RIG_1 = 'BLOQ' 'UZ' PL_ME                                            ;
+  DEP_1 = 'DEPI' RIG_1 1.                                              ;
+  CHA_1 = 'CHAR' 'DIMP' DEP_1 EUZIMP                                   ;
+
+*--- Chargement de jeu initial dans le JOI1
+
+* MCHML zero partout
+  DEF_0 = 'ZERO' MODTOT 'DEFORMATIONS'                                 ;
+* Evolution temporelle
+  EDEFJO = 'EVOL' 'MANU' 'TEMPS' ('PROG' 0. 1.E-4 1.E4)
+                         'COEF'  ('PROG' 0. 1.    1.  )                ;
+* MCHML de jeu dans le JOI1
+  DEF_JO = 'MANU' 'CHML' JO_MO 'EXX' (-1. * D_I)
+                  'TYPE' 'DEFORMATIONS' 'STRESSES'                     ;
+
+* Chargement 'DEFI' de jeu dans le JOI1
+  DEF_2 = DEF_0 + DEF_JO                                               ;
+  CHA_2 = 'CHAR' 'DEFI' DEF_2 EDEFJO                                   ;
+
+*--- Assemblage
+  CLTOT  = CLTOT 'ET' RIG_1                                            ;
+  CHATOT = CHA_1 'ET' CHA_2                                            ;
+
+*=== RESOLUTION =======================================================*
+
+*--- Liste des instants calcules, des resultats sauves, sauvegardes
+
+* Instants calcules
+
+
+* - liste des instants
+  I = 1                                                                ;
+  'REPE' B_INST (('DIME' L_TPS) - 1)                                   ;
+    I = I + 1                                                          ;
+    T_PREC = 'EXTR' L_TPS (I - 1)                                      ;
+    T_COUR = 'EXTR' L_TPS I                                            ;
+    'SI' (I 'EGA' 2)                                                   ;
+      INST_C = 'PROG' T_PREC                  T_COUR                                    ;
+    'FINS'                                                             ;
+    'SI' (I 'EGA' 3)                                                   ;
+      'SI' (T_PREC '<' 1.)                                             ;
+        T_PREC = 1.                                                    ;
+      'FINS'                                                           ;
+      LIST_Z = 'PROG' T_PREC PAS PAS_C T_COUR                          ;
+      INST_C = INST_C 'ET' LIST_Z                                      ;
+    'FINS'                                                             ;
+    'SI' (I '>' 3)                                                     ;
+      LIST_Z = 'PROG' T_PREC PAS PAS_C T_COUR                          ;
+      LIST_Z = 'ENLE' LIST_Z 1                                         ;
+      INST_C = INST_C 'ET' LIST_Z                                      ;
+    'FINS'                                                             ;
+  'FIN' B_INST                                                         ;
+* 'MESS' 'Instants CALCULES'; 'LIST' INST_C                            ;
+
+* Instants des resultats sauves
+* - pas de temps : 1 pas dont les resultats sont sauves tous les 1 pas de calcul
+  PAS_R = 1                                                            ;
+* - liste des instants
+  'REPE' B_INST ('DIME' INST_C)                                        ;
+    T_Z = 'EXTR' INST_C &B_INST                                        ;
+    'SI' (T_Z '<' 1.)                                                  ;
+      'SI' (&B_INST 'EGA' 1)                                           ;
+        INST_R = 'PROG'                                                ;
+      'SINO'                                                           ;
+        INST_R = INST_R 'ET' ('PROG' T_Z)                              ;
+      'FINS'                                                           ;
+    'SINO'                                                             ;
+      'SI' (T_Z 'EGA' 1.)                                              ;
+        INST_R = INST_R 'ET' ('PROG' T_Z)                              ;
+        I_Z  = &B_INST + PAS_R                                         ;
+      'SINO'                                                           ;
+        'SI' (&B_INST 'EGA' I_Z)                                       ;
+          INST_R = INST_R 'ET' ('PROG' T_Z)                            ;
+          I_Z  = &B_INST + PAS_R                                       ;
+          'SI' (I_Z '>EG' ('DIME' INST_C))                             ;
+            INST_R = INST_R 'ET'
+                     ('PROG' ('EXTR' INST_C ('DIME' INST_C)))          ;
+            'QUIT' B_INST                                              ;
+          'FINS'                                                       ;
+        'FINS'                                                         ;
+*       Pas de temps aux pics de chargement et aux six instants suivants
+*       pour decrire l'hysteresis pendant la decharge
+        'SI' ((T_Z 'EGA' TAB_TE.1)  'OU' (T_Z 'EGA' TAB_TE.3))         ;
+          'REPE' B_1 6                                                 ;
+            INST_R = INST_R 'ET'
+                     ('PROG' ('EXTR' INST_C (&B_INST + &B_1 - 1)))     ;
+          'FIN' B_1                                                    ;
+        'FINS'                                                         ;
+*       Pas de temps a chargement = 0
+        'SI' ((T_Z 'EGA' TAB_TE.2) 'OU' (T_Z 'EGA' TAB_TE.4))          ;
+          INST_R = INST_R 'ET' ('PROG' T_Z)                            ;
+        'FINS'                                                         ;
+      'FINS'                                                           ;
+    'FINS'                                                             ;
+  'FIN' B_INST                                                         ;
+  INST_R = 'ORDO' 'UNIQUE' INST_R                                      ;
+* 'MESS' 'Instants des resultats SAUVES'; 'LIST' INST_R                ;
+
+* Instants sauvegardes
+* - pas de temps : 1 pas dont les resultats sont sauvegardes tous les 10 pas de calcul
+  PAS_S = 10                                                           ;
+  'REPE' B_INST ('DIME' INST_C)                                        ;
+    T_Z = 'EXTR' INST_C &B_INST                                        ;
+    'SI' (T_Z '<' 1.)                                                  ;
+      'SI' (&B_INST 'EGA' 1)                                           ;
+        INST_S = 'PROG'                                                ;
+      'SINO'                                                           ;
+        INST_S = INST_S 'ET' ('PROG' T_Z)                              ;
+      'FINS'                                                           ;
+    'SINO'                                                             ;
+      'SI' (T_Z 'EGA' 1.)                                              ;
+        INST_S = INST_S 'ET' ('PROG' T_Z)                              ;
+        I_Z  = &B_INST + PAS_S                                         ;
+      'SINO'                                                           ;
+        'SI' (&B_INST 'EGA' I_Z)                                       ;
+          INST_S = INST_S 'ET' ('PROG' T_Z)                            ;
+          I_Z  = &B_INST + PAS_S                                       ;
+          'SI' (I_Z '>EG' ('DIME' INST_C))                             ;
+            INST_S = INST_S 'ET'
+                     ('PROG' ('EXTR' INST_C ('DIME' INST_C)))          ;
+            'QUIT' B_INST                                              ;
+          'FINS'                                                       ;
+        'FINS'                                                         ;
+      'FINS'                                                           ;
+    'FINS'                                                             ;
+  'FIN' B_INST                                                         ;
+  INST_S = 'ORDO' 'UNIQUE' INST_S                                      ;
+* 'MESS' 'Instants des resultats SAUVEGARDES'; 'LIST' INST_S           ;
+
+** Debug
+*  INST_C = 'PROG' 0. 0.1 1. 2. ;
+*  INST_R = INST_C ;
+*  INST_S = INST_C ;
+*  'MESS' 'Instants CALCULES'; 'LIST' INST_C                            ;
+*  'MESS' 'Instants des resultats SAUVES'; 'LIST' INST_R                ;
+*  'MESS' 'Instants des resultats SAUVEGARDES'; 'LIST' INST_S           ;
+
+*--- Apel a PASAPAS
+
+  TAB1 = 'TABLE'                                                       ;
+  TAB1 . 'MODELE'              = MODTOT                                ;
+  TAB1 . 'CARACTERISTIQUES'    = MATTOT                                ;
+  TAB1 . 'BLOCAGES_MECANIQUES' = CLTOT                                 ;
+  TAB1 . 'RIGIDITE_CONSTANTE'  = RCTOT                                 ;
+  TAB1 . 'CHARGEMENT'          = CHATOT                                ;
+  TAB1 . 'GRANDS_DEPLACEMENTS' = VRAI                                  ;
+  TAB1 . 'TEMPS_CALCULES'      = INST_C                                ;
+  TAB1 . 'TEMPS_SAUVES'        = INST_R                                ;
+  TAB1 . 'TEMPS_SAUVEGARDES'   = INST_S                                ;
+  TAB1 . 'AUGMENTATION_AUTOMATIQUE' = VRAI;                            ;
+  TAB1 . 'PRECISION'           = 1D-7;                            ;
+  TAB1 . 'K_SIGMA'             = VRAI                                  ;
+
+  T_EPS_SUP = 'TABLE' ;
+  TAB1 . 'MES_SAUVEGARDES'     = T_EPS_SUP                             ;
+  T_EPS_SUP . 'DEFTO'          = VRAI                                  ;
+  T_EPS_SUP . 'DEFIN'          = VRAI                                  ;
+
+  PASAPAS TAB1                                                         ;
+
+
+*=== POST-TRAITEMENT ==================================================*
+
+*--- Visualisation de la deformee du ressort a lames sous le 
+*--- depacement vertical de la plaque superieure consideree rigide
+*--- et des efforts de contact (appui + frottement)
+*--- de la plaque sur le ressort
+
+* Nombre de pas de temps sauves
+  NRESU  = 'DIME' TAB1 . 'DEPLACEMENTS'                                ;
+
+* Maillage ressort et plaque
+  MAIL_TO = RE_ME 'ET' PL_ME                                           ;
+
+* Points de cadrage des images animees
+  CADR_1 = -11.E-2 -11.E-2 -25.E-3                                     ;
+  CADR_2 =  11.E-2 -11.E-2 -25.E-3                                     ;
+  CADR_3 =  11.E-2  11.E-2 -25.E-3                                     ;
+  CADR_4 = -11.E-2  11.E-2 -25.E-3                                     ;
+
+* Maillage fixe (pour comparaison avec maillage deforme)
+  MAIL_FI = PL_ME 'ET' 
+    ('COUL' (CADR_1 'ET' CADR_2 'ET' CADR_3 'ET' CADR_4) 'BLAN')       ;
+
+* Etat initial
+  DEP0  = TAB1 . 'DEPLACEMENTS' . 0                                    ;
+  DEF0  = 'DEFO' MAIL_FI DEP0 0.                                       ;
+
+* Boucle d'extraction des resultats sur les pas de temps sauves
+  'REPE' BRESU (NRESU - 1)                                             ;
+
+*   Instant de calcul et champ de deplacement calcule
+    TPS1 = 'EXTR' (TAB1 . 'TEMPS_SAUVES') &BRESU                       ;
+    DEP1 = TAB1 . 'DEPLACEMENTS' . &BRESU                              ;
+
+*   controle signe de la réaction normale (pb vu au décollement)
+    FOJ1 = 'REDU' (TAB1 . 'CONTRAINTES' . &BRESU) JO_MO                ;
+    FNOR = ('EXTR' FOJ1 'EFFX' 1 1 1)                                  ;
+    'MESS' 'Resultat' ' ' &BRESU ' t =' TPS1 
+           'MCHAML(EFFX) dans le JOI1, elem1, pt.Gauss1' ' ' FNOR      ;
+
+    SI (FNOR > 1.E-8);
+      ERRE 5 'signe reaction normale contact JOI1';
+    FINSI;
+    
+*   Changement des noms de composante du MCHAML d'apres les directions
+*   locales du JOI1 : 
+*   - Ressort 1 : DIR1(EFFX) = 0. 0. 1. = Z
+*                 DIR2(EFFY) = 1. 0. 0. = X
+*                 DIR3(EFFZ) = 0. 1. 0. = Y
+    FOJ2 = 'CHAN' 'COMP'
+                 ('MOTS' 'EFFX' 'EFFY' 'EFFZ' 'MOMX' 'MOMY' 'MOMZ')
+                 ('MOTS' 'FZ'   'FX'   'FY'   'MOMZ' 'MOMX' 'MOMY')
+                   FOJ1                                                ;
+
+*   Changement en CHPOIN et reduction au point de raccordement
+*   avec la poutre ressort : RE_J1
+    FOJ3 = 'REDU' ('CHAN' 'CHPO' JO_MO FOJ2) RE_J1                    ;
+
+*   - Vecteur force
+    VFOT3 = 'VECT' FOJ3 2.E-5 'FX' 'FY' 'FZ' VERT                      ;
+
+*   - Maillage deforme et vecteur force
+    DEF2 = 'DEFO' MAIL_TO DEP1 1. VFOT3 ROUG                           ;
+
+*   Affichage
+    STR_Z0 = 'CHAI' 'Coef.frot.' FRO1                                  ;
+    STR_Z1 = 'CHAI' 'Force de contact sur maillage deforme' ' '
+                    'FORMAT' '(F7.2)'TPS1' s'                          ;
+    STR_Z2 = 'CHAI' NOM_ESS ' ' STR_Z3                                 ;
+    TITR_Z = 'CHAI' STR_Z0 ' -' ' ' STR_Z1 ' -' ' ' STR_Z2             ;
+    SI LOGITRAC;
+      'TRAC' 'TITR' TITR_Z (DEF0 'ET' DEF2) O_1                        ;
+    FINSI;
+
+
+
+
+  'FIN' BRESU;
+
+
+
+* controle signe de la réaction normale
+
+
+
+
+
+
+
+  'FIN' ;
+
+ 
+
+ 
+
+<<<<<<< HEAD
+=======
+ 
+
+ 
+
+>>>>>>> c4e0e84f (Les fichiers dgibi suivant ont étés modifiés :)

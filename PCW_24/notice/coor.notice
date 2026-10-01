@@ -1,0 +1,148 @@
+$$$$ COOR     NOTICE  PASCAL    21/06/22    21:15:03     11039          
+                                             DATE     21/06/22
+                                             
+    Operateur COORDONNEE                      Voir aussi :
+    --------------------
+
+    RESU1 = COOR  (N1) | POIN1 ;
+                       | GEO1  (CURV) ;
+                       | CHPO1 ;
+                       | CHEL1 ;
+                       | MOD1  ;
+
+
+Section : Mathematiques Autres
+Section : Maillage Generaux
+
+FRAN===========================================================
+    Objet :
+    _______
+
+       L'operateur COOR renvoie la N1-ieme coordonnee
+    d'un objet de type POINT, MAILLAGE, CHPOINT, MCHAML ou MMODEL.
+
+       L'option CURV renvoie le champ de coordonnee curviligne
+    d'une ligne de maillage orientee.
+
+
+    Operations possibles :
+    ______________________
+ANGL===========================================================
+    Description :
+    _____________
+
+       The COOR operator enables the user to recover the N1-ith
+    coordinate of a POINT, MAILLAGE, CHPOINT, MCHAML or MMODEL
+    type object.
+
+       The CURV option provides the curvilinear coordinate
+    of an oriented, meshed line.
+
+    Possible operations :
+    ______________________
+===========================================================
+
+              -----------------------------------------
+FRAN===========================================================
+              |  ENTREE            |  SORTIE (RESU1)  |
+ANGL===========================================================
+              |  INPUT             |  OUTPUT (RESU1)  |
+===========================================================
+    ---------------------------------------------------
+    |  OBJET  |  POINT    (POIN1)  |  FLOTTANT        |
+    |  OBJET  |  MAILLAGE (GEO1)   |  CHPOINT         |
+    |  OBJET  |  CHPOINT  (CHPO1)  |  CHPOINT         |
+    |  OBJET  |  MCHAML   (CHEL1)  |  MCHAML          |
+    |  OBJET  |  MMODEL   (MOD1 )  |  MCHAML          |
+    ---------------------------------------------------
+
+FRAN===========================================================
+    Remarque 1 :
+    ____________
+
+    Pour un objet de type CHPOINT, l'operateur fournit les coordonnees
+    des noeuds supportant le champ.
+
+    Remarque 2 :
+    ____________
+
+    Pour un objet de type MCHAML, l'operateur fournit pour chaque
+    element les coordonnees des points de l'element ou est exprime le
+    champ.
+
+    Remarque 3 :
+    ____________
+
+    L'operateur COOR rend la densite du point considere pour
+    N1 = IDIM + 1.
+    Ceci est aussi vrai pour des objets MAILLAGE et CHPOINT.
+
+    Remarque 4 :
+    ____________
+
+    Si N1 n'est pas indique, l'operateur COOR rend les deux (ou trois)
+    coordonnees de l'objet.
+
+    Remarque 5 :
+    ____________
+
+    Pour l'option CURV, la donnee de N1 est sans objet, ni consequence.
+
+    Remarque 6 :
+    ____________
+
+    Dans le cas d'un MMODEL, COOR renvoie un MCHAML aux noeuds.
+
+    Exemples :
+    __________
+
+    X Y Z = COOR P1 ;
+      Y   = COOR 2 P1 ;
+
+ANGL===========================================================
+    Note 1 :
+    ________
+
+    For a CHPOINT type object, the operator supplies the coordinates
+     of the nodes supporting the field.
+
+    Note 2 :
+    ________
+
+    For a MCHAML type object, the operator supplies, for each element
+     the coordinates of the element points where the field is expressed.
+
+    Note 3 :
+    ______
+
+    The COOR operator supplies the density of the point considered
+     for N1 = IDIM + 1.
+     The same is true of MAILLAGE and CHPOINT objects.
+
+    Note 4 :
+    ________
+
+    If N1 is not specified, the COOR operator supplies the two (or
+     three) coordinates of the object.
+
+    Note 5 :
+    ________
+
+    For the CURV option, N1 is not applicable, nor considered.
+
+    Note 6 :
+    ________
+
+    For a MMODEL object, COOR returns a MCHAML with values at the nodes.
+
+    Examples :
+    __________
+
+    X Y Z = COOR P1 ;
+      Y   = COOR 2 P1 ;
+
+$$$$
+
+ 
+ 
+ 

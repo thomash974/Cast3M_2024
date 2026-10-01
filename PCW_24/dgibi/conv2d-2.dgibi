@@ -1,0 +1,288 @@
+* fichier : conv2d-2.dgibi
+************************************************************************
+* Section : Fluides Permanent
+* Section : Fluides Convection
+************************************************************************
+* NOM         : CONV2D-2
+* DESCRIPTION : 2D pure convection equation
+*
+*               Similar to conv2d.dgibi but more complex:
+*               + interactive GUI (interact = vrai)
+*               + slide generation for the lecture notes (transp = vrai)
+*
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 25/09/2007, version initiale
+* HISTORIQUE : v1, 25/09/2007, création
+************************************************************************
+*
+'OPTION' 'DIME' 2 'ELEM' 'QUA8' ;
+interact = FAUX ;
+transp   = VRAI ;
+*
+* Scaled hyperbolic tangent function
+*
+'DEBPROC' STANH ;
+'ARGUMENT' xmoy*'FLOTTANT' ;
+'ARGUMENT' xtan*'FLOTTANT' ;
+'ARGUMENT' ymin*'FLOTTANT' ;
+'ARGUMENT' ymax*'FLOTTANT' ;
+'ARGUMENT' xi*'CHPOINT' ;
+*
+xnew = '/' ('-' xi xmoy) xtan ; 
+ynew = 'TANH' xnew ;
+ytan = '/' ('-' ymax ymin) 2.D0 ;
+ymoy = '/' ('+' ymax ymin) 2.D0 ;
+y = '+' ('*' ynew ytan) ymoy ;
+*
+'RESPRO' y ;
+'FINPROC' ;
+*
+*
+'DEBPROC' CALCUL ;
+'ARGUMENT' iini*'ENTIER' ;
+'ARGUMENT' iang*'ENTIER' ;
+'ARGUMENT' imail*'ENTIER' ;
+'ARGUMENT' idecent*'ENTIER' ;
+'ARGUMENT' icmd*'ENTIER' ;
+'ARGUMENT' itrac*'ENTIER' ;
+'ARGUMENT' lnclk/'LOGIQUE' ;
+*
+'SI' ('NON' ('EXISTE' lnclk)) ;
+   lnclk = FAUX ;
+'FINSI' ;   
+*
+angle = '*' ('-' iang 1) 10.D0 ;
+nmail = '*' 15 imail ;
+lcmd = 'PROG' 0.2 0.5 1.0 ;
+cmd  = 'EXTRAIRE' lcmd icmd ; 
+*
+lmesh = 1.5 ;
+'SI' ('EGA' idecent 1) ;
+   typdec = 'CENTREE' ;
+* diffusion toute petite (very small diffusion)
+   difart = '/' ('/' lmesh ('FLOTTANT' nmail)) 2.D45 ;
+*   difart = 0. ;
+   niter  = 1 ;
+   omeg   = 1. ;
+'FINSI' ;   
+'SI' ('EGA' idecent 2) ;
+   typdec = 'CENTREE' ;
+* alfa = U dx / 2 Pem avec Peclet critique de maille = 1
+* alfa = U dx / 2 Pem with critical mesh Peclet number = 1
+   difart = '/' ('/' lmesh ('FLOTTANT' nmail)) 2. ;
+   difart = '*' difart cmd ;
+   niter  = 1 ;
+   omeg   = 1. ;
+'FINSI' ;   
+'SI' ('EGA' idecent 3) ;
+   typdec = 'SUPG' ;
+   difart = 0. ;
+   niter  = 1 ;
+   omeg   = 1. ;
+'FINSI' ;   
+'SI' ('EGA' idecent 4) ;
+   typdec = 'SUPGDC' ;
+   difart = 0. ;
+   niter = 15 ;
+   omeg  = 0.7 ;
+'FINSI' ;   
+*
+* Maillage (Mesh)
+*
+larg = 1.5 ; prof = 1.5 ;
+p0 = 0. 0. ; p1 = larg 0. ;
+lt = 'DROIT' nmail p0 p1 ;
+*mt  = 'TRANSLATION' lt ('ENTIER' ('*' nmail 1.5)) (0. 1.5) ;
+mt  = 'TRANSLATION' lt nmail (0. prof) ;
+*mt  = 'TRANSLATION' lt nmail (0. iang) ;
+cmt = 'CONTOUR' mt ;
+pmt = 'CHANGER' mt 'POI1' ; pcmt = 'CHANGER' cmt 'POI1' ;
+intmt = 'DIFF' pmt pcmt ;
+pertx = 'BRUIT' 'BLAN' 'GAUSS' 0. ('/' 0.1 nmail) intmt ; 
+perty = 'BRUIT' 'BLAN' 'GAUSS' 0. ('/' 0.1 nmail) intmt ;
+*'DEPLACER' mt 'PLUS'
+*    ('+' ('NOMC' 'UX' pertx) ('NOMC' 'UY' perty)) ;
+bas dro hau gau = 'COTE' mt ;
+hau = 'INVERSE' hau ;
+_bas = 'CHANGER' bas 'QUAF' ; _dro = 'CHANGER' dro 'QUAF' ;
+_hau = 'CHANGER' hau 'QUAF' ; _gau = 'CHANGER' gau 'QUAF' ;
+_mt  = 'CHANGER' mt 'QUAF' ;
+'ELIMINATION' (_mt 'ET' _bas 'ET' _gau 'ET' _dro 'ET' _hau) 1.D-6 ;
+$mt = 'MODE' _mt 'NAVIER_STOKES' 'LINE' ;
+$gau = 'MODE' _gau 'NAVIER_STOKES' 'LINE' ;
+$dro = 'MODE' _dro 'NAVIER_STOKES' 'LINE' ;
+$hau = 'MODE' _hau 'NAVIER_STOKES' 'LINE' ;
+$bas = 'MODE' _bas 'NAVIER_STOKES' 'LINE' ;
+mt = 'DOMA' $mt 'MAILLAGE' ; gau = 'DOMA' $gau 'MAILLAGE' ;
+dro = 'DOMA' $dro 'MAILLAGE' ; hau = 'DOMA' $hau 'MAILLAGE' ;
+bas = 'DOMA' $bas 'MAILLAGE' ;
+*
+* Boundary condition
+*
+xmoye = 0.5 ;
+xmoys = xmoye '+' ('*' prof ('TAN' angle)) ; 
+'SI' ('EGA' iini 1) ;
+   solex = STANH ('COORDONNEE' 1 mt) xmoye -0.15 0. 1. ;
+   solsor= STANH ('COORDONNEE' 1 mt) xmoys -0.15 0. 1. ;
+'SINON' ;   
+   solex  = 'MASQUE' ('COORDONNEE' 1 mt) 'INFERIEUR' xmoye ;
+   solsor = 'MASQUE' ('COORDONNEE' 1 mt) 'INFERIEUR' xmoys ;
+'FINSI' ;   
+mclim = 'ET' bas gau ;
+cclim = 'REDU' solex mclim ;
+*
+* table EQEX (Problem description)
+*
+rv = 'EQEX' 'NITER' niter 'OMEGA' omeg
+     'OPTI' 'EF' 'IMPL' typdec 'CMD' cmd
+     'ZONE' $mt 'OPER' 'KONV' 1. 'UN' 'ALF' 'INCO' 'TN'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $mt 'OPER' 'LAPN' 'ALF' 'INCO' 'TN'
+     'CLIM' mclim 'TN' 'TIMP' cclim
+      ;
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' (('SIN' angle)
+                                                  ('COS' angle)) ;
+rv . 'INCO' . 'ALF' = 'KCHT' $mt 'SCAL' 'CENTRE' difart ;
+rv . 'INCO' . 'TN'  = 'KCHT' $mt 'SCAL' 'SOMMET' 0. ;
+*
+EXEC rv ;
+*
+tn = rv . 'INCO' . 'TN' ;
+*
+* Post-traitement (Post-treatment)
+*
+'SI' ('EGA' itrac 1) ;
+   'OPTI' 'DIME' 3 ;
+   tnp mtp = 'PLUS' tn mt ('*' ('NOMC' 'UZ' tn) 0.5D0) ;
+   oeil = '*' (1.2 -2.4 1.3) 2. ;
+   'SI' lnclk ;
+      'TRACER' oeil 'CACH' tnp mtp 'NCLK' ;
+   'SINON' ;
+      'TRACER' oeil 'CACH' tnp mtp ; 
+   'FINSI' ;         
+   'OPTI' 'DIME' 2 ;
+'FINSI' ;
+'SI' ('EGA' itrac 2) ;
+   'OPTI' 'DIME' 3 ;
+   mtp = 'PLUS' mt ('*' ('NOMC' 'UZ' tn) 0.5D0) ;
+   oeil = '*' (1.2 -2.4 1.3) 2. ;
+   'SI' lnclk ;    
+      'TRACER' oeil 'CACH' mtp  'NCLK' ;
+   'SINON' ;    
+      'TRACER' oeil 'CACH' mtp ;
+   'FINSI' ;      
+   'OPTI' 'DIME' 2 ;
+'FINSI' ;
+'SI' ('EGA' itrac 3) ;
+   evb = 'EVOL' 'CHPO' solsor 'SCAL' hau ;
+   evh = 'EVOL' 'CHPO' tn     'SCAL' hau ;
+*   evtot = ('COULEUR' evh 'JAUN') 'ET' ('COULEUR' evb 'TURQ') ;
+   evtot = evh 'ET' evb ;
+   tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+   tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+   tabt . 'TITRE' . 1 = 'CHAINE' 'y=1' ;
+   tabt . 'TITRE' . 2 = 'CHAINE' 'y=0' ;
+   'SI' lnclk ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'T' 'LEGE' tabt 'NCLK' ;
+   'SINON' ;
+      'DESSIN' evtot 'TITX' 'X' 'TITY' 'T' 'LEGE' tabt ;
+   'FINSI' ;
+'FINSI' ;   
+'FINPROC' ;
+*
+'SI' interact ;
+*
+* Table contenant les choix des menus (Menu entries)
+*
+tini = 'TABLE' ;
+tini . 1 = 'tanh' ; tini . 2 = 'choc' ;
+ntini = 'DIME' tini ; itini = 1 ;
+*
+tang = 'TABLE' ;
+tang . 1 = 'ang=0' ; tang . 2 = 'ang=10' ; tang . 3 = 'ang=20' ;
+ntang = 'DIME' tang ; itang = 2 ;
+*
+tanx = 'TABLE' ;
+tanx . 1 = 'nx=15' ; tanx . 2 = 'nx=30' ;
+ntanx = 'DIME' tanx ; itanx = 2 ;
+*
+tadc = 'TABLE' ;
+tadc . 1 = 'CENTREE' ; tadc . 2 = 'CENT+DIFF' ; tadc . 3 = 'SUPG' ;
+tadc . 4 = 'SUPGDC' ;
+ntadc = 'DIME' tadc ; itadc = 1 ;
+*
+tacmd = 'TABLE' ;
+tacmd . 1 = 'CMD0.3' ; tacmd . 2 = 'CMD0.5' ; tacmd . 3 = 'CMD1.0' ;
+ntacmd = 'DIME' tacmd ; itacmd = 2 ;
+*
+taff = 'TABLE' ;
+taff . 1 = '3D+ISO' ; taff . 2 = '3D' ; taff . 3 = '2D' ;
+ntaff = 'DIME' taff ; itaff = 1 ;
+*
+* Boucle d'affichage (Print loop)
+*
+'REPETER' bouc ;
+   CALCUL itini itang itanx itadc itacmd itaff VRAI ;
+   cha = 'CHAINE' 'Transport concentration' ;
+   ret = 'MENU' cha (tini . itini) (tang . itang) (tanx . itanx)
+                    (tadc . itadc) (tacmd . itacmd) (taff . itaff) ;
+   'SI' ('EGA' ret 'Quitter') ;
+      'QUITTER' bouc ;
+   'FINSI';
+   'SI' ('EGA' ret (tini . itini)) ; itini = '+' itini 1 ; 'FINSI' ;
+   'SI' (itini > ntini) ; itini = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tang . itang)) ; itang = '+' itang 1 ; 'FINSI' ;
+   'SI' (itang > ntang) ; itang = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tanx . itanx)) ; itanx = '+' itanx 1 ; 'FINSI' ;
+   'SI' (itanx > ntanx) ; itanx = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tadc . itadc)) ; itadc = '+' itadc 1 ; 'FINSI' ;
+   'SI' (itadc > ntadc) ; itadc = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tacmd . itacmd)) ; itacmd = '+' itacmd 1 ; 'FINSI' ;
+   'SI' (itacmd > ntacmd) ; itacmd = 1 ; 'FINSI';
+   'SI' ('EGA' ret (taff . itaff)) ; itaff = '+' itaff 1 ; 'FINSI' ;
+   'SI' (itaff > ntaff) ; itaff = 1 ; 'FINSI';
+'FIN' bouc ;
+'FINSI' ;
+*
+* Mes transparents
+* Lecture notes slides
+*
+'SI' transp ;
+'OPTI' 'TRAC' 'PS' ;
+   CALCUL 1 2 2 1 2 2 ;
+*
+   CALCUL 1 2 2 2 2 2 ;
+   CALCUL 1 2 2 2 2 3 ;
+*   
+   CALCUL 1 2 2 3 2 2 ;
+   CALCUL 1 2 2 3 2 3 ;
+*
+   CALCUL 2 2 2 3 2 2 ;
+   CALCUL 2 2 2 4 2 2 ;
+'FINSI' ;   
+*
+'SI' interact ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;   
+*
+* End of dgibi file CONV2D-2
+*
+'FIN' ;
+
+ 
+

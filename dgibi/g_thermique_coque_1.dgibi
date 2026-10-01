@@ -1,0 +1,521 @@
+* fichier : g_thermique_coque_1.dgibi
+****************************************************
+* Section : Mecanique Rupture
+****************************************************
+*                                                  *
+*       VALIDATION DE LA PROCEDURE G_THETA         *
+*   POUR UNE FISSURE DANS UNE PLAQUE SOUMISE A     *
+*    UN CHARGEMENT THERMIQUE DANS L'EPAISSEUR      *
+*                        -                         *
+*      VALIDATION DE LA MODELISATION COQUE PAR     *
+*            COMPARAISON A UN CALCUL 3D            *
+*                                                  *
+*                                                  *
+*  GEOMETRIE : plaque                              *
+*                                                  *
+*  longueur du tube          : 3000. MM            *
+*  epaisseur du tube         :  17.5 MM            *
+*  rayon moyen du tube       :  350. MM            *
+*  longueur de la fissure    :   50. MM            *
+*                                                  *
+*  MATERIAU : élastique                            *
+*                                                  *
+*  Module d'Young         : 2.E5 MPa               *
+*  Coefficient de poisson : 0.3                    *
+*                                                  *
+*  CHARGEMENT : température imposée                *
+*                                                  *
+****************************************************
+
+* I - MAILLAGE
+* ------------
+
+* I.1 - MAILLAGE 2D
+* *****************
+
+* OPTIONS
+ORD_EF = 2 ;
+SI (EGA ORD_EF 1) ;
+        SUP_GEO_2D = 'QUA4' ;
+        SUP_GEO_3D = 'CUB8' ;
+        EF_Q = 'COQ4' ;
+        EF_T = 'COQ3' ;
+SINON ;
+        SI (EGA ORD_EF 2) ;
+                SUP_GEO_2D = 'QUA8' ;
+                SUP_GEO_3D = 'CU20' ;
+                EF_Q = 'COQ8' ;
+                EF_T = 'COQ6' ;
+        SINON ;
+                MESS 'ERREUR : L''ORDRE DES ELEMENTS DOIT ETRE 1 OU 2' ;
+                ERRE 21 ;
+        FINSI ;
+FINSI ;
+OPTI 'DIME' 2 'ELEM' SUP_GEO_2D ;
+
+* PARAMETRES
+* TM = TAILLE DE MAILLE EN POINTE DE FISSURE
+* N = NOMBRE DE COUCHES D'ELEMENTS SUR 45 DEGRES
+* C = DEMI-COTE DU CARRE
+* R = RAYON DU DISQUE
+* LDEP = LARGEUR DE BANDE DEPOSEE (POUR UN METAL BIPHASE)
+* EPAI_T = EPAISSEUR TOTALE DE L'EPROUVETTE
+
+A = 17.5 ;
+W = 70. ;
+H = 280. ;
+RAP1 = A/W ;
+RAP2 = H/W ;
+TM = 0.2 ;
+N = 4 ;
+LCRITW = (W*(1.-RAP1)) ;
+LCRITA = W*RAP1 ;
+LDEP = 10. ;
+C = MINI (PROG (W/5.) LDEP LCRITA LCRITW) ;
+R = C / 2. ;
+EPAI_T = .7 * 40;
+
+* DEBUT DU MAILLAGE
+P0 = 0. 0. ;
+P1 = A 0. ;
+DENS1 = 2.*TM ;
+DENS DENS1 ;
+P2 = P1 PLUS ((TM*N*2.) 0.) ;
+SI ((TM * N * 2.) > R) ;
+        NC =  R / 2. ;
+        MESS 'LE PRODUIT (TM*N) DOIT ETRE INFERIEUR A' NC ;
+FINSI ;
+DENS2 = 1.5*(PI*R)/(4.*N) ;
+DENS DENS2 ;
+P10 = P1 PLUS (R 0.) ;
+
+LIGAM0 = P2 DROI P10 ;
+
+SU21 = LIGAM0 ROTA N 45. P1 ;
+L21 = SU21 COTE 4 ;
+C21 =  SU21 COTE 2 ;
+SU22 = (SU21 COTE 3) ROTA N 45. P1 ;
+L22 = SU22 COTE 2 ;
+C22 =  SU22 COTE 4 ;
+SU23 = (SU22 COTE 3) ROTA N 45. P1 ;
+L23 = SU23 COTE 4 ;
+C23 =  SU23 COTE 2 ;
+SU24 = (SU23 COTE 3) ROTA N 45. P1 ;
+L24 = SU24 COTE 2 ;
+C24 =  SU24 COTE 4 ;
+
+RAC = L21 ET L22 ET L23 ET L24 ;
+SU2 = SU21 ET SU22 ET SU23 ET SU24 ;
+
+DENS TM ;
+QAD = P1 PLUS ((TM*N) 0.) ;
+QAG = P1 MOIN ((TM*N) 0.) ;
+BASD = P1 DROI N QAD ;
+BASG = P1 DROI N QAG ;
+BAS = ORDO (BASG ET BASD) ;
+PAVE1 = BAS TRAN N (0. (TM*N)) ;
+COPAV1 = PAVE1 COTE 2 ;
+COPAV2 = PAVE1 COTE 3 ;
+COPAV3 = PAVE1 COTE 4 ;
+COPAV = COPAV1 ET COPAV2 ET COPAV3 ;
+DEC = (ENTI (N / 1.2)) * (-1) ;
+JONCD = QAD DROI P2 ;
+JONCG = QAG DROI (SU24 POIN 'PROC' QAG) ;
+SUJON = DALL COPAV JONCD RAC JONCG 'PLAN' ;
+SU0 = SUJON ET PAVE1 ;
+LIG0 = BASD ET JONCD ;
+LIGAM0 =  LIGAM0 ET LIG0 ;
+L1 = LIGAM0 ;
+
+* CARRE EXTERIEUR AUTOUR DU FOND DE FISSURE
+DENS (2.*DENS2) ;
+PDB = P1 PLUS (C 0.) ;
+PDH = P1 PLUS (C C) ;
+PMH = P1 PLUS (0. C) ;
+PGH = P1 PLUS (((-1) * C) C) ;
+PGB = P1 PLUS (((-1) * C) 0.) ;
+
+CARD = PDB DROI N PDH ;
+CARHD = PDH DROI N PMH ;
+CARHG = PMH DROI N PGH ;
+CARG = PGH DROI N PGB ;
+
+DECC = ((-1) * (ENTI ((C - R) / (1. * DENS2)))) - 1 ;
+
+DIAD1 = (C21 POIN 'INITIAL') DROI DECC PDB ;
+DIAD1H = (C22 POIN 'FINAL') DROI DECC PDH ;
+DIAM = (C23 POIN 'INITIAL') DROI DECC PMH ;
+DIAG1H = (C24 POIN 'FINAL') DROI DECC PGH ;
+DIAG1 = (C24 POIN 'INITIAL') DROI DECC PGB ;
+
+SU3 = DALL C21 DIAD1H CARD DIAD1 'PLAN';
+SU4 = (DALL C22 DIAM CARHD DIAD1H 'PLAN') ET
+                (DALL C23 DIAG1H CARHG DIAM 'PLAN') ;
+SU5 = DALL C24 DIAG1 CARG DIAG1H 'PLAN' ;
+
+CARRE = SU0 ET SU2 ET SU3 ET SU4 ET SU5 ;
+LIGAM1 = LIGAM0 ET DIAD1 ;
+
+* PARTIE METAL DEPOSE
+CLCRITW =  (C < (LCRITW + 0.01)) ET (C > (LCRITW - 0.01)) ;
+CLCRITA =  (C < (LCRITA + 0.01)) ET (C > (LCRITA - 0.01)) ;
+CLDEP =    (C < (LDEP + 0.01)) ET (C >  (LDEP - 0.01)) ;
+
+SI ((NON CLCRITW ) ET (NON CLCRITA)) ;
+        MESS 'CAS GENERAL' ;
+        VTL = 0. (LDEP - C) ;
+        VTG = (((-1) * (LCRITA - C)) 0.) ;
+        VTD =  (LCRITW - C) 0. ;
+        NFL = ENTI ((LDEP - C) / (MESU (CARHD ELEM 1) LONG)) ;
+        NFG = ENTI ((LCRITA - C) / (MESU (CARG ELEM 1) LONG)) ;
+        NFD = ENTI ((LCRITW - C) / (MESU (CARD ELEM 1) LONG)) ;
+        SI (NFG EGA 0) ;
+                NFG = 1 ;
+                SU7 = CARG TRAN NFG VTG ;
+        SINON ;
+                DENSI = (MESU (CARG ELEM 1) LONG) ;
+                DENSF = DENSI * (1 + (NFG / 20.)) ;
+                SU7 = CARG TRAN  'DINI' DENSI 'DFIN' DENSF VTG ;
+        FINSI ;
+        SI (NFD EGA 0) ;
+                NFD = 1 ;
+                SU6 = CARD TRAN NFD VTD ;
+        SINON ;
+                DENSI = (MESU (CARD ELEM 1) LONG) ;
+                DENSF = DENSI * (1 + (NFD / 20.)) ;
+                SU6 = CARD TRAN  'DINI' DENSI 'DFIN' DENSF VTD ;
+        FINSI ;
+        L8 = (SU7 COTE 4) ET (SU6 COTE 2) ET CARHD ET CARHG ;
+        L8 = ORDO L8 ;
+        SI CLDEP ;
+                MESS 'CAS CRITIQUE LDEP' ;
+                MDEP = CARRE ET SU6 ET SU7 ;
+                L8B = INVE L8 ;
+                LIGAM = LIGAM1 ET (SU6 COTE 4) ;
+                LSYM1 = (SU7 COTE 3) ;
+        SINON ;
+                SI (NFL EGA 0) ;
+                        NFL = 1 ;
+                        SU8 = L8 TRAN NFL VTL ;
+                SINON ;
+                        DENSI = (MESU (CARHD ELEM 1) LONG) ;
+                        DENSF = DENSI * (1 + (NFL / 10.)) ;
+                        SU8 = L8 TRAN  'DINI' DENSI 'DFIN' DENSF VTL ;
+                FINSI ;
+                MDEP = CARRE ET SU6 ET SU7 ET SU8 ;
+                L8B = SU8 COTE 3 ;
+                LIGAM = LIGAM1 ET (SU6 COTE 4) ;
+                LSYM1 =  (SU7 COTE 3) ET (SU8 COTE 4) ;
+        FINSI ;
+FINSI ;
+
+SI CLCRITW ;
+        MESS 'CAS CRITIQUE W' ;
+        VTL = 0. (LDEP - C) ;
+        VTT = (((-1) * (LCRITA - C)) 0.) ;
+        NFL = ENTI ((LDEP - C) / (MESU (CARHD ELEM 1) LONG)) ;
+        NFT = ENTI ((LCRITA - C) / (MESU (CARG ELEM 1) LONG)) ;
+        SI (NFT EGA 0) ;
+                NFT = 1 ;
+                SU7 = CARG TRAN NFT VTT ;
+        SINON ;
+                DENSI = (MESU (CARG ELEM 1) LONG) ;
+                DENSF = DENSI * (1 + (NFT / 20.)) ;
+                SU7 = CARG TRAN  'DINI' DENSI 'DFIN' DENSF VTT ;
+        FINSI ;
+        L8 = (SU7 COTE 4) ET CARHD ET CARHG ;
+        L8 = ORDO L8 ;
+        SI (CLDEP) ;
+                MESS 'CAS CRITIQUE LDEP ET LCRITW' ;
+                MDEP = CARRE ET SU7 ;
+                L8B = INVE L8 ;
+                LIGAM = LIGAM1 ;
+                LSYM1 = (SU7 COTE 3) ;
+        SINON ;
+                SI (NFL EGA 0) ;
+                        NFL = 1 ;
+                        SU8 = L8 TRAN NFL VTL ;
+                SINON ;
+                        DENSI = (MESU (CARHD ELEM 1) LONG) ;
+                        DENSF = DENSI * (1 + (NFL / 10.)) ;
+                        SU8 = L8 TRAN  'DINI' DENSI 'DFIN' DENSF VTL ;
+                FINSI ;
+                MDEP = CARRE ET SU7 ET SU8 ;
+                L8B = SU8 COTE 3 ;
+                LIGAM = LIGAM1 ;
+                LSYM1 =  (SU7 COTE 3) ET (SU8 COTE 4) ;
+        FINSI ;
+FINSI ;
+
+SI CLCRITA ;
+        MESS 'CAS CRITIQUE A' ;
+        VTL = 0. (LDEP - C) ;
+        VTT = (LCRITW - C) 0. ;
+        NFL = ENTI ((LDEP - C) / (MESU (CARHD ELEM 1) LONG)) ;
+        NFT = ENTI ((LCRITW - C) / (MESU (CARD ELEM 1) LONG)) ;
+        SI (NFT EGA 0) ;
+                NFT = 1 ;
+                SU6 = CARD TRAN NFT VTT ;
+        SINON ;
+                DENSI = (MESU (CARD ELEM 1) LONG) ;
+                DENSF = DENSI * (1 + (NFT / 20.)) ;
+                SU6 = CARD TRAN  'DINI' DENSI 'DFIN' DENSF VTT ;
+        FINSI ;
+        L8 = (SU6 COTE 2) ET CARHD ET CARHG ;
+        L8 = ORDO L8 ;
+        SI (CLDEP) ;
+*               MESS 'CAS CRITIQUE LDEP ET LCRITA' ;
+                MDEP = CARRE ET SU6 ;
+                L8B = L8 ;
+                LIGAM = LIGAM1  ET (SU6 COTE 4) ; ;
+                LSYM1 = CARG ;
+        SINON ;
+                SI (NFL EGA 0) ;
+                        NFL = 1 ;
+                        SU8 = L8 TRAN NFL VTL ;
+                SINON ;
+                        DENSI = (MESU (CARHD ELEM 1) LONG) ;
+                        DENSF = DENSI * (1 + (NFL / 10.)) ;
+                        SU8 = L8 TRAN  'DINI' DENSI 'DFIN' DENSF VTL ;
+                FINSI ;
+                MDEP = CARRE ET SU6 ET SU8 ;
+                L8B = SU8 COTE 3 ;
+                L8B = INVE L8B ;
+                LIGAM = LIGAM1 ET (SU6 COTE 4) ;
+                LSYM1 = (SU8 COTE 2) ET CARG ;
+        FINSI ;
+FINSI ;
+
+* PARTIE METAL DE BASE
+L8B = ORDO L8B ;
+PPI = L8B POIN 'INITIAL' ;
+PF = L8B POIN 'FINAL' ;
+LU = (MESU L8B LONG) / (NBEL L8B) * 1.2 ;
+FRON1 = (PPI PLUS (0. LU)) DROI (ENTI ((NBEL L8B) / 1.51))
+                        (PF PLUS (0. LU)) ;
+LUB = ((MESU FRON1 LONG) / (NBEL FRON1)) * 1.2 ;
+PIB = FRON1 POIN 'INITIAL' ;
+PFB = FRON1 POIN 'FINAL' ;
+FRON2 = (PIB PLUS (0. LUB)) D (ENTI ((NBEL FRON1) / 1.51))
+                        (PFB PLUS (0. LUB)) ;
+
+JOIN1 = COUT L8B FRON1 ;
+JOIN2 = COUT FRON1 FRON2 ;
+JOIN = JOIN1 ET JOIN2 ;
+JOINL = CHAN JOIN LIGNE ;
+JOINP = JOINL POIN 'DROIT' P0 (P0 PLUS (0. 10.)) (TM / 10.) ;
+LSYM2 = JOINL ELEM 'APPUYE' 'STRICTEMENT' JOINP ;
+
+LREST = ((W * RAP2) / 2.) - (LDEP + LU + LUB) ;
+VT = 0. LREST ;
+LE = MESU (FRON2 ELEM 1) LONG ;
+CORP = FRON2 TRAN (ENTI (LREST / LE)) VT ;
+LSYM3 = CORP COTE 2 ;
+PINIF = LIGAM POIN 'INITIAL' ;
+
+* FIN DU MAILLAGE
+MBAS = CORP ET JOIN ;
+* PLAN VERTICALE DE SYMETRIE
+LSYM = LSYM1 ET LSYM2 ET LSYM3 ;
+LSYM = LSYM COUL VERT ;
+* FACE DE CHARGEMENT
+SCHAR = CORP COTE 3 ;
+SCHAR = SCHAR COUL ROUG ;
+* LIGAMENT
+LIGAM = LIGAM COUL BLEU ;
+* MAILLAGE COMPLET
+CCP = MBAS ET MDEP ;
+* TRAC 'QUAL' (CCP ET LIGAM ET LSYM ET SCHAR) ;FIN ;
+
+* PREMIERE COUCHE D'ELEMENT AUTOUR DE LA FISSURE
+IELEM = 53 ;
+ELEFIS = CCP ELEM SUP_GEO_2D IELEM ;
+
+
+* I.2 - MAILLAGE 3D
+* *****************
+
+OPTI 'DIME' 3 'ELEM' SUP_GEO_3D ;
+
+* EXTRUSION
+VOL1 = CCP VOLU 5 'TRAN' (0. 0. (EPAI_T/2.)) ;
+* TRAC 'CACH' VOL1 ;FIN ;
+
+
+* II - CALCULS
+* ------------
+
+* PROPRIETES :
+* YOUN1 = MODULE D'YOUNG
+* NU1 = COEFFICIENT DE POISSON
+* ALPH1 = COEFFICIENT DE DILATATION
+* TALP1 = TEMPERATURE DE REFERENCE POUR LE COEFFICIENT DE DILATATION SECANT
+* TREF1 = TEMPERATURE DE REFERENCE POUR LA DEFORMATION THERMIQUE
+
+YOUN1 = 2.E05;
+NU1 = 0.3 ;
+ALPH1 = 0.5 ;
+TALP1 = 0. ;
+TREF1 = 0. ;
+
+* II.1 - CALCUL 3D MASSIF
+* ***********************
+
+* MODELE ET MATERIAU
+MOD1 = MODE VOL1 'MECANIQUE' 'ELASTIQUE' ;
+MAT1 = MATE MOD1 'YOUN' YOUN1 'NU' NU1 'ALPH' ALPH1 'TALP' TALP1 'TREF' TREF1 ;
+RIG1 = RIGI MOD1 MAT1 ;
+
+* CL
+XLIGAM = MINI (COOR 1 LIGAM) ;
+D_VOL1 = ENVE VOL1 ;
+Y1 = COOR 2 D_VOL1 ;
+YLIM = (MINI Y1) + 1.E-5 ;
+PLIGAM3D = Y1 POIN 'EGINFE' YLIM ;
+PLIGAM3D = (COOR 1 PLIGAM3D) POIN 'EGSUPE' XLIGAM ;
+LIGAM3D = D_VOL1 ELEM 'APPUYE' PLIGAM3D ;
+CL1 = BLOQ 'UY' LIGAM3D ;
+
+X1 = COOR 1 D_VOL1 ;
+XLIM = (MINI X1) + 1.E-5 ;
+PYOZ = X1 POIN 'EGINFE' XLIM ;
+YOZ = D_VOL1 ELEM 'APPUYE' PYOZ ;
+CL2 = BLOQ 'UX' YOZ ;
+
+Z1 = COOR 3 D_VOL1 ;
+ZLIM = (MINI Z1) + 1.E-5 ;
+PXOY = Z1 POIN 'EGINFE' ZLIM ;
+XOY = D_VOL1 ELEM 'APPUYE' PXOY ;
+CL3 = BLOQ 'UZ' XOY ;
+
+* TRAC 'CACH' (VOL1 ET (LIGAM3D COUL 'ROUG') ET (YOZ COUL 'BLEU')
+*                                       ET (XOY COUL 'VERT')) ;FIN ;
+
+CL0 = CL1 ET CL2 ET CL3 ;
+
+* TEMPERATURE IMPOSEE
+EV1 = EVOL 'MANU' 'X1' (PROG 0 70) (PROG -0.0005 0);
+TIMP = VARI EV1 (COOR 1 VOL1) 'T' ;
+CHAR1 = BSIG MOD1 (THET MOD1 MAT1 TIMP) ;
+
+* RESOLUTION
+DEP1 = RESO (RIG1 ET CL0) CHAR1 ;
+* DEF1 = DEFO VOL1 DEP1 ;
+* TRAC 'CACH' DEF1 ;FIN ;
+
+* APPEL A G_THETA
+PLEVRE = Y1 POIN 'EGINFE' YLIM ;
+LEVRE = D_VOL1 ELEM 'APPUYE' PLEVRE ;
+LEVRE = LEVRE DIFF LIGAM3D ;
+D_LEVRE = CONT LEVRE ;
+PFRONT = (COOR 1 D_LEVRE) POIN 'MAXI' ;
+FRONT_FISS = D_LEVRE ELEM 'APPUYE' PFRONT ;
+* TRAC 'CACH' (VOL1 ET (LEVRE COUL 'ROUG') ET (FRONT_FISS COUL 'BLEU')) ;FIN ;
+
+SUPTAB = TABL ;
+SUPTAB.'OBJECTIF' = MOT 'J' ;
+SUPTAB.'LEVRE_SUPERIEURE' = LEVRE ;
+SUPTAB.'FRONT_FISSURE' = FRONT_FISS ;
+SUPTAB.'SOLUTION_RESO' = DEP1 ;
+SUPTAB.'CARACTERISTIQUES' = MAT1 ;
+SUPTAB.'MODELE' = MOD1 ;
+SUPTAB.'TEMPERATURES' = TIMP ;
+SUPTAB.'COUCHE' = 4 ;
+
+G_THETA SUPTAB ;
+
+G3D = SUPTAB.'RESULTATS'.'GLOBAL' ;
+
+
+* * II.2 - CALCUL COQUE
+* * *******************
+* 
+* OPTI 'ELEM' SUP_GEO_2D ;
+* 
+* * MODELE MULTICOUCHE
+* * ELEMENT POUR LE MODELE MULTICOUCHE
+* * NOMBRE DE COUCHES ET LEUR EPAISSEUR
+* NB_COU = 13 ;
+* EPAI_C = EPAI_T * 1.E-6 ;
+* * CREATION DU MODELE MULTICOUCHE
+* EPAI_I = (EPAI_T - (EPAI_C*NB_COU))/(NB_COU - 1) ;
+* TBEPAI = TABL ;
+* TBEXCE = TABLE ;
+* MOD_MUL = VIDE 'MMODEL' ;
+* MAT_MUL = VIDE 'MCHAML' ;
+* REPE I ((2*NB_COU) - 1) ;
+*       EX1 = (EPAI_I + EPAI_C)*(&I - NB_COU)/2. ;
+*       SI (EGA ((&I/2)*2) &I) ;
+*               EP1 = EPAI_I ;
+*       SINON ;
+*               EP1 = EPAI_C ;
+*       FINSI;
+*       MOD_MU1 = MODE ELEFIS 'MECANIQUE' 'ELASTIQUE' EF_Q 'CONS' (CHAI &I) ;
+*       MAT_MU1 = MATE MOD_MU1 'YOUN' YOUN1 'NU' NU1 'ALPH' ALPH1 'TALP' TALP1
+*                                               'TREF' TREF1 'EPAI' EP1 'EXCE' EX1 ;
+*       MOD_MUL = MOD_MUL ET MOD_MU1 ;
+*       MAT_MUL = MAT_MUL ET MAT_MU1 ;
+* FIN I;
+* 
+* * RESTE DU MODELE
+* MOD0 = MODE (CCP DIFF ELEFIS) 'MECANIQUE' 'ELASTIQUE' EF_T EF_Q ;
+* MAT0 = MATE MOD0 'YOUN' YOUN1 'NU' NU1 'ALPH' ALPH1 'TALP' TALP1 'TREF' TREF1
+*                               'EPAI' EPAI_T ;
+* MOD2 = MOD0 ET MOD_MUL ;
+* MAT2 = MAT0 ET MAT_MUL ;
+* RIG2 = RIGI MOD2 MAT2 ;
+* 
+* * CL
+* CL1 = BLOQ 'UY' 'RX' 'RZ' LIGAM ;
+* CL2 = BLOQ 'UX' 'RY' 'RZ' LSYM ;
+* CL3 = BLOQ 'UZ' SCHAR ;
+* CL0 = CL1 ET CL2 ET CL3 ;
+* 
+* * CHARGEMENT
+* TCOQ = (NOMC 'TINF' TIMP) + TIMP + (NOMC 'TSUP' TIMP) ;
+* CHAR2 = BSIG MOD2 (THET MOD2 MAT2 TCOQ) MAT2 ;
+* 
+* * RESOLUTION
+* DEP2 = RESO (RIG2 ET CL0) CHAR2 ;
+* * DEF2 = DEFO CCP DEP2 ;
+* * TRAC 'CACH' DEF2 ;FIN ;
+* 
+* * APPEL A G_THETA
+* Y2 = COOR 2 CCP ;
+* YLIM = (MINI Y2) + 1.E-5 ;
+* PLEVRE = Y2 POIN 'EGINFE' YLIM ;
+* D_CCP = CONT CCP ;
+* LEVRE = D_CCP ELEM 'APPUYE' PLEVRE ;
+* LEVRE = LEVRE DIFF LIGAM ;
+* XFISS = COOR 1 LEVRE ;
+* FRONT_FISS = XFISS POIN 'MAXI' ;
+* * TRAC 'CACH' (CCP ET (LEVRE COUL 'ROUG') ET (FRONT_FISS COUL 'BLEU')) ;FIN ;
+* 
+* SUPTAB = TABL ;
+* SUPTAB.'OBJECTIF' = MOT 'J' ;
+* SUPTAB.'LEVRE_SUPERIEURE' = LEVRE ;
+* SUPTAB.'FRONT_FISSURE' = FRONT_FISS POIN 1 ;
+* SUPTAB.'ELEMENT_MULTICOUCHE' = ELEFIS ;
+* SUPTAB.'SOLUTION_RESO' = DEP2 ;
+* SUPTAB.'CARACTERISTIQUES' = MAT2 ;
+* SUPTAB.'MODELE' = MOD2 ;
+* SUPTAB.'TEMPERATURES' = TCOQ ;
+* SUPTAB.'COUCHE' = 4 ;
+* 
+* G_THETA SUPTAB ;
+* 
+* GCOQ = SUPTAB.'RESULTATS'.'GLOBAL' ;
+* * OPTI 'DONN' 5 ;
+* 
+* * II.3 - COMPARAISON
+* * ******************
+* 
+* ERR1 = (ABS (GCOQ - G3D)) / G3D ;
+* MESS  (CHAI 'ERREUR RELATIVE :' ' ' 'FORMAT' '(F4.1)' (100*ERR1) ' %') ;
+* SI (ERR1 > 5.E-3) ;
+*       ERRE 5 ;
+* FINSI ;
+
+FIN ;
+ 
+

@@ -1,0 +1,76 @@
+$$$$ ORDOVIBC NOTICE  BP208322  21/09/06    21:15:06     11096          
+                                             DATE     21/09/06
+
+                                             
+    Operateur ORDOVIBC                           Voir aussi : VIBC ORDO
+    ------------------
+
+       
+    ORDOVIBC TbasC2 (TbasC1);
+    
+    
+Section : Mecanique Dynamique
+
+FRAN==========================================================
+
+    Objet :
+    _______
+
+    La procedure ORDOVIBC crée des listreels {wR} et {wI} des frequences  
+    réelles et imaginaires d'une base modale complexe TbasC2 obtenue 
+    avec VIBC et ordonne les modes complexes : 
+    - selon {wR} croissant si TbasC1 n'est pas fourni,
+    - selon l'ordre des modes de TbasC1 de manière à minimiser
+      le produit scalaire complexe <\psi1,\psi2> + <w1,w2>
+      si TbasC1 est fourni.
+
+    Commentaire :
+    _____________
+
+    TbasC2       : base modales complexe a traiter 
+                   (type TABLE, sous-type BASEMODA)
+                   avec les indices :
+      . 'MODES' = table des modes |non ordonnée (Entree)
+                                  |ordonnée     (Sortie)
+      . 'LISTE_FREQUENCES_REELLES'     = listreel des {wR} ordonnées (Sortie)
+      . 'LISTE_FREQUENCES_IMAGINAIRES' = listreel des {wI} ordonnées (Sortie)
+
+    TbasC1       : base modales complexe de reference pour 
+                   l'ordonnancement de TbasC2
+                   (type TABLE, sous-type BASEMODA)
+
+
+ANGL==========================================================
+
+    Description :
+    _____________
+
+    The ORDOVIBC procedur creates the listreels {wR} and {wI} of real 
+    and imaginary eigen-frequencies of a complex eigenbasis TbasC2 
+    obtained wIth VIBC and sort the complex modes so that :
+    - {wR} are in ascending order (if TbasC1 is not given)
+    - it respects the order of the mode of TbasC1 by minimizating the
+      distance defined as : <\psi1,\psi2> + <w1,w2>
+      if TbasC1 is given.
+
+ 
+    Contents :
+    __________
+
+    TbasC2       : complex eigenbasis to treat
+                   (type TABLE, sub-type BASEMODA)
+                   wIth the index :
+      . 'MODES' = table of modes |unsorted   (In)
+                                 |sorted     (Out)
+      . 'LISTE_FREQUENCES_REELLES'     = listreel {wR} sorted (Out)
+      . 'LISTE_FREQUENCES_IMAGINAIRES' = listreel {wI} sorted (Out)
+
+    TbasC1       : complex eigenbasis used as reference to order TbasC2
+                   (type TABLE, sub-type BASEMODA)
+
+
+$$$$
+ 
+
+
+ 

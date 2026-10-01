@@ -1,0 +1,113 @@
+$$$$ REMA     NOTICE  GOUNAND   21/04/09    21:15:07     10945          
+                                             DATE     21/04/09
+
+Section : Maillage Autres
+
+FRAN==========================================================
+    Operateur REMA (REMAiller)              Voir aussi : TRIA
+    --------------------------                           RAFT
+
+ANGL==========================================================
+    Operator REMA (REMesh)                    See also : TRIA
+    ----------------------                               RAFT
+
+==========================================================
+    MAIL1 (METR1) =  'REMA' MAIL2 (MAIL3) (METR2) ...
+
+                           ... | ('AJNO') | ('IPOL') (TAB1) ;
+                               |  'NOAJ'  |
+
+FRAN===========================================================
+    Objet :
+    _______
+
+    Cet operateur remaille un maillage de simplex (triangles ou
+    tetraedres) de maniere anisotrope par un algorithme de maillage
+    topologique du a T. Coupez et al.
+
+    Commentaire :
+    _____________
+
+      MAIL1 : maillage genere (type MAILLAGE)
+
+      METR1 : si le mot-cle 'IPOL' est donne, METR1 (type CHPOINT) est
+              la metrique interpolee sur le nouveau maillage MAIL1
+
+      MAIL2 : maillage a optimiser (type MAILLAGE)
+
+      MAIL3 : partie du bord de MAIL2 que le mailleur ne doit pas
+              modifier (par defaut le mailleur peut retirer ou ajouter
+              des noeuds sur les parties planes du bord de MAIL2)
+
+      METR2 : objet de type FLOTTANT ou CHPOINT               
+              Si METR2 est de type FLOTTANT, il s'agit de la taille
+              d'arete voulue (densite)
+              Si METR2 est de type CHPOINT, il s'agit de l'inverse
+              de la metrique voulue (unite : longueur^-2)
+
+      TAB1  : objet optionnel de type TABLE dont les indices sont des
+              parametres d'entree ou de sortie du mailleur
+              (voir notice MAILTOPO pour plus de details)
+
+    Remarques :
+    ___________
+
+     1) Si la metrique voulue est isotrope, le nom de composante est G.
+        Si la metrique voulue est anisotrope, les noms des composantes
+        sont :  G11, G21, G22, (G31, G32, G33 en 3D)
+        
+     2) Si le mot-clef 'AJNO' (par defaut) est donne, le mailleur peut
+        generer de nouveaux noeuds.
+        Si le mot-clef 'NOAJ' est donne, le mailleur ne genere pas de
+        nouveaux noeuds.
+    
+ANGL===========================================================
+    Description :
+    ___________
+
+     This operator remeshes a mesh of simplices (triangles or
+     tetrahedra) anisotropically using a topological meshing algorithm
+     due to T. Coupez et al.
+    
+    Contents :
+    _________
+
+      MAIL1 : output mesh (MAILLAGE type)
+
+      METR1 : if keyword 'IPOL' is given, METR1 (CHPOINT type) is
+              the metric interpolated on the output mesh MAIL1
+
+      MAIL2 : boundary of the output mesh (MAILLAGE type)
+
+      MAIL3 : mesh to be optimized (MAILLAGE type)
+
+      MAIL4 : part of MAIL3's boundary that the algorithm should leave
+              untouched (by default it can add or substract nodes on the
+              planar parts of MAIL3's boundary)
+
+      METR2 : object of type FLOTTANT or CHPOINT               
+              If METR1 is of type FLOTTANT, it is a wanted edge size
+              (density)
+              If METR1 is of type CHPOINT, It is the inverse of the
+              wanted metric field (unit : length^-2)
+
+      TAB1  : optional data of TABLE type the indices of which are
+              input or output parameters of the meshing algorithm
+              (see MAILTOPO info file for details)
+
+
+    Remarks :
+    _________
+    
+     1) If the metric field is isotropic, its component name is 'G'.
+        If the metric field is anisotropic, its component names are:
+        G11, G21, G22, (G31, G32, G33 in 3D)
+
+     2) If keyword 'AJNO' (default) is given, the meshing algorithm
+        can create new nodes.
+        If keyword 'NOAJ' is given, the meshing algorithm doesn't
+        create new nodes.
+
+
+
+ 

@@ -1,0 +1,217 @@
+* fichier : mato-2d4.dgibi
+************************************************************************
+* Section : Maillage Autres
+************************************************************************
+'OPTION' 'ECHO' 0 ; 
+************************************************************************
+* NOM         : MATO-2D4
+* DESCRIPTION : Test du MAilleur TOpologique pour mailler un carré
+*               avec une métrique isotrope constante en espace
+*               dans le but d'obtenir 10x10 mailles. 
+*               Au départ, le carré est 1x1. Concernant la frontière,
+*               on contraint le mailleur, soit à ne pas la modifier,
+*               soit à en modifier une partie, soit la totalité. 
+*
+*               On teste la qualité des éléments obtenus.
+*
+*               Issu de 2d_9.dgibi+tests
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 07/04/2020, version initiale
+* HISTORIQUE : v1, 07/04/2020, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+interact = FAUX ;
+graph    = FAUX ;
+*
+'OPTION' 'DIME' 2 'ELEM' 'TRI3' ;
+*
+'SI' ('NON' interact) ;
+  'OPTION' 'TRAC' 'PSC' ;
+'SINON' ;
+  'OPTION' 'TRAC' 'X' ;
+'FINSI' ;  
+lqual = 'PROG' 0. 'PAS' 0.05 1. ;
+*
+* Création du contour
+*
+nx = 1 ; nv = 10 ;
+pA = 0. 0. ; pB = 1. 0. ; pC = 1. 1. ; pD = 0. 1. ;
+lAB = 'DROI' nx pA pB ;
+lBC = 'DROI' nx pB pC ;
+lCD = 'DROI' nx pC pD ;
+lDA = 'DROI' nx pD pA ;
+*
+cnt = lAB 'ET' lBC 'ET' lCD 'ET' lDA ;
+*
+'SI' graph ;
+   tit = 'CHAI'  'Contour ' ;
+      'TRACER' 'CACH' cnt 'TITR' tit 'NOEU' ;
+'FINSI' ;   
+*
+*  Tests divers (consistance...)
+*
+lok = VRAI ;
+*
+* TEST 1  Création d'un maillage sans ajouter de noeuds 
+*
+   mail1 = 'TRIA' 'TOPO' cnt 'NOAJ' ;
+   'SI' graph ;
+      tit = 'CHAI'  'Maillage genere sans noeud supplémentaire' ;
+      'TRAC' mail1 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 1 : on vérifie que le nombre de noeuds est conservé
+nno1 = 'NBNO' cnt ;
+nno2 = 'NBNO' mail1 ;
+'SI' ('NEG' nno1 nno2) ;
+   'MESS' '!!! TEST 1 : nombre de noeuds non conserve' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 2  Remaillage de mail1 avec une taille voulue de 0.1 sans
+*         toucher le bord
+*
+   mail2 = 'REMA' mail1 ('CONT' mail1) ('/' 1. nv) ;
+   'SI' graph ;
+      tit = 'CHAI' 'Maillage genere sans toucher le bord' ;
+      'TRAC' mail2 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 2 : on vérifie que les qualités mini, moyenne et maxi des éléments sont bonnes
+qmail2 = 'INDI' 'TOPO' mail2 ;
+miq = 'MINI' qmail2 ; moq = MATOUTIL 'MOYECHAM' qmail2 ;
+maq = 'MAXI' qmail2 ;
+'MESS'  'FORMAT' '(E9.2)' 'TEST 2 : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momail2 = 'MODE' mail2 'THERMIQUE' ;
+      tit = 'CHAI' 'Qualite maillage sans toucher le bord' ;
+      'TRAC' qmail2 momail2 lqual 'TITR' tit ;
+   'FINSI' ;
+* Sur mon linux64 au 07/04/2020 : Qmin= 0.91E-01 Qmoy= 0.82E+00 Qmax= 0.10E+01
+miqref = 0.08 ; moqref = 0.81 ; maqref = 0.99 ;
+'SI' ('<EG' miq miqref) ;
+   'MESS' '!!! TEST 2 : miq=' miq ' < miqref=' miqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' moq moqref) ;
+   'MESS' '!!! TEST 2 : moq=' moq ' < moqref=' moqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' maq maqref) ;
+   'MESS' '!!! TEST 2 : maq=' maq ' < maqref=' maqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 3  Remaillage de mail1 avec une taille voulue de 0.1 en touchant
+*         le bord sauf lAB
+*
+   mail3 = 'REMA' mail1 lAB ('/' 1. nv) ;
+   'SI' graph ;
+      tit = 'CHAI' 'Maillage genere sans toucher lAB' ;
+      'TRAC' mail3 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 3 : on vérifie que le bord n'a pas été touché
+*          ceci est fait dans mailtopo
+* Test 3 : on vérifie que les qualités mini, moyenne et maxi des éléments sont bonnes
+qmail3 = 'INDI' 'TOPO' mail3 ;
+miq = 'MINI' qmail3 ; moq = MATOUTIL 'MOYECHAM' qmail3 ;
+maq = 'MAXI' qmail3 ;
+'MESS'  'FORMAT' '(E9.2)' 'TEST 3 : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momail3 = 'MODE' mail3 'THERMIQUE' ;
+      tit = 'CHAI' 'Qualite maillage sans toucher lAB' ;
+      'TRAC' qmail3 momail3 lqual 'TITR' tit ;
+   'FINSI' ;
+* Sur mon linux64 au 07/04/2020 : Qmin= 0.13E+00 Qmoy= 0.90E+00 Qmax= 0.10E+01
+miqref = 0.12 ; moqref = 0.89 ; maqref = 0.99 ;
+'SI' ('<EG' miq miqref) ;
+   'MESS' '!!! TEST 3 : miq=' miq ' < miqref=' miqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' moq moqref) ;
+   'MESS' '!!! TEST 3 : moq=' moq ' < moqref=' moqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' maq maqref) ;
+   'MESS' '!!! TEST 3 : maq=' maq ' < maqref=' maqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 4  Remaillage de mail1 avec une taille voulue de 0.1 en touchant
+*         tout le bord
+*
+   mail4 = 'REMA' mail1 ('/' 1. nv) ;
+   'SI' graph ;
+      tit = 'CHAI' 'Maillage genere en modifiant le bord' ;
+      'TRAC' mail4 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 4 : on vérifie que le bord n'a pas été touché
+*          ceci est fait dans mailtopo
+* Test 4 : on vérifie que les qualités mini, moyenne et maxi des éléments sont bonnes
+qmail4 = 'INDI' 'TOPO' mail4 ;
+miq = 'MINI' qmail4 ; moq = MATOUTIL 'MOYECHAM' qmail4 ;
+maq = 'MAXI' qmail4 ;
+'MESS'  'FORMAT' '(E9.2)' 'TEST 4 : Qmin=' miq ' Qmoy=' moq ' Qmax=' maq ;
+   'SI' graph ;
+      momail4 = 'MODE' mail4 'THERMIQUE' ;
+      tit = 'CHAI' 'Qualite maillage avec bord modifie' ;
+      'TRAC' qmail4 momail4 lqual 'TITR' tit ;
+   'FINSI' ;
+* Sur mon linux64 au 07/04/2020 : Qmin= 0.65E+00 Qmoy= 0.91E+00 Qmax= 0.10E+01
+miqref = 0.64 ; moqref = 0.90 ; maqref = 0.99 ;
+'SI' ('<EG' miq miqref) ;
+   'MESS' '!!! TEST 4 : miq=' miq ' < miqref=' miqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' moq moqref) ;
+   'MESS' '!!! TEST 4 : moq=' moq ' < moqref=' moqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+'SI' ('<EG' maq maqref) ;
+   'MESS' '!!! TEST 4 : maq=' maq ' < maqref=' maqref ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* TEST 5  Remaillage de mail4 avec une taille voulue de 0.1 en ne touchant
+*         plus le bord. On s'attend à ne pas changer le maillage mais
+*         c'est sans compter avec l'algorithme du noeud fictif qui nous
+*         a déjà fait des blagues  
+*
+   mail5 = 'REMA' mail4 ('CONT' mail4) ('/' 1. nv) ;
+   'SI' graph ;
+      tit = 'CHAI' 'Maillage genere sans toucher le bord' ;
+      'TRAC' mail5 'TITR' tit 'NOEU' ;
+   'FINSI' ;
+* Test 5 : on vérifie que mail5 et mail4 sont identiques ainsi que les
+* qualités
+dn45= 'NBEL' ('DIFF' mail4 mail5) ;
+'SI' ('NEG' dn45 0) ;
+   'MESS' '!!! TEST 5 : mail4 .NE. mail5' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* Test final
+*
+'SI' ('NON' lok) ;
+   'ERREUR' 5 ;
+'SINON' ;   
+   'SAUT' 1 'LIGN' ;
+   'MESSAGE' ('CHAINE' 'Tout sest bien passe !') ;
+'FINSI' ;
+*
+'SI' interact ;
+   'OPTION' 'ECHO' 1 ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;
+*
+* End of dgibi file MATO-2D4
+*
+'FIN' ;
+
+ 
+

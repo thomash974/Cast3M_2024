@@ -1,0 +1,205 @@
+$$$$ INDI     NOTICE  GOUNAND   21/04/01    21:15:06     10933          
+                                             DATE     21/04/01
+
+    Operateur INDI                           Voir aussi : TRIA REMA 
+    --------------
+Section : Maillage Manipulation
+
+FRAN==========================================================
+    ----------------------
+    |  1ere possibilite  |
+    ----------------------
+ANGL==========================================================
+    ---------------------
+    |  1st possibility  |
+    ---------------------
+==========================================================
+
+    CHAM1 = INDI GEO1 NOMi ...   ;
+
+FRAN==========================================================
+    Objet :
+    -------
+
+    L'operateur INDI fournit des indicateurs permettant d'apprecier
+    la qualite d'un maillage.
+    Les criteres testes sont specifies par des mots-cles.
+    L'operateur cree un champ par elements (type MCHAML) dont les
+    composantes sont ces criteres.
+
+    Commentaires :
+    --------------
+
+    GEO1   : objet maillage (type MELEME)
+
+    NOMi   : mot-cle (type mot). Les valeurs possibles sont :
+
+   'PLAN'  : Critere de planearite pour les elements a 4 noeuds.
+             La valeur calculee est directement proportionnelle a
+             l'angle entre les normales N1 et N2 definies par :
+
+             - N1 = produit vectoriel (S1 S2,S1 S4)
+             - N2 = produit vectoriel (S3 S4,S3 S2)
+               (S1,S2,S3,S4 sont les sommets de l'element)
+
+             Les valeurs sont comprises entre 0 et 100.
+             Un mchaml resultat de valeur constante egale a 100
+             indiquera que tous les elements sont plans.
+
+   'ASPE'  : Pour les elements TRI3 et TET4 seulement
+             Rapport d'aspect (aspect ratio), il s'agit du rapport de la
+             plus grande arete sur la plus petite hauteur, normalise
+
+             - pour les TRI3 = SQRT(3)/2 * grande arete / petite hauteur
+             - pour les TET4 = SQRT(2/3) * grande arete / petite hauteur
+
+             Les valeurs sont comprises entre 1 (element equilateral)
+             et + infini
+
+   'SKEW'  : Pour les elements TRI3 et TET4 seulement
+             Pointicite (skewness), il s'agit de l'ecart relatif entre la
+             mesure de l'element et celle de l'element "optimal"
+
+             SKEW = (mes_optimal - mes) / mes_optimal
+
+             La mesure est l'aire (pour les TRI3) ou le volume (pour les TET4)
+
+             L'element "optimal" est l'element equilateral place dans la
+             meme sphere circonscrite que l'element etudie
+
+             Les valeurs sont comprises entre 0 (element equilateral)
+             et 1 (element degenere)
+ANGL==========================================================
+    Description :
+    -------------
+
+    The INDI operator supplies indicators that make it possible to
+    estimate the quality of a mesh.
+    The tested criteria are specified by key words.
+    The operator creates a field by elements (MCHAML type) whose
+    components are actually these criteria.
+
+    Contents :
+    ---------
+
+    GEO1   : mesh object (MELEME type)
+
+    NOMi   : key word (MOT type). The following values are available:
+
+   'PLAN'  : Planearity criterion for 4-node elements.
+             The calculated value is directly proportional to
+             the angle between the normals N1 and N2 defined by :
+
+             - N1 = vectorial product (S1 S2,S1 S4)
+             - N2 = vectorial product (S3 S4,S3 S2)
+               (S1,S2,S3,S4 are the element apexes)
+
+             The values range between 0 and 100.
+             An generated MCHAML with a constant value equal to 100
+             will indicate that all the elements are plane elements.
+
+   'ASPE'  : For the TRI3 and TET4 elements only
+             Aspect ratio, defined as the ratio of the highest edge to
+             the smallest altitude, normalised
+
+             - for TRI3 = SQRT(3)/2 * highest edge / smallest altitude
+             - for TET4 = SQRT(2/3) * highest edge / smallest altitude
+
+             Values are between 1 (equilateral element) and + infinity
+
+   'SKEW'  : For the TRI3 and TET4 elements only
+             Skewness, defined as the relative difference between the size
+             of the element and the size of the "optimal" element
+
+             SKEW = (size_optimal - size) / size_optimal
+
+             The size is the surface area (for TRI3) or the volume (for TET4)
+
+             The "optimal" element is the equilateral element located in the
+             circumscribed sphere of the studied element.
+
+             Values are between 0 (equilateral element)
+             and 1 (degenerate element)
+FRAN==========================================================
+
+
+    ----------------------
+    |  2eme possibilite  |
+    ----------------------
+ANGL==========================================================
+
+
+    ---------------------
+    |  2nd possibility  |
+    ---------------------
+==========================================================
+
+     CHAM1 = INDI 'TOPO' MAIL1 (METR1) ('LISTREEL') ;
+
+FRAN===========================================================
+     Objet :
+     _______
+
+     L'operateur INDI fournit un indicateur de qualite d'un maillage
+     de TRI3 ou de TET4, eventuellement dans une metrique donnee.
+     
+     Commentaire :
+     _____________
+
+     MAIL1   : maillage (type MAILLAGE) constitué d'un seul type
+               d'elements TRI3 ou TET4
+     METR1   : objet de type FLOTTANT ou CHPOINT               
+               Si METR1 est de type FLOTTANT, il s'agit de la taille
+               d'arete voulue (densite)
+               Si METR1 est de type CHPOINT, il s'agit de l'inverse
+               de la metrique voulue (unite : longueur^-2)
+               
+     CHAM1   : champ (type MCHAML ou LISTREEL) de qualite
+     
+     Remarques :
+     ___________
+
+     1) Si la metrique voulue est isotrope, le nom de composante est G.
+        Si la metrique voulue est anisotrope, les noms des composantes
+        sont :  G11, G21, G22, (G31, G32, G33 en 3D)
+
+     2) En presence du mot-cle LISTREEL, l'operateur renvoie un objet
+        de ce type plutot que du type MCHAML.
+
+     3) L'indicateur varie entre 0 (element degenere) et 1
+        (element equilateral, de cote 1 dans la métrique voulue si
+        METR1 est donnee) 
+ANGL===========================================================
+     Description :
+     _____________
+
+     The INDI operator outputs a quality indicator for a mesh of
+     simplices (TRI3 or TET4). A desired metric field can be given.
+
+     Contents :
+     __________
+
+     MAIL1   : mesh (type MAILLAGE) of simplices (TRI3 or TET4)
+     METR1   : object of type FLOTTANT or CHPOINT               
+               If METR1 is of type FLOTTANT, it is a wanted edge size
+               (density)
+               If METR1 is of type CHPOINT, It is the inverse of the
+               wanted metric field (unit : length^-2)
+               
+     CHAM1   : mesh quality indicator (MCHAML or LISTREEL type)
+
+     Note :
+     ________
+
+     1) If the metric field is isotropic, its component name is 'G'.
+        If the metric field is anisotropic, its component names are:
+        G11, G21, G22, (G31, G32, G33 in 3D)
+
+     2) If the LISTREEL keyword is given, the operator outputs an
+        object of LISTREEL type instead of MCHAML type.
+
+     3) The quality indicator varies between 0 (degenerate element)
+        and 1 (equilateral element, of unit edge size in the desired
+        metric if METR1 is given)
+ 
+ 

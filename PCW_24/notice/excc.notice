@@ -1,0 +1,49 @@
+$$$$ EXCC     NOTICE  PV        21/12/10    22:23:13     11215          
+                                             DATE     21/12/10
+
+    Operateur EXCC                           Voir aussi : IMPF FRIG
+    --------------                                        IMPO EXCF
+
+     CHPOI1 = EXCC RIG1 DEPL1 MODE1 CHAM1 (CHPOI2);
+
+
+Section : Mecanique Limites
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    EXCC permet de calculer un champ de force limite de frottement
+    (type CHPOINT) a partir de la raideur de frottement RIG1, du champ
+    de deplacement DEPL1 (type CHPOINT), du modele de contact-frottant
+    MODE1 et du champ de proprietes de frottement CHAM1 (type MCHAML).
+
+    On peut fournir un champ minimum de forces de frottement : CHPOI2.
+
+    Remarque :
+    __________
+     
+    EXCC est employe dans UNPAS. Il y a peu de raisons de l'employer
+    directement.
+    EXCC est employe uniquement dans le cas des cables.
+
+ 
+ANGL==========================================================
+    Description :
+    ____________
+
+    EXCC is used to calculate a force field of friction (CHPOINT type)
+    using the friction stiffness RIG1, the deplacement field DEPL1
+    (CHPOINT type), the contact-friction model MODE1 and the friction
+    properties field CHAM1 (MCHAML type).
+
+    A minimum field of friction forces can be given : CHPOI2.
+    
+    Observation :
+    ___________
+
+    EXCC is used in UNPAS. There is little reason to use it directly.
+    EXCC is used only for cables.
+ 
+$$$$
+ 

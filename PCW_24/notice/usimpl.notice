@@ -1,0 +1,83 @@
+$$$$ USIMPL   NOTICE  MB234859  24/02/06    21:15:04     11833          
+                                             DATE     24/02/06
+
+ Procedure USIMPL                        Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USDEPL USEXPL USINIB
+                                        USPOST USTMPS USURE
+
+         USIMPL TAB1 ; 
+
+  [Q. Caradec thesis]
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui applique l'usure selon un schema implicite :
+    
+                    h[k+1] = h[k] + deltaN * DH[k+1]
+    
+    Avec
+     - h[k+1]  : l'usure au cycle [k+1]
+     - h[k]    : l'usure au cycle [k]
+     - deltaN  : facteur de saut de cycle    (voir USACCE)
+     - DH[k+1] : taux d'usure au cycle [k+1] (voir USCALC)
+    
+    Un schema iteratif est implemente et a chacune des iterations,
+    notee i, la convergence est testee selon :
+    
+                  h[k] + deltaN * DH[k+1]{i} - h[k+1]{i} < crit
+    
+    Avec
+     - crit    : critere de convergence
+
+    Une fois ce critere satisfait, le cycle suivant demarre.
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+  Cette procedure est appelee par USURE.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which uses an implicit scheme to solve wear :
+    
+                    h[k+1] = h[k] + deltaN * DH[k+1]
+    
+    With 
+     - h[k+1]  : wear profile at cycle [k+1]
+     - h[k]    : wear profile at cycle [k]
+     - deltaN  : cycle jump coefficient            (voir USACCE).
+     - DH[k+1] : wear rate computed at cycle [k+1] (voir USCALC)
+
+   An iteratif process is implemented and at each iteration, denoted i, 
+   the convergence is tested 
+    
+                  h[k] + deltaN * DH[k+1]{i} - h[k+1]{i} < crit
+    
+    With
+     - crit    : convergence criteria
+   
+   Once this criteria is satisfied, the next cycle begins.       
+ 
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+  This procedure is called by USURE.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+ 

@@ -1,0 +1,97 @@
+$$$$ EGA      NOTICE  PV090527  24/02/10    21:15:03     11820          
+                                             DATE     24/02/10
+
+    Operateur EGA                            Voir aussi : NEG
+    -------------                                         <     >
+                                                          <EG   >EG
+                                                          ENTI FLOT
+
+    LOG1 = OBJET1  EGA  OBJET2 (OBJET3) ;
+
+
+Section : Mathematiques Logique
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    L'operateur EGA compare les objets OBJET1 et OBJET2.
+
+    Dans le cas general, c'est leur identite qui est testee. 
+    Deux objets deduits l'un de l'autre par affectation (=) sont egaux.
+    Deux objets deduits l'un de l'autre par copie (COPI) sont differents.
+
+    Pour certains types d'objet, le test porte sur leur contenu.
+
+    Commentaire :
+    _____________
+
+    OBJET1 / OBJET2 : objet a comparer.
+
+
+    OBJET3 : - Pour la comparaison d'objets de type FLOTTANT,
+             OBJET3 est la tolerance (type FLOTTANT).
+             - Pour la comparaison d'objets de type MOT, OBJET3 est
+             un ENTIER precisant le nombre de caracteres sur lesquels
+             porte la comparaison. EGA compte le nombre de caracteres
+             de gauche a droite a partir du 1er caractere. Par defaut,
+             on considere tous les caracteres de chaque objet.
+
+    LOG1   : resultat (type LOGIQUE) ayant pour valeur VRAI si les
+             deux objets sont egaux et FAUX sinon.
+
+    Remarque :
+    __________
+
+    Pour des objets de type MOT, il faut respecter l'ordre suivant :
+    LOG1 = EGA  MOT1  MOT2  ;
+    Dans la comparaison on ne tiendra pas compte des blancs situes a
+    la fin des mots. (EGA 'AA' 'AA   ') est VRAI.
+
+    Si on compare des scalaires (type ENTIER ou FLOTTANT),
+    OBJET2 sera converti au type de OBJET1.
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The EGA operator compares two objects: OBJET1 and OBJET2.
+
+    In the general case, the test is about identity.
+    Two objects built by affectation of a new name (=) are equals.
+    Two object built by copy (COPI) are differents.
+
+    For some object's types, the object's content is tested.
+
+
+    Contents :
+    __________
+
+    OBJET1 / OBJET2 : objects to be compared.
+
+
+    FLOT1  : - When comparing FLOTTANT type objects, OBJET3
+             is a tolerance (FLOTTANT type).
+             - When comparing MOT type objects ("words"), OBJET3 is an
+             integer giving the number of characters to be compared.
+             EGA counts the number of characetrs from left to right
+             and from the 1st character. By default, EGA compares all
+             the characters of the 2 objects.
+
+    LOG1   : result (LOGIQUE type) ; its value is VRAI (true) if the
+             two objects are identical and FAUX (false) if not
+
+    Note :
+    ______
+
+    For MOT type objects, it is required that the following order
+    be respected :
+    LOG1 = EGA  MOT1  MOT2  ;
+    Tailing white spaces will be ignored :
+    (EGA 'AA' 'AA   ') is VRAI
+
+    If scalars are compared (type ENTIER or FLOTTANT),
+    the second one will be converted to the type of the first one.
+ 
+ 
+ 

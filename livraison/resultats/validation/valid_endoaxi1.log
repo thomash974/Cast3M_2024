@@ -1,0 +1,10 @@
+=== Cas 4 : endoaxi1 (endommagement, axisymetrique) ===
+Valeurs comparees : 18
+Temps horloge (ms) : origine 107 ; niveau 1 111 ; niveau 2 115
+Acceleration par rapport a l origine : niveau 1   0.96 ; niveau 2   0.93
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 1 ; niveau 1 1 ; niveau 2 1
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 10
+Niveau 1 : raideur reutilisee 1 fois, recalculee 2 fois ; HOOK evite 12 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 2 fois, recalculee 1 fois ; HOOK evite 12 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

@@ -1,0 +1,79 @@
+$$$$ ADVE     NOTICE  CB215821  22/03/31    21:15:04     11326          
+                                             DATE     22/03/31
+
+     Operateur ADVE                               Voir aussi :
+     --------------                               MODE, MATE
+
+     ADV1 = ADVE MOD1 MAT1 ('SYMM') ;
+
+Section : Fluides Modele
+
+FRAN================================================================
+     Description :
+     -------------
+
+     L'operateur ADVE construit la matrice de rigidite du type :
+
+       (ADV1)ij = Ni (V . grad(Nj)) dx ,
+
+     V etant un champ vectoriel a une ou deux ou trois composantes. Cette
+     matrice est  non  symetrique  et correspond a  la  discretisation du
+     transport d'un scalaire par un champ de vitesse V.
+
+      - THERMIQUE v.grad(T)
+      - DIFFUSION v.grac(C) (Les inconnues primales et duales pour
+                             la DIFFUSION sont contenues dans MOD1)
+
+     Contenu :
+     ---------
+
+     MOD1    : MMODEL de type THERMIQUE ISOTROPE ADVECTION
+     MAT1    : MCHAML de type 'CARACTERISTIQUES' (voir MATE)
+     ADV1    : Matrice de 'RIGIDITE' non symetrique
+
+     Notes :
+     -------
+
+       1 - Si le mot cle 'SYMM' est present, le resultat sera la partie
+           symetrique de la matrice originale, c-a-d :
+
+          (ADV1)ij = [Ni (V . grad(Nj)) + Nj (V . grad(Ni))]/2 dx
+
+           Dans ce cas, ADV1 est symetrique.
+
+ANGL================================================================
+     Description:
+     ____________
+
+     The ADVE operator builds a stiffness matrix of the type:
+
+      (ADV1)ij = Ni (V . grad(Nj)) dx ,
+
+     V is a vector field with one, two or three components. This matrix
+     is non symmetric and corresponds to the discretization of the
+     scalar transport by a velocity field V.
+
+      - THERMIQUE v.grad(T)
+      - DIFFUSION v.grac(C) (Primal and dual unknowns for the diffusion
+                             are defined in the MOD1 (MMODEL) definition)
+
+     Contents:
+     _________
+
+      MOD1   :  MMODEL of the type THERMIQUE ISOTROPE ADVECTION
+      MAT1   :  MCHAML of 'CARACTERISTIQUES' type (See also MATE)
+      ADV1   :  Non symetric matrix ('RIGIDITE' type)
+
+
+     Notes:
+     ______
+
+        1.- If the key word 'SYMM' is present, the result is the
+            symmetric part of the original matrix, that is:
+
+                        (ADV1)ij = [Ni (V . grad(Nj)) + Nj (V . grad(Ni))]/2 dx
+
+            In this case, ADV1 is symmetric.
+
+$$$$
+ 

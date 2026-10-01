@@ -1,0 +1,74 @@
+$$$$ USCALC   NOTICE  MB234859  24/02/06    21:15:03     11833          
+                                             DATE     24/02/06
+
+ Procedure USCALC                        Voir aussi : USACCE USADAC 
+ ----------------                       USDEPL USEXPL USIMPL USINIB
+                                        USPOST USTMPS USURE
+
+         USCALC TAB1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui determine, pour chaque noeud du maillage se trouvant 
+    a l'indice 'SURFACE_APPLICATION', la pression de contact, le 
+    cisaillement, le glissement et l'energie dissipee.
+    Lorsque tous les instants du cycle sont calcules, elle construit le 
+    cycle d'usure (force tangentielle en fonction du deplacement). Ce 
+    dernier est utilise pour determiner si les pas de temps doivent etre 
+    reevalues ou non. 
+
+    (Voir ci-dessous pour les indices de la table concernes)
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+  Cette procedure est appelee par USURE.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ Resultat conserve en fin de calcul
+ ----------------------------------
+   'CYCLE_DE_FRETTING' : EVOLUTION tracant la reaction tangentielle en
+                         fonction du deplacement impose.
+
++----------------------------------------------------------------------+
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which calculates, for each node of the mesh at index  
+    'SURFACE_APPLICATION', contact pressure, shearing, sliding
+    and dissipated energy. 
+    If it is the last time of a cycle, the wear cycle (shearing force 
+    with respect to the imposed displacement) is created. It is used to 
+    decide on modifying timesteps or not.
+    
+    (See below the index of the table concerned)
+ 
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+  This procedure is called by USURE.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+
+ Saved results 
+ -------------
+   'CYCLE_DE_FRETTING' : EVOLUTION which gives tangential reaction    
+                         versus imposed displacement.
+
++----------------------------------------------------------------------+
+ 

@@ -1,0 +1,198 @@
+* fichier : sormat.dgibi
+'OPTI' echo 0 ;
+************************************************************************
+* NOM         : SORMAT
+* DESCRIPTION : Test basique de la sortie d'une matrice.
+*               On teste avec une matrice symétrique et une
+*               non-symétrique 
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stephane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mel : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 18/04/2019, version initiale
+* HISTORIQUE : v1, 18/04/2019, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+*
+interact= FAUX ;
+*
+'OPTION' 'DIME' 2 'ELEM' 'TRI3'  ;
+p0 = 0. 0.  ; p1 = 1. 0. ; p2 = 2. 0. ;
+mt = 'MANU' 'TRI3' p1 p0 p2 ;
+'OPTI' echo 1 ;
+*
+* 
+* MATRICE SYMETRIQUE SANS MULTIPLICATEURS SANS NORMALISATION
+*
+*
+'OPTI' echo 0 ;
+'OPTI' 'NORM' 'ANNU' ;
+*
+rig = 'MANU' 'RIGI' mt ('MOTS' 'T') ('PROG' 4. -1. 5. 0. -2. 6.) ;
+*
+mat = rig ;
+for = 'NOMC' 'Q' ('+' ('COOR' 1 mt) 1.) 'NATU' 'DISCRET' ;
+smb = for ;
+mat1 = '*' mat 1. ;
+mat2 = '*' mat 1. ;
+sol = 'RESO' mat1 smb ;
+
+resc1 = '-' smb ('*' mat sol) ;
+nresc1 = 'MAXI' resc1 'ABS' ; tol = 1.d-14 ;
+cherr = 'CHAI' 'nresc1=' nresc1 ' tol=' tol ;
+'SI' ('>' nresc1 tol) ; 'ERRE' cherr ; 'SINO' ; 'MESS' cherr ; 'FINS' ;
+
+nomdir = 'CHAINE' './' ;
+nomfic = 'sormatsym' ;
+fic = 'CHAINE' nomdir nomfic ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LA MATRICE SYMETRIQUE' ;'SAUT' 1 'LIGNE' ;
+*'LIST' ('VALE' 'NORM') ;
+'LIST' mat2 ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LE SECOND MEMBRE' ;
+'LIST' smb ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LA SOLUTION' ;
+'LIST' sol ;
+'SAUT' 1 'LIGNE' ; 'MESSAGE' ('CHAINE' 'SORTIE :' ' ' fic '...') ;
+'OPTI' 'SORTIR' fic ;
+'SORTIR' 'MAT' 'MM' 'ASSE' mat2 'TITR' nomfic 'GEOM' 'INCO' 'FORC' smb
+     'RESU' sol ;
+'OPTI' echo 1 ;
+*
+* 
+* MATRICE SYMETRIQUE SANS MULTIPLICATEURS AVEC NORMALISATION
+* DONC PLUS SYMETRIQUE !!!!!!
+* A noter que la normalisation AUTO ne marche pas car l'operateur SORT
+* utilise en interne l'assembleur non symétrique (asns1.eso via kres9)
+* qui ne gere pas l'option AUTO
+*
+'OPTI' echo 0 ;
+'OPTI' 'NORM' ('MOTS' 'T') ('PROG' 11.) ('MOTS' 'Q') ('PROG' 2.)   ;
+*
+riga = 'MANU' 'RIGI' mt ('MOTS' 'T') ('PROG' 4. -1. 5. 0. -2. 6.) ;
+*
+mata = riga ;
+fora = 'NOMC' 'Q' ('+' ('COOR' 1 mt) 1.) 'NATU' 'DISCRET' ;
+smba = fora ;
+mata1 = '*' mata 1. ;
+mata2 = '*' mata 1. ;
+sola = 'RESO' mata1 smba ;
+
+resc1a = '-' smba ('*' mata sola) ;
+nresc1a = 'MAXI' resc1a 'ABS' ; tol = 1.d-14 ;
+cherr = 'CHAI' 'nresc1a=' nresc1a ' tol=' tol ;
+'SI' ('>' nresc1a tol) ; 'ERRE' cherr ; 'SINO' ; 'MESS' cherr ; 'FINS' ;
+
+nomdir = 'CHAINE' './' ;
+nomfic = 'sormatsymnorm' ;
+fic = 'CHAINE' nomdir nomfic ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LA MATRICE EX-SYMETRIQUE NORMALISEE' ;'SAUT' 1 'LIGNE' ;
+*'LIST' ('VALE' 'NORM') ;
+'LIST' mata2 ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LE SECOND MEMBRE' ;
+'LIST' smba ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LA SOLUTION' ;
+'LIST' sola ;
+'SAUT' 1 'LIGNE' ; 'MESSAGE' ('CHAINE' 'SORTIE :' ' ' fic '...') ;
+'OPTI' 'SORTIR' fic ;
+'SORTIR' 'MAT' 'MM' 'ASSE' mata2 'TITR' nomfic 'GEOM' 'INCO' 'FORC' smba
+     'RESU' sola ;
+
+'OPTI' echo 1 ;
+*
+* 
+* MATRICE NON SYMETRIQUE SANS MULTIPLICATEURS SANS NORMALISATION
+*
+*
+'OPTI' echo 0 ;
+'OPTI' 'NORM' 'ANNU' ;
+rig11 = 'MANU' 'RIGI' p1 ('MOTS' 'T') ('PROG' 4.) ;
+rig22 = 'MANU' 'RIGI' p1 ('MOTS' 'UX') ('PROG' 5.) ;
+rig33 = 'MANU' 'RIGI' p1 ('MOTS' 'UY') ('PROG' 6.) ;
+rig23 = 'MANU' 'RIGI' p1 ('MOTS' 'UY') 'DUAL' ('MOTS' 'FX') 'QUEL'
+('PROG' 2.) ;
+rign = rig11 'ET' rig22 'ET' rig33 'ET' rig23 ;
+matn = rign ;
+forn = 'MANU' 'CHPO' p1 3 'Q' 1. 'FX' 2. 'FY' 3. 
+               'NATU' 'DISCRET' ;
+smbn = forn ;
+matn1 = '*' matn 1. ;
+matn2 = '*' matn 1. ;
+soln = 'RESO' matn1 smbn ;
+*
+resc1n = '-' smbn ('*' matn soln) ;
+nresc1n = 'MAXI' resc1n 'ABS' ; tol = 1.d-14 ;
+cherr = 'CHAI' 'nresc1n=' nresc1n ' tol=' tol ;
+'SI' ('>' nresc1n tol) ; 'ERRE' cherr ; 'SINO' ; 'MESS' cherr ; 'FINS' ;
+*
+nomdir = 'CHAINE' './' ;
+nomfic = 'sormatnosym' ;
+fic = 'CHAINE' nomdir nomfic ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LA MATRICE *NON* SYMETRIQUE' ;'SAUT' 1 'LIGNE' ;
+*'LIST' ('VALE' 'NORM') ;
+'LIST' matn2 ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LE SECOND MEMBRE' ;
+'LIST' smbn ;
+'SAUT' 1 'LIGNE' ; 'MESS' 'LA SOLUTION' ;
+'LIST' soln ;
+'SAUT' 1 'LIGNE' ; 'MESSAGE' ('CHAINE' 'SORTIE :' ' ' fic '...') ;
+'OPTI' 'SORTIR' fic ;
+'SORTIR' 'MAT' 'MM' matn2 'ASSE' 'TITR' nomfic 'GEOM' 'INCO' 'FORC' smbn
+     'RESU' soln ;
+
+*
+* MULTIPLICATEURS DE LAGRANGE NON GERES A CE JOUR PAR SORMAT, voir sormat.eso
+*
+'SI' faux ;
+*
+* 
+* MATRICE SYMETRIQUE AVEC MULTIPLICATEURS SANS NORMALISATION
+*
+*
+cc = 'MANU' 'CHPO' mt 1 'T' 1. ;
+rig = 'MANU' 'RIGI' cc 'DIAG' ;
+con1  = 'RELA' p0 'T' '+' 2. p1 'T' '-' p2 'T' ;
+vcon1 = 'DEPI' con1 4. ;
+con2  = 'RELA' p0 'T' '+' 2. p1 'T' '+' p2 'T' ;
+vcon2 = 'DEPI' con2 5. ;
+*
+matsn   = rig 'ET' con1 'ET' con2 ;
+forsn = 'NOMC' 'Q' ('+' ('COOR' 1 mt) 1.) 'NATU' 'DISCRET' ;
+smbsn = for 'ET' vcon1 'ET' vcon2 ;
+*
+matsn1 = '*' matsn 1. ;
+matsn2 = '*' matsn 1. ;
+solsn = 'RESO' matsn1 smbsn ;
+*
+resc1sn = '-' smbsn ('*' matsn solsn) ;
+nresc1sn = 'MAXI' resc1sn 'ABS' ; tol = 1.d-14 ;
+cherr = 'CHAI' 'nresc1sn=' nresc1sn ' tol=' tol ;
+'SI' ('>' nresc1sn tol) ; 'ERRE' cherr ; 'SINO' ; 'MESS' cherr ; 'FINS' ;
+*
+nomdir = 'CHAINE' './' ;
+nomfic = 'sormatmulsansnorm' ;
+fic = 'CHAINE' nomdir nomfic ;
+'MESSAGE' ('CHAINE' 'Sorting' ' ' fic '...') ;
+'LIST' matsn2 ; 'LIST' smbsn ; 'LIST' solsn ;
+'OPTI' 'NORM' 'ANNU' ;
+'OPTI' 'SORTIR' fic ;
+'SORTIR' 'MAT' 'MM' matsn2 'ASSE' 'TITR' nomfic 'GEOM' 'INCO' 'FORC' smbsn
+     'RESU' solsn ;
+*
+* FIN MULTIPLICATEURS NON GERES A CE JOUR
+*
+'FINS' ;
+*
+'SI' interact ;
+   'OPTI' 'DONN'  5 'ECHO' 1 ;
+'FINS' ;
+*
+* End of dgibi file SORMAT
+*
+'FIN' ;
+
+ 
+

@@ -1,0 +1,25 @@
+* fichier : trac_chpoint.dgibi
+*
+** Options generales
+OPTI 'DIME' 2 'ELEM' 'QUA4' 'DENS' 0.1 'TRAC' 'PSC' ;
+
+** Maillage
+l1 = DROI (1. 0.) (2. 0.) ;
+s1 = l1 ROTA 180. (0. 0.) ;
+s2 = s1 PLUS (0. 3.) ;
+s  = s1 ET s2 ;
+
+** Champs de coordonnees et trace
+x1 y1 = COOR s1 ;
+x2 y2 = COOR s2 ;
+chp1  = (NOMC 'X' x1) ET (NOMC 'Y' y1) ;
+chp2  = (NOMC 'X' x2) ET (NOMC 'Y' y2) ;
+chp   = chp1 ET chp2 ;
+TRAC chp 'TITR' 'Trace de CHPOINT sur les noeuds' ;
+
+FIN ;
+
+ 
+
+ 
+

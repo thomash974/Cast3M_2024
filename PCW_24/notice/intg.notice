@@ -1,0 +1,263 @@
+$$$$ INTG     NOTICE  PASCAL    20/11/13    21:15:05     10778          
+                                             DATE     20/11/13
+                                             
+    Operateur INTG                           Voir aussi : PRIM
+    --------------
+
+
+Section : Mathematiques Autres
+
+FRAN==========================================================
+    L'operateur INTG realise l'integration :
+    - d'une composante d'un champ (objet de type CHAMELEM) (syntaxe 1) 
+       . soit sur le domaine ou elle est definie, auquel cas le resultat 
+         est un nombre, 
+       . soit sur chacun des elements (option 'ELEM') auquel cas le 
+         resultat est un champ par elements.
+    - de fonction(s) (objet de type EVOLUTION) (syntaxe 2) par la 
+      methode des trapezes.
+    
+ANGL==========================================================
+    The operator INTG performs the integration :
+    - of a field component (CHAMELEM type object) (syntax 1) 
+       . either on the region where it has been defined, in which case 
+         the result is a number, 
+       . or on each element ('ELEM' option), in which  case the result 
+         is a field by elements.
+    - of fonction(s) (EVOLUTION type object) (syntax 2) by means of the 
+      trapezoidal rule.
+      
+    
+FRAN==========================================================
+CHAP{Integration d'un champ par element}
+    
+ANGL==========================================================
+CHAP{Integration of a field defined by element}
+    
+==========================================================
+      OBJET1  =  INTG  ('ELEM') MODL1 CHAM1 (MOT1) (CAR1) ;
+
+FRAN==========================================================
+      Commentaire :
+      _____________
+
+      MODL1  : objet modele (type MMODEL).
+
+      MOT1   : nom de la composante (type MOT),
+               inutile si le champ n'a qu'une composante
+
+      CHAM1  : champ contenant la composante qu'on integre (type MCHAML)
+
+      CAR1   : champ de caracteristiques geometriques (type MCHAML,
+               sous-type CARACTERISTIQUES)
+
+      OBJET1 : objet resultat :
+
+               - nombre (type FLOTTANT) si l'integration est realisee
+                 sur le domaine de definition de la composante
+
+               - champ par elements (type MCHAML, sous-type SCALAIRE)
+                 dont les valeurs sont definies aux centres de gravite
+                 si l'integration est realisee sur chacun des elements
+                 (option avec le mot-cle 'ELEM')
+
+      
+      Attention : Pour les coques, le domaine d'integration est la
+      ----------- surface de la coque et pour les poutres, le domaine
+                  d'integration est la ligne moyenne de la poutre.
+                  Si l'on veut integrer sur le volume de ces elements,
+                  il faut donner le champs de caracteristiques
+                  geometriques CAR1 (type MCHAML, sous-type
+                  CARACTERISTIQUES)
+
+
+      Exemples d'applications possibles :
+
+      calcul de la masse, du volume, de l'energie dissipee, etc ...
+      
+
+ANGL==========================================================
+      Contents:
+      _________
+
+      MODL1  : model object (MMODEL type)
+
+      MOT1   : name of the component (MOT type)
+               useless if the field has a single component
+
+      CHAM1  : field containing the component to be integrated
+               (MCHAML type)
+
+      CAR1   : field of geometrical properties (MCHAML type,
+               CARACTERISTIQUES subtype)
+
+      OBJET1 : generated object :
+
+               - number (FLOTTANT type) if the integration is
+                 performed in the region where the component has
+                 been defined
+
+               - field by elements (MCHAML type, SCALAIRE subtype)
+                 if the integration is performed on each element
+                 (option with the key word 'ELEM'). Its values are
+                 defined at the center of gravity of the elements.
+
+
+      CAUTION:  For the shells, the integration region corresponds to
+      --------  the shell surface, and, for the beams, the integration
+                region is the beam mid-line.
+                If an integration is requested on the volume of these
+                elements, the field of geometrical properties
+                CAR1 will have to be supplied.
+                (MCHAML type, CARACTERISTIQUES subtype)
+
+                
+    Examples of possible applications :
+
+    Calculation of mass, volume, dissipative energy, etc ...
+
+    
+FRAN==========================================================
+CHAP{Integration d'une evolution}
+    
+ANGL==========================================================
+CHAP{Integration of an evolution}
+    
+==========================================================
+                                            | LREE1 LREE2 |
+    RESU1  =  INTG  EVOL1 ('ABS') | ('BORN' | FLOT1 FLOT2 |) ;
+                                  |
+                                  | ('INDI' |  ENT1  ENT2 |) ;
+                                            | LENT1 LENT2 |
+ 
+FRAN==========================================================
+   Commentaire :
+   _____________
+
+     EVOL1        : fonction a integrer (type EVOLUTION).
+     
+     'ABS'        : mot-cle pour integrer la valeur absolue de la fonction.
+
+     'BORN'       : mot-cle pour preciser les bornes de l'intervalle
+                    d'integration.
+
+     FLOT1, FLOT2 : bornes de l'intervalle d'integration (type FLOTTANT).
+                    Si besoin, la valeur de l'evolution est interpolee
+                    (voir IPOL).
+                    Si FLOT1 > FLOT2, alors les bornes sont inversees et
+                    l'integrale est multipliee par -1.
+
+
+     LREE1, LREE2 : definition de plusieurs intervalles d'integration
+                    en donnant deux listes de bornes (type LISTREEL).
+                    Si besoin, la valeur de l'evolution est interpolee
+                    (voir IPOL).
+                    Si certaines bornes sont donnees dans un ordre decroissant
+                    (FLOT1 > FLOT2), alors les bornes sont inversees et
+                    les integrales correspondantes sont multipliees par -1.
+
+     'INDI'       : mot-cle pour preciser les bornes de l'intervalle
+                    d'integration a l'aide des indices de la liste des
+                    abscisses.
+
+     ENT1, ENT2   : indices de la liste des abscisses definissant les
+                    bornes de l'intervalle d'integration (type ENTIER).
+                    Si ENT1 > ENT2, alors les bornes sont inversees et
+                    l'integrale est multipliee par -1.
+
+     LENT1, LENT2 : listes d'indices de la liste des abscisses definissant
+                    les intervalles d'integration (type LISTENTI).
+                    Si certains indices sont donnes dans un ordre decroissant
+                    (ENT1 > ENT2), alors les bornes sont inversees et les
+                    integrales correspondantes sont multipliees par -1.
+
+
+     RESU1        : objet resultat, dont le type est :
+
+                    - FLOTTANT, si l'on integre une evolution sur 1 intervalle
+                      d'integration.
+
+                    - LISTREEL, si l'on integre une evolution sur plusieurs
+                      intevralles d'integration ou plusieurs evolutions (EVOL1
+                      contient plusieurs courbes) sur 1 interval d'integration.
+
+                    - NUAGE, si on integre plusieurs evolutions sur plusieurs
+                      intervalles d'integration. Dans ce cas, le NUAGE resultat
+                      comporte autant de composantes que d'evolutions, les noms
+                      de composante etant le numero de chaque courbe prefixee
+                      par 'IE' : 'IE1' pour la 1ere, 'IE2' pour la 2e...
+                      Chaque composante contient alors 1 LISTREEL, resultat de
+                      l'integration de l'evolution correspondante sur les
+                      differents intervalles d'integration.
+
+   Remarque : Dans le cas de l'integration de plusieurs evolutions sur plusieurs
+   ---------- intervalles avec l'option INDI, ils faut s'assurer que les indices
+              fournis correspondent bien a ce que l'on attend pour toutes les
+              evolutions. Dans ce cas, il semble preferable que les evolutions
+              aient toutes la meme liste de reels en abscisse.
+
+
+ANGL==========================================================
+   Contents :
+   __________
+
+     EVOL1        : function to be integrated (EVOLUTION type).
+     
+     'ABS'        : keyword to integrate the function absolute value.
+
+     'BORN'       : keyword to specify the integration interval.
+
+     FLOT1, FLOT2 : bounds of the integration interval (FLOTTANT type).
+                    The function is interpolated at the bounds if needed
+                    (see IPOL).
+                    If FLOT1 > FLOT2, then the bounds are inversed and the
+                    integrals is multiplied by -1.
+
+     LREE1, LREE2 : specification of several integration intervals by giving
+                    two list of bounds (LISTREEL type).
+                    The function is interpolated at the bounds if needed
+                    (see IPOL).
+                    If some bounds are in a reverse order (FLOT1 > FLOT2),
+                    then they are inversed and the corresponding integrals
+                    are multiplied by -1.
+
+     'INDI'       : keyword to specify the integration interval by giving
+                    indices in the list of real values in abscissa.
+                    
+     ENT1, ENT2   : indices in the list of real values in abscissa defining
+                    the bounds of the integration interval (ENTIER type).
+                    If ENT1 > ENT2, then the bounds are inversed and the
+                    integrals is multiplied by -1.
+
+     LENT1, LENT2 : list of indices in the list of abscissa defining the
+                    bounds of the integration intervals (LISTENTI type).
+                    If some indices are in a reverse order (ENT1 > ENT2),
+                    then the bounds are inversed and the corresponding
+                    integrals are multiplied by -1.
+
+
+     RESU1        : result object, which type is:
+
+                    - FLOTTANT, when integrating 1 function over 1 integration
+                      interval.
+
+                    - LISTREEL, when integrating 1 function over several
+                      integration intervals or several functions (EVOL1 can
+                      contain several curves) over 1 integration interval.
+
+                    - NUAGE, when integrating several functions over several
+                      integration intervals. The NUAGE has as many components
+                      as there are functions to integrate, the component names
+                      being the rank of the function in EVOL1 with prefix 'IE':
+                      'IE1' for the 1st, 'IE2' for the 2nd...
+                      Each component contains 1 LISTREEL object, result of the
+                      integration of the function over the different intervals.
+
+   Note : When integrating several functions over several integration intervals
+   ------ with the INDI option, one must check tha the given indices correspond
+          to what is expected in the lists of abscissa of all the functions.
+          In this case, we recommand that all the functions have the same list
+          of abscissa.
+ 
+ 
+ 

@@ -1,0 +1,171 @@
+* fichier : formation_pasapas_3_solution.dgibi
+************************************************************************
+*              FORMATION AVANCEE SUR LA PROCEDURE PASAPAS              *
+*                                                                      *
+* Chauffage d'une plaque par une source de chaleur variable            *
+* dependante de la temperature                                         *
+*                                                                      *
+* Ce fichier constitue la mise donnee solution du probleme et realise  *
+* - le maillage                                                        *
+* - la definition du modele et des parametres materiaux variables      *
+* - la definition du chargement (convection + source variable)         *
+* - la resolution avec PASAPAS                                         *
+* - le post traitement                                                 *
+************************************************************************
+
+
+** Options generales
+OPTI 'DIME' 2 'ELEM' 'QUA8' 'ECHO' 0 ;
+ITRAC = FAUX ;
+
+
+** Parametres geometriques, materiaux, conditions aux limites
+TPSMAX   = 1.E5 ;
+L        = 1. ;
+R        = 0.25 ;
+CP       = 128. ;
+RHO      = 19300. ;
+T_INI    = 20. ;
+T_EXT    = 20. ;
+LT       = PROG -1.E6 1.E6 ;
+LL       = 200. + (0.3 * LT) ;
+LAMBDA   = EVOL 'MANU' 'T' LT 'K' LL ;
+HCONV    = EVOL 'MANU' 'TEMP' (PROG 0. TPSMAX) 'H' (PROG 10. 200.) ;
+VSOUR    = 4.E6 * (EXP (-1. * (((T_INI - 1000.) / 700.) ** 2))) ;
+
+
+** Maillage
+OPTI 'DENS' (R/5.) ;
+P0       = 0. 0. ;
+P1       = L 0. ;
+LBAS     = DROI P0 P1 ;
+S1       = LBAS TRAN (0. L) ;
+CHX      = S1 COOR 1 ;
+PTX      = CHX POIN 'EGINFE' (R + 1.E-8) ;
+EL1      = S1 ELEM 'APPU' 'STRI' PTX ;
+CHY      = EL1 COOR 2 ;
+PTY      = CHY POIN 'EGINFE' (R + 1.E-8) ;
+MAIL1    = EL1 ELEM 'APPU' 'STRI' PTY ;
+MAIL2    = DIFF S1 MAIL1 ;
+MAILT    = MAIL1 ET MAIL2 ;
+LDROITE  = S1 COTE 2 ;
+LHAUT    = S1 COTE 3 ;
+LEXT     = LDROITE ET LHAUT ;
+P2       = MAILT 'POIN' 'PROC' (L L) ;
+SI ITRAC ;
+  TRAC 'FACE' ((MAIL1 COUL 'ROUG') ET (MAIL2 COUL 'BLEU')) 'TITR' 'Maillage (zone source en rouge)' ;
+FINSI ;
+
+
+** Modeles et materiaux
+MOD_THER = MODE MAILT 'THERMIQUE' 'CONDUCTION' ;
+MAT_THER = MATE MOD_THER 'K' LAMBDA 'C' CP 'RHO' RHO 'TINI' T_INI ;
+* sous-modele reduit au maillage de la source (pour l'operateur SOUR)
+MOD1     = REDU MOD_THER MAIL1 ;
+
+MOD_CONV = MODE LEXT 'THERMIQUE' 'CONVECTION' ;
+MAT_CONV = MATE MOD_CONV 'H' HCONV 'TC' T_EXT ;
+
+
+** Chargements thermiques
+EV1      = EVOL 'MANU' (PROG 0. TPSMAX) (PROG 1. 1.) ;
+CHFL1    = SOUR MOD1 VSOUR MAIL1 ;
+CHA1     = CHAR 'Q' CHFL1 EV1 ;
+
+
+**Resolution avec PASAPAS
+TAB1                         = TABL ;
+TAB1 . 'MODELE'              = MOD_THER ET MOD_CONV ;
+TAB1 . 'CARACTERISTIQUES'    = MAT_THER ET MAT_CONV ;
+TAB1 . 'CHARGEMENT'          = CHA1 ;
+TAB1 . 'TEMPS_CALCULES'      = PROG 0. 'PAS' (TPSMAX / 50.) TPSMAX ;
+TAB1 . 'PROCEDURE_PERSO2'    = VRAI ;
+***TAB1 . 'PROCEDURE_CHARTHER'  = VRAI ;
+TAB1 . 'AMOI'                = TABL ;
+TAB1 . 'AMOI' . 'MAIL'       = MAIL1 ;
+TAB1 . 'AMOI' . 'MODE'       = MOD1 ;
+
+
+** Procedure PERSO2 pour modifier la source selon la temperature
+*  (les modifications des CL sont pises en compte au pas de temps suivant,
+*   les resultats auront donc un pas de temps de retard !)
+DEBP PERSO2 T1*'TABLE' ;
+  MA1 = T1 . 'AMOI' . 'MAIL' ;
+  MO1 = T1 . 'AMOI' . 'MODE' ;
+* reduction du champ de temperatures au maillage de la source
+  CHT1 = T1 . 'WTABLE' . 'THER_COURANT' ;
+  CHT2 = REDU CHT1 MA1 ;
+* calcul du champ de source a partir du champ de temperature
+  CHS = 4.E6 * (EXP (-1. * (((CHT2 - 1000.) / 700.) ** 2))) ;
+* creation du second membre et d'un chargement
+  CHFL1 = SOUR MO1 CHS ;
+  EV1   = EVOL 'MANU' (PROG 0. TPSMAX) (PROG 1. 1.) ;
+  CHA1  = CHAR 'Q' CHFL1 EV1 ;
+* modification du chargement dans la table de calcul
+  T1 . 'WTABLE' . 'CHARGEMENT' = CHA1 ;
+FINP ;
+
+
+** Il est aussi possible de modeliser la source variable avec CHARTHER
+*  selon la temperature au debut ou a la fin du pas en cours de calcul
+DEBP CHARTHER T1*'TABLE'  TPS1*'FLOTTANT' ;
+  MA1 = T1 . 'AMOI' . 'MAIL' ;
+  MO1 = T1 . 'AMOI' . 'MODE' ;
+* on recupere la temperature
+  SI VRAI ;
+*  soit au debut du pas de temps
+    CHT1 = T1 . 'ESTIMATION' . 'TEMPERATURES' ;
+  SINON ;
+*  soit a la fin du pas de temps
+    CHT1 = T1 . 'WTABLE' . 'THER_COURANT' ;
+  FINSI ;
+* reduction du champ de temperatures au maillage de la source
+  CHT2 = REDU CHT1 MA1 ;
+* calcul du champ de source a partir du champ de temperature
+  CHS = 4.E6 * (EXP (-1. * (((CHT2 - 1000.) / 700.) ** 2))) ;
+* creation du second membre
+  CHFL1 = SOUR MO1 CHS ;
+* sortie du second membre
+  T2 = TABL ;
+  T2 . 'ADDI_SECOND' = CHFL1 ;
+FINP T2 ;
+
+
+** Appel a la procedure PASAPAS
+PASAPAS TAB1 ;
+
+
+** Post-traitement
+NBOU1 = DIME (TAB1 . 'TEMPS_CALCULES') ;
+T_MAX = 1800. ;
+LIS1 = PROG T_INI 'PAS' ((T_MAX - T_INI) / 20.) T_MAX ;
+REPE BOU1 NBOU1 ;
+  I        = &BOU1 - 1 ;
+* temps
+  TEMPS_I  = TAB1 . 'TEMPS' . I ;
+  P100     = ENTI (100. * TEMPS_I / TPSMAX) ;
+* temperatures au temps i
+  TEMP_I   = TAB1 . 'TEMPERATURES' . I ;
+  SI ITRAC ;
+    TRAC TEMP_I MAILT LIS1 'TITR' (CHAI 'Temperature au temps' TEMPS_I ' (' P100 '%)') ;
+  FINSI ;
+FIN BOU1 ;
+* courbes d'evolution temporelles des temperatures aux coins de la piece
+EVTP0 = EVOL 'ROUG' 'TEMP' TAB1 'TEMPERATURES' 'T' P0 ;
+EVTP2 = EVOL 'BLEU' 'TEMP' TAB1 'TEMPERATURES' 'T' P2 ;
+TL = TABL ;
+TL . 'TITRE' = TABL ;
+TL . 'TITRE' . 1 = 'Coin inf. gauche' ;
+TL . 'TITRE' . 2 = 'Coin sup. droite' ;
+SI ITRAC ;
+  DESS (EVTP0 ET EVTP2) 'LEGE' 'SE' TL 'TITR' 'Temperature aux coins vs Temps' 'YBOR' 0. 2000. ;
+FINSI ;
+
+FIN ;
+
+ 
+
+ 
+
+ 
+

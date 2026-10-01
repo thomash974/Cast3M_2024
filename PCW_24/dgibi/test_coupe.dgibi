@@ -1,0 +1,42 @@
+** Un petit cas test de l'operateur COUP
+
+** Options generales
+OPTI 'DIME' 3 'ELEM' 'CUB8' ;
+itrac = FAUX ;
+
+** Maillage
+p1 = 0. 0. 0. ;
+p2 = 1. 0. 0. ; 
+p3 = 1. 1. 0. ; 
+p4 = 0. 1. 0. ; 
+d1 = DROI 2 p1 p2 ; 
+d2 = DROI 2 p2 p3 ; 
+d3 = DROI 2 p3 p4 ; 
+d4 = DROI 2 p4 p1 ; 
+s  = SURF (d1 ET d2 ET d3 ET d4) 'PLAN' ;
+v  = s VOLU TRAN 10 (0. 0. 10.) ;
+
+** Plan de coupe et coupe du maillage
+pc1 = 0. 0. 3.1 ;
+pc2 = 1. 0. 3.1 ;
+pc3 = 0. 1. 4.3 ;
+pc  = pc1 ET pc2 ET pc3 ;
+s1  = COUP v pc1 pc2 pc3 ;
+
+** Controle du maillage de la section
+* verification avec VERM
+VERM s1 ;
+* les points sont ils bien dans le plan ?
+ps1 = s1 POIN 'PLAN' pc1 pc2 pc3 1.E-10 ;
+SI ((NBNO ps1) NEG (NBNO s1)) ;
+  ERRE 'Les points du maillage de la coupe ne sont pas dans le plan !' ;
+FINSI ;
+* trace du maillage
+SI itrac ;
+  TRAC ((ARET v) ET (pc COUL 'ROUG') ET (s1 COUL 'VERT')) ;
+FINSI ;
+
+
+FIN ;
+ 
+

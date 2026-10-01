@@ -1,0 +1,61 @@
+$$$$ TITR     NOTICE  PV        19/12/10    21:15:14     10423          
+                                             DATE     19/12/10
+
+    Directive TITRE                          Voir aussi : CHAIN
+    ---------------
+
+
+Section : Langage Base
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    La directive TITRE permet de donner un titre a la tache en cours.
+Il contient au plus 72 caracteres. La syntaxe est celle de
+l'operateur CHAIN (appele en interne).
+
+    Commentaire :
+    _____________
+
+    Ce titre s'affichera, en particulier, lors de tout trace demande
+apres l'execution de cette directive.
+
+    Exemple :
+    _________
+
+    PRESS = 25.86  ;
+    ICAS  = 2 ;
+    TITRE  ' CAS DE CHARGE NUMERO' ICAS ' VALEUR DE LA PRESSION' PRESS;
+
+cette suite d'instructions fabrique le titre suivant :
+
+   CAS DE CHARGE NUMERO     2  VALEUR DE LA PRESSION  25.860
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The TITRE instruction enables the user to attribute a title
+ to the current job. The title does not exceed 72 characters.
+ Syntax is the same as CHAIN operator (internally called).
+
+    Note :
+    ________
+
+    This title will be displayed especially when plotting after 
+ the running of this instruction.
+
+    Example :
+    _________
+
+    PRESS = 25.86  ;
+    ICAS  = 2 ;
+    TITRE  ' CAS DE CHARGE NUMERO' ICAS ' VALEUR DE LA PRESSION' PRESS;
+
+  this series of instructions creates the following title :
+
+   CAS DE CHARGE NUMERO     2  VALEUR DE LA PRESSION  25.860
+
+$$$$
+ 

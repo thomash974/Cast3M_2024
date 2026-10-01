@@ -1,0 +1,85 @@
+$$$$ REMP     NOTICE  JC220346  19/12/29    21:15:06     10441          
+                                             DATE     19/12/29
+
+    Directive/operateur REMPLACER            Voir aussi : INSE
+    -----------------------------                         ENLE
+
+    REMPLACER OBJET1 INDIC1 OBJET2 ;
+    
+    MOT2 = REMPLACER MOT1 INDIC1 OBJET2 ;
+
+
+Section : Langage Objets
+Section : Langage Caracteres
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    La directive REMPLACER remplace l'element de position INDIC1 dans
+    l'objet OBJET1 par l'objet OBJET2.
+
+
+    Si INDIC1 est un objet LISTENTI, on remplace successivement les
+    indices voulus de OBJET1 par :
+
+     - la meme valeur à chaque fois, si OBJET2 n'est pas une liste.
+
+     - des valeurs definies individuellement, si OBJET2 est une liste
+       de meme longueur que INDIC1.
+       
+    Dans le cas ou OBJET1 est de type MOT, REMPLACER devient un
+    operateur (le resultat est renvoye dans un nouvel objet MOT2).
+
+
+    Operations possibles :
+    ______________________
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The REMPLACER instruction replaces the INDIC1-th element in OBJET1
+    with OBJET2.
+
+
+    If INDIC1 is a LISTENTI object, the selected elements in OBJET1 are
+    successively replaced by :
+
+     - a unique value, if OBJET2 is not a list.
+
+     - individual values, if OBJET2 is list of the same length as
+       INDIC1.
+       
+    In the case where OBJET1's type is MOT, REMPLACER is an operator
+    (the result is returned in a new object called MOT2).
+
+
+    Possible operations :
+    _____________________
+
+==========================================================
+    ----------------------------------------------
+    |    OBJET1    |   INDIC1     |    OBJET2    |
+    ----------------------------------------------
+    |   MOT        |   MOT        |   MOT        |
+    |   MOT        |   LISTMOTS   |   LISTMOTS   |
+    ----------------------------------------------
+    |   LISTREEL   |   ENTIER     |   FLOTTANT   |
+    |   LISTENTI   |   ENTIER     |   ENTIER     |
+    |   LISTMOTS   |   ENTIER     |   MOT        |
+    |   LISTCHPO   |   ENTIER     |   CHPOINT    |
+    ----------------------------------------------
+    |   LISTREEL   |   LISTENTI   |   FLOTTANT   |
+    |   LISTENTI   |   LISTENTI   |   ENTIER     |
+    |   LISTMOTS   |   LISTENTI   |   MOT        |
+    |   LISTCHPO   |   LISTENTI   |   CHPOINT    |
+    ----------------------------------------------
+    |   LISTREEL   |   LISTENTI   |   LISTREEL   |
+    |   LISTENTI   |   LISTENTI   |   LISTENTI   |
+    |   LISTMOTS   |   LISTENTI   |   LISTMOTS   |
+    |   LISTCHPO   |   LISTENTI   |   LISTCHPO   |
+    ----------------------------------------------
+ 
+ 
+ 

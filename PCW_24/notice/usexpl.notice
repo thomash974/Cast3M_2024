@@ -1,0 +1,67 @@
+$$$$ USEXPL   NOTICE  MB234859  24/02/06    21:15:03     11833          
+                                             DATE     24/02/06
+
+ Procedure USEXPL                        Voir aussi : USACCE USCALC 
+ ----------------                       USDEPL USDEPL USIMPL USINIB
+                                        USPOST USTMPS USURE
+
+         USEXPL TAB1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui applique l'usure selon un schema explicite :
+    
+                    h[k+1] = h[k] + deltaN * DH[k]
+    
+    Avec
+     - h[k+1] : l'usure au cycle [k+1]
+     - h[k]   : l'usure au cycle [k]
+     - deltaN : facteur de saut de cycle  (voir USACCE)
+     - DH[k]  : taux d'usure au cycle [k] (voir USCALC)
+    
+    Une fois tous les instants du cycle [k] calcule, le maillage est 
+    deplace de h[k+1] et le cycle suivant demarre.
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+  Cette procedure est appelee par USURE.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which uses an explicit scheme to solve wear :
+    
+                    h[k+1] = h[k] + deltaN * DH[k]
+    
+    With 
+     - h[k+1] : wear profile at cycle [k+1]
+     - h[k]   : wear profile at cycle [k]
+     - deltaN : cycle jump coefficient          (voir USACCE).
+     - DH[k]  : wear rate computed at cycle [k] (voir USCALC)
+
+   When each timesteps of the cycle [k] are computed, the wear profil 
+   h[k+1] is applied to the mesh and the next cycle begins.
+ 
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+  This procedure is called by USURE.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+ 

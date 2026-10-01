@@ -1,0 +1,341 @@
+* fichier : dyne05.dgibi
+*
+************************************************************************
+*
+* DYNE05 : 
+*
+* Calcul d'un oscillateur frottant en contact permanent
+* en situation de "Stick and Slip" 
+*
+*                         | Fn
+*                      ___v___  
+*   |        k        |       |--> x(t) 
+*   |-----|/|/|/|-----|   m   |
+*   |                 |_______|
+*                --------------------
+*                       µd=µs    --> Ve
+*  ^ Y
+*  |
+*  +----> X
+*  
+* Test de l'option VITESSE_ENTRAINEMENT pour la liaison DYNE
+* POINT_PLAN_FROTTEMENT qui ajoute une sur-vitesse tangentielle
+*
+* Ref : [Andreaus & Casini, 2001, JSV, "DYNAMICS OF FRICTION OSCILLATORS
+*        EXCITED BY A MOVING BASE AND/OR DRIVING FORCE"]
+*
+* Auteur : BP, 2020-03-16
+*
+************************************************************************
+
+
+************************************************************************
+*                      OPTIONS et DONNEES
+************************************************************************
+OPTI DIME 3 ELEM SEG2;
+OPTI TRAC PSC EPTR 8 POTR HELVETICA_16;
+GRAPH = FAUX;
+
+* physical data
+  m = 1.;
+  k = 1.;
+  mu_s = 0.6;
+  mu_d = 0.5;
+  si (mu_s < mu_d); erreur 21; finsi;
+  Ve = 1.;
+  Fn = 1.;  
+
+* contact parameters
+  kchoc = 1.*k;
+  Kt = 100.*kchoc;
+
+* deduced parameter
+  w   = (k/m)**0.5;
+  wHz = w / (2.*pi);
+  u0 = Fn / k;
+  Ct = 0.5*(m*Kt)**0.5;
+*test  Ct = 0.;
+  
+* critical timestep (Diff Centrees, no damping)
+  wadhe = ((k+Kt)/m)**0.5;
+  dtc = 2. / wadhe;
+  
+* initial conditions
+  x_0    = mu_d * u0 ;
+  y_0    = -1. * Fn / kchoc;
+* la valeur pour dxdt_0 critique entre pure sliding et stick-slip 
+* doit etre de Ve/w=1 ici.
+*  dxdt_prog = prog 0.8 1.0;
+  dxdt_prog = prog  0.8    0.9    1.0   ;
+*   dxdt_prog = prog  0.8    0.9    1.0   1.1    1.2 ;
+  coco_anal = mots 'MARI' 'BLEU' 'AZUR' 'CYAN' 'TURQ';
+* CI pour DYNE deduite de la solution analytique
+  dxdt_nega = prog;
+
+  
+************************************************************************
+*                    SOLUTION ANALYTIQUE
+************************************************************************
+
+  ev_anal = VIDE 'EVOLUTIO';
+  
+*-------------------------------------------> BOUCLE SUR LES CI
+  REPE B (DIME dxdt_prog);
+  
+  dxdt_0 = extr dxdt_prog &B;  
+  coco   = extr coco_anal &B;
+  MESS '*** CALCUL ANALYTIQUE pour x(0)='x_0, ' , dx/dt(0)='dxdt_0 ' ***';
+  cha_lege = CHAI 'Analytic v0=' FORMAT '(F3.1)' dxdt_0;
+ 
+* vitesse critique
+  Aux0 = x_0 - (mu_d * u0);
+  Ve_crit = w * (( (Aux0**2) + (dxdt_0**2) )**0.5);
+  MESS 'Ve Ve_crit = ' Ve Ve_crit;
+
+* portrait de phase 
+  SI (Ve > Ve_crit);
+*   si tapis rapide (ou CI faibles), alors regime "pure sliding" (_ps)
+    R_ps = ((Aux0**2) + (dxdt_0**2))**0.5;
+    tprog = prog 0. 'PAS' (1. / 200) 1.;
+    x_ps  = (R_ps * (sin (360.*w*tprog))) + (mu_d * u0);
+    dx_ps =  R_ps * (cos (360.*w*tprog));
+    ev_ps = EVOL coco MANU LEGE cha_lege 'x' x_ps 'dxdt' dx_ps;
+*    DESS ev_ps CARR;
+    ev_anal = ev_anal et ev_ps;
+si GRAPH;   DESS ev_ps 'CARR' 'TITRE' cha_lege 'MIMA';  finsi;
+    dxdt_nega = dxdt_nega et (-1.*R_ps);
+    
+  SINON;
+*   si tapis "lent" (ou CI "fortes"), alors stick-slip
+*   sticking phase (_stick)
+    x_deb = u0 * ((2.*mu_d) - mu_s);
+    x_fin = u0 * mu_s;
+    n_stick = 10;
+    x_stick  = prog x_deb 'PAS' ((x_fin - x_deb)/n_stick) x_fin;
+    dx_stick = prog (dime x_stick) * (Ve/w); 
+*   sliding phase
+    R_slip  = ( ((Ve/w)**2) + ((u0*(mu_s-mu_d))**2) )**0.5;
+    t_deb   = ASIN (u0*(mu_s-mu_d) / R_slip);
+    t_fin   = 360. - t_deb; 
+    t_slip  = prog t_deb 'PAS' ((t_fin - t_deb)/200) t_fin;
+    x_slip  = (R_slip * (sin (t_slip))) + (mu_d * u0);
+    dx_slip =  R_slip * (cos (t_slip));
+*   evol
+    ev_ss = EVOL coco MANU LEGE cha_lege 'x' (x_stick  et x_slip ) 
+                                      'dxdt' (dx_stick et dx_slip);
+    ev_anal = ev_anal et ev_ss;
+si GRAPH;    DESS ev_ss 'CARR' 'TITRE' cha_lege 'MIMA'; finsi;
+    dxdt_nega = dxdt_nega et (-1.*R_slip);
+    
+  FINSI;
+  
+  
+  fin B;
+  
+si GRAPH;  DESS ev_anal 'CARR' 'TITRE' 'Solutions analytiques'; finsi;
+  list dxdt_nega;
+  
+  
+************************************************************************
+*                       BASE MODALE 
+************************************************************************
+* point physique
+  p1 = 0. 0. 0.;
+  
+* base modale = 2 modes
+  palfa1 = 0. 0. 0.;
+  phi1 = MANU 'CHPO' p1 2 'UX' 1. 'UY' 0. 'NATURE' 'DIFFUS';
+  palfa2 = 0. 0. 0.;
+  phi2 = MANU 'CHPO' p1 2 'UX' 0. 'UY' 1. 'NATURE' 'DIFFUS';
+  
+  TBAS = TABL 'BASE_MODALE';
+  TBAS . 'MODES' = TABL 'BASE_DE_MODES'; 
+  TBAS . 'MODES' . 1 = TABL 'MODES';
+  TBAS . 'MODES' . 1 . 'POINT_REPERE'      = palfa1;
+  TBAS . 'MODES' . 1 . 'FREQUENCE'         = wHz;
+  TBAS . 'MODES' . 1 . 'MASSE_GENERALISEE' = m;
+  TBAS . 'MODES' . 1 . 'DEFORMEE_MODALE'   = phi1;
+  TBAS . 'MODES' . 2 = TABL 'MODES';
+  TBAS . 'MODES' . 2 . 'POINT_REPERE'      = palfa2;
+  TBAS . 'MODES' . 2 . 'FREQUENCE'         = 0.;
+  TBAS . 'MODES' . 2 . 'MASSE_GENERALISEE' = m;
+  TBAS . 'MODES' . 2 . 'DEFORMEE_MODALE'   = phi2;
+  
+  
+************************************************************************
+*                           LIAISONS 
+************************************************************************
+
+* contact-frottant point_plan_frottement
+  TL1 = TABL 'LIAISON_ELEMENTAIRE';
+  TL1 . 'TYPE_LIAISON' = mot 'POINT_PLAN_FROTTEMENT';
+  TL1 . 'SUPPORT'      = p1;
+  TL1 . 'NORMALE'      = (0. -1. 0.) ;
+  TL1 . 'RAIDEUR'      = kchoc;
+  TL1 . 'JEU'          = 0.;
+  TL1 . 'COEFFICIENT_GLISSEMENT' = mu_d;
+  TL1 . 'COEFFICIENT_ADHERENCE'  = mu_s;
+  TL1 . 'RAIDEUR_TANGENTIELLE'    = Kt;
+  TL1 . 'AMORTISSEMENT_TANGENTIEL'= Ct;
+  TL1 . 'VITESSE_ENTRAINEMENT'    = poin  Ve 0. 0.;
+* stockage  
+  TLB  = TABL 'LIAISON_B';
+  TLB . 1 = TL1;
+  TLIA = TABL 'LIAISON';
+  TLIA . 'LIAISON_B' = TLB; 
+  
+  
+************************************************************************
+*                           CHARGEMENT
+************************************************************************
+
+TCHARG = TABLE 'CHARGEMENT' ;
+t_char = PROG -1. 1.E3 ;
+F_char = PROG  1. 1. ;
+ev_char = EVOL MANU t_char F_char;
+F_chpo  = MANU CHPO 1 p1 'FY' (-1.*Fn);
+CHAR1 = CHAR ev_char F_chpo ;
+TCHARG . 'BASE_A' = PJBA TBAS CHAR1 ;
+
+
+************************************************************************
+*                           SORTIES
+************************************************************************
+ 
+  TSORT = TABLE 'SORTIE'; 
+* +on stocke les deplacements modaux 
+  TSORV = TABLE 'VARIABLE';
+  TSORV . 'TYPE_SORTIE' = MOT 'LISTREEL';
+  TSORT . 'VARIABLE' = TSORV;
+* + on stocke les variables du contact 
+  TSORLB = TABLE 'LIAISON_B';
+  TSORLB . TL1 = VRAI;
+  TSORT . 'LIAISON_B' = TSORLB;
+ 
+* pour le post traitement DYNE
+  ev_dyne = VIDE 'EVOLUTIO';
+*   coco_dyne = mots 'ROUG' 'ORAN';
+*   coco_dyne = mots 'BRUN' 'BRIQ' 'ROUG' 'ORAN' 'OR';
+  coco_dyne = mots 'BRUN' 'ROUG' 'ORAN' 'OR' 'OLIV';
+  Tdess1 = TABL ;
+  Tdess1 . 2 = MOT 'TIRR';
+  
+ 
+************************************************************************
+*                      PARAMETRES TEMPORELS
+************************************************************************
+ 
+* PAS DE TEMPS, NOMBRE DE PAS, SORTIE TOUS LES NSORT
+  DT    = 1.E-3;
+  NPAS  = 10000;
+  NSORT = 10;
+  si (DT < dtc);  mess 'Pas de temps =' DT '  <  critique=' dtc; 
+  sinon;          erre 21;
+  finsi;
+
+ 
+************************************************************************
+*                      CONDITIONS INITIALES
+************************************************************************
+ 
+  TINIT = TABL 'INITIAL';
+  TINIT . 'DEPLACEMENT' 
+    = (MANU 'CHPO' palfa1 1 'ALFA' x_0 'NATURE' 'DISCRET')
+   et (MANU 'CHPO' palfa2 1 'ALFA' y_0 'NATURE' 'DISCRET');
+  
+ 
+*-------------------------------------------> BOUCLE SUR LES CI
+  REPE B (DIME dxdt_prog);
+  
+  dxdt_0 = extr dxdt_prog &B; 
+  dxdt_0 = extr dxdt_nega &B;   
+  coco   = extr coco_dyne &B;
+  MESS '*** CALCUL DYNE pour x(0)='x_0, ' , dx/dt(0)='dxdt_0 ' ***';
+  cha_lege = CHAI 'Cast3M v0=' FORMAT '(F6.3)' dxdt_0;
+  TITRE cha_lege;
+
+  TINIT . 'VITESSE'     
+    = (MANU 'CHPO' palfa1 1 'ALFA' dxdt_0 'NATURE' 'DIFFUS')
+   et (MANU 'CHPO' palfa2 1 'ALFA' 0.     'NATURE' 'DIFFUS');
+ 
+ 
+
+************************************************************************
+* CALCUL DYNE : INTEGRATION TEMPORELLE
+************************************************************************
+
+*   opti impi 333;
+*  TDYNE = DYNE 'DE_VOGELAERE' TBAS TLIA TSORT TINIT TCHARG
+  TDYNE = DYNE 'DIFFERENCES_CENTREES' TBAS TLIA TSORT TINIT TCHARG
+                              NPAS DT   NSORT ;
+*   opti impi 0;
+* opti TRAC X ;  erre 21;
+
+ 
+************************************************************************
+* POST TRAITEMENT 
+************************************************************************
+*OPTI TRAC 'X';
+
+pr_time = TDYNE . 'TEMPS_DE_SORTIE';  
+pr_x = TDYNE . 'DEPLACEMENT' . palfa1;
+pr_y = TDYNE . 'DEPLACEMENT' . palfa2;
+pr_vx = TDYNE . 'VITESSE' . palfa1;
+
+ev_x = EVOL coco MANU  'LEGE' 'u_{x}'  't' pr_time 'u' pr_x; 
+ev_y = EVOL coco MANU  'LEGE' 'u_{y}'  't' pr_time 'u' pr_y;
+si GRAPH; DESS (ev_x et ev_y) Tdess1; finsi;
+
+ev_phase = EVOL coco MANU LEGE cha_lege 'u_{x}'  pr_x 'v_{x}' pr_vx;
+si GRAPH; DESS ev_phase 'CARR'; finsi;
+ev_dyne = ev_dyne et ev_phase;
+
+pr_fn = TDYNE . TL1 . 'FORCE_DE_CHOC_NORMALE';
+ev_Fn = EVOL coco MANU  'LEGE' 'F_{n}'  't' pr_time 'F' pr_fn;
+pr_ft = TDYNE . TL1 . 'FORCE_DE_CHOC_TANGENTIELLE';
+ev_Ft = EVOL coco MANU  'LEGE' 'F_{t}'  't' pr_time 'F' pr_ft;
+*dess (ev_Ft et ev_Fn) Tdess1;
+si GRAPH; dess ev_Ft ; finsi;
+
+pr_vt = TDYNE . TL1 . 'VITESSE_TANGENTIELLE';
+*ev_vt = EVOL rose MANU 'LEGE' 'v_{t} (rel.)'  't' pr_time 'V' pr_vt;
+*ev_vx = EVOL coco MANU 'LEGE' 'v_{x}'  't' pr_time 'V' pr_vx;
+ev_vt = EVOL rose MANU 'LEGE' 'v_{t} (rel.)'  't' pr_time 'V' (-1.*pr_vt);
+ev_vx = EVOL coco MANU 'LEGE' 'v_{x}-Ve'  't' pr_time 'V' (pr_vx - Ve);
+si GRAPH;dess (ev_vx et ev_vt) LEGE 'NO' Tdess1; finsi;
+
+fin B;
+
+* zoom sur le passage glissement -> adherence ->  glissement 
+si GRAPH;
+  dess ev_Ft Tdess1 XBOR 3. 3.5 XGRA 0.05;
+  dess (ev_vx et ev_vt) XBOR 3. 3.5 XGRA 0.05 LEGE 'SO' Tdess1;
+finsi;
+*   OPTI TRAC 'X';
+  
+* comparaison avec solution analytique
+Tdess6 = tabl;
+Tdess6 . 4 = mot 'TIRR';
+Tdess6 . 5 = mot 'TIRR';
+Tdess6 . 6 = mot 'TIRR';
+si GRAPH;
+  DESS (ev_dyne et ev_anal) 'CARR' LEGE 'AXES' Tdess6;
+  DESS (ev_dyne et ev_anal) 'YBOR'  0.9  1.1 'XBOR' 0.3 0.8 LEGE Tdess6;
+  DESS (ev_dyne et ev_anal) 'YBOR' -1.1 -0.9 'XBOR' 0.3 0.8 LEGE Tdess6;
+finsi;
+  
+
+************************************************************************
+* TEST DE VALIDATION 
+************************************************************************
+* TODO ...  
+    
+FIN ;
+
+
+ 
+
+ 
+
+ 
+

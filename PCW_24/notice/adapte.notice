@@ -1,0 +1,155 @@
+$$$$ ADAPTE   NOTICE  PASCAL    22/04/27    21:15:01     11356          
+                                             DATE     22/04/27
+=======================================================================
+
+    Procedure ADAPTE                         Voir aussi : SOUDAGE, WAAM
+    ================
+
+FRAN===================================================================
+    Objet :
+    -------
+
+        La procedure ADAPTE permet d'adapter le maillage d'un modele
+    evoluant au cours du temps en fonction d'un autre maillage, a priori
+    moins fin. ADAPTE est notamment utilise dans le cas de la simulation
+    du soudage ou de la fabrication additive pour deraffiner le modele
+    au-dela d'une certaine distance du point d'apport de matiere.
+
+        Le maillage du modele et celui fourni en argument doivent etre
+    hierarchiques : les noeuds de l'un doivent etre communs aux deux.
+
+        Le modele a adapter est decrit par un CHARGEMENT de nom MODE.
+    L'adaptation est realisee en parcourant une trajectoire (celle du 
+    procede). Celle-ci est egalement decrite par un CHARGEMENT.
+
+
+ANGL===================================================================
+    Description :
+    -------------
+
+         The ADAPTE procedure is used to adapt the mesh of a model
+     evolving over time according to another mesh, a priori coarser.
+     ADAPTE is used in particular in welding or additive manufacturing
+     simulations to refine the model beyond a certain distance from the
+     point of material deposit.
+
+         The mesh of the model and that provided in input must be
+     hierarchical: the nodes of one must be common to both.
+
+         The model to be adapted is described by a CHARGEMENT object,
+     of name MODE. Adaptation is performed along the trajectory of the
+     process. This trajectory is also described by a CHARGEMENT object.
+
+
+FRAN===================================================================
+    Syntaxe :
+    ---------
+
+ANGL===================================================================
+    Syntax :
+    --------
+
+=======================================================================
+    CHAR2 LREE1 = ADAPTE 'MAIL' GEO1 CHAR1 'DIST' FLOT1 ...
+
+             ... ('TRAJ' FLOT2) ('MINI' FLOT3) ;
+
+FRAN===================================================================
+    Entrees :
+    ---------
+
+    GEO1    : objet MAILLAGE, dont les mailles sont subsitutuees a celles
+              du maillage decrit dans le CHARGEMENT.
+              
+
+    CHAR1   : objet CHARGEMENT, contenant :
+              - un chargement de nom MODE, decrivant l'evolution temporelle
+                du modele a adapter ;
+              - un chargement de nom TRAJ, decrivant l'evolution temporelle
+                d'un point le long d'une trajectoire.
+
+    FLOT1   : objet FLOTTANT, distance d'adaptation separant le point de la
+              trajectoire a un instant donne et la partie adaptee.
+
+    FLOT2   : objet FLOTTANT, distance parcourue sur la trajectoire avant
+              toute nouvelle adaptation. Permet de ne pas adapter le
+              maillage systematiquement.
+
+    FLOT3   : objet FLOTTANT, distance minimale en-dessous de laquelle
+              l'adaptation est systematiquement realisee. Sert a retirer
+              les elements de la partie adaptee pour les remplacer par le
+              maillage fin initial lorsque la trajectoire revient a proxi-
+              -mite d'une partie adaptee (FLOT3 est pris egal FLOT1 s'il
+              lui est superieur).
+
+
+    Sorties :
+    ---------
+
+    CHAR2   : objet CHARGEMENT, contenant :
+              - un chargement, de nom MAIL, contenant le maillage adapte
+                au cours du temps ;
+              - un chargement, de nom BLOD, BLOM ou BLOT, contenant des
+                relations (RIGIDITE) entre les inconnues nodales a l'inter-
+                -face des parties non conformes du maillage adapte assurant
+                la continuite de la solution.
+
+    LREE1   : objet LISTREEL, liste des instants ou le maillage est adapte.
+
+
+ANGL===================================================================
+    Inputs :
+    --------
+
+    GEO1    : MAILLAGE type object, mesh whose elements have to replace
+              those of the mesh described in CHAR1. Generaly, GEO1 is a
+              coarser mesh.
+
+    CHAR1   : CHARGEMENT type object, containing :
+              - a chargement named MAIL, describing the temporal evolution
+                of the mesh to be adapted,
+              - a chargement named TRAJ, describing the temporal evolution
+                of a point along a trajectory.
+
+    FLOT1   : FLOTTANT type object, adaptation distance beetween the point on
+              the trajectory at the given time step and the elements of GEO1.
+
+    FLOT2   : FLOTTANT type object, distance traveled along the trajectory
+              before any adaptation. Usefull not to adapt the mesh every time.
+
+    FLOT3   : FLOTTANT type object, minimal distance below which the mesh
+              adaptation is forced. Usefull to remove elements of the adapted
+              part and to replace them by the initial mesh when the trajectory
+              goes back nearby the previously adapted part (FLOT3 is taken
+              equal to FLOT1 if given superior to it).
+
+
+    Outputs :
+    ---------
+
+    CHAR2   : CHARGEMENT type object, containing :
+              - a CHARGEMENT, named MAIL, describing the temporal evolution
+                of the adapted mesh,
+              - a CHARGEMENT, named either BLOD, BLOM ou BLOT, containing
+                relations between the DOF of the model on the hanging nodes
+                of the adapted mesh to insure the continuity of the solution.
+
+    LREE1   : LISTREEL type object, list of time steps at which the mesh is
+              adapted.
+
+
+FRAN===================================================================
+    Remarque : ADAPTE est disponible uniquement en dimension 3.
+    ----------
+
+
+ANGL===================================================================
+    Remark : The ADAPTE procedure only works in 3 dimensions.
+    --------
+
+
+$$$$
+ 
+ 
+ 
+ 

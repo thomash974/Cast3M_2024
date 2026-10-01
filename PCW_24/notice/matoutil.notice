@@ -1,0 +1,30 @@
+$$$$ MATOUTIL NOTICE  GOUNAND   21/04/09    21:15:04     10944          
+                                             DATE     21/04/09
+
+
+
+FRAN==========================================================
+    Procedure MATOUTIL                          Voir aussi : MAILTOPO
+    ------------------                                   
+
+ANGL==========================================================
+    Procedure MATOUTIL                            See also : MAILTOPO
+    ------------------                                         
+
+==========================================================
+FRAN===========================================================
+    Objet :
+    _______
+
+    "MAilTOpo UTILitaires"
+
+    Des utililitaires utilises par la procedure MAILTOPO.
+    
+ANGL===========================================================
+    Description :
+    ___________
+
+    "MAilTOpo UTILity functions"
+
+    Utility functions used by the MAILTOP procedure.
+ 

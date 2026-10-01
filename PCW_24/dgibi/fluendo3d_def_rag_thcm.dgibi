@@ -1,0 +1,1422 @@
+* fichier : fluendo3d_rag_def_thcm.dgibi
+************************************************************************
+* Section : Mecanique Viscoplastique
+************************************************************************
+*
+* test de la formulation RAG(AAR) et RSI(DEF) du modele fluendo3d
+* ----------------------------------------------------------------------
+*
+* Alain Sellier, Stephane Multon, Pierre Morenon
+* mercredi 4 janvier 2023
+*
+*-----------------------------------------------------------------------
+* Exemple de calcul d un element en beton soumis a la RAG et a la RSI
+* en condition thermo-hydro-chimiques variables et gonflement libre en
+* un premier temps, et soumis a une contrainte axiale de 10 MPa par la
+* suite
+*-----------------------------------------------------------------------
+graph1=FAUX;
+opti dime 2 elem qua4 mode axis;
+*geometrie
+p1=0. 0.;
+p2=0.065 0.;
+p3=0.065 0.24;
+p4=0. 0.24;
+n1=1;
+d12=d n1 p1 p2;
+d23=d n1 p2 p3;
+d34=d n1 p3 p4;
+d41=d n1 p4 p1;
+surf1=daller d12  d23  d34  d41;
+*trac surf1;
+
+****************************modele et materiau *************************
+
+mod1=mode surf1 mecanique elastique 
+viscoplastique FLUENDO3D;
+
+*****beton *************************************************************
+*rc et E du beton
+rc180=72.;
+ec180=44000.;
+
+*caracteristiques  beton deduite avec regles EC2
+rt180=4.4;
+moyrt00=4.4;
+sigrt00=0.10*moyrt00;
+rt0 = moyrt00;
+E0=ec180;
+ep00=moyrt00/E0;
+ep0=(E0**-1)*rt0;
+
+*caracteristiques des aciers
+Eacier=1.82e5;
+fyacier=430.; 
+*contrainte equivalente de cisaillement pour le calcul de ls (MC2010)
+taueq0=1.8*moyrt00;
+
+*evolution CNAD-NA
+evcna1=evol manu 'NA' (prog 0. 1.) 'NALD' (prog 0. 1.);
+
+*evolution VW-W
+evcw1=evol manu 'W' (prog 0. 1.) 'VW' (prog 0. 1.);
+
+*finite element size for Hillerborgh method
+tail1=tail direction mod1; 
+ray1=coor 1 surf1;
+ray2=0.25*(chan 'CHAM' ray1 mod1 'RIGIDITE'  'CARACTERISTIQUES');
+
+
+*elasticity, plasticity and damage
+matd1=MATE mod1 YOUN e0 NU 0.2 RHO 2400. ALPH 1.0e-5 NREN 0 DIM3 0.1
+ YORF e0 NURF 0.2 HYDR 1. HREF 1. HYDS 0.2 RT rt0 EPT 1.1e-4 GFT 1.e-4
+ RC rc180 EPC 2.e-3 DELT 1.  BETA 0.15 EKDC 2.0e-3 REF 5. GFR 1.0e-4 
+ TSTH 45. DT80 0.15 TREF 20. TALP 20.;
+  
+*water
+matgw1=MATE mod1 TTKW 40. VW evcw1 PORO 0.12 BSHR 0.25 MSHR 44. 
+ MVGN 0.49  SKDW 17. DCDW 1. CSHR 0.50 HSHR (3.0*e0) TTRW 20. 
+ KWRT 0.25 KWRC 0.1 ; 
+
+*visco elasticity and visco plasticity (creep)
+matf1=MATE mod1 TTRF 20. TAUK 2. YKSY 3.5 TAUM 2. EKFL 3.8e-4
+XFLU 2. NRJM 45000. DFMX 0. MDTT 15000. TDTT 1.0 WDTT 0.02 PDTT 1.0 ;
+
+*rag
+matgr1=MATE mod1  VRAG 1.0e-2  TRAG 120. NRJR 40000. TTRG 38. DCDG 0.15
+SRSR 0.5 VVRG 1.0e-3 KRAG 2000. CRAG 1. HRAG 1000. EKDG 3.0e-3;
+
+*def
+matgd1=MATE mod1  VDEF 6.0e-2  SSAD 0.6 NALD evcna1 TPRD 30. TTKD 80.
+NAKD 0.28 NRJP 40000. TTRP 20. SRSD 0.95  NABD 0.92   TDID (65./24.) 
+NRJD 70000. TTKF 70. TFID (30./24.) NRJF 180000.  EXND 0.18 EXMD 3. 
+VVDF 6.0e-3 KDEF 2000. CDEF 1. HDEF 1000. EKDS 3.0e-4 DCDS 0.015;
+                 
+*Weibull scale effect : note cf below to prepar Vmax field
+matw1=MATE mod1 VREF 2.1e-4 VMAX 2.2e-3 CVRT 0.08;
+
+*material chracteristics assemblage
+mat1=matd1 ET matf1  ET  matgw1 et matgr1 ET matgd1 ET matw1
+ ET tail1;
+
+*******************conditions aux limites en pression ******************
+cl1=bloq p1 UR UZ;
+cl2=bloq d12 UZ;
+cl3=bloq d41 UR;
+sig2=press mass mod1 d34 1.;
+*chargement vertical
+evsig2=evol manu 'temps'
+            (prog 0.  350. 351. 800.)
+            'coeff'
+            (prog 1.0e-2 1.0e-2  10. 10.) coul bleu;
+si (graph1) ;
+    dess evsig2 titr 'contrainte verticale';
+finsi ; 
+charsig2=char 'MECA' sig2 evsig2; 
+sig3=press mass mod1 d23 1.;
+*chargement radial
+evsig3=evol manu 'temps'
+            (prog 0.  350. 351. 800.)
+            'coeff'
+            (prog 1.0e-2 1.0e-2 1.0e-2 1.0e-2) coul bleu;
+si (graph1) ;
+    dess evsig3 titr 'contrainte radiale'; 
+finsi ;
+
+charsig3=char 'MECA' sig3 evsig3; 
+
+*******************histoire de temperature *****************************
+chth1=manu chpo  surf1 'T' 1.;
+evth1=evol manu 'temps' (prog 0. 1. 20. 21. 48. 49. 800.) 'coef' 
+                        (prog 20. 65. 65. 20. 20. 38. 38.);
+si(graph1) ;
+     dess evth1 titr 'temperature(C)-temps(j)';
+finsi ;
+chath1=char 'T' chth1 evth1;
+
+******************histoire de alcalins *********************************
+chna1=manu chpo  surf1 'NA' 1.;
+evna1=evol manu 'temps' (prog 0.  800.) 'coef' 
+                        (prog 0.92 0.0);
+si(graph1) ;
+  dess evna1 titr 'Na(mol/l)-temps(j)';
+finsi ;
+chana1=char 'NA' chna1 evna1;
+
+*****************histoire hydrique *************************************
+chw1=manu chpo  surf1 'W' 0.12;
+ltw1=prog 0. pas 10. 800.;
+sr0=0.85;
+sr1=1.0;
+tsech1=50.;
+coeft1=-1.*(tsech1**-1);
+lcw1=((sr0-sr1)*(exp((coeft1)*ltw1)))+(sr1*(exp(0.*ltw1)));
+evw1=evol manu 'temps' ltw1 'coef'  lcw1;
+si (graph1);
+  dess evw1 titr 'Evolution Sr(t)';
+finsi;
+chaw1=char 'W' chw1 evw1;
+ 
+************************************************************************
+tab1=table;
+ltc1=prog 0. pas 0.5 1. pas 1. 30. pas 2. 60. pas 5. 350. pas 0.1 352. 
+ pas 2. 450. pas 5.  500. ;  
+tab1.temps_calcules=ltc1;
+tab1.caracteristiques=mat1;
+tab1.modele=mod1;
+tab1.blocages_mecaniques=cl1 et cl2 et cl3;
+tab1.mova='VAFT';
+tab1.chargement=charsig2  et chana1 et chath1 et chaw1 et charsig3;
+tab1.precision=1.0e-5;
+tab1.processeurs=mot 'COMPORTEMENT';
+pasapas tab1;
+
+
+************************************************************************
+*exploitation des resultats
+************************************************************************
+
+*-----------------------------------------------------------------------
+
+*courbe de deplacement au centre de l eprouvette
+*et variables internes
+n1=dime (tab1.temps);
+i1=0;
+dp3=prog;
+lt1=prog;
+epr1=prog;
+epz1=prog;
+repeter bloc0 n1;
+ z1=extr tab1.deplacements.i1 UZ p1;
+ depi1=tab1.deplacements.i1;
+ epsi1=epsi depi1 mod1;
+ sig1=tab1.contraintes.i1;
+ epzz1=extr ( exco epsi1 'EPZZ') 'EPZZ' 1 1 1;
+ szz1=extr ( exco sig1 'SMZZ') 'SMZZ' 1 1 1;
+ eprr1=extr(exco epsi1 'EPRR') 'EPRR' 1 1 1;
+ srr1=extr ( exco sig1 'SMRR') 'SMRR' 1 1 1;
+ epr1=epr1 et (prog (eprr1));
+ epz1=epz1 et (prog (epzz1));
+ lt1=lt1 et (prog (tab1.temps.i1));
+ i1=i1+1;
+fin bloc0;
+
+*courbes deformations temps theorique
+evezth1=(evol manu 'TEMPS' lt1 'EPZZ' (1.e6*epz1)) coul roug;
+everth1=(evol manu 'TEMPS' lt1 'EPRR' (1.e6*epr1)) coul vert;
+si (graph1);
+    dess (evezth1 et everth1) titr 'deplacements axial et radial';
+finsi ;
+
+
+*-----------------------------------------------------------------------
+*test de conformite
+test1=VRAI;
+si (TEST1) ;
+    n1=184; fref1 = 2.8984E-03;
+    n2=184; fref2 = 6.6484E-03;
+    fcal1='EXTR' epz1 (n1);
+    fcal2='EXTR' epr1 (n2);
+    err1 = abs ((fref1 - fcal1)/fref1) ; 
+    err2 = abs ((fref2 - fcal2)/fref2) ;
+    si ((err1 < 1.0e-3) et (err2 < 1.0e-3)) ;
+        erre 0 ;
+    sinon ;
+        erre 5 ;
+    finsi ;
+finsi;
+
+
+si (graph1) ;
+
+*-----------------------------------------------------------------------
+* evolution de la chimie
+
+lt0=prog;
+
+tabn2=table;
+tabn2.1='AFT1';
+tabn2.2='AFM1';
+tabn2.3='AFT2';
+tabn2.4='VAFT';
+tabn2.5='ATIL';
+tabn2.6='STIL';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='AFT1';
+tabe6.TITRE.2='AFM1';
+tabe6.TITRE.3='AFT2';
+tabe6.TITRE.4='VAFT';
+tabe6.TITRE.5='ATIL';
+tabe6.TITRE.6='STIL';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+si (graph1);
+dess evol1 'LEGE' tabe6;
+finsi; 
+
+*-----------------------------------------------------------------------
+
+lrag1=prog;
+ldef1=prog;
+ltemp1=prog;
+repe bouc2 (dim0-1);
+ t3=tab1.variables_internes.(&bouc2);
+ aar1=extr t3 'AGEL' 1 1 1 ;
+ lrag1=lrag1 et (prog aar1);
+ ade1=extr t3 'ADEF' 1 1 1 ;
+ ldef1=ldef1 et (prog ade1);
+ ltemp1=ltemp1 et (prog (tab1.temps.(&bouc2)));
+fin bouc2;
+evar1=(evol manu 'temps' ltemp1 'aar' lrag1) coul bleu;
+evde1=(evol manu 'temps' ltemp1 'def' ldef1) coul roug;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='AAR';
+tabe6.TITRE.2='DEF';
+dess (evar1 et evde1) 'LEGE' tabe6;
+
+*-----------------------------------------------------------------------
+lrag1=prog;
+ldef1=prog;
+lwat1=prog;
+ltemp1=prog;
+repe bouc2 (dim0-1);
+ t3=tab1.variables_internes.(&bouc2);
+ aar1=extr t3 'PGEL' 1 1 1 ;
+ lrag1=lrag1 et (prog aar1);
+ ade1=extr t3 'PAFT' 1 1 1 ;
+ ldef1=ldef1 et (prog ade1);
+ awa1=extr t3 'PWAT' 1 1 1 ;
+ lwat1=lwat1 et (prog awa1);
+ ltemp1=ltemp1 et (prog (tab1.temps.(&bouc2)));
+fin bouc2;
+evar1=(evol manu 'temps' ltemp1 'PGEL' lrag1) coul rose;
+evde1=(evol manu 'temps' ltemp1 'PAFT' ldef1) coul roug;
+evwe1=(evol manu 'temps' ltemp1 'PWAT' lwat1) coul cyan;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='PGEL';
+tabe6.TITRE.2='PAFT';
+tabe6.TITRE.3='PWAT';
+dess (evar1 et evde1 et evwe1) 'LEGE' tabe6;
+
+
+*points experimentaux RAG libre
+ltpsex1=prog 7. 28.   56.  91. 182.  273. 365.;
+lepzex1=1.e4*(prog 0. 0.015 0.05 0.1 0.175 0.21 0.22);
+leprex1=1.e4*(prog 0. 0.05  0.1  0.175 0.24 0.25 0.27);
+ 
+*correction pt exp partie elastique
+defelz1=(0./37200.)*1.0e6;
+defelr1=(-0.2*defelz1);
+nls1=dime lepzex1;
+lsepex1=prog nls1 * defelz1 ;
+lseper1=prog nls1 * defelr1 ;
+lepzex1=lepzex1+lsepex1;
+leprex1=leprex1+lseper1; 
+evezex1=evol manu 'temps' ltpsex1 'epzz exp' lepzex1; 
+everex1=evol manu 'temps' ltpsex1 'eprr exp' leprex1;
+
+tab3=table;
+tab3.1 = 'MARQ CROI NOLI' ;
+tab3.3 = 'TIRR';
+tab3.4 = 'MARQ  LOSA NOLI';
+tab3.'TITRE' = 'TABLE' ;
+tab3.'TITRE'. 1 = MOT 'epzz exp' ;
+tab3.'TITRE'. 2 = MOT 'epzz th' ;
+tab3.'TITRE'. 3 = MOT 'eprr th' ;
+tab3.'TITRE'. 4 = MOT 'eprr exp';
+dess (evezex1 et evezth1 et everth1 et everex1) lege tab3; 
+
+OPTI 'SORT' 'Def_et_rag_axial_00_szz_ezz.xls';
+SORT 'EXCE' evezth1 evezex1 'SEPA' 'PVIR';
+OPTI 'SORT' 'Def_et_rag_axial_00_srr_err.xls';
+SORT 'EXCE' everth1 everex1 'SEPA' 'PVIR';
+
+*déformations sur l'éprouvette
+
+def0=defo tab1.deplacements.(n1-1) surf1 0.;
+def1=defo tab1.deplacements.(n1-1) surf1  roug;
+*epsi1=epsi def1 mod1;
+trac (def1 et def0);
+*------------------------------------------------------------------------
+*evol de quelques variables internes
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EVT1';
+tabn2.2='EVT2';
+tabn2.3='EVT3';
+tabn2.4='EVT4';
+tabn2.5='EVT5';
+tabn2.6='EVT6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EVT1';
+tabe6.TITRE.2='EVT2';
+tabe6.TITRE.3='EVT3';
+tabe6.TITRE.4='EVT4';
+tabe6.TITRE.5='EVT5';
+tabe6.TITRE.6='EVT6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+dess evol1 'LEGE' tabe6;
+
+*-----------------------------------------------------------------------
+
+*------------------------------------------------------------------------
+*evol de quelques variables internes
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPG1';
+tabn2.2='EPG2';
+tabn2.3='EPG3';
+tabn2.4='EPG4';
+tabn2.5='EPG5';
+tabn2.6='EPG6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPG1';
+tabe6.TITRE.2='EPG2';
+tabe6.TITRE.3='EPG3';
+tabe6.TITRE.4='EPG4';
+tabe6.TITRE.5='EPG5';
+tabe6.TITRE.6='EPG6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+dess evol1 'LEGE' tabe6;
+
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPS1';
+tabn2.2='EPS2';
+tabn2.3='EPS3';
+tabn2.4='EPS4';
+tabn2.5='EPS5';
+tabn2.6='EPS6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPS1';
+tabe6.TITRE.2='EPS2';
+tabe6.TITRE.3='EPS3';
+tabe6.TITRE.4='EPS4';
+tabe6.TITRE.5='EPS5';
+tabe6.TITRE.6='EPS6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+dess (evol1 ) 'LEGE' tabe6;
+
+*-----------------------------------------------------------------------
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPT1';
+tabn2.2='EPT2';
+tabn2.3='EPT3';
+tabn2.4='EPT4';
+tabn2.5='EPT5';
+tabn2.6='EPT6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPT1';
+tabe6.TITRE.2='EPT2';
+tabe6.TITRE.3='EPT3';
+tabe6.TITRE.4='EPT4';
+tabe6.TITRE.5='EPT5';
+tabe6.TITRE.6='EPT6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+dess evol1 'LEGE' tabe6;
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPC1';
+tabn2.2='EPC2';
+tabn2.3='EPC3';
+tabn2.4='EPC4';
+tabn2.5='EPC5';
+tabn2.6='EPC6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPC1';
+tabe6.TITRE.2='EPC2';
+tabe6.TITRE.3='EPC3';
+tabe6.TITRE.4='EPC4';
+tabe6.TITRE.5='EPC5';
+tabe6.TITRE.6='EPC6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+lrag1=prog;
+ldef1=prog;
+ltemp1=prog;
+repe bouc2 (dim0-1);
+ t3=tab1.variables_internes.(&bouc2);
+ aar1=extr t3 'AGEL' 1 1 1 ;
+ lrag1=lrag1 et (prog aar1);
+ ade1=extr t3 'ADEF' 1 1 1 ;
+ ldef1=ldef1 et (prog ade1);
+ ltemp1=ltemp1 et (prog (tab1.temps.(&bouc2)));
+fin bouc2;
+evar1=(evol manu 'temps' ltemp1 'aar' lrag1) coul bleu;
+evde1=(evol manu 'temps' ltemp1 'def' ldef1) coul roug;
+dess (evar1 et evde1);
+
+dess evol1 'LEGE' tabe6;
+*-----------------------------------------------------------------------
+*-----------------------------------------------------------------------
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPE1';
+tabn2.2='EPE2';
+tabn2.3='EPE3';
+tabn2.4='EPE4';
+tabn2.5='EPE5';
+tabn2.6='EPE6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPE1';
+tabe6.TITRE.2='EPE2';
+tabe6.TITRE.3='EPE3';
+tabe6.TITRE.4='EPE4';
+tabe6.TITRE.5='EPE5';
+tabe6.TITRE.6='EPE6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+dess (evol1 ) 'LEGE' tabe6;
+
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPK1';
+tabn2.2='EPK2';
+tabn2.3='EPK3';
+tabn2.4='EPK4';
+tabn2.5='EPK5';
+tabn2.6='EPK6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPK1';
+tabe6.TITRE.2='EPK2';
+tabe6.TITRE.3='EPK3';
+tabe6.TITRE.4='EPK4';
+tabe6.TITRE.5='EPK5';
+tabe6.TITRE.6='EPK6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+dess (evol1 ) 'LEGE' tabe6;
+
+*-----------------------------------------------------------------------
+lt0=prog;
+
+tabn2=table;
+tabn2.1='EPM1';
+tabn2.2='EPM2';
+tabn2.3='EPM3';
+tabn2.4='EPM4';
+tabn2.5='EPM5';
+tabn2.6='EPM6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='EPM1';
+tabe6.TITRE.2='EPM2';
+tabe6.TITRE.3='EPM3';
+tabe6.TITRE.4='EPM4';
+tabe6.TITRE.5='EPM5';
+tabe6.TITRE.6='EPM6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ ROND';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime(tabn2));
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+dess (evol1 ) 'LEGE' tabe6;
+
+dim0=dime tab1.temps;
+trac (exco dtra tab1.variables_internes.(dim0-1)) mod1;
+
+dim0=dime tab1.temps;
+trac (exco dcom tab1.variables_internes.(dim0-1)) mod1;
+
+
+*trac d'une variable interne
+nom0='WPL0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTRA';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTPP';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTM0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTW0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTG0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTS0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='WPL0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DCOM';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DCM0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DCW0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DCG0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DCS0';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DFLU';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='DTHE';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='BAFT';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='PAFT';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='BGEL';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*trac d'une variable interne
+nom0='PGEL';
+dim0=dime tab1.temps;
+list1=prog;
+list2=prog;
+repe bouc4 dim0;
+ vi0=tab1.variables_internes.(&bouc4-1);
+ xi0=exco nom0 vi0;
+ yi0=extr xi0 nom0 1 1 1;
+ t0=tab1.temps.(&bouc4-1);
+ list1=list1 et (prog t0);
+ list2=list2 et (prog yi0);
+fin bouc4;
+evolpt3=evol manu 'temps' list1 nom0 list2;
+dess (evolpt3 );
+
+*-----------------------------------------------------------------------
+*evol de quelques variables internes
+lt0=prog;
+tabn2=table;
+
+tabn2.1='WPL1';
+tabn2.2='WPL2';
+tabn2.3='WPL3';
+tabn2.4='WPL4';
+tabn2.5='WPL5';
+tabn2.6='WPL6';
+
+tabl2=table;
+tabl2.1=prog;
+tabl2.2=prog;
+tabl2.3=prog;
+tabl2.4=prog;
+tabl2.5=prog;
+tabl2.6=prog;
+
+tabe5=table;
+tabe5.1=bleu;
+tabe5.2=roug;
+tabe5.3=rose;
+tabe5.4=ROUG;
+tabe5.5=CYAN;
+tabe5.6=VERT;
+
+tabe6=table;
+tabe6.TITRE=table;
+tabe6.TITRE.1='WPL1';
+tabe6.TITRE.2='WPL2';
+tabe6.TITRE.3='WPL3';
+tabe6.TITRE.4='WPL4';
+tabe6.TITRE.5='WPL5';
+tabe6.TITRE.6='WPL6';
+tabe6.1= 'MARQ CROI';
+tabe6.2= 'MARQ PLUS';
+tabe6.3= 'MARQ CARR';
+tabe6.4= 'MARQ CROI';
+tabe6.5= 'MARQ PLUS';
+tabe6.6= 'MARQ CARR';
+
+dim0=dime tab1.temps;
+
+repe bouc1 (dim0-1);
+ vari1=tab1.variables_internes.(&bouc1);
+ repe bouc2 (dime(tabn2));
+  t3=exco (tabn2.(&bouc2)) vari1;
+  t2=extr t3 (tabn2.(&bouc2))  1 1 1;
+  tabl2.(&bouc2)=tabl2.(&bouc2) et (prog t2);
+ fin bouc2;
+ t0=tab1.temps.(&bouc1);
+ lt0=lt0 et (prog t0);
+fin bouc1;
+
+tabe3=table;
+tabe5.'TITRE'=table;
+x1=(log(10))**-1;
+lnt0=x1*(log(lt0));
+
+repe bouc3 (dime tabn2);
+ tabe5.'TITRE'.(&bouc3)=tabn2.(&bouc3); 
+ si((&bouc3) ega 1);
+  evol1=evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+  evol2=evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3);
+ sinon;
+  evol1=evol1 et(evol manu 'temps' lt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+  evol2=evol2 et (evol manu 'temps' lnt0 
+  tabn2.(&bouc3) tabl2.(&bouc3) coul tabe5.&bouc3);
+ finsi;
+fin bouc3;
+
+dess evol1 'LEGE' tabe6;
+finsi;
+fin;
+
+
+
+
+
+
+ 
+
+ 
+

@@ -1,0 +1,107 @@
+$$$$ TOPOACTI
+* TOPOACTI  PROCEDUR  FD218221  23/11/29    21:15:05     11799          
+* TOPOACTI  PROCEDUR  CB215821  21/04/15    14:10:01     9715
+
+************************************************************************
+** Procedure called by TOPOPTIM for generating the mesh, model,
+** material and contact of the active zone.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 1.0 2021/04/15
+************************************************************************
+
+DEBP TOPOACTI tab0*'TABLE' ;
+
+* Input data
+* **********
+
+wtab0 = tab0.'WTABLE' ;
+bool0 = wtab0.'BOOL' ;
+
+* Cleaning previous step
+* **********************
+
+OTER (wtab0.'MAILLAGE') 'A' ;
+SI bool0.'MECANIQUE' ;
+    OTER (wtab0.'MECANIQUE'.'MODELE') 'A' ;
+    OTER (wtab0.'MECANIQUE'.'CARACTERISTIQUES') 'A' ;
+FINS ;
+SI bool0.'THERMIQUE' ;
+    OTER (wtab0.'THERMIQUE'.'MODELE') 'A' ;
+    OTER (wtab0.'THERMIQUE'.'CARACTERISTIQUES') 'A' ;
+FINS ;
+SI bool0.'CONTACT' ;
+    OTER (wtab0.'CONTACT'.'MODELE') 'A' ;
+    OTER (wtab0.'CONTACT'.'CARACTERISTIQUES') 'A' ;
+FINS ;
+OTER (wtab0.'RESOLUTION') 'A' ;
+MENA ;
+
+* Active mesh
+* ***********
+
+SI bool0.'ZONE_FIGEE' ;
+    mshA = (wtab0.'MAXDENSITE' + wtab0.'UN'.(2)) ELEM 'SUPE' tab0.'SEUIL' ;
+SINO ;
+    mshA = wtab0.'MAXDENSITE' ELEM 'SUPE' tab0.'SEUIL' ;
+FINS ;
+wtab0.'MAILLAGE'.'A' = mshA ;
+
+* Active model
+* ************
+
+SI bool0.'MECANIQUE' ;
+    wtab0.'MECANIQUE'.'MODELE'.'A' = REDU wtab0.'MECANIQUE'.'MODELE'.(0) mshA ;
+FINS ;
+SI bool0.'THERMIQUE' ;
+    wtab0.'THERMIQUE'.'MODELE'.'A' = REDU wtab0.'THERMIQUE'.'MODELE'.(0) mshA ;
+FINS ;
+
+* Active material
+* ***************
+
+SI bool0.'MECANIQUE' ;
+    matMA = TOPOMATE wtab0.'MECANIQUE'.'MODELE'.(1)
+                     wtab0.'MECANIQUE'.'CARACTERISTIQUES'.(1)
+                     wtab0.'MECANIQUE'.'DENSITE' ;
+    SI bool0.'ZONE_FIGEE' ;
+        matMA = matMA ET wtab0.'MECANIQUE'.'CARACTERISTIQUES'.(2) ;
+    FINS ;
+    matMA = REDU matMA mshA ;
+    wtab0.'MECANIQUE'.'CARACTERISTIQUES'.'A' = matMA ;
+FINS ;
+SI bool0.'THERMIQUE' ;
+    matTA = TOPOMATE wtab0.'THERMIQUE'.'MODELE'.(1)
+                     wtab0.'THERMIQUE'.'CARACTERISTIQUES'.(1)
+                     wtab0.'THERMIQUE'.'DENSITE' ;
+    SI bool0.'ZONE_FIGEE' ;
+        matTA = matTA ET wtab0.'THERMIQUE'.'CARACTERISTIQUES'.(2) ; 
+    FINS ;
+    matTA = REDU matTA mshA ;
+    wtab0.'THERMIQUE'.'CARACTERISTIQUES'.'A' = matTA ;
+FINS ;
+
+* Active contact
+* **************
+
+SI bool0.'CONTACT' ;
+    tmp0 = DIFF wtab0.'MAILLAGE'.(0) mshA ;
+    SI ((NBEL tmp0) > 0) ;
+        tmp0 = (MANU 'CHPO' tmp0 1 'SCAL'1.0) POIN 'SUPE' 0.0 ;
+        tmp0 = wtab0.'CONTACT'.'MAILLAGE'.(0) ELEM 'APPU' 'LARG' tmp0 ;
+        mshCA = DIFF wtab0.'CONTACT'.'MAILLAGE'.(0) tmp0 ;
+    SINO ;
+        mshCA = wtab0.'CONTACT'.'MAILLAGE'.(0) ;
+    FINS ;
+    wtab0.'CONTACT'.'MAILLAGE'.'A' = mshCA ;
+    wtab0.'CONTACT'.'MODELE'.'A' = REDU wtab0.'CONTACT'.'MODELE'.(0) mshCA ;
+    wtab0.'CONTACT'.'CARACTERISTIQUES'.'A' = REDU wtab0.'CONTACT'.'CARACTERISTIQUES'.(0) mshCA ;
+FINS ;
+
+FINP ;
+
+$$$$
+ 

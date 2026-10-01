@@ -1,0 +1,37 @@
+$$$$ NOUV     NOTICE  PV090527  23/04/05    21:15:03     11650          
+                                             DATE     23/04/05
+Section : Presentation
+FRAN====================================================================
+Documentation Generale sur Cast3M :
+  http://www-cast3m.cea.fr/index.php?xml=maj2011
+
+Modification de la gestion des procedures et des notices.
+
+Elles sont maintenant directement lues dans des fichiers eponymes appartenant
+aux repertoires specifies par les variables d'environnement CASTEM_PROCEDUR24
+et CASTEM_NOTICE24.
+
+Par defaut et dans l'ordre, ce sont:
+Le repertoire courant
+Le repertoire ./procedur
+Le repertoire d'installation
+
+ANGL====================================================================
+Cast3M General Documentation:
+  http://www-cast3m.cea.fr/index.php?xml=maj2011
+
+Update on procedur and notice management.
+
+Procedur and notice are now directly acquired from eponym files located in 
+directories specified by the environment variables CASTEM_PROCEDUR24 and CASTEM_NOTICE24.
+
+By default they are:
+The current directory
+The directory ./procedur
+The installation directory
+
+========================================================================
+
+***********************************************************************
+ 
+ 

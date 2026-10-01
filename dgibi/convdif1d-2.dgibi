@@ -1,0 +1,237 @@
+* fichier : convdif1d-2.dgibi
+************************************************************************
+* Section : Fluides Permanent
+* Section : Fluides Diffusion
+* Section : Fluides Convection
+************************************************************************
+* NOM         : CONVDIF1D-2
+* DESCRIPTION : 1D convection-diffusion equation
+*
+*               Similar to convdif1d.dgibi but more complex:
+*               + interactive GUI (interact = vrai)
+*               + slide generation for the lecture notes (transp = vrai)
+*
+*               See:
+*               ENSTA Lecture Notes 2021
+*               Introduction to the finite element method applied to 
+*               incompressible fluid mechanics (in english)
+*               Introduction a la methode des elements finis en
+*               mecanique des fluides incompressibles (en francais)
+*               Stephane GOUNAND and Sergey KUDRIAKOV
+*               http://www-cast3m.cea.fr/index.php?xml=supportcours
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 25/09/2007, version initiale
+* HISTORIQUE : v1, 25/09/2007, création
+************************************************************************
+*
+* Solution exacte : (1 - exp (2 Pe x)) / (1 - exp (2 Pe))
+* Exact solution
+* 
+'DEBPROC' solex ;
+'ARGUMENT' pe*'FLOTTANT' ;
+pe2 = '*' pe 2 ;
+lx = 'PROG' 0. 'PAS' 1.D-3 1. ;
+l1 = 'PROG' ('DIME' lx) * 1. ;
+num = '-' l1 ('EXP' ('*' lx pe2)) ;
+den = '-' 1. ('EXP' pe2) ;
+ly  = '/' num den ;
+evex = 'EVOL' 'MANU' lx ly ;
+'RESPRO' evex ;
+'FINPROC' ;
+*
+'OPTION' 'DIME' 2 'ELEM' 'QUA8' ;
+interact = faux ;
+nb = VRAI ;
+transp = vrai ;
+*
+Peclet  = 10. ;
+*
+'DEBPROC' CALCUL ;
+'ARGUMENT' imail*'ENTIER' ;
+'ARGUMENT' tmail*'ENTIER' ;
+'ARGUMENT' idecent*'ENTIER' ;
+'ARGUMENT' icmd*'ENTIER' ;
+'ARGUMENT' lnclk/'LOGIQUE' ;
+*
+'SI' ('NON' ('EXISTE' lnclk)) ;
+   lnclk = FAUX ;
+'FINSI' ;
+*
+* Nombre de mailles (mesh number)
+lnmail = 'LECT' 4 6 10 20 40 ;
+nmail = 'EXTRAIRE' lnmail imail ;
+* Densités (densities)
+ltmail = 'PROG' 1. 3. 10. ;
+dmail = 'EXTRAIRE' ltmail tmail ;
+dmoy = '/' 1. ('FLOTTANT' nmail) ;
+dini = '*' dmoy dmail ;
+dfin = '/' dmoy dmail ;
+* Décentrement (upwinding)
+'SI' ('EGA' idecent 1) ;
+   typdec = 'CENTREE' ;
+   niter  = 1 ;
+'FINSI' ;   
+'SI' ('EGA' idecent 2) ;
+   typdec = 'SUPG' ;
+   niter  = 1 ;
+'FINSI' ;
+* Coefficient multiplicatif du décentrement
+* Multiplier for the upwinding term
+lcmd = 'PROG' 0.2 0.5 1. ;
+cmd = 'EXTRAIRE' lcmd icmd ; 
+*
+* Maillage (Mesh)
+*
+p0 = 0. 0. ; p1 = 1. 0. ;
+*'SI' ('>' tmail 1) ;
+   lt = 'DROIT' ('*' nmail -1) p0 p1 'DINI' dini 'DFIN' dfin ;
+*'SINON' ;   
+*   lt = 'DROIT' nmail p0 p1 ;
+*'FINSI' ;    
+bas = lt ;
+mt  = 'TRANSLATION' lt 1 (0. 1.) ;
+gau = 'COTE' 4 mt ;
+dro = 'COTE' 2 mt ;
+_bas = 'CHANGER' bas 'QUAF' ;
+_gau = 'CHANGER' gau 'QUAF' ;
+_dro = 'CHANGER' dro 'QUAF' ;
+_mt  = 'CHANGER' mt 'QUAF' ;
+'ELIMINATION' (_mt 'ET' _bas 'ET' _gau 'ET' _dro) 1.D-6 ;
+$mt = 'MODE' _mt 'NAVIER_STOKES' 'LINE' ;
+$bas = 'MODE' _bas 'NAVIER_STOKES' 'LINE' ;
+$gau = 'MODE' _gau 'NAVIER_STOKES' 'LINE' ;
+$dro = 'MODE' _dro 'NAVIER_STOKES' 'LINE' ;
+mt = 'DOMA' $mt 'MAILLAGE' ;
+bas = 'DOMA' $bas 'MAILLAGE' ;
+gau = 'DOMA' $gau 'MAILLAGE' ;
+dro = 'DOMA' $dro 'MAILLAGE' ;
+*
+* table EQEX (Problem description)
+*
+rv = 'EQEX' 'NITER' niter 
+     'OPTI' 'EF' 'IMPL' typdec 'CMD' cmd 
+     'ZONE' $mt 'OPER' 'KONV' 1. 'UN' 'ALF' 'INCO' 'TN'
+     'OPTI' 'EF' 'IMPL' 'CENTREE'
+     'ZONE' $mt 'OPER' 'LAPN' 'ALF' 'INCO' 'TN'
+     'CLIM' gau 'TN' 'TIMP' 0.
+     'CLIM' dro 'TN' 'TIMP' 1.
+      ;
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' (1. 0.) ;
+rv . 'INCO' . 'ALF' = 'KCHT' $mt 'SCAL' 'CENTRE' ('/' 0.5 Peclet) ;
+rv . 'INCO' . 'TN'  = 'KCHT' $mt 'SCAL' 'SOMMET' 0. ;
+*
+EXEC rv ;
+*
+* Post treatment
+*
+tn = rv . 'INCO' . 'TN' ;
+evt = 'EVOL' 'CHPO' tn 'SCAL' bas ;
+evx = SOLEX Peclet ;
+evm = 'EVOL' 'CHPO' ('MANUEL' 'CHPO' bas 1 'SCAL' -0.3) 'SCAL' bas ;
+'SI' nb ;
+   evtot = evt 'ET' evx ;
+'SINON' ;   
+   evtot = ('COULEUR' evt 'JAUN') 'ET' ('COULEUR' evx 'TURQ') ;
+'FINSI' ;
+'SI' ('>' tmail 1) ;
+   evtot = evtot 'ET' evm ;
+'FINSI' ;
+*
+tabt = 'TABLE' ; tabt . 'TITRE' = 'TABLE' ;
+tabt . 1 = 'CHAINE' 'TIRC MARQ CROI' ;
+*tabt . 1 = 'CHAINE' 'TIRC NOLI' ;
+tabt . 3 = 'CHAINE' 'MARQ PLUS' ;
+tabt . 'TITRE' . 1 = 'CHAINE' 'Sol. App.' ;
+tabt . 'TITRE' . 2 = 'CHAINE' 'Sol. Exa.' ;
+tabt . 'TITRE' . 3 = 'CHAINE' 'Pts  mail.' ;
+'SI' transp ;
+   'DESSIN' evtot 'TITX' 'X' 'TITY' 'T'
+             'LEGE' tabt ;
+'SINON' ;
+   'SI' lnclk ;
+   'DESSIN' evtot 'TITX' 'X' 'TITY' 'T'
+             'TITR' ('CHAINE' 'Peclet=' Peclet)
+             'LEGE' tabt 'NCLK' ;
+   'SINON' ;
+   'DESSIN' evtot 'TITX' 'X' 'TITY' 'T'
+             'TITR' ('CHAINE' 'Peclet=' Peclet)
+             'LEGE' tabt ;
+   'FINSI' ;
+'FINSI' ;   
+'FINPROC' ;
+*
+'SI' interact ;
+*
+* Table contenant les choix des menus
+* Menu entries
+*
+tanx = 'TABLE' ;
+tanx . 1 = 'nx=4' ; tanx . 2 = 'nx=6' ; tanx . 3 = 'nx=10' ;
+tanx . 4 = 'nx=20' ; tanx . 5 = 'nx=40' ;
+ntanx = 'DIME' tanx ; itanx = 1 ;
+tatm = 'TABLE' ;
+tatm . 1 = 'Regulier' ; tatm . 2 = 'Densx3' ; tatm . 3 = 'Densx10' ;
+ntatm = 'DIME' tatm ; itatm = 1 ;
+tadc = 'TABLE' ;
+tadc . 1 = 'CENTREE' ; tadc . 2 = 'SUPG' ;
+* tadc . 3 = 'SUPGDC' ;
+ntadc = 'DIME' tadc ; itadc = 1 ;
+*
+tacmd = 'TABLE' ;
+tacmd . 1 = 'CMD0.2' ; tacmd . 2 = 'CMD0.5' ; tacmd . 3 = 'CMD1.0' ;
+ntacmd = 'DIME' tacmd ; itacmd = 2 ;
+*
+* Boucle d'affichage
+* Print loop
+*
+'REPETER' bouc ;
+   CALCUL itanx itatm itadc itacmd VRAI ;
+   cha = 'CHAINE' 'Peclet=' Peclet ;
+   ret = 'MENU' cha (tanx . itanx) (tatm . itatm) (tadc . itadc)
+                    (tacmd . itacmd) ;
+   'SI' ('EGA' ret 'Quitter') ;
+      'QUITTER' bouc ;
+   'FINSI';
+   'SI' ('EGA' ret (tanx . itanx)) ; itanx = '+' itanx 1 ; 'FINSI' ;
+   'SI' (itanx > ntanx) ; itanx = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tatm . itatm)) ; itatm = '+' itatm 1 ; 'FINSI' ;
+   'SI' (itatm > ntatm) ; itatm = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tadc . itadc)) ; itadc = '+' itadc 1 ; 'FINSI' ;
+   'SI' (itadc > ntadc) ; itadc = 1 ; 'FINSI';
+   'SI' ('EGA' ret (tacmd . itacmd)) ; itacmd = '+' itacmd 1 ; 'FINSI' ;
+   'SI' (itacmd > ntacmd) ; itacmd = 1 ; 'FINSI';
+'FIN' bouc ;
+'FINSI' ;
+*
+* Mes transparents
+* Lecture notes slides 
+*
+'SI' transp ;
+'OPTI' 'TRAC' 'PS' ;
+   CALCUL 2 1 1 2 ;
+*   
+   CALCUL 3 1 1 2 ;
+   CALCUL 5 1 1 2 ;
+*
+   CALCUL 2 2 1 2 ;
+   CALCUL 2 3 1 2 ;
+*
+   CALCUL 2 1 2 2 ;
+   CALCUL 3 1 2 2 ;
+'FINSI' ;   
+*   
+'SI' interact ;
+   'OPTION' 'DONN' 5 ;
+'FINSI' ;    
+*
+* End of dgibi file CONVDIF1D-2
+*
+'FIN' ;
+
+ 
+

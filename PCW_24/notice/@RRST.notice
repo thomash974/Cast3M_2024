@@ -1,0 +1,64 @@
+$$$$ @RRST    NOTICE  CB215821  19/11/18    21:15:01     10383          
+                                             DATE     19/11/18
+Section : Mathematiques Autres
+
+*----------------------------------------------------------------------
+*      CETTE METHODE A ETE MISE GRACIEUSEMENT
+*      A DISPOSITION DE  LA COMMUNAUTE CAST3M
+*      PAR TAMASKOVICS N.
+*     (Freiberg Institut für Geotechnik )
+*----------------------------------------------------------------------
+
+    Methode @RRST                           Voir aussi:@RSTH       @RRSV
+    -------------                                      @RRSR @RSCS @RSCV
+
+    LRE2 = RS%'RST'  TAB1;
+
+FRAN==============================================================
+
+    Objet :
+    _______
+
+    La methode @RRST forme partie du objet @RSTH et est appelee avec
+    l'abbreviation %'RST'.
+
+
+    Commentaire :
+    _____________
+
+    La methode @RRST initialise un objet @RSTH avec les donnees
+    dans la TABLE TAB1.
+
+
+    Exemples :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+ANGL==============================================================
+
+    Description :
+    _____________
+
+    The method @RRST belongs to the object @RSTH and is called with
+    the abbreviation %'RST'.
+
+
+    Contents :
+    __________
+
+    The method @RRST initialize the object @RSTH with the contents
+    of the TABLE TAB1.
+
+
+    Example :
+    _________
+
+    Random_Set_Theory_01.dgibi
+    Random_Set_Theory_03.dgibi
+    Random_Set_Theory_03.dgibi
+
+$$$$
+ 

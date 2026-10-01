@@ -1,0 +1,161 @@
+* fichier : supore.dgibi
+************************************************************************
+* Section : Mecanique Contact
+************************************************************************
+*---------------------------------------------------------------------*
+*    Ce cas-test permet de verifier la  gestion du contact            *
+* La valeur de la densite a mis en evidence des problemes dans le     *
+* superelement le 13/10/22                                            *
+*---------------------------------------------------------------------*
+TITR 'SUPPORT EPICEA' ;                                                         
+OPTI DIME 3 ELEM tri3 OMBR FAUX  ;   DENS 19.13;
+*PTI TRAC bens   ;
+*OPTI TRAC open   ;
+*optio norm annu;
+P1=0 0 0 ;     P2=700 0 0 ;   P3=700 200 0 ;  P4=700 750 0;                     
+P5=0 750 0 ;   P6=0 200 0 ;   P7=212 200 0 ;  P8=0 0 500;                       
+P9=212 0 500;  P10=212 200 500; P11=212 300 500; P12=0 300 500;                 
+P13=0 200 500;                                                                  
+                                                                                
+OEIL = 1E5 5E4 5E4 ;                                                            
+                                                                                
+                                                                                
+LI1= P1 D P2 D P3 D P7 D P6 D;                                                  
+LI2= P3 D P4 D P7 D;                                                            
+LI3= P7 D P4 D P5 D P6 D;                                                       
+LI4= P8 D P9 D P10 D P13 D;                                                     
+LI5= P13 D P10 D P11 D P12 D;                                                   
+LI6= P6 D P7 D P10 D P13 D;                                                     
+LI7= P7 D P3 D P10 D ;                                                          
+LI8= P7 D P4 D P10 D ;                                                          
+LI9= P1 D P6 D P13 D P8 D ;                                                     
+L10= P6 D P5 D P12 D P13 D;                                                     
+                                                                                
+SU1= SURF PLAN LI1 ;                                                            
+SU2= SURF PLAN LI2 ;                                                            
+SU3= SURF PLAN LI3 ;                                                            
+SU4= SURF PLAN LI4 ;                                                            
+SU5= SURF PLAN LI5 ;                                                            
+SU6= SURF PLAN LI6 ;                                                            
+SU7= SURF PLAN LI7 ;                                                            
+SU8= SURF PLAN LI8 ;                                                            
+* OPTIO IMPI 0;                                                                 
+SU9= SURF PLAN LI9 ;                                                            
+*LIST SU9;                                                                       
+*TRAC OEIL SU9;
+S10= SURF PLAN L10 ;                                                            
+*TRAC OEIL S10;
+                                                                                
+GPLAQ = SU1 ET SU2 ET SU3   COUL ROSE ;                                         
+PPLAQ = SU4 ET SU5          COUL ROUG ;                                         
+**LIST PPLAQ;                                                                     
+PLAQ  = GPLAQ ET PPLAQ ;                                                        
+                                                                                
+NER15 = SU6 ET SU7          COUL VERT ;                                         
+NER16=  SU8                 COUL BLEU ;                                         
+NERV7 = SU9 ET S10          COUL TURQ ;                                         
+NER17 = NER15 ET NER16 ;                                                        
+                                                                                
+                                                                                
+SUPOR = GPLAQ ET PPLAQ ET NER17 ET NERV7 ;                                      
+                                                                                
+                                                                                
+LIXX = P2 D P1 D P8 D P9 ;                                                      
+*TRAC OEIL SU9;
+ELIM (SUPOR ET LIXX) ;                                                          
+*TRAC OEIL SU9;
+tass supor;
+*TRAC cach  SUPOR OEIL;
+                                                                                
+*modi           SUPOR OEIL ; OPTIO DONN 5;
+*optio donn 5;
+* TRAC face      SUPOR OEIL ;
+* MODI SUPOR OEIL ;   optio donn 5;
+* CALCUL                                                                        
+                                                                                
+SYXX = SYMT DEPL ROTA P1 P2 P8 LIXX ;                                           
+SYYY = SYMT DEPL ROTA P1 P5 P8 NERV7;                                           
+ APLAQ= BLOQ MAXI UZ PPLAQ  ;
+* APLAQ= BLOQ UZ   PPLAQ ;
+COLIM= SYXX ET SYYY ET APLAQ ;                                                  
+*LIST (SYXX EXTRAI MAIL);                                                        
+*LIST (SYYY EXTRAI MAIL);                                                        
+*LIST (APLAQ EXTRAI MAIL);                                                       
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+MO1 = MODEL GPLAQ MECANIQUE DKT ;                                           
+MO2 = MODEL PPLAQ MECANIQUE DKT ;                                           
+MO3 = MODEL NER17 MECANIQUE DKT ;                                           
+MO4 = MODEL NERV7 MECANIQUE DKT ;                                           
+MOT= mo1 ET mo2 ET mo3 ET mo4 ;                                                
+                                                                                
+MATT =  mot MATERIAU YOUN 2E4 NU 0.3 ;                            
+                                                                                
+T1 =  mo1 CARACTERI EPAI 20 ;                                      
+T2 =  mo2 CARACTERI EPAI 20 ;                                      
+T3 =  mo3 CARACTERI EPAI 15 ;                                      
+T4 =  mo4 CARACTERI EPAI 7.5;                                      
+GEOT = T1 ET T2 ET T3 ET T4 ;                                                   
+                                                                                
+V = 0 0 1 ;                                                                     
+EFOR = PRES COQU mo1 0.0619 V ;TEMPS;                                           
+                                                                                
+RIG1 = RIGI mot (MATT et GEOT) ;TEMPS;                                                   
+RIGT = RIG1 ET COLIM ;OPTIO IMPI 0; temps;
+                                                                                
+*optio reso iter; optio impi 1;
+CHDE = RESO RIGT EFOR ;TEMPS;OPTIO IMPI 0;                                      
+temps place;
+*optio donn 5;
+
+*LIST CHDE;                                                                      
+
+* test sur le residu;
+RESUL = CHDE * RIGT - EFOR RESU;
+**LIST (CHDE * RIGT - EFOR RESU);
+crit = maxi abs (resul enle 'FLX');
+list crit;
+si (crit > 1D-5); erreur 5; finsi;
+fin;
+optio donn 5;
+*ptio sauv 'test.sauv';
+*auv;
+*in;
+RES1= DEFO SUPOR CHDE 0   VERT ;                                                
+RES2 = DEFO SUPOR CHDE 50  ROSE ;                                               
+REST = RES1 ET RES2 ;                                                           
+*TRAC OEIL REST ;
+                                                                                
+STRES = SIGM CHDE mot (matt et geot);                                                   
+                       
+VONMI = VMIS STRES mot (matt et geot);                                      
+                                                                                
+TRAC VONMI  mot RES2 OEIL ;
+                                                                                
+RE=REAC RIGT CHDE;                                                              
+LIST (RE RESULR);                                                               
+*OPTIO DONN 5;
+                                                                                
+                                                                                
+VE1=VECTEUR RE 0.02 FX FY FZ ROUGE;                                             
+VE2=VECTEUR EFOR 0.25 FX FY FZ ROUGE;                                           
+VV=VE1 ET VE2;                                                                  
+*CINE=ANIME SUPOR 20 CHDE 150. EFOR 0.25 ROUGE;                                 
+CINE=ANIME SUPOR 20 CHDE 150. ;                                                 
+TRAC OEIL CINE CACH OSCI;
+*TRAC OEIL CINE FACE OSCI;                                                      
+CIN1=ANIME (SUPOR CONTOUR) CHDE 150. 20;                                        
+*TRAC OEIL CIN1 OSCI;                                                           
+                                                                                
+OPTIO DONN 5;                                                                   
+RES3=DEFO SUPOR CHDE VV 50  ROSE ;                                              
+                                                                                
+TRAC VONMI mot RES3 OEIL(CONTOUR SUPOR);                                            
+OPTIO DONN 5;                                                                   
+TRAC OEIL (RES1 ET RES3) CACH;                                                  
+ 
+

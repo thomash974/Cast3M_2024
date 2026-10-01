@@ -1,0 +1,83 @@
+$$$$ BESS     NOTICE  CB215821  23/10/19    09:51:02     11762          
+                                             DATE     23/10/19
+
+      RESU1 = 'BESS' | 'J0'      | OBJET1 (MOT1) ;
+                     | 'J1'      |
+                     | 'JN' | N1 |
+                     | 'Y0'      |
+                     | 'Y1'      |
+                     | 'YN' | N1 |
+
+Section : Mathematiques Fonctions
+
+FRAN====================================================================
+
+    Operateur BESS                           Voir aussi : GAMM
+    --------------
+
+    Objet :
+    _______
+
+    L'operateur BESS applique l'une des fonctions de Bessel a l'objet OBJET1.
+
+    N1 : Objet de type 'ENTIER' correspondant a l'ordre de la fonction
+         de Bessel pour les cas 'JN' ou 'YN'.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+
+
+    Remarque :
+    __________
+
+    Dans le cas d'un objet EVOLUTIO, MOT1 permet d'indiquer si l'operation
+    porte sur les abscisses (mot-cle 'ABSC') ou sur les ordonnees (mot-cle
+    'ORDO', par defaut).
+
+
+ANGL====================================================================
+
+    Operator BESS                            See also : GAMM
+    -------------
+
+    Description :
+    ____________
+
+    The BESS operator operator applies one of the Bessel function to the values
+    of the OBJET1 object.
+
+    N1 : 'ENTIER' type objet corresponding to the order of the
+          Bessel function for the cases 'JN' or 'YN'.
+
+              -------------------------------------
+              |    OBJET1       |      RESU1      |
+              -------------------------------------
+              |    ENTIER       |    FLOTTANT     |
+              |    FLOTTANT     |    FLOTTANT     |
+              |    LISTENTI     |    LISTREEL     |
+              |    LISTREEL     |    LISTREEL     |
+              |    EVOLUTIO     |    EVOLUTIO     |
+              |    CHPOINT      |    CHPOINT      |
+              |    MCHAML       |    MCHAML       |
+              -------------------------------------
+
+
+    Remark :
+    _______
+
+    In the case of an EVOLUTIO object, MOT1 indicates if the operation
+    is achieved on the abscissa ('ABSC' key-word) or on the ordinates
+    ('ORDO' key-word, by default).
+
+$$$$
+
+ 

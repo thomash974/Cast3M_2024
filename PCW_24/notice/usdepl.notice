@@ -1,0 +1,52 @@
+$$$$ USDEPL   NOTICE  MB234859  24/02/06    21:15:03     11833          
+                                             DATE     24/02/06
+
+ Procedure USDEPL                        Voir aussi : USACCE USADAC 
+ ----------------                       USCALC USEXPL USIMPL USINIB
+                                        USPOST USTMPS USURE
+ 
+                USDEPL TAB1 ENT1 ; 
+
+Section : Mecanique Usure
+
+FRAN====================================================================
+
+  Objet :
+  -------
+
+    Procedure qui actualise les coordonnees du maillage a partir du champ
+    contenu a l'indice 'USURE_CYCLE'.  
+ 
+  Commentaires :
+  --------------
+
+    TAB1 : Objet de type TABLE correspondant a la table de PASAPAS.
+
+    ENT1 : Objet de type ENTIER donnant le numero de la boite a 
+           considerer.
+
+  Cette procedure est appelee par USEXPL et USIMPL.
+  Elle ne doit pas etre appelee directement.
+
+*---------------------------------------------------------------------*
+
+ANGL====================================================================
+
+  Description :
+  -------------
+
+    Procedure which updates the mesh coordinates with the field store 
+    at the index 'USURE_CYCLE'.
+ 
+  Comments :
+  ----------
+
+    TAB1 : TABLE type object which corresponds to the PASAPAS table.
+
+    ENT1 : ENTIER type object which gives the wear box number.
+
+  This procedure is called by USEXPL and USIMPL.
+  It should not be called directly.
+
+*---------------------------------------------------------------------*
+ 

@@ -1,0 +1,381 @@
+* fichier : pilotage_indirect_1.dgibi
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* Problem description: 
+*
+* In the example below, we study the effects caused by the progressive
+* strain localization. The structure consists of a bar under uniform 
+* tension in which the load is applied via displacement control at the
+* right edge. At this edge, only the direction of the displacement
+* is known a priori. The displacement intensity is calculated in such
+* a way to respect the path equation specified by the user. Here, the 
+* defaut path equation (CMSI) is utilised. The strain localization is 
+* induced increasing the value of NELX. The higher this number the 
+* more severe the snap-back becomes. On the other hand, the lower this
+* number, the more the snap-back tends to fade away.
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*'OPTI' 'ECHO' 0;
+'OPTI' 'TRAC' 'PSC';
+'OPTI' 'DIME' 2 'ELEM' 'QUA4' 'MODE' 'PLAN CONTR';
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* export psc figures
+PLT1 = VRAI;
+* export output text
+EXP1 = FAUX;
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* DEFINING THE PARAMETRIC GEOMETRY
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* bar height
+H1 = 0.1;
+* bar length
+L1 = 1.0;
+* total number of elements along the x direction
+NELX = 29;
+* total number of elements along the y direction
+NELY = 3;
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+PIN = 'TABLE';
+ 
+'SI' (NELX < 3);
+  'MESS' 'error: the NELX must be greater than 3 and odd';
+'SINON';
+  PIN.1 = 0. 0.;
+'FINSI';
+        
+'REPE' BOPO NELX;
+  CX = 'COOR' 1 PIN.(&BOPO);
+  CX = CX + (L1/NELX);
+  CY = 'COOR' 2 PIN.(&BOPO);
+  PIN.(&BOPO + 1) = CX CY;
+'FIN' BOPO;
+
+LINH = 'TABLE';
+'REPE' BOLI NELX;
+        LINH.(&BOLI) = 'DROI' 1 PIN.(&BOLI) PIN.(&BOLI + 1);
+'FIN' BOLI;
+
+'REPE' BOLI NELX;
+        'SI' (&BOLI 'EGA' 1);
+                MALHA = LINH.(&BOLI);
+        'SINON';
+                MALHA = MALHA 'ET' LINH.(&BOLI);
+        'FINSI';
+'FIN' BOLI;
+
+PSU = 'TABLE';
+PSU.1 = 0. H1;
+        
+'REPE' BOPO NELX;
+        CX = 'COOR' 1 PSU.(&BOPO);
+        CX = CX + (L1/NELX);
+        CY = 'COOR' 2 PSU.(&BOPO);
+        PSU.(&BOPO + 1) = CX CY;
+'FIN' BOPO;
+
+'REPE' BOPO NELX;
+        CX = 'COOR' 1 PSU.(&BOPO);
+        CX = CX + (L1/NELX);
+        CY = 'COOR' 2 PSU.(&BOPO);
+        PSU.(&BOPO + 1) = CX CY;
+'FIN' BOPO;
+
+'REPE' BOLI NELX;
+        LINH.(NELX + &BOLI) = 'DROI' 1 PSU.(&BOLI) PSU.(&BOLI + 1);
+'FIN' BOLI;
+
+'REPE' BOLI NELX;
+        MALHA = MALHA 'ET' LINH.(NELX + &BOLI);
+'FIN' BOLI;
+
+*VERTICAL LINES
+
+'REPE' BOLI (NELX+1);
+        LINH.((2*NELX) + &BOLI) = 'DROI' NELY PIN.(&BOLI) PSU.(&BOLI);
+'FIN' BOLI;
+
+'REPE' BOLI (NELX+1);
+        MALHA = MALHA 'ET' LINH.((2*NELX) + &BOLI);
+'FIN' BOLI;
+
+*SURFACES
+AREA = 'TABLE';
+'REPE' BOEX NELX;
+        AREA.(&BOEX) = 'DALL' LINH.(&BOEX)
+                                                LINH.(&BOEX + (2*NELX) + 1)
+                                                LINH.(&BOEX + NELX)
+                                                LINH.(&BOEX + (2*NELX)) ;
+'FIN' BOEX;
+
+'REPE' BOEX NELX;
+        'SI' (&BOEX 'EGA' 1);
+                ELASPART = AREA.(&BOEX);
+        'SINON';
+                'SI' (&BOEX 'EGA' ((NELX+1)/2));
+                        DAMMPART = AREA.(&BOEX);
+                'SINON';
+                        ELASPART = ELASPART 'ET' AREA.(&BOEX);
+                'FINSI';
+        'FINSI';        
+'FIN' BOEX;
+
+str1 = (DAMMPART 'ET' ELASPART);
+leftedg = LINH.(2*NELX + 1);
+PA = PIN.1;
+PB = PIN.(NELX+1);
+rigtedg = LINH.(3*NELX + 1);
+
+'SI' PLT1; 
+  'TRAC' str1;
+'FINSI';
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF PARAMETRIC GEOMETRY
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* DEFINING MODEL AND MATERIAL
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+AT=1.0e0;
+AC=1.2e0;
+BC=1.5e+03;
+BT=1.0E4;
+epsd0=1.0E-4;
+YG=1.0E+9;
+BBT=1.06e0;
+NNU=0.0;
+RO =2.3E+03;
+
+MOD1 = 'MODE' ELASPART 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE';
+MAT1 = 'MATE' MOD1 'YOUN' YG 'NU' NNU 'RHO' RO;
+
+MOD2 = 'MODE' DAMMPART 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 
+    'ENDOMMAGEMENT' 'MAZARS';
+MAT2 = 'MATE' MOD2 'YOUN' YG 'NU' NNU 'RHO' RO 'BTRA' BT 
+    'KTR0' epsd0 'ATRA' AT 'ACOM' AC 'BCOM' BC 'BETA' BBT;
+
+MODTOT = MOD1 'ET' MOD2;
+MATTOT = MAT1 'ET' MAT2;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF MODEL AND MATERIAL
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* DEFINING BOUNDARY CONDITIONS (known a priori)
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+CL1 = 'BLOQ' 'UX' leftedg;
+CL2 = 'BLOQ' 'UY' PA;
+CLT = CL1 'ET' CL2;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF BOUNDARY CONDITIONS
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* PROBLEM SOLUTION
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* 
+* number of time increments
+ntincrem = 24;
+*
+* control parameter
+TAU = 5.0E-5;
+*
+* direction of the applied displacement (u_hat)
+CL3 = 'BLOQ' 'UX' rigtedg;
+CLT = CLT 'ET' CL3;
+uch = 'DEPI' CL3 1.0;
+*
+lis_incr= 'PROG' 0. 'PAS' 1    (ntincrem. * 1) ;
+lis_tau = 'PROG' 0. 'PAS' TAU  (ntincrem. * TAU) ;
+ev1 = 'EVOL' 'MANU' 't' lis_incr 'tau' lis_tau ;
+*
+****  preparing PASAPAS input table
+tab1 = 'TABLE';
+tab1 . 'MOVA' = 'D' ;
+tab1 . 'BLOCAGES_MECANIQUES' = CLT ;
+tab1 . 'CARACTERISTIQUES' = mattot ;
+tab1 . 'MODELE' = modtot ;
+tab1 . 'TEMPS_CALCULES' = lis_incr ;
+
+****  lines to be included for ativating path-following control ******
+tab1 . 'PILOTAGE_INDIRECT'     = VRAI;
+tab1 . 'DEPLACEMENTS_PILOTES'  = uch ;
+tab1 . 'PARAMETRE_DE_PILOTAGE' = ev1 ;
+
+PASAPAS tab1;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF SOLUTION
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* BEGIN OF POST-PROCESSING
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+****  procedure @TOTAL adapted
+'DEBPROC' RESFORCE CH1*'CHPOINT' GEO*'MAILLAGE' COMP1*'MOT' ;
+  CH2 = 'REDU' CH1 GEO ;
+  CHTOT = 'RESU' CH2 ;
+  P1 = ('EXTR' CHTOT MAIL) 'POIN' 1 ;                               
+  TOT1 = 'EXTR' CHTOT COMP1 P1 ;
+'FINPROC' TOT1 ;
+*
+*
+nn = 'DIME' tab1 . 'TEMPS';
+*
+PROF = 'PROG' 0.;
+PROT = 'PROG' 0.;
+PROD = 'PROG' 0.;
+*
+'REPE' LAB (nn - 1 ) ;
+  ii = &LAB ;
+  TT     = tab1 . 'TEMPS' . ii ;
+  deplac = tab1 . 'DEPLACEMENTS' . ii ;
+  force_indirect = 'REAC' CL3 deplac  ;
+  FF = RESFORCE force_indirect rigtedg 'FX' ;
+  DD = 'EXTR' deplac 'UX' PB ;
+
+  PROT = PROT 'ET' ( 'PROG' TT) ;
+  PROF = PROF 'ET' ( 'PROG' FF) ;
+  PROD = PROD 'ET' ( 'PROG' DD) ;
+'FIN' LAB ;
+
+'SI' PLT1; 
+  PROETA = TAB1 . 'COEFFICIENT_DE_PILOTAGE' ;
+  evo11 = 'EVOL' 'TURQ' 'MANU' 'disp' PROD 'forc' PROF ; 
+  evo12 = 'EVOL' 'ROUG' 'MANU' 'increment' PROT 'eta' PROETA ; 
+  'DESS' evo11 ;
+  'DESS' evo12 ;
+'FINSI';
+
+'SI' EXP1;
+  @EXCEL1 evo11 'forc_displ_cmsi.txt' ;
+'FINSI';
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF POST-PROCESSING
+* 
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* BEGIN OF NON-REGRESSION TEST
+* 
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+refx = 'PROG' 0.;
+refx = refx 'ET' ('PROG' 5.00000E-05);
+refx = refx 'ET' ('PROG' 1.00000E-04);
+refx = refx 'ET' ('PROG' 9.30148E-05);
+refx = refx 'ET' ('PROG' 7.79353E-05);
+refx = refx 'ET' ('PROG' 6.24797E-05);
+refx = refx 'ET' ('PROG' 4.95454E-05);
+refx = refx 'ET' ('PROG' 3.98080E-05);
+refx = refx 'ET' ('PROG' 3.30212E-05);
+refx = refx 'ET' ('PROG' 2.86375E-05);
+refx = refx 'ET' ('PROG' 2.60834E-05);
+refx = refx 'ET' ('PROG' 2.48648E-05);
+refx = refx 'ET' ('PROG' 2.45930E-05);
+refx = refx 'ET' ('PROG' 2.49786E-05);
+refx = refx 'ET' ('PROG' 2.58132E-05);
+refx = refx 'ET' ('PROG' 2.69508E-05);
+refx = refx 'ET' ('PROG' 2.82906E-05);
+refx = refx 'ET' ('PROG' 2.97643E-05);
+refx = refx 'ET' ('PROG' 3.13260E-05);
+refx = refx 'ET' ('PROG' 3.29452E-05);
+refx = refx 'ET' ('PROG' 3.46019E-05);
+*refx = refx 'ET' ('PROG' 3.62828E-05);
+*refx = refx 'ET' ('PROG' 3.79792E-05);
+*refx = refx 'ET' ('PROG' 3.96857E-05);
+*refx = refx 'ET' ('PROG' 4.13987E-05)a
+*  modif pv modification residuel mazars
+REFX = REFX 'ET' ('PROG' 3.63083E-05);
+REFX = REFX 'ET' ('PROG' 3.80372E-05);
+REFX = REFX 'ET' ('PROG' 3.97662E-05);
+REFX = REFX 'ET' ('PROG' 4.14952E-05);
+
+
+refy = 'PROG' 0.;
+refy = refy 'ET' ('PROG' 5.00000E+03);
+refy = refy 'ET' ('PROG' 1.00000E+04);
+refy = refy 'ET' ('PROG' 9.09796E+03);
+refy = refy 'ET' ('PROG' 7.35759E+03);
+refy = refy 'ET' ('PROG' 5.57825E+03);
+refy = refy 'ET' ('PROG' 4.06006E+03);
+refy = refy 'ET' ('PROG' 2.87297E+03);
+refy = refy 'ET' ('PROG' 1.99148E+03);
+refy = refy 'ET' ('PROG' 1.35888E+03);
+refy = refy 'ET' ('PROG' 9.15782E+02);
+refy = refy 'ET' ('PROG' 6.10995E+02);
+refy = refy 'ET' ('PROG' 4.04277E+02);
+refy = refy 'ET' ('PROG' 2.65640E+02);
+refy = refy 'ET' ('PROG' 1.73513E+02);
+refy = refy 'ET' ('PROG' 1.12758E+02);
+refy = refy 'ET' ('PROG' 7.29506E+01);
+refy = refy 'ET' ('PROG' 4.70122E+01);
+refy = refy 'ET' ('PROG' 3.01917E+01);
+refy = refy 'ET' ('PROG' 1.93295E+01);
+refy = refy 'ET' ('PROG' 1.23410E+01);
+*refy = refy 'ET' ('PROG' 7.85945E+00);
+*refy = refy 'ET' ('PROG' 4.99400E+00);
+*refy = refy 'ET' ('PROG' 3.16669E+00);
+*refy = refy 'ET' ('PROG' 2.00421E+00);
+*  modif pv  modification mazars residuel
+REFY = REFY 'ET' ('PROG' 1.05E+01);
+REFY = REFY 'ET' ('PROG' 1.10E+01); 
+REFY = REFY 'ET' ('PROG' 1.15E+01);
+REFY = REFY 'ET' ('PROG' 1.20E+01);
+
+tol1 = 1.0e-3;
+maxres = 0.;
+'REPE' BTEST (nn - 1 ) ;
+ V1 = 'EXTR' refx (&BTEST + 1);
+ V2 = 'EXTR' prod (&BTEST + 1);
+ res1 = 'ABS' ((V1 - V2)/V1);
+ 'SI' (res1 > maxres); maxres = res1; 'FINSI';
+
+ W1 = 'EXTR' refy (&BTEST + 1);
+ W2 = 'EXTR' prof (&BTEST + 1);
+ res2 = 'ABS' ((W1 - W2)/W1);
+ 'SI' (res2 > maxres); maxres = res2; 'FINSI';
+
+'FIN' BTEST ;
+
+err1 = maxres > tol1;
+
+'SI' err1;
+ 'ERRE' 5 ;
+'FINSI';
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF NON-REGRESSION TEST
+* 
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'FIN'; 
+
+ 
+
+ 
+
+ 
+

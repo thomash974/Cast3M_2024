@@ -1,0 +1,502 @@
+* fichier : source1.dgibi
+* section : thermique
+*----------------------------------------------------------------------*
+*                           SOURCE1.DGIBI                              *
+*----------------------------------------------------------------------*
+*
+* Objet :
+* -------
+*
+* Verfication / validation d'un modele de source de chaleur.
+* Formulation generale (THERMIQUE SOURCE).
+*
+* Description :
+* -------------
+* Comparaison des flux nodaux equivalents obtenus avec le modele a
+* ceux obtenus en fournissant directement la valeur de la densite de
+* chaleur a l'operateur SOURCE (ancienne syntaxe).
+*
+* Type de calcul : Aucun
+* Mode de calcul : 1D, 2D PLAN, AXIS et 3D
+* Type d'element : TRI3 TRI6 QUA4 QUA8 TET4 TE10 PYR5 PY13 PRI6 PR15
+*                  CUB8 CU20 BARR TUY2 COQ2 COQ3 COQ4 COQ6 COQ8
+* Objectif       : Ecart relatif des flux integres < 1.e-12
+*
+*----------------------------------------------------------------------*
+
+*
+*----------------------------------------------------------------------*
+*
+*------------------------ 1D ELEMENTS LINEAIRES -----------------------*
+*
+opti dime 1 elem seg2 ;
+
+lo1      = 50.e-3 ;
+l1       = (poin 0.) droi 10 (poin lo1) ;
+
+* Massifs :
+* ---------
+*
+opti mode unid plan ;
+
+mo1      = mode l1 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode l1 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l1 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+opti mode unid axis ;
+
+mo1      = mode l1 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode l1 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l1 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+opti mode unid sphe ;
+
+mo1      = mode l1 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode l1 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l1 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+*---------------------- 1D ELEMENTS QUADRATIQUES ---------------------*
+*
+opti dime 1 elem seg3 ;
+
+lo1      = 50.e-3 ;
+l1       = (poin 0.) droi 10 (poin lo1) ;
+
+* Massifs :
+* ---------
+*
+opti mode unid plan ;
+
+mo1      = mode l1 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode l1 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l1 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+opti mode unid axis ;
+
+mo1      = mode l1 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode l1 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l1 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+opti mode unid sphe ;
+
+mo1      = mode l1 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode l1 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l1 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+*------------------------ 2D ELEMENTS LINEAIRES -----------------------*
+*
+opti dime 2 elem qua4 ;
+
+ep1      = 10.e-3 ;
+l1       = (0 0) droi 10 (0 ep1) ;
+s1       = l1    tran 50 (lo1 0) ;
+l2       = s1 cote 3 ;
+s2       = l2    tran 50 (lo1 ep1) ;
+s2       = s2 chan tri3 ;
+s0       = s1 et s2 ;
+
+*trac s0 titr ' Maillage test' ;
+
+opti mode plan ;
+*
+* Massifs :
+* ---------
+*
+mo1      = mode s0 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode s0 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 s0 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Barres :
+* --------
+*
+mo1      = mode l2 thermique barr ;
+ma1      = mate mo1 k 1 sect 0.01 ;
+
+moq1     = mode l2 thermique source barr ;
+maq1     = mate moq1 'QVOL' 1. sect 0.01 ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+  ERRE ' Probleme MODE SOURCE' ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Tuyaux :
+* --------
+*
+mo1      = mode l2 thermique tuy2 ;
+ma1      = mate mo1 k 1 sect 0.01 ;
+
+moq1     = mode l2 thermique source tuy2 ;
+maq1     = mate moq1 'QVOL' 1. sect 0.01 ;
+
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Coques :
+* --------
+*
+mo1      = mode l2 thermique coq2 ;
+ma1      = mate mo1 k 1 epai 0.01 ;
+
+moq1     = mode l2 thermique source coq2 ;
+maq1     = mate moq1 'QVOL' 1. 'QINF' 1. 'QSUP' 1. epai 0.01 ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+opti mode axis ;
+*
+* Massifs :
+* ---------
+*
+mo1      = mode s0 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode s0 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 s0 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Barres :
+* --------
+*
+mo1      = mode l2 thermique barr ;
+ma1      = mate mo1 k 1 sect 0.01 ;
+
+moq1     = mode l2 thermique source barr ;
+maq1     = mate moq1 'QVOL' 1. sect 0.01 ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Tuyaux :
+* --------
+*
+mo1      = mode l2 thermique tuy2 ;
+ma1      = mate mo1 k 1 sect 0.01 ;
+
+moq1     = mode l2 thermique source tuy2 ;
+maq1     = mate moq1 'QVOL' 1. sect 0.01 ;
+
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Coques :
+* --------
+*
+mo1      = mode l2 thermique coq2 ;
+ma1      = mate mo1 k 1 epai 0.01 ;
+
+moq1     = mode l2 thermique source coq2 ;
+maq1     = mate moq1 'QVOL' 1. 'QINF' 1. 'QSUP' 1. epai 0.01 ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+*---------------------- 2D ELEMENTS QUADRATIQUES ----------------------*
+
+s0       = s0 chan quad ;
+l2       = l2 chan quad ;
+
+opti mode plan ;
+
+* Massifs :
+*----------
+*
+mo1      = mode s0 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode s0 thermique source ;
+
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 s0 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+opti mode axis ;
+
+* Massifs :
+*----------
+*
+mo1      = mode s0 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode s0 thermique source ;
+
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 s0 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+*------------------------ 3D ELEMENTS LINEAIRES -----------------------*
+*
+opti dime 3 elem cub8 ;
+s0       = s0 chan line ;
+l2       = l2 chan line ;
+
+v0       = s0 volu tran 5 (0 0 ep1) ;
+x1       = v0 coor 1 ;
+v3       = v0 elem appu stri (x1 poin supe (1.5 * lo1)) ;
+v0       = v0 diff v3 ;
+v0       = v0 et (v3 chan tet4) ;
+
+el1      = (v0 elem cub8) elem 1 ;
+py1      = (el1 chan quaf) chan pyr5 ;
+v0       = (v0 diff el1) et py1 ;
+
+* Massifs :
+*----------
+*
+mo1      = mode v0 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode v0 thermique source ;
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 v0 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Barres :
+* --------
+*
+mo1      = mode l2 thermique barr ;
+ma1      = mate mo1 k 1 sect 0.01 ;
+
+moq1     = mode l2 thermique source barr ;
+maq1     = mate moq1 'QVOL' 1. sect 0.01 ;
+
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Tuyaux :
+* --------
+*
+mo1      = mode l2 thermique tuy2 ;
+ma1      = mate mo1 k 1 sect 0.01 ;
+
+moq1     = mode l2 thermique source tuy2 ;
+maq1     = mate moq1 'QVOL' 1. sect 0.01 ;
+
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 l2 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Coques :
+* --------
+*
+mo1      = mode s0 thermique coq3 coq4 ;
+ma1      = mate mo1 k 1 epai 0.01 ;
+
+moq1     = mode s0 thermique source coq3 coq4 ;
+maq1     = mate moq1 'QVOL' 1. 'QINF' 1. 'QSUP' 1. epai 0.01 ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 s0 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+*---------------------- 3D ELEMENTS QUADRATIQUES ----------------------*
+*
+v0       = v0 chan quad ;
+s0       = s0 chan quad ;
+
+* Massifs :
+* ---------
+*
+mo1      = mode v0 thermique ;
+ma1      = mate mo1 k 25. ;
+
+moq1     = mode v0 thermique source ;
+
+maq1     = mate moq1 'QVOL' 1. ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 v0 1. ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+* Coques :
+* --------
+*
+mo1      = mode s0 thermique coq6 coq8 ;
+ma1      = mate mo1 k 1 epai 0.01 ;
+
+moq1     = mode s0 thermique source coq6 coq8 ;
+maq1     = mate moq1 'QVOL' 1. 'QINF' 1. 'QSUP' 1. epai 0.01 ;
+
+sq1      = sour moq1 maq1 ;
+sqref1   = sour mo1 s0 1. ma1 ;
+
+err1     = (maxi abs (sq1 - sqref1)) / (maxi abs sqref1) ;
+list err1 ;
+si (err1 > 1.e-12) ;
+  ERRE ' Probleme MODE SOURCE' ;
+fins ;
+
+*-------------------------------- FIN ---------------------------------*
+fin ;
+ 
+
+ 
+

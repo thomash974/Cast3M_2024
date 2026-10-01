@@ -1,0 +1,287 @@
+* fichier : soudage5.dgibi
+* section : thermique conduction convection changement_phase
+*----------------------------------------------------------------------*
+*                     S O U D A G E 5 . D G I B I                      *
+*----------------------------------------------------------------------*
+* Objet :                                                              
+* -------
+*
+*    Exemple d'utilisation d'un modele de SOURCE THERMIQUE GAUSSIENNE
+* pour la simulation d'une ligne de fusion en soudage sur une plaque
+* en acier 316L (proprietes approchees) avec prise e compte ou non de 
+* la chaleur latente de changement de phase.
+*
+*    La ligne de fusion est volotairement non conforme au maillage de
+* la plaque afin d'illustrer la mise en donnee du deplacement d'une
+* source de chaleur suivant une trajectoire independante du maillage
+* de calcul.
+*
+*    Les points de la trajectoire sont neanmoins "accroches" au maillage
+* de calcul (RELA ACCRO) afin de pouvoir post-traiter l'evolution de la
+* temperature le long de cette ligne (en temps ou en espace).
+*
+*    Enfin, on illustre aussi la possibilite de faire des affichages au
+* cours du calcul avec la procedure PERSO2 et l'option NCLK de TRAC.
+*
+* Description :
+* -------------
+*
+* Type de calcul : Thermique Transitoire
+* Mode de calcul : 3D
+* Type d'element : CUB8
+* Chargement     : Source de chaleur, Convection
+*
+*----------------------------------------------------------------------*
+*
+* Mettre ig1 a VRAI pour visualiser le calcul :
+ig1      = faux ;
+opti trac psc ;
+
+* Mettre icomplet a VRAI pour le calcul complet :
+* fcomp1 : fraction du calcul complet
+icomplet = faux ;
+fcomp1   =  0.05 ;
+ 
+* Racine du nom du fichier (pour nom fichier sauvegarde et animation) :
+fic1     = 'soudage5' ;
+
+ig1      = ig1 ou (ega (vale trac) 'PSC') ;
+
+*----------------------------  Parametres -----------------------------*
+*
+* Geometrie : longueur, largeur, epaisseur
+lo1      = 100.e-3 ;
+la1      =  50.e-3 ;
+ep1      =  10.e-3 ;
+
+* Densite maillage :
+de1      = 2.5e-3 ;
+  
+*---- Parametres physiques : 
+* rho1   : masse volumique (kg/m3) 
+* cp1    : capacite calorifique (J/kg/K) 
+* k1     : conductivite thermique (W/m/K)
+* Tfus1  : temperature de fusion (degC)
+* Qlat1  : Chaleur latente de fusion (J/m3)
+rho1     = 7760. ;
+cp1      =  500. ;
+k1       =   24. ;
+Tfus1    = 1450. ;
+Qlat1    = 2.e9  ;
+
+*---- Parametres du chargement :
+* Soudage :
+* vs1    : vitesse de soudage (m/s)
+* tis1   : instant debut deplacement de la torche (s)
+vs1      = 80.e-3 / 60. ;
+tis1     = 0. ;
+
+* Source de chaleur Gaussienne : 
+* q0     : puissance thermique totale (W)
+* r0     : rayon source Gaussienne (m)
+* z0     : profondeur source Gaussienne (m) 
+q0       = 1.5e3 ;
+r0       = 5.e-3 ;
+z0       = 3.e-3 ;
+*
+* Conditions iniiale & aux limites
+* h1     : coefficient d'echange convectif (W/m2/K) 
+* tini0  : temperature initiale 
+* te0    : temperature exterieure de convection
+h1       = 20. ;
+tini0    = 20. ;
+te0      = 20. ;
+
+*------------------------------ Maillage ------------------------------*
+opti dime 3 elem cub8 isov suli ; 
+  
+* Repere :
+O1       = 0 0 0 ; 
+X1       = 1 0 0 ; 
+Y1       = 0 1 0 ; 
+Z1       = 0 0 1 ; 
+  
+* Maillage de la plaque :
+P1       = la1 * y1 ; 
+l1       = O1      droi         P1 dini de1 dfin de1 ; 
+s1       = l1      tran (ep1 * z1) dini de1 dfin de1 ; 
+v1       = s1 volu tran (lo1 * x1) dini de1 dfin de1 ; 
+
+* Surface de convection :
+scv1     = enve v1 ;
+
+si ig1 ;
+  trac cach   v1 titre ' Maillage de la plaque ' ;
+  trac cach scv1 titre ' Surface echange convectif = enveloppe maillage ' ; 
+fins ;
+  
+*------------------------ CI - CL / Chargement -----------------------*
+
+***** Definition du chargement thermique de la torche *****
+* Ligne de fusion :
+ps1      = 3.e-3 0.e-3 ep1 ;
+ps2      = (lo1 - 5.e-3) (la1 - 2.e-3) ep1 ;
+ls1      = ps1 droi 50 ps2 ;
+ls1      = ls1 coul roug ;
+chs1     = ls1 coor curv ;
+si ig1 ;
+  trac cach (v1 et ls1) titre 'Maillage de la ligne de fusion' ;
+  trac chs1 ls1 titre 'Abscisse curiviligne de la ligne de fusion' ;
+fins ;
+
+* Evolution temporelle de la position de la torche TIG (m/s) :
+* tfs1 : instant fin de deplacement de la torche (s)
+lls1    = maxi chs1 ;
+tfs1    = ((mesu ls1) / vs1) + tis1 ;
+lts1    = prog 0. tis1 tfs1 ;
+lxs1    = prog 0.   0. lls1 ;
+evs1    = evol vert manu temp lts1 lxs1 ;
+si ig1 ;
+  dess evs1 xbor 0. tfs1
+    titre ' Evolution temporelle du deplacement de la torche (abscisse curviligne)' ;
+fins ;
+
+* Chargement decrivant le trajet de la source :
+cg2      = char traj chs1 evs1 ;
+
+* Evolution temporelle de la puissance de la torche :
+lq1    = prog 1. 1. 1. ;
+evq1   = evol roug manu temp lts1 qtot lq1 ;
+evq1   = q0 * evq1 ;
+si ig1 ;
+  dess evq1 xbor 0. tfs1
+    titre ' Evolution temporelle de la puissance thermique de la torche (W) ' ;
+fins ;
+
+*--------------------- Modele / Caracteristiques ----------------------*
+
+* Conduction :
+mo1      = mode v1 thermique ; 
+ma1      = mate mo1 k k1 rho rho1 'C' cp1 'TINI' tini0 ;
+
+mocp1    = mode    v1 changement_phase parfait inco 'T' 'Q' ;
+macp1    = mate mocp1 prim Tfus1 dual Qlat1 ;
+  
+* Convection :
+mocv1    = mode scv1 thermique convection ; 
+macv1    = mate mocv1 'H' h1 'TC' te0 ;
+
+* Source Gaussienne isotrope_transverse :
+moq1     = mode v1 thermique source gaussienne isotrope_transverse ;
+maq1     = mate moq1 qtot evq1 orig cg2 rgau r0 dire (0 0 1) zgau z0 ;
+
+*------------ Affichages T au cours du calcul avec PERSO2 -------------*
+
+debp PERSO2 tu1*table ;
+tps1     = tu1.estimation.temps ;
+liso1    = prog 0. 200. pas 125. 1700. ;
+titre (chai format '(F7.2)' 'Temperature au temps ' tps1 ' (s)') ;
+si ig1 ;
+  trac liso1 nclk tu1.wtable.ther_courant v1 (aret v1) ;
+fins ;
+finp ;
+
+*------------------ Calcul SANS Changement de Phase -------------------*
+
+* Instants de calcul :
+* pas1 : pas de temps pour avancer d'un 1/2 element
+pas1     = 0.2 * de1 / vs1 ;
+ltca1    = prog 0. pas (0.2*pas1) (2.*pas1) pas pas1 (fcomp1*tfs1) ;
+si icomplet ;
+  ltca1    = prog 0. pas (0.2*pas1) (2.*pas1) pas pas1 tfs1 ;
+fins ;
+
+* Table PASAPAS :
+ta1                       = table ;
+ta1 . modele              = mo1 et mocv1 et moq1 ;
+ta1 . caracteristiques    = ma1 et macv1 et maq1 ;
+ta1 . blocages_thermiques = rela ls1 accro v1 (mots T) ;
+ta1 . temps_calcules      = ltca1 ;
+ta1 . procedure_perso2    = ig1 ;
+
+pasapas ta1 ;
+
+*------------------ Calcul AVEC Changement de Phase -------------------*
+
+* Table PASAPAS :
+ta2                       = table ;
+ta2 . modele              = mo1 et mocv1 et moq1 et mocp1 ;
+ta2 . caracteristiques    = ma1 et macv1 et maq1 et macp1 ;
+ta2 . blocages_thermiques = ta1 . blocages_thermiques ;
+ta2 . temps_calcules      = ltca1 ;
+ta2 . procedure_perso2    = ig1 ;
+
+pasapas ta2 ;
+
+*-------------------------- Post-Traitement ---------------------------*
+
+* Evolution temporelle de la temperature :
+* - Au point de depart de la ligne de fusion
+* - A 75% du parcours fait sur de la ligne de fusion
+si icomplet ;
+  fac2     = 0.75 ;
+sino ;
+  fac2     = 0.75 * fcomp1 ;
+fins ;
+Pt1      = Ps1 ;
+Pt2      = ls1 poin proc (Pt1 plus ((Ps2 moin Ps1) * fac2)) ;
+si ig1 ;
+  trac cach ((v1 moin (0 0 1.e-6)) et ((Pt1 et Pt2) coul vert)) qual titr ' Pt2, Pt2 : positions thermocouples' ;
+fins ;
+
+evpt11   = evol bleu temp ta1 temperatures T Pt1 ;
+evpt21   = evol oran temp ta1 temperatures T Pt2 ;
+evpt12   = evol bleu temp ta2 temperatures T Pt1 ;
+evpt22   = evol oran temp ta2 temperatures T Pt2 ;
+evt0     = evpt11 et evpt21 et evpt12 et evpt22 ;
+
+si ig1 ;
+  tleg1    = table ;
+  tleg1 . titre = table ;
+  tleg1 . titre . 1 = 'T(Pt1) Sans Chgt Phase' ;
+  tleg1 . titre . 2 = 'T(Pt2) Sans Chgt Phase' ;
+  tleg1 . titre . 3 = 'T(Pt1) Avec Chgt Phase' ;
+  tleg1 . titre . 4 = 'T(Pt2) Avec Chgt Phase' ;
+  tleg1 . 2 = mot 'TIRR' ;
+  tleg1 . 3 = mot 'MARQ S CROI NOLI' ;
+  tleg1 . 4 = mot 'MARQ S ROND NOLI' ;
+  dess evt0 lege tleg1 titr 'Comparaison thermogrammes calculs avec ou sans changement de phase' ;
+fins ;
+
+* Evolution spatiale de la temperature a 2 instants differents :
+* -  5% du temps final
+* - 75% du temps final 
+tf1      = maxi ta1.temps_calcules ;
+cht11    = peche ta1 temperatures (0.05*tf1) ipol ;
+cht21    = peche ta1 temperatures (0.75*tf1) ipol ;
+cht12    = peche ta2 temperatures (0.05*tf1) ipol ;
+cht22    = peche ta2 temperatures (0.75*tf1) ipol ;
+evls11   = evol bleu chpo cht11 T ls1 ;
+evls21   = evol oran chpo cht21 T ls1 ;
+evls12   = evol bleu chpo cht12 T ls1 ;
+evls22   = evol oran chpo cht22 T ls1 ;
+evls0    = evls11 et evls21 et evls12 et evls22 ;
+
+si ig1 ;
+  tleg1    = table ;
+  tleg1 . titre = table ;
+  tleg1 . titre . 1 = 'T(t1) Sans Chgt Phase' ;
+  tleg1 . titre . 2 = 'T(t2) Sans Chgt Phase' ;
+  tleg1 . titre . 3 = 'T(t1) Avec Chgt Phase' ;
+  tleg1 . titre . 4 = 'T(t2) Avec Chgt Phase' ;
+  tleg1 . 2 = mot 'TIRR' ;
+  tleg1 . 3 = mot 'MARQ S CROI NOLI' ;
+  tleg1 . 4 = mot 'MARQ S ROND NOLI' ;
+  si icomplet ;
+    dess evls0 lege tleg1 titr 'Comparaison evolution spatiale T avec ou sans Chgt Phase' ;
+  sino ;
+    dess evls0 lege tleg1 xbor 0. 0.05 titr 'Comparaison evolution spatiale T avec ou sans Chgt Phase' ;
+  fins ;
+fins ;
+
+fin ;
+
+ 
+
+ 
+

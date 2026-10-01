@@ -1,0 +1,43 @@
+************************************************************************
+* Section : Entree-Sortie
+************************************************************************
+* TEST DE LECTURE DE FICHIERS CSV AVEC COMME SEPARATEUR ' '
+*
+* ON A MIS EXPRES DES ' ' SUPPLEMENTAIRES EN DEBUT ET FIN DE CERTAINES
+* LIGNES AINSI QU'ENTRE CERTAINES VALEURS POUR VERIFIER QU'ILS SONT
+* IGNORES
+************************************************************************
+
+XPREC = VALE 'PREC';
+
+*  repertoire des fichiers "divers"
+DIVERS = VENV 'CASTEM_DIVERS';
+* LECTURE EN COLONNES
+TAB1 = LIRE 'CSV' ('CHAIN' DIVERS '/lire_csv_espaces.csv') 'SEPA' ' ';
+
+L1 = PROG 0. 3. 6.;
+L2 = PROG 1. 4. 7.;
+L3 = PROG 2. 5. 8.;
+SI (((MAXI 'ABS' (TAB1.(1) - L1)) >EG XPREC) OU
+    ((MAXI 'ABS' (TAB1.(2) - L2)) >EG XPREC) OU
+    ((MAXI 'ABS' (TAB1.(3) - L3)) >EG XPREC));
+    ERRE 'PROBLEME DE LECTURE (LECTURE EN COLONNES)';
+FINSI;
+
+* LECTURE EN LIGNES
+TAB2 = LIRE 'CSV' ('CHAIN' DIVERS '/lire_csv_espaces.csv') 'SEPA' ' ' 'LIGN';;
+
+L1 = PROG 0. 1. 2.;
+L2 = PROG 3. 4. 5.;
+L3 = PROG 6. 7. 8.;
+SI (((MAXI 'ABS' (TAB2.(1) - L1)) >EG XPREC) OU
+    ((MAXI 'ABS' (TAB2.(2) - L2)) >EG XPREC) OU
+    ((MAXI 'ABS' (TAB2.(3) - L3)) >EG XPREC));
+    ERRE 'PROBLEME DE LECTURE (LECTURE EN LIGNES)';
+FINSI;
+
+FIN;
+ 
+
+ 
+

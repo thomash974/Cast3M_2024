@@ -1,0 +1,64 @@
+$$$$ RFCO     NOTICE  PV090527  23/06/16    21:15:03     11677          
+                                             DATE     23/06/16
+ 
+ 
+    Operateur RFCO                         
+    -------------
+    
+       R1  F1  =  RFCO  MOD1 LOG1  CHEL1 ;
+                                
+
+FRAN==========================================================
+
+    Objet :
+    _______
+
+    L'operateur RFCO  calcule les raideurs des modeles de CONTACT ou CONTRAINTE  MOD1
+    ainsi que les valeurs des seconds membres.
+   
+
+
+      Commentaire :
+      _____________
+
+      MOD1  : objet MODELE contenant les formulations 'CONTACT' ou 'CONTRAINTE'
+
+      LOG1  : LOGIQUE a FAUX en cas de non convergence
+      
+      CHEL1 : CHAMELEM de proprietes des modeles
+
+      R1    : RIGIDITES de conditions ou ENTIERS 0
+      
+      F1    : CHPOINT portant sur les multiplicateurs de Lagrange des modeles et contenant les seconds membres        
+                    
+            
+     Remarque : Cet operateur est appele par PASAPAS pour actualiser les conditions en cours de calcul
+ANGL==========================================================
+
+    Description :
+    ____________
+
+    This operator computes stiffness matrix for 'CONTACT' or 'CONTRAINTE' formulation.
+    It also computes second member.
+
+
+      Contents :
+      _________
+
+      MOD1  : MODELE object with 'CONTACT' or 'CONTRAINTE' formulation
+
+      LOG1  : False in non convergence situation
+      
+      R1    : Stiffness matrix or integer 0
+
+      CHEL1 : CHAMELEM of model  properties
+      
+      F1    : CHPOINT of Lagrange multiplier containing second member 
+      
+      
+      Comments : This operator is invoked by the PASAPAS procedure to update conditions during the computation.
+$$$$
+
+ 
+ 
+ 

@@ -1,0 +1,166 @@
+$$$$ TEMP     NOTICE  PASCAL    21/06/24    21:15:03     11043          
+                                             DATE     21/06/24
+
+    Directive TEMPS                           Voir aussi : PLAC
+    ---------------
+
+  TEMPS |   -                       | ;
+        | 'PLAC'                    |
+        | 'IMPR' |   -    |   -     |
+        |        | 'MAXI' | 'HORL'  |
+        |        | 'SOMM' | 'CPU'   |
+        |                   'APPE'  |
+        |                   'EFFI'  |
+        |        | 'PROC' |   -     |
+        |        | 'BOUC' | 'HORL'  |
+        |                 | 'CPU'   |
+        |                 | 'APPE'  |
+        | 'ZERO'                    |
+        | 'SGAC' 'IMPR'             |
+
+
+    Operateur TEMPS
+    ---------------
+
+  TAB1        = TEMPS 'NOEC' ;
+  ENTI1 ENTI2 = TEMPS 'SGAC' ;
+  ENTI1       = TEMPS | 'CPU'  | ;
+                      | 'HORL' |
+
+
+Section : Entree-Sortie Entree-Sortie
+
+FRAN==========================================================
+    Objet :
+    -------
+
+ Syntaxe 1 : Utilisation comme une directive
+ -------------------------------------------
+  -'TEMP';
+      - Affiche le temps horloge et CPU ecoule depuis le dernier appel
+
+  -'TEMP' 'SGAC' 'IMPR' ;
+      - Affiche le  nombre d'appel  par operateur,  le cumul de segments
+        restes actifs  apres  l'appel  ainsi que  la  taille (en K-MOTS)
+        correspondante.
+        Remarque : Esope fait une pile de SEGMENTS a desactiver, un SEGMENT
+                   dans cette pile n'est pas compte comme desactive.
+
+  -'TEMP' 'PLAC' ;
+      - Affiche l'etat de la memoire dans ESOPE (en MOTS)
+
+  -'TEMP' 'IMPR' (MOT1 (MOT2)) (MOT3) ;
+      - MOT1 : 'PROC'    : Informations sur les PROCEDURES
+               'BOUC'    : Informations sur les BOUCLES
+                Sans MOT1: Informations sur les OPERATEURS (MOT2 possible)
+                           MOT2 :'MAXI'    : Maximum  de  tous  les ASSISTANTS
+                                 'SOMM'    : Somme  sur   tous  les ASSISTANTS
+                                  Sans MOT2: Toutes les valeurs des ASSISTANTS
+            Attention, c'est le maximum du temps horloge qui est indique,
+            meme avec SOMM.
+
+      - MOT3 : 'HORL'    : Temps horloge   seulement (Avec trie croissant)
+               'CPU '    : Temps CPU       seulement (Avec trie croissant)
+               'APPE'    : Nombre d'appels seulement (Avec trie croissant)
+                Sans MOT3: Toutes les informations. 
+
+
+  -'TEMP' 'ZERO' ;
+      - Initialise  les tableaux  des temps  ainsi que  les informations
+        liees aux SEGMENTS.
+
+    Remarque : 1 MOT = 8 octets en 64-bits
+    ----------         4 octets en 32-bits
+
+
+ Syntaxe 2 : Utilisation comme un operateur
+ ------------------------------------------
+  - TAB1 ='TEMP' 'NOEC' ;
+      - Renvoie  dans la TABLE TAB1  le detail par operateur et
+        par assistant  des  temps  horloge  et CPU ainsi que le
+        nombre  d'appels.  On  retrouvera  egalement  les temps
+        horloge et CPU depuis le  depart du calcul et depuis le
+        dernier appel a l'operateur TEMP.
+
+        
+  - ENTI1 ENTI2 ='TEMP' 'SGAC' ;
+      - Renvoie dans 2 entiers l'etat general des segments
+         ENTI1 : Nombre total de SEGMENTS Actifs
+         ENTI2 : Taille totale correspondante (en MOTS).
+
+    Remarque : 1 MOT = 8 octets en 64-bits
+    ----------         4 octets en 32-bits
+
+  - ENTI1 ='TEMP' | 'CPU'  | ;
+                  | 'HORL' |
+      - Renvoie  dans  l'entier ENTI1 le temps CPU ou le temps HORLoge
+        (en millisecondes) ecoule depuis le dernier appel a TEMP ZERO.
+
+ANGL==========================================================
+    Description :
+    -------------
+
+ Syntaxe 1 : Used as a DIRECTIVE
+ -------------------------------
+  -'TEMP';
+      - Print the elapsed and CPU time since the last call
+
+  -'TEMP' 'SGAC' 'IMPR' ;
+      - Displays the number of call per operator, the cumulated SEGMENTS
+        remained active after the call and the corresponding size in K-MOTS.
+        Remark : Esope has a list of SEGMENTS to desactivate, one SEGMENT
+                 in that list is not considered desactivated.
+
+  -'TEMP' 'PLAC' ;
+      - Print the ESOPE memory current state (GEMAT) (unit=MOTS)
+
+  -'TEMP' 'IMPR' (MOT1 (MOT2)) (MOT3) ;
+      - MOT1 : 'PROC'       : Informations about PROCEDURES
+               'BOUC'       : Informations about LOOPS
+                Without MOT1: Informations about OPERATORS (possibly MOT2)
+                           MOT2 :'MAXI'       : Maximum  on all   the ASSISTANTS
+                                 'SOMM'       : Sum      on all   the ASSISTANTS
+                                  Without MOT2: All the values on the ASSISTANTS
+         Beware, the maximum of elapsed time is displayed even with SOMM keyword.
+
+      - MOT3 : 'HORL'       : Elapsed time    only (Ascending sort)
+               'CPU '       : CPU time        only (Ascending sort)
+               'APPE'       : Number of calls only (Ascending sort)
+                Without MOT3: All the informations. 
+
+  -'TEMP' 'ZERO' ;
+      - Initializes the time an SEGMENTS information.
+
+    Remark : 1 MOT = 8 octets on 64-bits architectures
+    ----------       4 octets on 32-bits architectures
+
+
+ Syntaxe 2 : Used as an operator
+ -------------------------------
+  - TAB1 ='TEMP' 'NOEC' ;
+      - Returns  the TAB1  TABLE detail  per operator  and  per
+        assistant  Elapsed  time,  CPU  time  and the number of
+        calls. We also find elapsed  time and CPU time from the
+        beginning of  the calculation  and since the  last call
+        of the TEMP directive / operator.
+       
+  - ENTI1 ENTI2 ='TEMP' 'SGAC' ;
+      - Returns in 2 integers general state of segments: Memory
+         ENTI1: Total active SEGMENTS
+         ENTI2: Total corresponding size (in MOTS)
+
+    Remark : 1 MOT = 8 octets on 64-bits architectures
+    ----------       4 octets on 32-bits architectures
+
+  - ENTI1 = 'TEMP' | 'CPU'  | ;
+                   | 'HORL' |
+      - ENTI1 is an integer equal to the CPU time (milliseconds)
+        or to the elapsed time with the 'HORL' option (milliseconds)
+        since the last call to TEMP ZERO.
+
+
+$$$$
+ 
+ 
+ 
+ 

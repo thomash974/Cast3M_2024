@@ -1,0 +1,134 @@
+$$$$ PAS_ETAT
+* PAS_ETAT  PROCEDUR  PASCAL    22/04/13    21:15:02     11339          
+'DEBPROC' PAS_ETAT PRECED*'TABLE' TI*'FLOTTANT' MOREF/'MOT'   ;
+************************************************************************
+* Cette procedure cree un MCHAML qui contient l'ETAT au sens
+* THERMODYNAMIQUE à un instant donne (TI)
+*
+* MOREF : MOT optionnel pouvant prendre la valeur de 'REFERENCE'
+*         si l'etat a calculer est l'etat de REFERENCE
+*
+* Partie 1 : Interpolation entre le debut du PAS (CONTINUATION)
+*                             et la fin   du PAS (ESTIMATION  )
+* Partie 2 : Tire dans le CHARGEMENT
+* on  interpole entre le dernier pas (dans la table estimation)
+* et les dernieres valeurs convergees (dans continuation).
+*
+************************************************************************
+ WTAB = PRECED. 'WTABLE';
+ 
+ CONTI = PRECED. 'CONTINUATION';
+ ESTIM = PRECED. 'ESTIMATION'  ;
+ NCONT ='DIME' CONTI           ;
+ 
+ IND   ='INDE' CONTI           ;
+ TDEB  = CONTI.'TEMPS'         ;
+ TFIN  = ESTIM.'TEMPS'         ;
+ IAD   = FAUX                  ;
+ IAC   = FAUX                  ;
+
+'SI' ( 'NEG' TFIN TDEB)                       ;
+   XPRO  = (TI  '-' TDEB) '/' (TFIN '-' TDEB) ;
+   UNXPRO= 1.D0 '-' XPRO                      ;
+   IAD   = ('ABS' UNXPRO) '>' ('VALE' 'PREC') ;
+   IAC   = ('ABS' XPRO  ) '>' ('VALE' 'PREC') ;
+'FINS'                                        ;
+
+* Evaluation de l'ETAT courant
+ ETAT1   = 'VIDE'  'MCHAML'      ;
+'REPE' BOU NCONT;
+   BOOL1 = FAUX;
+   MO    ='MOT' IND. &BOU ;
+*   pas decide si grave d'avoir les reactions !!!! ni les temperatures ni les
+   'SI' ( 'EGA' MO 'GEOFIN')                   ; 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'GEODEB')                   ; 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'REACTIONS')                ; 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'DEFORMATIONS_INELASTIQUES'); 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'DEFORMATIONS')             ; 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'VITESSES')                 ; 'ITER' BOU;'FINSI';
+*  'SI' ( 'EGA' MO 'CARA_ACTU')                ; 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'PROPORTIONS_PHASES')       ; 'ITER' BOU;'FINSI';
+   'SI' ( 'EGA' MO 'PROPORTIONS_PHASE ')       ; 'ITER' BOU;'FINSI';
+ 
+    TYPMO ='TYPE' CONTI.MO ;
+ 
+   'SI' (('NEG' TYPMO 'ENTIER') 'ET' ('NEG' TYPMO 'FLOTTANT') 'ET' ('NEG' TYPMO 'MCHAML')  'ET' ('NEG' TYPMO 'CHPOINT'));
+*     On ne traite que les types qui nous plaisent :)
+      'ITER' BOU ;
+   'FINS';
+ 
+   'SI' (('EGA' MO 'TEMPERATURES') 'ET' ('EGA' MOREF ('MOT' 'REFERENCE')));
+*     On utilise TEMPERATURE_REFERENCE au lieu de la TEMPERATURE
+      VAD = WTAB.'TEMPERATURE_REFERENCE';
+ 
+   'SINO';
+     'SI' IAD;
+        'SI' IAC ;
+           VAD =(CONTI.MO '*' UNXPRO) '+' (ESTIM.MO '*' XPRO) ;
+        'SINO';
+           VAD = CONTI.MO;
+        'FINS';
+     'SINON' ;
+        VAD = ESTIM. MO;
+     'FINSI';
+   'FINS';
+
+   'SI' (( 'EGA' ( 'TYPE' VAD) ('MOT' 'FLOTTANT')) 'OU'
+         ( 'EGA' ( 'TYPE' VAD) ('MOT' 'ENTIER'  )));
+      BOOL1 = VRAI;
+   'FINSI';
+
+   'SI' (BOOL1);
+      ETAT1 = ETAT1 'ADET' WTAB. 'MODELE'  MO VAD ;
+   'SINON';
+     'SI' ( 'EGA' ( 'TYPE' VAD) ('MOT' 'MCHAML'));
+        ETAT1= 'ADET' ETAT1 WTAB.'MODELE' (REDU VAD WTAB.'MODELE');
+     'SINON';
+        ETAT1= 'ADET' ETAT1 WTAB.'MODELE'       VAD ;
+     'FINSI';
+   'FINS';
+'FIN' BOU;
+
+* -------------------------------------------------------------------
+* Debut Calcul de l etat pour le Tracking dans le cas du modele PBFEM
+* -------------------------------------------------------------------
+* Switch selon la methode de tracking si existence de PBFEM avec option Tracking active
+'SI' ('EXIS' wtab.'MODELE' 'MATE' 'EFEM');
+  'SI' ('EXIS' PRECED 'TRACKING');
+    'SI' (PRECED.'TRACKING');
+*      Cas du tracking global (Oliver, 2002) - determination de l etat
+      'SI' ('EGA' PRECED.'TYP_TRAC' 'fixed_HC');
+         MCH_TRA = FIXHC PRECED;
+
+      'SINON';
+*        Cas du tracking global - diffusion-convection isotrope - determination de l et
+        'SI' ('EGA' PRECED.'TYP_TRAC' 'variable_HC');
+           MCH_TRA = VARIHC PRECED;
+
+        'SINON';
+*          Cas du tracking global - diffusion-convection anisotrope - determination de l
+          'SI' ('EGA' PRECED.'TYP_TRAC' 'variable_HCD_SU');
+             MCH_TRA = VARIHCSU PRECED;
+          'FINSI';
+        'FINSI';
+      'FINSI';
+
+*      On rempli ETAT1 pour ensuite realiser l instanciation dans PAS_MATE
+       ETAT1= 'ADET' ETAT1 WTAB.'MODELE' MCH_TRA;
+    'FINSI';
+  'FINSI';
+'FINSI';
+* -----------------------------------------------------------------
+* Fin Calcul de l etat pour le Tracking dans le cas du modele PBFEM
+* -----------------------------------------------------------------
+
+* Ajout du CHARGEMENT au temps TI
+'SI' ('EXIS' WTAB 'CHARGEMENT')                           ;
+   ETAT1 ='ADET' ETAT1 WTAB.'MODELE' WTAB.'CHARGEMENT' TI ;
+'FINS'                                                    ;
+
+*Verification qu'on dispose de toutes les composantes ;
+ PAS_VERM PRECED ETAT1                                ;
+
+'FINP' ETAT1;
+ 

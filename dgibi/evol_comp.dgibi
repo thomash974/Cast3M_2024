@@ -1,0 +1,61 @@
+* fichier : evol_comp.dgibi
+
+*******************************************
+* Section : Langage Base
+*******************************************
+
+************************************************************************
+*                             PRESENTATION                             *
+************************************************************************
+* Ce cas-test permet de tester 
+*  1- le bon fonctionnement des differentes combinaisons de l'operateur
+*     'EVOL' avec l'option 'COMP'
+*  2- le bon fonctionnement de l'operateur 'LIST' de ces combisaisons
+*  3- le bon fonctionnement de l'operateur 'DESS' de ces combisaisons
+*  4- le bo fonctionnement de l'operateur 'RIMP'
+************************************************************************
+
+ OPTI TRAC 'PSC';
+
+LAB1 = PROG 1  2  3     4   5 ;
+
+LRE1 = PROG 1. 0. -2.2  3. -1.E+5 ;
+LIM1 = PROG 0. 5. -2.2  4.  0.E+5 ;
+
+LAB2 = LAB1 ;
+LMO2 = PROG 1.  5.  (2.2*(2.**0.5))      +5.       +1.E+5 ;
+LPH2 = PROG 0. +90.      -135.      (ATG(4./3.))   +180. ;
+
+EVR1 = 'EVOL' 'COMP' 'REIM' LAB1 LRE1 LIM1 ;
+EVR2 = 'EVOL' 'COMP' 'MOPH' LAB2 LMO2 LPH2 ;
+
+EVC2 = RIMP EVR1 ;
+EVC3 = RIMP EVC2 ;
+
+LIST EVC3 ;
+LIST EVC2 ;
+
+EV0 = 'ABS' (EVC3 - EVR1) ;
+ra1 = 'MAXIMUM' ('EXTRAIRE' ev0 'ORDO' 1) ;
+EV0 = RIMP EV0 ;
+ra2 = 'MAXIMUM' ('EXTRAIRE' ev0 'ORDO' 1) ;
+'SI' (('>' ra1 1.E-15) 'OU' ('>' ra2 5.E-11)) ;
+  'ERREUR' 'TEST 1 RATE' ;
+'FINSI' ;
+
+EV0 = 'ABS' (EVC2 - EVR2) ;
+ra1 = 'MAXIMUM' ('EXTRAIRE' ev0 'ORDO' 1) ;
+'SI' ('>' ra1 1.E-15) ;
+  'ERREUR' 'TEST 2 RATE' ;
+'FINSI' ;
+EV0 = RIMP EV0 ;
+ra1 = 'MAXIMUM' ('EXTRAIRE' ev0 'ORDO' 1) ;
+ra2 = 'MAXIMUM' ('EXTRAIRE' ev0 'ORDO' 2) ;
+'SI' (('>' ra1 1.E-15) 'OU' ('>' ra2 1.E-15)) ;
+  'ERREUR' 'TEST 3 RATE' ;
+'FINSI' ;
+
+FIN ;
+
+ 
+

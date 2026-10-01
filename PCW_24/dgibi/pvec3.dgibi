@@ -1,0 +1,119 @@
+* fichier :  pvec3.dgibi
+*******************************************************************************
+* Section : Mathematiques Fonctions
+*******************************************************************************
+
+*******************************************************************************
+* NOM         : PVEC3
+*
+* DESCRIPTION : Cas-test pour l'opérateur PVEC avec des POINTS, des CHPOINTS
+*               et des CHAMLS
+*               On vérifie en 2D :
+*               PVEC (1. 0.) = (0. 1.) POUR LES 3 TYPES D'OBJETS
+*               et en 3D :
+*               (1. 0. 0.) PVEC (0. 1. 0.) = (0. 0. 1.)
+*
+* AUTEUR      : Joffrey BLUTHE (CEA/DEN/DM2S/SEMT/LISN)
+*               mél : joffrey.bluthe@cea.fr
+*
+* VERSION    : v1, 13/04/2021, version initiale
+*******************************************************************************
+
+* I - TEST DE PVEC EN 2D
+* ----------------------
+
+OPTI 'DIME' 2 'ELEM' 'QUA4' ;
+COMP1 = MOT 'X' ;
+COMP2 = MOT 'Y' ;
+COMPS = MOTS COMP1 COMP2 ;
+
+* PVEC SUR UN POINT
+P1 = 1. 0. ;
+P2 = PVEC P1 ;
+P3 = 0. 1. ;
+DP = P3 MOIN P2 ;
+NORM1 = NORM DP ;
+SI (NEG NORM1 0.) ;
+    MESS 'ERREUR : LE PRODUIT VECTORIEL 2D EST INCORRECT' ;
+    MESS '         DANS LE CAS D''UN POINT' ;
+    ERRE 5 ;
+FINSI ;
+
+* PVEC SUR UN CHPO
+P0 = 0. 0. ;
+CHPO1 = MANU 'CHPO' P0 2 COMP1 1. COMP2 0. ;
+CHPO2 = PVEC CHPO1 COMPS COMPS ;
+CHPO3 = MANU 'CHPO' P0 2 COMP1 0. COMP2 1. ;
+DCHPO = CHPO3 - CHPO2 ;
+NORM1 = (PSCA DCHPO DCHPO COMPS COMPS)**0.5 ;
+SI (NEG (MAXI NORM1 'ABS') 0.) ;
+    MESS 'ERREUR : LE PRODUIT VECTORIEL 2D EST INCORRECT' ;
+    MESS '         DANS LE CAS D''UN CHPOINT' ;
+    ERRE 5 ;
+FINSI ;
+
+* PVEC SUR UN MCHAML
+P0 = MANU 'POI1' P0 ;
+CHAM1 = MANU 'CHML' P0 COMP1 1. COMP2 0. ;
+CHAM2 = PVEC CHAM1 COMPS COMPS ;
+CHAM3 = MANU 'CHML' P0 COMP1 0. COMP2 1. ;
+DCHAM = CHAM3 - CHAM2 ;
+NORM1 = (PSCA DCHAM DCHAM COMPS COMPS)**0.5 ;
+SI (NEG (MAXI NORM1 'ABS') 0.) ;
+    MESS 'ERREUR : LE PRODUIT VECTORIEL 2D EST INCORRECT' ;
+    MESS '         DANS LE CAS D''UN CHAML' ;
+    ERRE 5 ;
+FINSI ;
+
+
+* II - TEST DE PVEC EN 3D
+* -----------------------
+
+OPTI 'DIME' 3 'ELEM' 'CUB8' ;
+COMP3 = MOT '2' ;
+COMPS = MOTS COMP1 COMP2 COMP3 ;
+
+* PVEC SUR UN POINT
+P1 = 1. 0. 0. ;
+P2 = 0. 1. 0. ;
+P3 = P1 PVEC P2 ;
+P4 = 0. 0. 1. ;
+DP = P4 MOIN P3 ;
+NORM1 = NORM DP ;
+SI (NEG NORM1 0.) ;
+    MESS 'ERREUR : LE PRODUIT VECTORIEL 3D EST INCORRECT' ;
+    MESS '         DANS LE CAS D''UN POINT' ;
+    ERRE 5 ;
+FINSI ;
+
+* PVEC SUR UN CHPO
+P0 = 0. 0. 0. ;
+CHPO1 = MANU 'CHPO' P0 3 COMP1 1. COMP2 0. COMP3 0. ;
+CHPO2 = MANU 'CHPO' P0 3 COMP1 0. COMP2 1. COMP3 0. ;
+CHPO3 = CHPO1 PVEC CHPO2 COMPS COMPS COMPS ;
+CHPO4 = MANU 'CHPO' P0 3 COMP1 0. COMP2 0. COMP3 1. ;
+DCHPO = CHPO4 - CHPO3 ;
+NORM1 = (PSCA DCHPO DCHPO COMPS COMPS)**0.5 ;
+SI (NEG (MAXI NORM1 'ABS') 0.) ;
+    MESS 'ERREUR : LE PRODUIT VECTORIEL 3D EST INCORRECT' ;
+    MESS '         DANS LE CAS D''UN CHPOINT' ;
+    ERRE 5 ;
+FINSI ;
+
+* PVEC SUR UN MCHAML
+P0 = MANU 'POI1' P0 ;
+CHAM1 = MANU 'CHML' P0 COMP1 1. COMP2 0. COMP3 0. ;
+CHAM2 = MANU 'CHML' P0 COMP1 0. COMP2 1. COMP3 0. ;
+CHAM3 = CHAM1 PVEC CHAM2 COMPS COMPS COMPS ;
+CHAM4 = MANU 'CHML' P0 COMP1 0. COMP2 0. COMP3 1. ;
+DCHAM = CHAM4 - CHAM3 ;
+NORM1 = (PSCA DCHAM DCHAM COMPS COMPS)**0.5 ;
+SI (NEG (MAXI NORM1 'ABS') 0.) ;
+    MESS 'ERREUR : LE PRODUIT VECTORIEL 3D EST INCORRECT' ;
+    MESS '         DANS LE CAS D''UN CHAML' ;
+    ERRE 5 ;
+FINSI ;
+
+FIN ;
+ 
+

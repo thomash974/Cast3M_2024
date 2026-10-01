@@ -1,0 +1,39 @@
+$$$$ MESS     NOTICE  PV        19/12/10    21:15:08     10423          
+                                             DATE     19/12/10
+                                             
+    Directive MESSAGE                        Voir aussi : CHAINE
+    -----------------
+
+
+Section : Entree-Sortie Entree-Sortie
+
+FRAN===========================================================
+    Objet :
+    _______
+
+    La directive MESSAGE permet d'editer sous forme de message une suite
+d'objets. La syntaxe est celle de l'operateur CHAINE (appele en interne).
+
+
+    Exemple :
+    _________
+
+            OBJET1 = MOT   ' LA VALEUR DE PI EST :' ;
+            P = 3.14159 ;
+            MESSAGE OBJET1 P ;
+ANGL===========================================================
+    Description :
+    ____________
+
+    The MESSAGE instruction enables the user to issue a series of
+ objects in the form of a message. The syntax is the one of the 
+ CHAINE operator (internally called).
+
+    Example :
+    _________
+
+            OBJET1 = MOT   ' LA VALEUR DE PI EST :' ;
+            P = 3.14159 ;
+            MESSAGE OBJET1 P ;
+$$$$
+ 

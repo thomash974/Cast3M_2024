@@ -1,0 +1,278 @@
+$$$$ TOPOSENS
+* TOPOSENS  PROCEDUR  FD218221  24/01/24    21:15:01     11828          
+* TOPOSENS  PROCEDUR  CB215821  21/04/15    14:10:01     9715
+
+************************************************************************
+** Procedure called by TOPOPTIM for calculating the sensitivity field
+** and the objective value.
+**
+** Author:
+** Guenhael Le Quilliec (LaMe - Polytech Tours)
+**
+** Version:
+** 1.0 2021/04/15
+************************************************************************
+
+DEBP TOPOSENS tab0*'TABLE' ;
+
+* Input data
+* **********
+
+vdM0     = tab0.'RAPPORT_RAIDEURS_MECANIQUES' ;
+vdT0     = tab0.'RAPPORT_RAIDEURS_THERMIQUES' ;
+WghtMcn0 = tab0.'POIDS_MECANISME' ;
+WghtM0   = tab0.'POIDS_ENERGIE_DEFO' ;
+WghtT0   = tab0.'POIDS_TEMPERATURE' ;
+wtab0    = tab0.'WTABLE' ;
+bool0    = wtab0.'BOOL' ;
+zero1    = wtab0.'ZERO'.(1) ;
+p0       = wtab0.'FACTEUR_P' ;
+bmsh1    = wtab0.'MAILLAGE'.'GRAVITE' ;
+mdlA     = wtab0.'RESOLUTION'.'A' ;
+SI bool0.'CAS_MULTIPLES' ;
+    case_nb0 = wtab0.'NB_CAS' ;
+FINS ;
+SI bool0.'PASAPAS' ;
+    NbStp0   = wtab0.'NB_PAS' ;
+FINS ;
+SI bool0.'MECANIQUE' ;
+    volElM1  = wtab0.'MECANIQUE'.'VOLUME'.(1) ;
+    modM1    = wtab0.'MECANIQUE'.'MODELE'.(1) ;
+FINS ;
+SI bool0.'THERMIQUE' ;
+    volElT1  = wtab0.'THERMIQUE'.'VOLUME'.(1) ;
+    modT1    = wtab0.'THERMIQUE'.'MODELE'.(1) ;
+FINS ;
+x0   = wtab0.'TOPOLOGIE' ;
+obj0 = wtab0.'OBJECTIF' ;
+dc0  = wtab0.'SENSIBILITE' ;
+
+* Active mesh, model, material and resolution belonging to msh1
+* *************************************************************
+
+mshA = INTE wtab0.'MAILLAGE'.'A' wtab0.'MAILLAGE'.(1) ;
+SI bool0.'MECANIQUE' ;
+    modMA = REDU wtab0.'MECANIQUE'.'MODELE'.(0) mshA ;
+    matMA = REDU tab0.'WTABLE'.'MECANIQUE'.'CARACTERISTIQUES'.'A' mshA ;
+FINS ;
+SI bool0.'THERMIQUE' ;
+    modTA = REDU wtab0.'THERMIQUE'.'MODELE'.(0) mshA ;
+    matTA = REDU tab0.'WTABLE'.'THERMIQUE'.'CARACTERISTIQUES'.'A' mshA ;
+FINS ;
+
+* Mechanism objective value and the sensitivity field
+* ***************************************************
+
+SI bool0.'MECANISME' ;
+    SI bool0.'CAS_MULTIPLES' ;
+        REPE loop0 case_nb0 ;
+        SI bool0.'PASAPAS' ;
+            sigAE = REDU (mdlA.&loop0.'MECANISME_ENTREE'.'CONTRAINTES'.NbStp0) mshA ;
+            epsAE = ELAS modMA sigAE matMA ;
+            sigAS = REDU (mdlA.&loop0.'MECANISME_SORTIE'.'CONTRAINTES'.NbStp0) mshA ;
+*            epsAS = ELAS modMA sigAS matMA ;
+        SINO ;
+*            sigAE = REDU (mdlA.&loop0.'MECANISME_ENTREE'.'CONTRAINTES') mshA ;
+            epsAE = REDU (mdlA.&loop0.'MECANISME_ENTREE'.'DEFORMATIONS') mshA ;
+            sigAS = REDU (mdlA.&loop0.'MECANISME_SORTIE'.'CONTRAINTES') mshA ;
+*            epsAS = REDU (mdlA.&loop0.'MECANISME_SORTIE'.'DEFORMATIONS') mshA ;
+        FINS ;
+*       1/2.Cijkl.[1/2(diUEj+djUEi)].[1/2(dkUSl+dlUSk)]
+*       =1/2.Cijkl.EPSEij.EPSSkl
+*       =1/2.EPSEij.SIGSij
+        eneA = ENER modMA sigAS epsAE ;
+*       Element field of the strain energy density at barycenter
+        eneA = (INTG 'ELEM' eneA modMA matMA) / (REDU volElM1 modMA) ;
+*       Total strain energy
+        tmp0 = INTG eneA modMA matMA ;
+*       Objective function:
+        obj0 = obj0 + (WghtMcn0 * tmp0 / case_nb0) ;
+*       Rigidity property field at barycenter
+        tmp0 = CHAN 'CHAM' (EXCO 'YOUN' matMA 'SCAL') modMA 'GRAVITE' '        ' ;
+*       1/2.EPSEij.EPSSij
+        tmp0 = zero1 + (REDU (eneA/tmp0) modM1) ;
+*       Sensitivity field:
+        dc0  = dc0 + ((WghtMcn0 / case_nb0) * tmp0 * ((1.0 - vdM0) * p0 * (x0**(p0 - 1.0)))) ;
+*       Objective function:
+*TODO        obj0 = obj0 + (0.0 / case_nb0) ;
+        FIN loop0 ;
+    SINO ;
+        SI bool0.'PASAPAS' ;
+            sigAE = REDU (mdlA.'MECANISME_ENTREE'.'CONTRAINTES'.NbStp0) mshA ;
+            epsAE = ELAS modMA sigAE matMA ;
+            sigAS = REDU (mdlA.'MECANISME_SORTIE'.'CONTRAINTES'.NbStp0) mshA ;
+*            epsAS = ELAS modMA sigAS matMA ;
+        SINO ;
+*            sigAE = REDU (mdlA.'MECANISME_ENTREE'.'CONTRAINTES') mshA ;
+            epsAE = REDU (mdlA.'MECANISME_ENTREE'.'DEFORMATIONS') mshA ;
+            sigAS = REDU (mdlA.'MECANISME_SORTIE'.'CONTRAINTES') mshA ;
+*            epsAS = REDU (mdlA.'MECANISME_SORTIE'.'DEFORMATIONS') mshA ;
+        FINS ;
+*       1/2.Cijkl.[1/2(diUEj+djUEi)].[1/2(dkUSl+dlUSk)]
+*       =1/2.Cijkl.EPSEij.EPSSkl
+*       =1/2.EPSEij.SIGSij
+        eneA = ENER modMA sigAS epsAE ;
+*       Element field of the strain energy density at barycenter
+        eneA = (INTG 'ELEM' eneA modMA matMA) / (REDU volElM1 modMA) ;
+*       Total strain energy
+        tmp0 = INTG eneA modMA matMA ;
+*       Objective function:
+        obj0 = obj0 + (WghtMcn0 * tmp0) ;
+*       Rigidity property field at barycenter
+        tmp0 = CHAN 'CHAM' (EXCO 'YOUN' matMA 'SCAL') modMA 'GRAVITE' '        ' ;
+*       1/2.EPSEij.EPSSij
+        tmp0 = zero1 + (REDU (eneA/tmp0) modM1) ;
+*       Sensitivity field:
+        dc0 = dc0 + (WghtMcn0 * tmp0 * ((1.0 - vdM0) * p0 * (x0**(p0 - 1.0)))) ;
+    FINS ;
+FINS ;
+
+* Strain energy objective value and the sensitivity field
+* *******************************************************
+
+*SI (bool0.'MECANIQUE' ET ((ABS WghtM0) > tab0.'PRECISION')) ;
+SI (bool0.'MECANIQUE' ET (NEG WghtM0 0.0)) ;
+    SI bool0.'CAS_MULTIPLES' ;
+        REPE loop0 case_nb0 ;
+        SI bool0.'PASAPAS' ;
+            sigA = REDU (mdlA.&loop0.'CONTRAINTES'.NbStp0) mshA ;
+            epsA = ELAS modMA sigA matMA ;
+        SINO ;
+            sigA = REDU (mdlA.&loop0.'CONTRAINTES') mshA ;
+            epsA = REDU (mdlA.&loop0.'DEFORMATIONS') mshA ;
+        FINS ;
+*       1/2.Cijkl.[1/2(diUj+djUi)].[1/2(dkUl+dlUk)]
+*       =1/2.Cijkl.EPSij.EPSkl
+*       =1/2.EPSij.SIGij
+*       =Element field of the elastic strain energy density at
+*        integration points:
+        eneA = ENER modMA sigA epsA ;
+*       Element field of the strain energy density at barycenter
+        eneA = (INTG 'ELEM' eneA modMA matMA) / (REDU volElM1 modMA) ;
+*       Objective function:
+*       Add the total elastic strain energy * weight / nb of cases
+        obj0 = obj0 + (WghtM0 * (INTG eneA modMA matMA) / case_nb0) ;
+*       Rigidity property field at barycenter
+        tmp0 = CHAN 'CHAM' (EXCO 'YOUN' matMA 'SCAL') modMA 'GRAVITE' '        ' ;
+*       1/2.EPSij.EPSij
+        tmp0 = zero1 + (REDU (eneA/tmp0) modM1) ;
+*       Sensitivity field:
+        dc0  = dc0 + ((WghtM0 / case_nb0) * tmp0 * ((vdM0 - 1.0) * p0 * (x0**(p0 - 1.0)))) ;
+        FIN loop0 ;
+    SINO ;
+        SI bool0.'PASAPAS' ;
+            sigA = REDU (mdlA.'CONTRAINTES'.NbStp0) mshA ;
+            epsA = ELAS modMA sigA matMA ;
+        SINO ;
+            sigA = REDU (mdlA.'CONTRAINTES') mshA ;
+            epsA = REDU (mdlA.'DEFORMATIONS') mshA ;
+        FINS ;
+*       1/2.Cijkl.[1/2(diUj+djUi)].[1/2(dkUl+dlUk)]
+*       =1/2.Cijkl.EPSij.EPSkl
+*       =1/2.EPSij.SIGij
+*       =Element field of the elastic strain energy density at
+*        integration points:
+        eneA = ENER modMA sigA epsA ;
+*       Element field of the strain energy density at barycenter
+        eneA = (INTG 'ELEM' eneA modMA matMA) / (REDU volElM1 modMA) ;
+*       Total strain energy
+        tmp0 = INTG eneA modMA matMA ;
+*       Objective function
+        obj0 = obj0 + (WghtM0 * tmp0) ;
+*       Rigidity property field at barycenter
+        tmp0 = CHAN 'CHAM' (EXCO 'YOUN' matMA 'SCAL') modMA 'GRAVITE' '        ' ;
+*       1/2.EPSij.EPSij
+        tmp0 = zero1 + (REDU (eneA/tmp0) modM1) ;
+*       Sensitivity field
+        dc0  = dc0 + (WghtM0 * tmp0 * ((vdM0 - 1.0) * p0 * (x0**(p0 - 1.0)))) ;
+    FINS ;
+FINS ;
+
+* Thermal compliance objective value and the sensitivity field
+* ************************************************************
+
+*SI (bool0.'THERMIQUE' ET ((ABS WghtT0) > tab0.'PRECISION')) ;
+SI (bool0.'THERMIQUE' ET (NEG WghtT0 0.0)) ;
+    SI bool0.'CAS_MULTIPLES' ;
+        REPE loop0 case_nb0 ;
+*       Temperature node field
+        SI bool0.'PASAPAS' ;
+            TA = REDU (mdlA.&loop0.'TEMPERATURES'.NbStp0) mshA ;
+        SINO ;
+            TA = REDU (mdlA.&loop0.'TEMPERATURES') mshA ;
+        FINS ;
+*       1/2.K.grad(T).grad(T)
+*       =1/2.K.grad(T)^2
+*       =Element field of the thermal compliance density at integration points:
+*       (without 1/2 nor K, they will be added locally for better performances)
+        grdTA = GRAD modTA TA ;
+        cmp0 = EXTR grdTA 'COMP' ;
+        eneA = PSCA grdTA grdTA cmp0 cmp0 ;
+*       Element field at barycenter
+        eneA = (INTG 'ELEM' eneA modTA matTA) / (REDU volElT1 modTA) ;
+*       Conductivity field at barycenter: K
+        tmp0 = CHAN 'CHAM' (EXCO 'K' matTA 'SCAL') modTA 'GRAVITE' '        ' ;
+*       Integration (with K)
+        tmp0 = INTG (eneA * tmp0) modTA matTA ;
+*       Objective function (with 1/2)
+        obj0 = obj0 + (WghtT0 * 0.5 * tmp0 / case_nb0) ;
+*       Switch the model of the element field eneA
+*       from Therm to Mecha
+        tmp0 = zero1 + (REDU eneA modT1) ;
+        SI bool0.'MECANIQUE' ;
+            tmp0 = TOPOCHAN tmp0 modM1 bmsh1 ;
+        FINS ;
+*       Sensitivity field (with 1/2)
+        dc0  = dc0 + ((WghtT0 * 0.5 / case_nb0) * tmp0 * ((vdT0 - 1.0) * p0 * (x0**(p0 - 1.0)))) ;
+        FIN loop0 ;
+    SINO ;
+*       Temperature node field
+        SI bool0.'PASAPAS' ;
+            TA = REDU (mdlA.'TEMPERATURES'.NbStp0) mshA ;
+        SINO ;
+            TA = REDU (mdlA.'TEMPERATURES') mshA ;
+        FINS ;
+*       1/2.K.grad(T).grad(T)
+*       =1/2.K.grad(T)^2
+*       =Element field of the thermal compliance density at integration points:
+*       (without 1/2 nor K, they will be added locally for better performances)
+        grdTA = GRAD modTA TA ;
+        cmp0 = EXTR grdTA 'COMP' ;
+        eneA = PSCA grdTA grdTA cmp0 cmp0 ;
+*       Element field at barycenter
+        eneA = (INTG 'ELEM' eneA modTA matTA) / (REDU volElT1 modTA) ;
+*       Conductivity field at barycenter: K
+        tmp0 = CHAN 'TYPE' (EXCO 'K' matTA 'SCAL') '        ' ;
+**  mess 'tmp0 * eneA' ;
+        tmp0 = INTG (eneA * tmp0) modTA matTA ;
+**        tmp0 = CHAN 'GRAVITE' modTA (EXCO 'K' matTA 'SCAL') '        ' ;
+**  mess 'tmp0 (6b)' ; list resu tmp0 ;
+*       Integration (with K)
+**  mess 'tmp0 * eneA' ;
+**        tmp0 = INTG (eneA * tmp0) modTA matTA ;
+*       Objective function (with 1/2)
+        obj0 = obj0 + (WghtT0 * 0.5 * tmp0) ;
+*       Switch the model of the element field eneA
+*       from Therm to Mecha
+        tmp0 = zero1 + (REDU eneA modT1) ;
+        SI bool0.'MECANIQUE' ;
+            tmp0 = TOPOCHAN tmp0 modM1 bmsh1 ;
+        FINS ;
+*       Sensitivity field (with 1/2)
+        dc0  = dc0 + ((WghtT0 * 0.5) * tmp0 * ((vdT0 - 1.0) * p0 * (x0**(p0 - 1.0)))) ;
+    FINS ;
+FINS ;
+
+* Output data
+* ***********
+
+* Save the objectove value and the sensitivity field
+tab0.'WTABLE'.'OBJECTIF' = obj0 ;
+tab0.'WTABLE'.'SENSIBILITE' = dc0 ;
+
+FINP ;
+
+$$$$
+ 
+ 
+ 

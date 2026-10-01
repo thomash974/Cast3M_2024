@@ -1,0 +1,37 @@
+$$$$ NOMM     NOTICE  OF166741  23/06/19    21:15:06     11679          
+                                             DATE     23/06/19
+
+
+    Directive NOMM
+    --------------
+                                                          
+    NOMM  LE_NOM  OBJET  ;
+
+
+Section : Langage Base
+
+FRAN==========================================================
+    Objet :
+    _______
+
+    La directive NOMMer permet de donner un nom a l'objet OBJET.
+
+Si LE_NOM designe un MOT, c'est la valeur de ce MOT qui sera le nom
+de l'objet. Sinon, ce sera la chaine LE_NOM.
+
+Le nom de l'objet est automatiquement converti en MAJUSCULES.
+
+
+ANGL==========================================================
+    Description :
+    _____________
+
+    The NOMM instruction is used to give a name to the object OBJECT.
+
+If LE_NOM designates an object of type MOT, it is the value of this 
+object which will be the new name. Otherwise it will be the sring LE_NOM.
+ 
+The name of the object is automatically converted into UPPERCASE.
+
+
+ 

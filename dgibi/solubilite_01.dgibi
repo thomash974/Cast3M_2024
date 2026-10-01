@@ -1,0 +1,168 @@
+* fichier :  solubilite_01.dgibi
+
+************************************************************************
+* Section : Changement_De_Phase Changement_De_Phase
+* Section : Diffusion Fick
+************************************************************************
+
+************************************************************************
+*  Cas test :  solubilite_01.dgibi
+*  --------
+*
+*  Categorie : Verification
+*  ---------
+*
+*  Description :
+*  -----------
+*
+*  Teste le MODELE 'CHANGEMENT_PHASE' 'SOLUBILITE' developpe en 2021
+*
+*  Plaque 2D constituee de 2 SOUS-ZONES 'TRI3' et 'QUA4'
+*  Le point P1 est soumis à un chargement oscillant sur les
+*  quantites duales 'QL' et 'QGA'.
+*  La quantite primale 'CL' a une limite de solubilite Sol1
+*  Les quantites primales 'CL' et 'CG' diffusent en plus dans
+*  le domaine avec un modele de DIFFUSION de FICK
+*
+*  Validation : (Aucune actuellement)
+*  ----------
+*  Tests a developper (Conservation des especes), solution analytique,
+*  etc.
+*
+************************************************************************
+
+'OPTI' 'TRAC' 'PSC';
+'OPTI' 'DIME' 2 'ELEM' 'QUA4' 'MODE' 'PLAN' ;
+
+*************** Solubilite ************************
+ Sol1  = 0.5  ;
+ SrcQL = 2.E-5   ;
+ SrcQG = 1.E-5   ;
+
+*************** Geometrie *************************************************
+ P1    =  0.     0.    ;
+ P2    =  5.e-3  0.    ;
+ P3    =  5.e-3 10.e-3 ;
+ P4    =  0.    10.e-3 ;
+
+ n     = 20 ;
+ L23   = P2 'DROI' n  P3 ;
+ L41   = P4 'DROI' n  P1 ;
+ L14   ='INVE' L41 ;
+
+ PA    ='POIN' L41 'PROC' (0. 2.5e-3) ;
+
+ n     = 10 ;
+ MQUA4 =      ('INVE'  L41) 'REGL' n L23 ;
+ MTRI3 ='CHAN' 'TRI3' (L23  'REGL' n (L23 'PLUS' P2));
+
+ su1   = MQUA4 'ET' MTRI3;
+
+**************** Modeles et caracteristiques *********************************
+ moddi1 ='MODE' su1   'DIFFUSION'        'FICK'       'INCO' 'CL' 'QL'            'CONS' 'CON1' ;
+ moddi2 ='MODE' su1   'DIFFUSION'        'FICK'       'INCO' 'CG' 'QGA'           'CONS' 'CON2' ;
+ modph1 ='MODE' su1   'CHANGEMENT_PHASE' 'SOLUBILITE' 'INCO' 'CL' 'CG' 'QL' 'QGA' 'CONS' 'SOL1' ;
+ modtot = moddi1 'ET' moddi2 'ET' modph1 ;
+
+ matdi1 ='MATE' moddi1 'K' 1.D-5 'CDIF' 5.D-2 ;
+ matdi2 ='MATE' moddi2 'K' 2.D-5 'CDIF' 1.D-1  ;
+ matph1 ='MATE' modph1 'SOLU' Sol1 ;
+ mattot = matdi1 'ET' matdi2 'ET' matph1 ;
+
+**************** CHARGEMENT *********************************
+ srcdi1  ='MANU' 'CHPO' ('MANU' 'POI1' P1) 1 'QL'  SrcQL ;
+ srcdi2  ='MANU' 'CHPO' ('MANU' 'POI1' P1) 1 'QGA' SrcQG ;
+
+ ltps1   ='PROG' 0. 'PAS' 0.1 10. ;
+ lqL     = 5.D-2 * ('SIN' (ltps1*360./4.)) ;
+ lqG     =-1.5D-2 * (3.D0 * ('SIN' (ltps1*360./3.))) * (1. + (ltps1 / 50.) ) ;
+
+ Evdi1   ='EVOL' 'BLEU' 'MANU' 'TEMP' ltps1 'QL'  lqL ;
+ Evdi2   ='EVOL' 'ROUG' 'MANU' 'TEMP' ltps1 'QGA' lqG ;
+
+ chardi1 ='CHAR' 'QL'  srcdi1 Evdi1 ;
+ chardi2 ='CHAR' 'QGA' srcdi2 Evdi2 ;
+ chartot = chardi1 'ET' chardi2 ;
+
+**************** PASAPAS *********************************
+ listT                      ='PROG' 0. 'PAS' 0.2 10. ;
+ xtab                       ='TABL'   ;
+ xtab.'MODELE'              = modtot  ;
+ xtab.'CARACTERISTIQUES'    = mattot  ;
+ xtab.'CHARGEMENT'          = chartot ;
+ xtab.'CONCENTRATIONS'      ='TABL'   ;
+ xtab.'CONCENTRATIONS'. 0   ='MANU' 'CHPO' su1 2 'CL' 0.25 'CG' 0.D0 'NATURE' 'DIFFUS' ;
+
+ xtab.'TEMPS_CALCULES'      = listT   ;
+ xtab.'PRECISION'           = 1.D-6   ;
+ xtab.'CTOL'                ='MANU' 'CHPO' su1 2 'CL' 1.D-6 'CG' 1.D-6 ;
+ xtab.'PROCESSEURS'         ='MONOPROCESSEUR' ;
+
+ PASAPAS xtab ;
+
+**************** POST-TRAITEMENT *********************************
+*Chargement en P1
+ TLEG           ='TABL';
+ TLEG.'TITRE'   ='TABL';
+ TLEG.'TITRE'. 1='CHAI' 'Liquide';
+ TLEG.'TITRE'. 2='CHAI' 'Gaz'           ;
+ Tit1 ='CHAI' 'Chargement sur le point P1';
+'DESS' (Evdi1 'ET' Evdi2) 'GRIL' 'TITR' Tit1 'LEGE' TLEG ;
+
+*Evolution des concentrations en P1
+ EVO_L   ='EVOL' 'BLEU' 'TEMP' xtab 'CONCENTRATIONS' 'CL' P1 ;
+ EVO_G   ='EVOL' 'ROUG' 'TEMP' xtab 'CONCENTRATIONS' 'CG' P1 ;
+ EVO_Som ='COUL' (EVO_L + EVO_G) 'VERT' ;
+ Tit1 ='CHAI' 'Concentrations CL et CG';
+'DESS' (EVO_L  'ET' EVO_G) 'GRIL' 'TITR' Tit1 'LEGE' TLEG ;
+ Tit1 ='CHAI' 'Cumul des concentrations CL et CG';
+'DESS'  EVO_Som            'GRIL' 'TITR' Tit1 ;
+
+*Evolution des reactions sur les blocages du modele de 'SOLUBILITE' en P1
+ BLOSOL='PMAT'  modph1   ;
+ Ltps1 ='TABL' 'ESCLAVE' ;
+ LREAL ='TABL' 'ESCLAVE' ;
+ LREAG ='TABL' 'ESCLAVE' ;
+'REPE' SURi ('DIME' xtab.'TEMPS')            ;
+   Tpsi = xtab.'TEMPS'. (&SURi - 1)          ;
+   Ci   = xtab.'CONCENTRATIONS'. (&SURi - 1) ;
+   REAi ='REDU' ('REAC' Ci BLOSOL) P1        ;
+   Ltps1. &SURi = Tpsi ;
+  'SI' ('EXIS' REAi 'QL');
+     LREAL. &SURi ='MAXI' ('EXCO' REAi 'QL' );
+  'SINO';
+     LREAL. &SURi = 0.D0;
+  'FINS';
+  'SI' ('EXIS' REAi 'QGA');
+     LREAG. &SURi ='MAXI' ('EXCO' REAi 'QGA' );
+  'SINO';
+     LREAG. &SURi = 0.D0;
+  'FINS';
+'FIN' SURi ;
+ Ltps1 ='ETG' Ltps1 ;
+ LREAL ='ETG' LREAL ;
+ LREAG ='ETG' LREAG ;
+
+ EVO_RL ='EVOL' 'BLEU' 'MANU' 'TEMP' Ltps1 'Reac_L' LREAL ;
+ EVO_RG ='EVOL' 'ROUG' 'MANU' 'TEMP' Ltps1 'Reac_G' LREAG ;
+
+ Tit1 ='CHAI' 'Reactions sur les blocages CL et CG';
+'DESS' (EVO_RL 'ET' EVO_RG) 'GRIL' 'TITR' Tit1 'LEGE' TLEG ;
+
+'REPE' SURi ('DIME' xtab.'TEMPS') ;
+   Ci   ='EXCO' xtab.'CONCENTRATIONS'. (&SURi - 1) 'CL';
+   Tpsi = xtab.'TEMPS'. (&SURi - 1)          ;
+   Titi ='CHAI' 'Concentration ''CL'' au temps :' Tpsi ;
+  'TRAC' Ci su1 'TITR' Titi ;
+'FIN' SURi ;
+
+'REPE' SURi ('DIME' xtab.'TEMPS') ;
+   Ci   ='EXCO' xtab.'CONCENTRATIONS'. (&SURi - 1) 'CG';
+   Tpsi = xtab.'TEMPS'. (&SURi - 1)          ;
+   Titi ='CHAI' 'Concentration ''CG'' au temps :' Tpsi ;
+  'TRAC' Ci su1 'TITR' Titi ;
+'FIN' SURi ;
+
+FIN ;
+ 
+

@@ -1,0 +1,215 @@
+* fichier :  rupt9.dgibi
+************************************************************************
+* Section : Mecanique Endommagement
+************************************************************************
+*           Test Rupt9.dgibi: Jeux de données         *
+*           ---------------------------------         *
+*                                                     *
+****************************************************
+*                                                  *
+*   VALIDATION DE LA PROCEDURE G_THETA SUR UNE     *
+*             PLAQUE EN TRACTION PURE              *
+*                        -                         *
+*  SOLUTION DE REFERENCE :                         *
+*  COMPENDIUM OF STRESS INTENSITY FACTORS,         *
+*  by Rooke & Cartwright.                          *
+*                                                  *
+*                                                  *
+*  GEOMETRIE :                                     *
+*                                                  *
+*  longueur de la plaque     : 250. MM             *
+*  largeur de la plaque      : 100. MM             *
+*  lonqueur de la fissure    : 50.  MM             *
+*  Inclinaison de la fissure : 45.0 degrés         *
+*                                                  *
+*  MATERIAU :                                      *
+*                                                  *
+*  Module d'Young         : 2.E5 MPA               *
+*  Coefficient de poisson : 0.3                    *
+*                                                  *
+*  CHARGEMENT :                                    *
+*                                                  *
+*  Traction pure          : 1.0 daN/MM**2          *
+*                                                  *
+*  SOLUTION ANALYTIQUE :                           *
+*                                                  *
+*  Les facteurs d'intensité de contraintes         *
+*                K1 = 150.37 daN/mm**(-3/2)        *
+*                K2 = -71.4 daN/mm**(-3/2)         *
+*                                                  *
+****************************************************
+
+* I - OPTIONS ET DONNEES
+* ----------------------
+
+* OPTIONS
+OPTI 'DIME' 2 'ELEM' 'QUA8' ;
+* SI BTRAC = VRAI ON TRACE LE MAILLAGE
+BTRAC = FAUX ;
+
+* DONNEES
+* L1   = LONGUEUR DE LA PLAQUE
+* H1   = LARGEUR DE LA PLAQUE
+* LF   = LONGUEUR DE LA FISSURE
+* ANG1 = INCLINAISON DE LA FISSURE
+* XF   = ABSCISSE OU LA FISSURE DEBOUCHE
+L1 = 250. ;
+H1 = 100. ;
+LF = 50. ;
+ANG1 = 45. ;
+XF = 100. ;
+
+* PROPRIÉTÉS MATÉRIAU
+MYOU = 2.E5 ;
+POI = 0.3 ;
+
+
+* II - MAILLAGE
+* -------------
+
+* PARAMETRES DU MAILLAGE
+DENS1 = 10. ;
+DENS DENS1 ;
+PREC1 = DENS1 * 1.E-10 ;
+NROT = ENTI (2.*PI*LF / DENS1 / 8.) ;
+
+* MAILLAGE CIRCULAIRE AUTOUR DE LA POINTE DE FISSURE (UN HUITIEME)
+P1I = XF 0. ;
+PF = P1I PLUS (LF * ((COS ANG1) (SIN ANG1))) ;
+P2I = 0.5*(P1I PLUS PF) ;
+D1 = DROI P2I PF 'DFIN' (DENS1 / (8*NROT)) ;
+S1 = D1 ROTA NROT 45. PF ;
+X Y = COOR S1 ;
+DFRO = (((X - (COOR 1 PF))**2) + ((Y - (COOR 2 PF))**2))**0.5 ;
+PFRO = DFRO POIN 'EGINFE' PREC1 ;
+ELIM PFRO PREC1 ;
+S1 = REGE S1 ;
+
+* MAILLAGE ENTRE LE HUITIEME DE CERCLE ET LE BAS DU RECTANGLE
+D2 = D1 TOUR 45. PF ;
+ELIM S1 D2 PREC1 ;
+CER1 = DIFF (CONT S1) (D1 ET D2) ;
+P3 = (COOR 1 PF) 0. ;
+D3 = DROI (NBEL CER1) P3 P1I ;
+S1 = S1 ET (CER1 REGL D3) ;
+
+* 3 SYMETRIES POUR OBTENIR LE MAILLAGE COMPLET AUTOUR DE LA POINTE
+* (ON PREND GARDE DE NE PAS FAIRE ELIM ENTRE S1 ET S2 POUR AVOIR LA FISSURE)
+S2 = S1 SYME 'DROI' P1I PF ;
+S3 = (S1 ET S2) SYME 'DROI' PF (PF PLUS (1. 0.)) ;
+ELIM (S2 ET S3) PREC1 ;
+S4 = (S1 ET S2 ET S3) SYME 'DROI' PF (PF PLUS (0. 1.)) ;
+ELIM (S3 ET S4) PREC1 ;
+ELIM S4 S1 PREC1 ;
+
+* STOT = SURFACE TOTALE
+STOT = S1 ET S2 ET S3 ET S4 ;
+
+* EXTENSION JUSQU'EN HAUT DU RECTANGLE
+PHAU = (COOR 2 STOT) POIN 'MAXI' ;
+DHAU = (CONT STOT) ELEM 'APPUYE' PHAU ;
+S5 = DHAU TRAN (0. (H1 - (MAXI (COOR 2 STOT)))) ;
+STOT = STOT ET S5 ;
+
+* EXTENSION JUSQU'AU BORD DROIT DU RECTANGLE
+PDROI = (COOR 1 STOT) POIN 'MAXI' ;
+DDROI = (CONT STOT) ELEM 'APPUYE' PDROI ;
+S6 = DDROI TRAN ((L1 - (MAXI (COOR 1 STOT))) 0.) ;
+STOT = STOT ET S6 ;
+
+* EXTENSION JUSQU'AU BORD GAUCHE DU RECTANGLE
+PGAU = (COOR 1 STOT) POIN 'MINI' ;
+DGAU = (CONT STOT) ELEM 'APPUYE' PGAU ;
+S7 = DGAU TRAN ((0. - (MINI (COOR 1 STOT))) 0.) ;
+STOT = STOT ET S7 ;
+
+* LEVRES ET FRONT
+PSUP = S2 POIN 'DROI' P1I PF PREC1 ;
+LVSUP = (CONT S2) ELEM 'APPUYE' PSUP ;
+LVSUP = ORDO LVSUP ;
+PINF = S1 POIN 'DROIT' P1I PF PREC1 ;
+LVINF = (CONT S1) ELEM 'APPUYE' PINF ;
+LVINF = ORDO LVINF ;
+MFRO1 = INTE (CHAN 'POI1' LVSUP) (CHAN 'POI1' LVINF) ;
+FRO1 = MFRO1 POIN 1 ;
+
+
+* III - MODELE, MATERIAU, CLS ET RESOLUTION
+* -----------------------------------------
+
+* MODELE ET MATERIAU
+MOD1 = MODE STOT 'MECANIQUE' 'ELASTIQUE' ;
+MAT1 = MATE MOD1 'YOUN' MYOU 'NU' POI ;
+RIG1 = RIGI MAT1 MOD1 ;
+
+* CONDITIONS AUX LIMITES ET CHARGEMENT
+P0 = 0. 0. ;
+P1 = L1 0. ;
+ELIM STOT (P0 ET P1) PREC1 ;
+BLO1 = BLOQ 'DEPL' P0 ;
+BLO2 = BLOQ 'UY' P1 ;
+BLO0 = BLO1 ET BLO2 ;
+PG = STOT POIN 'DROI' (0. 0.) (0. 1.) PREC1 ;
+LG = (CONT STOT) ELEM 'APPUYE' PG ;
+PD = STOT POIN 'DROI' (L1 0.) (L1 1.) PREC1 ;
+LD = (CONT STOT) ELEM 'APPUYE' PD ;
+F1 = PRES 'MASS' MOD1 -10. LG ;
+F2 = PRES 'MASS' MOD1 -10. LD ;
+F0 = F1 ET F2 ;
+
+* RESOLUTION
+U0 = RESO (RIG1 ET BLO0) F0 ;
+
+SI BTRAC ;
+    TRAC (STOT ET (LVSUP COUL 'ROUG') ET (MFRO1 COUL 'BLEU')) ;
+    DEF0 = DEFO STOT U0 0. ;
+    DEF1 = DEFO STOT U0 'ROUG' ;
+    TRAC (DEF0 ET DEF1) ;
+FINSI ;
+
+
+* IV - POST-TRAITEMENT
+* --------------------
+
+* APPEL A G_THETA
+SUPTAB = TABL ;
+SUPTAB.'OBJECTIF' = MOT 'DECOUPLAGE' ;
+SUPTAB.'LEVRE_SUPERIEURE' = LVSUP ;
+SUPTAB.'LEVRE_INFERIEURE' = LVINF ;
+SUPTAB.'FRONT_FISSURE' = FRO1 ; 
+SUPTAB.'MODELE' = MOD1 ;
+SUPTAB.'CARACTERISTIQUES' = MAT1 ;
+SUPTAB.'SOLUTION_RESO' = U0 ;
+SUPTAB.'CHARGEMENTS_MECANIQUES' = F0 ;
+SUPTAB.'COUCHE' = 3 ;
+SUPTAB.'METH_AUX' = MOT 'UANA' ;
+G_THETA SUPTAB ;
+KNUM = SUPTAB.'RESULTATS' ;
+
+* SOLUTION ANALYTIQUE
+KANA = TABL ;
+KANA.'I' = 150.37 ;
+KANA.'II' = -71.4 ;
+
+* RESULTATS
+ACC1 = 0.02 ;
+SAUT 'LIGNE' ;
+REPE IMOD 2 ;
+* ON ITERE SUR LES MODES
+    MMOD = EXTR 'II' 1 &IMOD ;
+    KN = KNUM.MMOD ;
+    KA = KANA.MMOD ;
+    ERR1 = ABS ((KA - KN)/KA) ;
+    MESS 'ERREUR RELATIVE SUR K' MMOD ' :' (ERR1 * 100.) '%' ;
+    SI (ERR1 > ACC1) ;
+        MESS 'LA SOLUTION NUMERIQUE EST TROP ELOIGNEE DE LA SOLUTION' ;
+        MESS 'ANALYTIQUE POUR LE CALCUL DU FIC EN MODE' ' ' MMOD ;
+        ERRE 5 ;
+    FINSI ;
+FIN IMOD ;
+
+FIN ;
+ 
+
+ 
+

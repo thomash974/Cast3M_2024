@@ -1,0 +1,777 @@
+$$$$ MAILTOPO
+* MAILTOPO  PROCEDUR  GOUNAND   21/04/09    21:15:04     10944          
+************************************************************************
+* NOM         : MAILTOPO
+* DESCRIPTION : Algorithme topologique de génération ou d'optimisation
+*               d'un maillage.
+*
+*               Bibliographie :
+*
+*@article{doi:10.1080/12506559.2000.10511454,
+*     author = {Coupez, Thierry},
+*     title = {Génération de maillage et adaptation de maillage par
+*     optimisation locale},
+*     journal = {Revue Européenne des Éléments Finis},
+*     volume = {9},
+*     number = {4},
+*     pages = {403-423},
+*     year = {2000},
+*     doi = {10.1080/12506559.2000.10511454},
+*     URL = {http://www.tandfonline.com/doi/abs/10.1080/12506559.2000.10511454}}
+*     
+*
+*@PhdThesis{,
+*  author =       {Cyril Gruau},
+*   title =        {Génération de métriques pour adaptation anisotrope
+*     de maillage, application à la mise en forme des matériaux}, 
+*  school =       {ENSMP},
+*  year =         {2004},
+*  month =     {10 dec}}
+*      
+*@article{Gruau20054951,
+*     title = "3D tetrahedral, unstructured and anisotropic mesh
+*     generation with adaptation to natural and multidomain metric", 
+*     journal = "Computer Methods in Applied Mechanics and Engineering",
+*     volume = "194",
+*     number = "48 - 49",
+*     pages = "4951 - 4976",
+*      year = "2005",
+*     issn = "0045-7825",
+*     doi = "10.1016/j.cma.2004.11.020",
+*     url = "http://www.sciencedirect.com/science/article/pii/S0045782505000745",
+*     author = "Cyril Gruau and Thierry Coupez",
+*     keywords = "Topology and shape optimization",
+*     keywords = "Elliptic interpolation",
+*     keywords = "Thickness detection and curvature treatment",
+*     keywords = "Interface refinement"}
+*
+* @article{Coupez20112391,
+*     title = "Metric construction by length distribution tensor and
+*     edge based error for anisotropic adaptive meshing",
+*     journal = "Journal of Computational Physics",
+*     volume = "230",
+*     number = "7",
+*     pages = "2391 - 2405",
+*     year = "2011",
+*     issn = "0021-9991",
+*     doi = "10.1016/j.jcp.2010.11.041",
+*     url = "http://www.sciencedirect.com/science/article/pii/S002199911000656X",
+*     author = "T. Coupez",
+*     keywords = "Metric",
+*     keywords = "Length distribution tensor",
+*     keywords = "Anisotropic meshing",
+*     keywords = "Interpolation error",
+*     keywords = "Edge error estimate"}
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SEMT/LTA)
+*               mél : stephane.gounand@cea.fr
+**********************************************************************
+* VERSION    : v1, 28/11/2017, version initiale
+* HISTORIQUE : v1, 28/11/2017, création
+* DESCRIPTION : IJOB=0
+*               Minimise le volume d'une topologie de maillage
+*               en le maintenant supérieur à 0
+*               IJOB=1
+*               Minimise le volume, mais on a le droit d'ajouter des
+*               noeuds internes
+*               IJOB=2
+*               La topologie de maillage est supposée être un maillage
+*               On essaie de l'améliorer en conservant son volume
+*               mais en augmentant sa qualité grace a l'adjonction
+*               de noeuds internes
+*
+* 2017/11/30 : On remplace par ialgo (0 ou 1 : génération ou
+*              optimisation de maillage) et iajno (autorise-t-on
+*              l'algorithme à ajouter des noeuds.)
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+*
+'DEBPROC' MAILTOPO ;
+* Mot-clé obligatoire :
+*            TRIA : génération de maillage (ialgo=0)
+*            REMA : remaillage             (ialgo=1)
+'ARGU' moalgo*'MOT' ;
+lmoalgo = 'MOTS' 'TRIA' 'REMA' ;
+ialgo   = 'POSI' moalgo 'DANS' lmoalgo ;
+'SI' ('EGA' ialgo 0) ;
+   'ERRE' 1052 'AVEC' moalgo lmoalgo ;
+'FINS' ;
+ialgo = ialgo '-' 1 ;
+*
+'ARGUMENT' topoini*'MAILLAGE' ;
+*dbg 'MESS' 'coucou mailtopo' ;
+*
+* Dans le cas REMA, le mailleur peut modifier le bord par défaut
+* seulement si on donne une métrique
+* à l'aide du noeud virtuel lvirt=vrai et on peut dire s'il y a une
+* partie du bord que l'on ne veut pas modifier
+* Dans le cas TRIA, le mailleur ne peut pas modifier le bord par défaut 
+*
+'SI' ('EGA' ialgo 1) ;
+   lvirt = vrai ;
+   'ARGU' mbnc/'MAILLAGE' ;
+   lmbnc = 'EXIS' mbnc ;
+'FINS' ;   
+'SI' ('EGA' ialgo 0) ;
+   lvirt = faux ;
+   lmbnc = faux ;
+'FINS' ;
+*
+* Valeur de la métrique
+* Attention pour les métriques scalaires, la donnée est homogène à une
+* longueur. Pour les métriques anisotropes (tensorielles), c'est
+* proportionnel à l'inverse du carré d'une longueur.
+*
+'ARGU' metva/'FLOTTANT' ;
+'SI' ('NON' ('EXIS' metva)) ;
+   'ARGU' metva/'CHPOINT' ;
+'FINS' ;
+* Convention dans cette procédure : s'il n'y a pas de métrique
+* On met metva à faux
+lmet = 'EXIS' metva ;
+'SI' ('NON' lmet) ;
+   metva = FAUX ;
+'FINS' ;
+tmetva = 'TYPE' metva ;
+*
+* Mot-clés optionnels :
+*            IPOL : renvoie la métrique (type CHPOINT) interpolée
+*            AJNO : on a le droit d'ajouter des noeuds internes (iajno=1
+*                   par défaut)
+*            NOAJ : on n'ajoute pas de noeurds internes (iajno=0)
+*
+lmotcle = 'MOTS' 'IPOL' 'AJNO' 'NOAJ' ;
+lipol = faux ;
+iajno = 1 ;
+'REPE' bmotcle ;
+   'ARGU' motcle/'MOT' ;
+   'SI' ('NON' ('EXIS' motcle)) ;
+      'QUIT' bmotcle ;
+   'SINO' ;
+*      'MESS' motcle ;
+      'SI' ('NON' ('EXIS' lmotcle motcle)) ;
+         'ERRE' 1052 'AVEC' motcle lmotcle ;
+      'FINS' ;
+      'SI' ('EGA' motcle 'IPOL') ;
+         'SI' ('EGA' ('TYPE' metva) 'CHPOINT') ;
+            lipol = vrai ;
+         'SINO' ;         
+            'ERRE' -370 'AVEC' motcle ;
+*  39 2
+*On ne veut pas d'objet de type %m1:8
+            'ERRE' 39 'AVEC' tmetva ;
+         'FINS' ;
+      'FINS' ;
+      'SI' ('EGA' motcle 'NOAJ') ; iajno = 0 ; 'FINS' ;
+      'SI' ('EGA' motcle 'AJNO') ; iajno = 1 ; 'FINS' ;
+   'FINS' ;
+'FIN' bmotcle ;
+*
+* Lecture mots-clefs valeur jusqu'à épuisement obligatoire ou non,
+* valeurs par défaut...
+*
+*     Obligatoire
+*
+* DESCRIPTION : IJOB=0
+*               Minimise le volume d'une topologie de maillage
+*               en le maintenant supérieur à 0
+*               IJOB=1
+*               Minimise le volume, mais on a le droit d'ajouter des
+*               noeuds internes
+*               IJOB=2
+*               La topologie de maillage est supposée être un maillage
+*               On essaie de l'améliorer en conservant son volume
+*               mais en augmentant sa qualité grace a l'adjonction
+*               de noeuds internes
+*
+* 2017/11/30 : On remplace par ialgo (0 ou 1 : génération ou
+*              optimisation de maillage) et iajno (autorise-t-on
+*              l'algorithme à ajouter des noeuds.)
+* 2018/01/17 : On essaie de faire aller l'algorithme plus vite en ne
+*              parcourant que les éléments touchant les différences
+*              d'un cycle d'optimisation à l'autre
+*              paramètre 
+*
+* 2018/06/16 : On a ajouté un indice bord_no_chan et corrigé quelques
+*              bugs dans son implémentation
+*
+*
+*
+*
+*ijob  = tparam . 'job' ;
+*
+*     Optionnel
+*
+'ARGU' tparam/'TABLE' ;
+xtparam = 'EXIS' tparam ;
+'SI' ('NON' xtparam) ;
+   tparam = 'TABL' ;
+'FINS' ;
+*
+* debug : niveau d'impression de la procédure
+*
+debug = MATOUTIL 'GASTIDX' tparam 'debug' 0 ;
+*
+'SI' ('>EG' debug 0) ;
+   'MESS' 'Mailleur topologique v1.0beta' ' -'
+      ' Bugs and suggestions to Stephane Gounand CEA France' ;
+'FINS' ;   
+*
+* graph : logique indiquant si la procédure émet des tracés
+*         (leur nombre dépend de debug)
+graph = MATOUTIL 'GASTIDX' tparam 'graph' faux ;
+*
+* id_cas : une chaine de caractères pour nommer le cas courant
+*
+idk = 'CHAI' 'topoini=' ('VALE' 'POINTEUR' topoini) ;
+idk = MATOUTIL 'GASTIDX' tparam 'id_cas' idk ;
+*
+* Nombre de boucle d'optimisation max
+*
+nboptim = MATOUTIL 'GASTIDX' tparam 'max_iter' 100 ;
+*
+* Sens de parcours des entités topologiques
+* isens = 0 (points, arêtes, faces, éléments)
+* isens = 1 sens inverse
+*
+isens = MATOUTIL 'GASTIDX' tparam 'sens' 0 ;
+**
+** impr : niveau d'impression des opérateurs appelés (OPTO ou TOPV)
+** (entre 0 et 3 pour l'instant)
+**
+*impr = 0 ;
+*'SI' ('EXIS' tparam 'impr') ; impr = tparam . 'impr' ; 'FINS' ;
+*
+* verif : niveau de vérification effectué dans les opérateurs appelés
+* (OPTO ou TOPV) (entre 0 et 2 pour l'instant)
+*
+iveri = MATOUTIL 'GASTIDX' tparam 'verif' 0 ;
+*
+* isegadj : impression des ajustements de dimension des segments
+* effectués dans les opérateurs appelés (OPTO ou TOPV) (entre 0 et 1)
+*
+isegadj = MATOUTIL 'GASTIDX' tparam 'impr_segadj' 0 ;
+*
+*
+* igibi = MATOUTIL 'GASTIDX' tparam 'type_implem' 0 ;
+*
+*
+* Table indiquant la stratégie de parcours des types de topologie
+* 1=points 2=aretes 3=triangles 4=tétras
+* Attention, on applique isens dessus. De plus les éléments de dimension
+* égale à celle de l'espace (surfaciques en 2D, volumiques en 3D) ne
+* seront parcourus que si on autorise l'ajout de noeuds.
+*
+vdim = 'VALE' 'DIME' ;
+tstrat = 'TABL' ;
+tstrat . 1 = 'LECT' 1 2 ;
+tstrat . 2 = 'LECT' 1 'PAS' 1 ('+' vdim 1) ;
+*
+tstrat = MATOUTIL 'GASTIDX' tparam 'strat_parcou_topo' tstrat ;
+* Verif
+'SI' ('NON' ('EXIS' tstrat 1)) ;
+   ch1 = 'CHAI' 'La table de stratégie de parcours na pas dindice 1' ;
+   'MESS' ch1 ;
+* Données incompatibles   
+   'ERRE' 21 ;
+'FINS' ;   
+*
+'SI' ('EGA' isens 1) ;
+   istrat = 1 ;
+   'REPE' binv ;
+      'SI' ('EXIS' tstrat istrat) ;
+         tstrat . istrat = INVELIST (tstrat . istrat) ;
+         istrat = istrat '+' 1 ;
+      'SINO' ;
+         'QUIT' binv ;
+      'FINS' ;
+   'FIN' binv ;
+'FINS' ;
+*
+* Nb de candidats max autour de chaque topologie parcourue
+*
+incma = MATOUTIL 'GASTIDX' tparam 'nb_cand_max' 1000 ;
+*
+* Stratégie à adopter si on dépasse le nombre de candidats max.
+*   0 : on saute le cas
+*   1 : on teste quelques candidats celui avec un noeud à la moitié
+*       du max. et avec le noeud milieu si possible
+*   2 : on sélectionne un nombre de candidats égal à incma^2 /
+*               nb points du bord
+istma = MATOUTIL 'GASTIDX' tparam 'strat_cand_max' 0 ;
+*
+* Tentative de stratégie rapide
+*
+lfast = MATOUTIL 'GASTIDX' tparam 'strat_fast' faux ;
+*
+* Tests sur la topologie initiale et correction éventuelle
+*
+lok = vrai ;
+* Type de job et type d'éléments du maillage
+'SI' ('NON' ('EXIS' ('LECT' 2 3) vdim)) ;
+* 709 2
+*Fonction indisponible en dimension %i1.
+   'ERRE' 709 'AVEC' vdim ;
+'FINS' ;   
+*
+'SI' ('EGA' vdim 2) ;
+   typlicit = 'MOTS' 'SEG2' 'TRI3' ;
+'FINS' ;   
+'SI' ('EGA' vdim 3) ;
+   typlicit = 'MOTS' 'TRI3' 'TET4' ;
+'FINS' ;   
+*
+ltini = 'ELEM' topoini 'TYPE' ;
+dltini = 'DIME' ltini ;
+'SI' ('NEG' dltini 1) ;
+   'SI' ('EGA' dltini 0) ;
+*1027 2
+*Une donnee de type %M1:8 est vide
+      'ERRE' 1027 'AVEC' 'MAILLAGE' ;
+   'SINO' ;
+*    132 2
+*On veut un objet %m1:8 elementaire
+      'ERRE' 132 'AVEC' 'MAILLAGE' ;
+   'FINS' ;
+'FINS' ;
+typel = 'EXTR' ltini 1 ;
+*'SI' ('EGA' ijob 2) ;
+'SI' ('EGA' ialgo 1) ;
+   typlicit = 'EXTR' typlicit ('LECT' ('DIME' typlicit)) ;
+   lvol = vrai ;
+'FINS' ;   
+*
+'SI' ('NON' ('EXIS' typlicit typel)) ;
+* 926 2
+*Le type d'element fini %m1:8 ne convient pas.
+   'ERRE' 926 'AVEC' ('CHAI' typel '    ') ;
+'FINS' ;
+*
+'SI' ('EGA' ialgo 0) ;
+   lvol = 'EGA' typel ('EXTR' typlicit ('DIME' typlicit)) ;
+'FINS' ;   
+*
+'SI' ('NON' lvol) ;
+   borini = topoini ;
+   noini = 'POIN' borini 'INITIAL' ;
+   topoini = 'COUT' noini borini ;
+'SINO' ;
+   borini  = MATOUTIL 'BORD' topoini ;
+'FINS' ;   
+*
+* mbnc : partie du bord ne devant pas changer
+*        mbnc = bord  si on est dans le cas TRIA (ialgo = 0)
+*        S'il n'a pas été donné explicitement dans le cas REMA (ialgo
+*        =1), on met la valeur par défaut :
+*        mbnc = vide
+*        Il faut que DIFF gère ce cas
+*        et que ETOILE soit correct
+*
+   'SI' ('NON' lmbnc) ;
+      'SI' ('NON' lvirt) ;
+         mbnc = borini ;
+      'SINO' ; 
+         lelem   = 'MOTS' 'POI1' 'SEG2' 'TRI3' 'TET4' ;
+         dimtopo = DEADUTIL 'DIMM' topoini ;
+         dimbord = dimtopo '-' ialgo ;
+         telemb = 'EXTR' lelem dimbord ;
+         mbnc = 'VIDE' 'MAILLAGE'/telemb ;
+      'FINS' ;
+   'SINO' ;
+* 2020/05/02 : si le maillage à ne pas modifier est le bord, on peut
+*              enlever le noeud virtuel   
+      'SI' ('EGA' ('NBEL' ('DIFF' borini mbnc)) 0) ;
+         lvirt = faux ;
+      'FINS' ;
+   'FINS' ;   
+* Vérification que mbnc est inclus dans le bord
+* Est-ce nécessaire ? L'algorithme ne pourrait-il pas marcher
+* si mbnc est composé de bords internes. C'est à regarder mais
+* CONT et ENVE doivent alors gérer ces cas.
+   mi = 'INTE' mbnc borini 'NOVERIF' ;
+*   'SI' ('NON' (EGAMAIL mi mbnc)) ;
+   'SI' ('NEG' ('NBEL' ('DIFF'  mi mbnc)) 0) ;
+      cherr = 'CHAI' 'bord_no_chan non inclus dans le bord' ;
+      'ERRE' cherr ;
+   'FINS' ;
+*'FINS' ;
+*
+* Précisions relatives sur les volumes et les qualités des éléments.
+* Attention à ces valeurs, elles peuvent changer les maillages obtenus
+* assez facilement.
+*
+precrelv = MATOUTIL 'GASTIDX' tparam 'precrel_volume' 1.d-11 ;
+precrelq = MATOUTIL 'GASTIDX' tparam 'precrel_qualite' 1.d-2 ;
+*
+* Ceci doit apparaître après les dernières modifications de tparam
+*
+'SI' ('>EG' debug 2) ;
+   'MESS' 'Parametres utilises :' ;
+   'LIST' tparam ;
+'FINS' ;
+* Vérification des indices de la table en entrée
+tindok = MATOUTIL 'GENTABIN' 'debug' 'graph' 'id_cas'
+  'max_iter' 'sens' 'verif' 'impr_segadj'
+  'strat_parcou_topo' 'nb_cand_max' 'strat_cand_max' 'strat_fast' ;
+tindok = MATOUTIL 'GENTABIN' tindok 'precrel_volume'
+                         'precrel_qualite' ;  
+MATOUTIL 'VERTABIN' tparam tindok ;
+*
+*   Orientation
+*
+*'SI' ('EGA' ijob 2) ;
+'SI' ('EGA' ialgo 1) ;
+   topoino = 'ORIE' topoini ;
+   pointr1 pointr2 = 'VALEUR' 'POINTEUR' topoino topoini ;
+   'SI' ('NEG' pointr1 pointr2) ;
+      'MESS' '!!! Topologie initiale : changement orientation elements '
+         'pour le cas' ' ' idk ;
+      lok = lok 'ET' faux ;
+   'FINS' ;
+'FINS' ;
+topoinu = 'UNIQ' topoini ;
+dnode = '-' ('NBEL' topoini) ('NBEL' topoinu) ;
+'SI' ('NEG' dnode 0) ;
+   'MESSAGE' '!!! Topologie initiale :' ' ' dnode
+     ' elements en double pour le cas' ' ' idk ;
+     'SI' ('EGA' ialgo 1) ;
+        lok = lok 'ET' faux ;
+     'FINS' ;   
+*   'SI' ('NEG' ijob 2) ;
+*   'FINS' ;
+'FINS' ;
+*
+* Le bord doit être connexe pour la génération de maillage
+* Pas nécessairement pour l'optimisation de maillage
+*
+tcini = 'PART' 'CONN' borini ;
+lmc = 'EXIS' tcini 2 ;
+*'SI' ('ET' ('<' ijob 2) lmc) ;
+'SI' ('ET' ('EGA' ialgo 0) lmc) ;
+   'MESS' '!!! Topologie initiale :'
+      ' Bord non connexe' ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*
+* Algorithme d'amélioration du maillage
+*
+volucib = MATOUTIL 'MESUINTE' borini ;
+volutol = '*' volucib precrelv ;
+'SI' ('>EG' debug 1) ;
+*'MESSAGE' ('CHAINE' 'Volume initial=' volini) ;
+   'MESSAGE' ('CHAINE' 'Volume cible=' volucib ' tolerance=' volutol) ;
+   'SI' graph ;
+      tit = 'CHAI' idk ' Topologie initiale' ;
+      'TRAC' 'CACH' topoini 'TITR' tit ;
+*      tit = 'CHAINE' idk ' Contour Initial ; vol=' volucib ;
+*      pbor = 'CHANGER' 'POI1' borini ;
+*      'TRACER' ('ET' borini pbor) 'TITR' tit ;
+   'FINS' ;      
+'FINSI' ;
+
+* Qualités
+'SI' ('>' debug 0) ; 
+   dvol nctelem nnul nctno miq maq moq =
+      MATOUTIL 'AFFQUAL' topoini volucib volutol 'REST' 'VMET' metva ;
+'SINO' ;
+   dvol nctelem nnul nctno miq maq moq =
+      MATOUTIL 'AFFQUAL' topoini volucib volutol 'REST' 'VMET' metva 'NAFF' ;
+'FINS' ;
+*
+* Tests sur la topologie initiale (éventuellement corrigée de
+*      l'orientation et des éléments uniques)
+*
+'SI' ('EGA' ialgo 1) ;
+   'SI' ('NEG' dvol 0. volutol) ;
+      'MESSAGE' '!!! Topologie initiale :'
+         ' Dvol non nul pour le cas' ' ' idk ;
+      lok = lok 'ET' faux ;
+   'FINS' ;
+'FINS' ;               
+'SI' ('<' ('+' dvol volutol) 0.) ;
+   'MESSAGE' '!!! Dvol negative pour le cas' ' ' idk ;
+   lok = lok 'ET' faux ;
+'FINSI' ;
+'SI' ('NON' lok) ;
+* 845 2
+*Maillage donne incorrect ?!!!
+   'ERRE' 845 ;
+'FINS' ;
+*
+'SI' lvirt ;
+   'SI' ('EGA' vdim 2) ; pdep = 0.1 0.05 ; 'FINS' ;
+   'SI' ('EGA' vdim 3) ; pdep = 0.1 0.05 0.066 ; 'FINS' ;
+   pzero = 'PLUS' ('BARYCENTRE' borini) pdep ;
+'SINO' ;
+   pzero = 0 ;
+'FINSI' ;
+*
+curtopo = topoini ;
+* Statistiques
+* nnascm  : nombre d'appels de la stratégie de limitation
+*           du nombre de candidats
+* nparcou : nombre de topologies parcourues
+* nexplor : nombre de topologies explorées
+* nchange : nombre de topologies changées
+nnascm = 0 ; nparcou = 0 ; nexplor = 0 ; nchange = 0 ;
+oldtopo = curtopo ;
+*
+* Boucle d'optimisation
+*
+istrat = 1 ; lstrat0 = 'LECT' ;
+'SI' lfast ; tfast = 'TABL' ; 'FINS' ;
+*
+'REPETER' boptim nboptim ;
+*tst 'REPETER' boptim 1 ;
+   'SI' ('EXIS' tstrat istrat) ;
+      ltyptop = tstrat . istrat ;
+   'SINO' ;
+      'QUIT' boptim ;
+   'FINS' ;
+*dbg   'MESS' ('CHAI' 'istrat=' istrat ' ltyptop=') ;
+*dbg   'LIST' ltyptop ;
+   ntyptop ='DIME' ltyptop ;
+*
+   tchange = 0 ;
+   'REPE' typtop ntyptop ;
+      iar = 'EXTR' ltyptop &typtop ;
+      not1 = 'ET' ('EGA' iajno 0) ('EGA' iar ('+' vdim 1)) ;
+      not2 = 'EXIS' lstrat0 iar ;
+*dbg      'MESS' ('CHAI' 'iar=' iar ' iajno=' iajno ' vdim=' vdim
+*dbg         ' not1=' not1 ' not2=' not2) ;
+*dbg      'MESS' 'lstrat0' ; 'LIST' lstrat0 ;
+      'SI' ('NON' ('OU' not1 not2)) ;
+         'SI' lfast ;
+            'SI' ('EXIS' tfast iar) ;
+               pretopo = tfast . iar ;
+               elecom  = 'INTE' pretopo curtopo ;
+               eledifc = 'DIFF' curtopo elecom ;
+               ncurtopo = 'NBEL' curtopo ;
+               nelecom  = 'NBEL' elecom ;
+               neledifc = 'NBEL' eledifc ;
+*               naparcav = 'NBEL' aparc ;   
+*               aparc   = 'ELEM' aparc 'APPUYE' 'LARGEMENT' eledifc ;
+*               naparcap = 'NBEL' aparc ;
+               curtopor = 'ELEM' curtopo 'APPUYE' 'LARGEMENT' eledifc ;
+               ncurr = 'NBEL' curtopor ;
+*               ch = 'CHAI' 'Acceleration : maillage (' neledifc ' / '
+               ch = 'CHAI' 'Acceleration : maillage (' ncurr ' / '
+               ncurtopo ')  ' ;
+*               iar ' (' naparcap ' / ' naparcav ')' ;
+               'MESS' ch ;
+*               AFFVAR 'ncurtopo' 'nelecom'
+*                  'neledifc' 'naparcav' 'naparcap' ;
+            'SINO' ;
+               'MESS' 'Pas dacceleration' ;
+               curtopor = curtopo ;
+            'FINS' ;
+            tfast . iar = curtopo ;
+         'SINO' ;
+            curtopor = curtopo ;
+         'FINS' ;
+         'SI' ('EGA' iar 1) ;
+            aparc = 'CHANGER' curtopor 'POI1' ;
+            motar = 'points' ;
+         'FINS' ;      
+         'SI' ('EGA' iar 2) ;
+            aparc = 'CHANGER' curtopor 'LIGN' ;
+            motar = 'aretes' ;
+         'FINSI' ;
+         'SI' ('EGA' iar 3) ;
+            aparc =  'CHAN' curtopor 'SURF' ;
+            motar = 'triangles' ;
+         'FINSI' ;
+         'SI' ('EGA' iar 4) ;
+            aparc =  curtopor ;
+            motar = 'tetras' ;
+         'FINSI' ;
+         titec = 'CHAINE' 'bop=' &boptim ' ' motar ;
+*      trr = ('EGA' ikas 34) 'ET' ('EGA' &boptim 2) 'ET' ('EGA' iar 2) ;
+*      trr = ('EGA' ikas 35) 'ET' ('EGA' &boptim 1) 'ET' ('EGA' iar 3) ;
+*      trr = ('EGA' &boptim 3) 'ET' ('EGA' iar 1) ;
+*      'SI' trr ; debug = 4 ; 'SINO' ; debug = 2 ; 'FINS' ;
+         inascm = 0 ; iparcou = 0 ; iexplor = 0 ; ichange = 0 ;
+         nparc = 'NBEL' aparc ;
+         'SI' ('>EG' debug 2) ;
+            titt = 'CHAINE' titec ' nel=' nparc ;
+            'MESSAGE' titt ;
+         'FINS' ;         
+         'SI' lvirt ;
+            curtopof = MATOUTIL 'FERMEPZ' curtopo mbnc pzero ;
+         'SINON' ;
+            curtopof = curtopo ;
+         'FINSI' ;
+         ch = 'CHAI' titec ' Topologie de depart' ;
+         'SI' ('>EG' debug 3) ;
+            'MESSAGE' ('CHAI' ch ' :') ;
+            'LISTE' curtopof ;
+            'SI' graph ;
+               'TRACER' 'CACH' curtopo 'NOEUD' 'TITR' ch ;
+            'FINS' ;
+         'FINS' ;
+         newtopo  = curtopo  ; newtopof = curtopof ;
+         jnascm = 0 ; jparcou = 0 ; jexplor = 0 ; jchange = 0 ;
+* igibi=0
+         newtopof metva kexplor kchange kparcou knascm = 'OPTO' newtopof aparc metva
+                  'VTOL' volutol 'QTOL' precrelq
+                  'ALGO' ialgo   'AJNO' iajno
+                  'VIRT' pzero
+                  'NCMA' incma 'STMA' istma
+                  'VERI' iveri 'SGAJ' isegadj 'IMPR' debug ;
+         jexplor = jexplor '+' kexplor ;
+         jchange = jchange '+' kchange ;
+         jparcou = jparcou '+' kparcou ;
+         jnascm  = jnascm  '+' knascm ;
+*
+         inascm  = '+' inascm  jnascm  ; nnascm  = '+' nnascm  jnascm  ;
+         iparcou = '+' iparcou jparcou ; nparcou = '+' nparcou jparcou ;
+         iexplor = '+' iexplor jexplor ; nexplor = '+' nexplor jexplor ;
+         ichange = '+' ichange jchange ; nchange = '+' nchange jchange ;
+         'SI' lvirt ;
+            newtopo = MATOUTIL 'OUVREPZ' newtopof pzero ;
+         'SINON' ;
+            newtopo = newtopof ;
+         'FINSI' ;
+         curtopo = newtopo ;
+         tparam . 'curtopo' = curtopo ;
+*
+         'SI' ('>EG' debug 2) ;
+            titt = 'CHAINE' 'bop=' &boptim ' ' motar
+                            ' Topologie: parcourues=' iparcou
+                            ' examinees=' iexplor
+                            ' changees=' ichange ' limit_cand=' inascm ;
+            'MESSAGE' titt ;
+            MATOUTIL 'AFFQUAL' curtopo volucib volutol 'VMET' metva ;
+            'SAUTER' 1 'LIGNE' ;
+            'SI' graph ;
+*?      AFFCAND curtopo 'QUAL' tit ;
+               curtopu = 'UNIQ' curtopo ;
+               dnode = '-' ('NBEL' curtopo) ('NBEL' curtopu) ;
+               'SI' ('NEG' dnode 0) ;
+                  'MESSAGE' '!!! ' dnode
+                     ' elements en double pour le cas ' idk ;
+               'FINS' ;
+               tit =  'CHAINE' 'bop=' &boptim ' '
+                   motar ' Topologie obtenue' ;
+               MATOUTIL 'AFFCAND' curtopu 'QUAL' 'VMET' metva
+                  'TITR' tit ;
+            'FINS' ;            
+         'FINSI' ;
+*      kchange = '+' kchange ichange ;
+         oldtopo = curtopo ;
+      'SINO' ;
+         ichange = 0 ;
+      'FINS' ;
+      tchange = tchange '+' ichange ;
+      'SI' ('EGA' ichange 0) ;
+         'SI' ('NON' ('EXIS' lstrat0 iar)) ;
+            lstrat0 = lstrat0 'ET' iar ;
+         'FINS' ;
+      'SINO' ;
+         lstrat0 = 'LECT' ;
+      'FINS' ;
+*      'SI' trr ; 'QUIT' boptim ; 'FINS' ;
+   'FIN' typtop ;
+   'SI' ('EGA' tchange 0) ;
+      istrat = '+' istrat 1 ;
+   'SINO' ;
+      istrat = 1 ;
+   'FINS' ;         
+'FIN' boptim ;
+*
+'SI' ('>EG' debug 1) ;
+   titt = 'CHAINE' idk ' Total:' ' ' 
+                   'Topologie: parcourues=' nparcou
+                   ' examinees=' nexplor
+                   ' changees=' nchange ' limit_cand=' nnascm ;
+   'MESSAGE' titt ;
+   MATOUTIL 'AFFQUAL' curtopo volucib volutol 'VMET' metva ;
+   'SI' graph ;
+      tit = 'CHAI' idk ' Topologie finale obtenue' ;
+      'TRAC' 'CACH' curtopo 'TITR' tit ;
+   'FINS' ;      
+'FINS' ;   
+'SAUTER' 1 'LIGNE' ;
+*
+* Tests et fin de la boucle
+*
+lok = vrai ;
+curtopu = 'UNIQ' curtopo ;
+dnode = '-' ('NBEL' curtopo) ('NBEL' curtopu) ;
+'SI' ('NEG' dnode 0) ;
+   'MESSAGE' '!!!' ' ' dnode
+     ' elements en double pour le cas' ' ' idk ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+*'SI' ('NON' lvirt) ;
+* Si pas de noeud virtuel, on est censé conserver le bord
+* 2018/06/11 même en cas de modification du bord, il y a peut-être
+* une partie qui doit être conservée
+   bornew = MATOUTIL 'BORD' curtopo ;
+   mi = 'INTE' mbnc bornew 'NOVERIF' ;
+*   'SI' ('NON' (EGAMAIL mi mbnc)) ;
+   'SI' ('NEG' ('NBEL' ('DIFF' mi mbnc)) 0) ;
+      'MESSAGE' '!!! Bord modifie pour le cas' ' ' idk ;
+      lok = lok 'ET' faux ;
+   'FINS' ;
+*'FINS' ;
+* Qualités
+dvol nctelem nnul nctno miq maq moq =
+   MATOUTIL 'AFFQUAL' curtopo volucib volutol 'REST' 'NAFF'
+      'VMET' metva ;
+*dvol = '-' ('MESURE' curtopo) volucib ;
+'SI' ('NEG' nnul 0) ;
+   'MESS' '!!! Elements de volume nul pour le cas' ' ' idk ;
+   lok = lok 'ET' faux ;
+'FINS' ;
+   'SI' ('NEG' dvol 0. volutol) ;
+      'MESSAGE' '!!! Non cvg sur le volume pour le cas' ' ' idk ;
+      'MESSAGE' ('CHAI' 'dvol=' dvol) ;
+*      'MESSAGE' '!!! Dvol non nul pour le cas ' idk ;
+      'SI' ('NON' ('ET' ('EGA' ialgo 0) ('EGA' iajno 0))) ;
+         lok = lok 'ET' faux ;
+      'FINS' ;         
+   'FINS' ;
+'SI' ('<' ('+' dvol volutol) 0.) ;
+   'MESSAGE' '!!! Dvol negative pour le cas' ' ' idk ;
+   lok = lok 'ET' faux ;
+'FINSI' ;
+*'SI' ('NEG' dvol 0. volutol) ;
+*   'MESSAGE' '!!! Non cvg sur le volume pour le cas ' idk ;
+*   'ERRE' 27 ;
+*'FINSI' ;
+*
+* Restitution de quelques informations
+*
+tparam . 'nnascm'  = nnascm ;
+tparam . 'nparcou' = nparcou ;
+tparam . 'nexplor' = nexplor ;
+tparam . 'nchange' = nchange ;
+*
+tparam . 'dvol'   = dvol ;
+tparam . 'nnul'   = nnul ;
+tparam . 'miq'    = miq ;
+tparam . 'maq'    = maq ;
+tparam . 'moq'    = moq ;
+*
+tparam . 'curtopo' = curtopo ;
+*
+'RESP' curtopo ;
+'SI' lipol ;
+   'RESP' metva ;
+'FINS' ;
+*lourd   'RESPRO'tparam ;
+*  27 2
+*Erreur generation de maillage. Il est neanmoins cree pour contrôle
+'SI' ('NON' lok) ;
+   'ERRE' 27 ;
+'FINSI' ;
+*
+* End of procedure file MAILTOPO
+*
+'FINPROC' ;
+
+ 

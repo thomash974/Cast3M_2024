@@ -1,0 +1,90 @@
+* fichier : test_thermique_1d.dgibi
+************************************************************************
+* Cas test THERMIQUE 1D : test des operateurs en 1D - a completer !
+************************************************************************
+TITRE 'THER1D - C.L. TEMPERATURE';     
+
+OPTION 'DIME' 1 'ELEM' SEG2;
+
+XMAX = 1.;
+P0 = 'POIN' 0.;
+P1 = 'POIN' XMAX;
+NX = 5;
+D1 = 'DROIT' NX P0 P1;
+opti sort 'testavs1D' ; sort avs D1 ;
+** opti sort 'toto' ;
+*'TRACER' D1;
+
+* DONNEES DU PB
+UI = 0;
+FI = 25;
+COND = 130.;
+
+* MODELE
+MOD1 = MODE D1 THERMIQUE ISOTROPE ;
+* MATERIAU                                                                      
+MAT1 = MATE MOD1 K COND ;
+
+* MATRICE DE CONDUCTIVITE
+CND1 = CONDUCTIVITE MOD1 MAT1 ;
+
+* CL DIRICHLET
+B0 = BLOQUE 'T   ' P0 ;    
+B1 = BLOQUE 'T   ' P1 ;
+
+* TERME SOURCE
+S  = 'MANUEL' CHPO D1 'F' FI;
+ES = 'SOURCE' MOD1 S ;
+
+* ASSEMBLAGE DES PREMIER ET SECOND MEMBRES:
+RIG1 = CND1 'ET'B0 'ET' B1;
+FF1 = ES;
+
+CHTER1 = RESOUDRE RIG1 FF1 ;
+*'TRACER' CHTER1 D1;
+
+*calcul de l'erreur
+*-- sol analytique
+*     T(X) = -FI/2K * X  * (X '-' 1)
+X= 'COORDONNEE' 1 D1;
+CHUN = 'MANUEL' CHPO D1 'SCAL' 1;
+CHP = X*(X-CHUN);
+SOL = CHP*(FI/(2*COND))*(-1);
+*'TRACER'SOL D1;
+ECART = ('NOMC' 'T' SOL) '-'CHTER1;
+NOR = ('XTX'ECART '/' NX )'**'(0.5);
+mess ' Calcul de l erreur NOR=' NOR ;
+* => super-convergence
+* -- non super convergence en un noeud hors discretisation
+
+* projection valeur en 0.5
+pm = 'POIN' 0.5;
+MPM = 'MANUEL' 'POI1' pm;
+chter2 = 'CHANGER' 'CHAM' CHTER1 MOD1 'NOEUD';
+val = proi mpm chter2;
+list val;
+* => 2.30769E-02
+* valeur analytique = 2.4038 E-02
+*****
+
+* Conditions de Neumann homogene partout
+MP0= 'MANUEL' 'POI1' P0;
+MP1= 'MANUEL' 'POI1' P1;
+F0 = FLUX MOD1 0. MP0 ;
+F1 = FLUX MOD1 0. MP1 ;
+* ASSEMBLAGE DES PREMIER ET SECOND MEMBRES:
+RIG1 = CND1 ;
+FF1 = F0 'ET' F1;
+CHTER1 = RESOUDRE RIG1 FF1 ;
+* Pas de blocages donc un mode rigide en T -> bloquer a 0 par RESOU -> solution constante nulle !
+* Si terme source nul : FF1 = F0 'ET' F1 'ET' ES ; -> pas de solution (2 points a bloquer en T)
+*'TRACER' CHTER1 D1;
+
+opti lect 'testavs1D.inp' ; mail1D = lire avs ;
+list mail1D.'LEMAILLA' ;
+
+'FIN';
+ 
+
+ 
+

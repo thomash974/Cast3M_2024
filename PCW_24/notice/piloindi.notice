@@ -1,0 +1,253 @@
+$$$$ PILOINDI NOTICE  GR250332  22/11/30    21:15:01     11510          
+                                             DATE     22/11/30
+
+
+    Procedure PILOINDI                      Voir aussi : PASAPAS, UNPAS
+    ------------------
+                                                                                
+                                                                                
+Section : Mecanique Resolution
+Section : Mecanique Limites
+
+FRAN===========================================================
+    Syntaxe :
+    _______
+ANGL===========================================================
+    Syntax :
+    _______
+PORT===========================================================
+    Sintaxe :
+    _______
+===========================================================
+
+      FLOT2 = PILOINDI TAB1 CHP1 CHP2 CHP3 CHP4 FLOT1;
+
+FRAN==========================================================
+
+    Objet :
+    ____________
+    Cette procedure est applicable aux cas de pilotage indirect de chargement 
+    mecanique, pour lesquels la correction sur les inconnues nodales peut etre 
+    decomposee de maniere additive:
+
+             d^(t) = d^(t-1) + dd^(i)                                      (1)
+            dd^(i) = dd^(i-1) + dI^(i) + [deta^(i)*dII^(i)]                (2)
+            dI^(i) = [K^(i-1)]^-1 *res^(i-1)                               (3)
+           dII^(i) = [K^(i-1)]^-1 *dch                                     (4)
+         P(dd^(i)) = tau^(t)                                               (5)
+
+    avec:
+
+    d^(t-1)   : deplacement au pas de temps (t-1);
+    dd^(i)    : increment de deplacements sur le pas a l'iteration (i);
+    dch       : direction du chargement impose (donnee d'entree de l'analyse);
+    res^(i-1) : desequilibre entre forces internes et externes ;
+    K^(i-1)   : matrice de rigidite du systeme ;
+    deta^(i)  : parametre de pilotage sur le pas ;
+    P(dd^(i)) : equation de pilotage indirect ;
+    tau^(t)   : seuil que l'equation de pilotage doit respecter sur le pas.
+
+    L'objectif de la procedure PILOINDI est de calculer la valeur deta^(i) (de
+    type FLOTTANT). Ensuite, cette valeur est transmise a UNPAS afin de 
+    calculer la correction dd^(i). Par defaut, l'equation de pilotage porte 
+    sur le maximum de la deformation totale equivalente (methode CMSI). Poutant,
+    la procedure PILOINDI peut etre surchargee par l'utilisateur qui souhaite 
+    definir sa propre equation de pilotage. 
+
+ANGL===========================================================
+
+    Description :
+    ___________
+    This procedure is applicable to the cases of mechanical indirect load
+    control, for which the correction on the nodal unknowns can be decomposed 
+    in an additive way:
+
+             d^(t) = d^(t-1) + dd^(i)                                      (1)
+            dd^(i) = dd^(i-1) + dI^(i) + [deta^(i)*dII^(i)]                (2)
+            dI^(i) = [K^(i-1)]^-1 *res^(i-1)                               (3)
+           dII^(i) = [K^(i-1)]^-1 *dch                                     (4)
+         P(dd^(i)) = tau^(t)                                               (5)
+
+    where:
+
+    d^(t-1)   : displacement at time step (t-1);
+    dd^(i)    : accumulated displacement increment over the current time step;
+    dch       : direction of the imposed loading;
+    res^(i-1) : unbalance between internal and external forces at iteration (i-1);
+    K^(i-1)   : system stiffness matrix at iteration (i-1);
+    deta^(i)  : path increment at iteration (i) ;
+    P(dd^(i)) : path equation ;
+    tau^(t)   : threshold of the path equation at the current time step.    
+
+PORT===========================================================
+    Descricao :
+    _______
+
+    Este procedimento e aplicavel em casos de controle indireto de carregamento 
+    mecanico, nos quais a correcao nas incognitas nodais pode ser decomposta 
+    de forma aditiva:
+
+             d^(t) = d^(t-1) + dd^(i)                                      (1)
+            dd^(i) = dd^(i-1) + dI^(i) + [deta^(i)*dII^(i)]                (2)
+            dI^(i) = [K^(i-1)]^-1 *res^(i-1)                               (3)
+           dII^(i) = [K^(i-1)]^-1 *dch                                     (4)
+         P(dd^(i)) = tau^(t)                                               (5)
+
+    onde :
+
+    d^(t-1)  : deslocamento no fim do passo de tempo precedente, ou seja (t-1);
+    dd^(i)   : incremento de deslocamento acumulado no passo de tempo atual;
+    dch      : direcao do carregamento aplicado;
+    res^(i-1): desequilibrio entre as forcas internas e externas na iteracao (i-1);
+    K^(i-1)  : matriz de rigidez do sistema na iteracao (i-1) ;
+    deta^(i) : incremento da variavel de caminho na iteracao (i);
+    P(dd^(i)): equacao de caminho;
+    tau^(t)  : limite que a equacao de caminho deve respeitar para o passo de 
+               tempo atual.
+
+FRAN===========================================================
+
+    Commentaire :
+    _____________
+    
+    TAB1  : Table courante de pasapas (type TABLE).
+    CHP1  : Deplacement accumule jusqu'au debut du pas de temps (type CHPOINT),
+            ce qui correspond a d^(t-1) dans l'equation (1).
+    CHP2  : Deplacement accumule dans le pas de temps courant (type CHPOINT),
+            ce qui correspond a dd^(i-1) dans l'equation (2).
+    CHP3  : Partie de la correction correspondant a dI^(i)  (type CHPOINT) 
+            dans l'equation (3).
+    CHP4  : Partie de la correction correspondant a dII^(i) (type CHPOINT) 
+            dans l'equation (4).
+    FLOT1 : Valeur limite que le critere de pilotage doit respecter dans le 
+            pas de temps courant (type FLOTTANT), ce qui correspond a tau^(t)
+            dans l'equation (5).
+    FLOT2 : Valeur (type FLOTTANT) calcule par PILOINDI, qui correspond a
+            deta^(i) dans l'equation (2).
+
+ANGL===========================================================
+
+    Contents :
+    __________
+
+    TAB1 : Current pasapas table (type TABLE).
+    CHP1 : Accumulated displacement until the beginning of the current time 
+           step (type CHPOINT), which corresponds to d^(t-1) in equation (1).
+    CHP2 : Accumulated displacement increments over the current time step 
+           (type CHPOINT), which corresponds to dd^(i-1) in equation (2).
+    CHP3 : Part of the increment correction (type CHPOINT) corresponding to 
+           dI^(i) in equation (3).
+    CHP4 : Part of the increment correction (type CHPOINT) corresponding to 
+           dII^(i) in equation (4).             
+    FLOT1: Limit value that must be respected by the path equation over the 
+           current time step (type FLOTTANT), which corresponds to tau^(t) in 
+           equation (5).
+    FLOT2: Value calculated by PILOINDI (type FLOTTANT), which corresponds to
+           deta^(i) in equation (2).
+
+PORT===========================================================
+
+    Comentarios :
+    _______
+
+     TAB1 : Tabela atual de pasapas (tipo TABLE).
+     CHP1 : Deslocamento acumulado ate o inicio do passo de tempo atual (tipo 
+            CHPOINT), que corresponde a d^(t-1) na equacao (1).
+     CHP2 : incremento de deslocamento acumulado ao longo do passo de tempo 
+            atual (tipo CHPOINT), que corresponde a dd^(i-1) na equacao (2).
+     CHP3 : Parte da correcao do incremento (tipo CHPOINT) correspondente a
+            dI^(i) na equacao (3).
+     CHP4 : Parte da correcao do incremento (tipo CHPOINT) correspondente a
+            dII^(i) na equacao (4).
+     FLOT1: Valor limite que deve ser respeitado pela equacao de pilotagem no
+            passo de tempo atual (tipo FLOTTANT), que corresponde a tau^(t) na
+            equacao (5).
+     FLOT2: Valor calculado por PILOINDI (tipo FLOTTANT), que corresponde a
+            deta^(i) na equacao (2).
+
+FRAN===========================================================
+
+    Remarque :
+    _____________
+
+    Les aspects theoriques et les formulations sous-jacentes sont disponibles 
+    dans les references [1], [2] et [3].
+
+
+ANGL===========================================================
+
+    Remark :
+    __________
+
+    The theoretical aspects and the underlying formulations are available in 
+    references [1], [2] et [3].
+
+PORT===========================================================
+
+    Observacao :
+    _______
+
+    Os aspectos teoricos e as formulacoes subjacentes estao disponiveis nas
+    referencias [1], [2] e [3].
+
+FRAN===========================================================
+
+    Exemples d'application en pilotage indirect de chargement:
+    __________
+
+    pilotage_indirect_1.dgibi
+    pilotage_indirect_1_cndi.dgibi
+    pilotage_indirect_1_cmep.dgibi
+    pilotage_indirect_2.dgibi
+
+    References :
+    _____________
+
+ANGL===========================================================
+
+    Path-following application :
+    __________
+
+    pilotage_indirect_1.dgibi
+    pilotage_indirect_1_cndi.dgibi
+    pilotage_indirect_1_cmep.dgibi
+    pilotage_indirect_2.dgibi
+
+    References :
+    _____________
+
+PORT===========================================================
+
+    Exemplos de aplicacao de pilotagem indireta de carregamento:
+    _______
+
+    pilotage_indirect_1.dgibi
+    pilotage_indirect_1_cndi.dgibi
+    pilotage_indirect_1_cmep.dgibi
+    pilotage_indirect_2.dgibi
+
+    Referencias :
+    _____________
+
+===========================================================
+    [1] H. Oliveira, G. Rastiello, A. Millard, I. Bitar, B. Richard. 
+    Implementation of path-following solvers in the finite element toolbox 
+    Cast3M: formulations, algorithms and applications. Volume 161, 2021,
+        103055, ISSN 0965-9978,
+        https://doi.org/10.1016/j.advengsoft.2021.103055.
+
+    [2] G. Rastiello, F. Riccard,, B. Richard. Discontinuity-scale
+    path-following methods for the embedded discontinuity modeling of
+    failure in solids. Computer Methods in Applied Mechanics and Engineering.
+    Volume 349, 2019, Pages 431-457, ISSN 0045-7825,
+    https://doi.org/10.1016/j.cma.2019.02.030.
+        
+        [3] G. Rastiello, H.L. Oliveira, A. Millard. Path-following
+        methods for unstable structural responses induced by strain softening:
+        a critical review. Comptes Rendus. Mécanique, Tome 350 (2022),
+        pp. 205-236.
+        doi : 10.5802/crmeca.112.
+
+$$$$ 
+ 
+ 

@@ -1,0 +1,10 @@
+=== Cas 7 : endocp1 (endommagement, contraintes planes) ===
+Valeurs comparees : 24
+Temps horloge (ms) : origine 335 ; niveau 1 304 ; niveau 2 280
+Acceleration par rapport a l origine : niveau 1   1.10 ; niveau 2   1.20
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 1 ; niveau 1 1 ; niveau 2 1
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 10
+Niveau 1 : raideur reutilisee 1 fois, recalculee 3 fois ; HOOK evite 24 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 3 fois, recalculee 1 fois ; HOOK evite 24 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

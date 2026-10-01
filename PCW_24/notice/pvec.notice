@@ -1,0 +1,103 @@
+$$$$ PVEC     NOTICE  JB251061  21/04/13    21:15:12     10954          
+                                             DATE     21/04/13
+
+    Operateur PVEC                           Voir aussi : PSCA
+    --------------                                        PMIX
+
+
+Section : Mathematiques Autres
+
+FRAN==========================================================
+CHAP{Syntaxe avec des POINTS}
+
+    VEC3 = VEC1  PVEC  (VEC2 si 3D) ;
+        
+PART{Objet}
+    L'operateur PVEC effectue le produit vectoriel (note x) 
+    de n-1 vecteurs, n etant la dimension de l'espace (n=2 ou 3). 
+    Le resultat est le vecteur :
+          VEC3 = | e_Z  x VEC1   en 2D
+                 | VEC1 x VEC2   en 3D
+
+PART{Commentaire}
+   VEC1, VEC2 : vecteurs (type POINT)
+   VEC3       : objet resultat (type POINT)
+   
+   
+CHAP{Syntaxe avec des CHPOINT ou des MCHAML}
+
+    OBJ3 = PVEC OBJ1 LMOTS1 (OBJ2 LMOTS2 si 3D) LMOTS3  ;
+    
+PART{Objet}
+    L'operateur PVEC effectue le produit vectoriel de n-1 champs par
+    point/element, n étant la dimension de l'espace (n=2 ou 3).
+    En dimension 2, le resultat est le champ par point/element de
+    composantes (-y, x), où x et y sont les composantes de OBJ1.
+
+PART{Commentaire}
+    OBJ1, OBJ2, OBJ3  : champ (type CHPOINT ou MCHAML) 
+    LMOTS1, LMOTS2, LMOTS3 : liste des composantes (type LISTMOTS), 
+    de dimension n, associee a chaque champ, dans l'ordre du systeme de
+    coordonnees retenu.
+    
+PART{Exemple}
+    Avec :
+      LMOTS1 = MOTS 'U,X' 'U,Y' 'U,Z' ;
+      LMOTS2 = MOTS 'V,X' 'V,Y' 'V,Z' ;
+      LMOTS3 = MOTS 'W,X' 'W,Y' 'W,Z' ;
+    OBJ3 aura la structure :
+      W,X = (U,Y * V,Z) - (U,Z * V,Y) 
+      W,Y = (U,Z * V,X) - (U,X * V,Z) 
+      W,Z = (U,X * V,Y) - (U,Y * V,X) 
+
+
+ANGL==========================================================
+CHAP{Syntax with POINTS}
+
+    VEC3 = VEC1  PVEC  (VEC2 when 3D) ;
+
+PART{Description}
+    The PVEC operator performs the vectorial product (designated x) 
+    of n-1 vectors, n being the space dimension (n=2 or 3). 
+    The result is the vector:
+          VEC3 = | e_Z  x VEC1   when 2D
+                 | VEC1 x VEC2   when 3D
+
+PART{Contents}
+   VEC1, VEC2 : vectors (POINT type)
+   VEC3       : generated object (POINT type)
+
+   
+CHAP{Syntax with CHPOINT or MCHAML}
+
+    OBJ3 = PVEC OBJ1 LMOTS1 (OBJ2 LMOTS2 when 3D) LMOTS3  ;
+    
+PART{Description}
+    The PVEC operator performs the vector product of n-1 fields
+    by point/element. n is the space dimension (n=2 or 3).
+    In dimension 2, the result is the field by point/element with
+    components (-y, x), where x and y and the components of OBJ1.
+
+PART{Contents}
+
+    OBJ1, OBJ2, OBJ3 : field (CHPOINT or MCHAML type)
+    LMOTS1, LMOTS2, LMOTS3 : list of components (LISTMOTS type),
+    of dimension n, for each field, sorted like the coordinate system.
+    
+PART{Example}
+    With:
+      LMOTS1 = MOTS 'U,X' 'U,Y' 'U,Z' ;
+      LMOTS2 = MOTS 'V,X' 'V,Y' 'V,Z' ;
+      LMOTS3 = MOTS 'W,X' 'W,Y' 'W,Z' ;
+    OBJ3 will obey to:
+      W,X = (U,Y * V,Z) - (U,Z * V,Y) 
+      W,Y = (U,Z * V,X) - (U,X * V,Z) 
+      W,Z = (U,X * V,Y) - (U,Y * V,X) 
+
+$$$$
+ 
+ 
+ 
+ 
+ 
+ 

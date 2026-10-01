@@ -1,0 +1,10 @@
+=== Cas 14 : ricbet_uni_1 (beton arme, endommagement (structure)) ===
+Valeurs comparees : 300
+Temps horloge (ms) : origine 533 ; niveau 1 549 ; niveau 2 606
+Acceleration par rapport a l origine : niveau 1   0.97 ; niveau 2   0.88
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 0 ; niveau 1 0 ; niveau 2 0
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 0
+Niveau 1 : raideur reutilisee 0 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 0 fois, recalculee 1 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

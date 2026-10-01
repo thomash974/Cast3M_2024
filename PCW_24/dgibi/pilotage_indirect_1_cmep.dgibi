@@ -1,0 +1,541 @@
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* Problem description: 
+*
+* In the example below, we study the effects caused by the progressive
+* strain localization. The structure consists of a bar under uniform 
+* tension in which the load is applied via displacement control at the
+* right edge. At this edge, only the direction of the displacement
+* is known a priori. The displacement intensity is calculated in such
+* a way to respect the path equation specified by the user. Here, the 
+* defaut path equation (CMSI) is replaced by the CMEP
+* (Lorentz and Badel, 2004) via the user procedure PILOINDI. According
+* to this formulation, the elastic predictor of the damage criterion 
+* function is controlled during the simulation. For more details, the
+* interested reader is referred to (Lorentz and Badel, 2004;
+* Rastiello et al., 2019; Oliveira et al., 2021; 
+* Rastiello et al., 2022). An unstable response is induced by
+* increasing the value of NELX. The higher this number, the more
+* severe the snap-back becomes. On the other hand, the lower this
+* number, the more the snap-back tends to fade away.
+*
+* E. Lorentz and P. Badel. A new path-following constraint for 
+* strain-softening finite element simulations, Int. J. Numer. Methods
+* Eng., Volume 60, 2004, no. 2, pp. 499-526 
+*
+* G. Rastiello, F. Riccard,, B. Richard. Discontinuity-scale
+* path-following methods for the embedded discontinuity modeling of
+* failure in solids. Computer Methods in Applied Mechanics and
+* Engineering. Volume 349, 2019, Pages 431-457, ISSN 0045-7825,
+* https://doi.org/10.1016/j.cma.2019.02.030.
+*
+* H. Oliveira, G. Rastiello, A. Millard, I. Bitar, B. Richard. 
+* Implementation of path-following solvers in the finite element toolbox 
+* Cast3M: formulations, algorithms and applications. Volume 161, 2021,
+* 103055, ISSN 0965-9978,
+* https://doi.org/10.1016/j.advengsoft.2021.103055.
+*
+* G. Rastiello, H.L. Oliveira, A. Millard. Path-following
+* methods for unstable structural responses induced by strain softening:
+* a critical review. Comptes Rendus. Mécanique, Tome 350 (2022),
+* pp. 205-236.
+* doi : 10.5802/crmeca.112.
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* Contact:
+* Giuseppe RASTIELLO
+* CEA Paris-Saclay, Université Paris-Saclay
+* DES/ISAS/DM2S/SEMT/EMSI
+* email : giuseppe.rastiello[at]cea.fr
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*'OPTI' 'ECHO' 0;
+'OPTI' 'DIME' 2 'ELEM' 'QUA4' 'MODE' 'PLAN CONTR';
+'OPTI' 'TRAC' 'PSC';
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* export psc figures
+PLT1 = FAUX;
+* export output text
+EXP1 = FAUX;
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* DEFINING THE PARAMETRIC GEOMETRY
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* bar height
+H1 = 0.1;
+* bar length
+L1 = 1.0;
+* total number of elements along the x direction
+NELX = 29;
+* total number of elements along the y direction
+NELY = 3;
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+PIN = 'TABLE';
+ 
+'SI' (NELX < 3);
+  'MESS' 'error: the NELX must be greater than 3 and odd';
+'SINON';
+  PIN.1 = 0. 0.;
+'FINSI';
+        
+'REPE' BOPO NELX;
+  CX = 'COOR' 1 PIN.(&BOPO);
+  CX = CX + (L1/NELX);
+  CY = 'COOR' 2 PIN.(&BOPO);
+  PIN.(&BOPO + 1) = CX CY;
+'FIN' BOPO;
+
+LINH = 'TABLE';
+'REPE' BOLI NELX;
+        LINH.(&BOLI) = 'DROI' 1 PIN.(&BOLI) PIN.(&BOLI + 1);
+'FIN' BOLI;
+
+'REPE' BOLI NELX;
+        'SI' (&BOLI 'EGA' 1);
+                MALHA = LINH.(&BOLI);
+        'SINON';
+                MALHA = MALHA 'ET' LINH.(&BOLI);
+        'FINSI';
+'FIN' BOLI;
+
+PSU = 'TABLE';
+PSU.1 = 0. H1;
+        
+'REPE' BOPO NELX;
+        CX = 'COOR' 1 PSU.(&BOPO);
+        CX = CX + (L1/NELX);
+        CY = 'COOR' 2 PSU.(&BOPO);
+        PSU.(&BOPO + 1) = CX CY;
+'FIN' BOPO;
+
+'REPE' BOPO NELX;
+        CX = 'COOR' 1 PSU.(&BOPO);
+        CX = CX + (L1/NELX);
+        CY = 'COOR' 2 PSU.(&BOPO);
+        PSU.(&BOPO + 1) = CX CY;
+'FIN' BOPO;
+
+'REPE' BOLI NELX;
+        LINH.(NELX + &BOLI) = 'DROI' 1 PSU.(&BOLI) PSU.(&BOLI + 1);
+'FIN' BOLI;
+
+'REPE' BOLI NELX;
+        MALHA = MALHA 'ET' LINH.(NELX + &BOLI);
+'FIN' BOLI;
+
+*VERTICAL LINES
+
+'REPE' BOLI (NELX+1);
+        LINH.((2*NELX) + &BOLI) = 'DROI' NELY PIN.(&BOLI) PSU.(&BOLI);
+'FIN' BOLI;
+
+'REPE' BOLI (NELX+1);
+        MALHA = MALHA 'ET' LINH.((2*NELX) + &BOLI);
+'FIN' BOLI;
+
+*SURFACES
+AREA = 'TABLE';
+'REPE' BOEX NELX;
+        AREA.(&BOEX) = 'DALL' LINH.(&BOEX)
+                                                LINH.(&BOEX + (2*NELX) + 1)
+                                                LINH.(&BOEX + NELX)
+                                                LINH.(&BOEX + (2*NELX)) ;
+'FIN' BOEX;
+
+'REPE' BOEX NELX;
+        'SI' (&BOEX 'EGA' 1);
+                ELASPART = AREA.(&BOEX);
+        'SINON';
+                'SI' (&BOEX 'EGA' ((NELX+1)/2));
+                        DAMMPART = AREA.(&BOEX);
+                'SINON';
+                        ELASPART = ELASPART 'ET' AREA.(&BOEX);
+                'FINSI';
+        'FINSI';        
+'FIN' BOEX;
+
+str1 = (DAMMPART 'ET' ELASPART);
+leftedg = LINH.(2*NELX + 1);
+PA = PIN.1;
+PB = PIN.(NELX+1);
+rigtedg = LINH.(3*NELX + 1);
+
+'SI' PLT1; 
+  'TRAC' str1;
+'FINSI';
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF PARAMETRIC GEOMETRY
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* DEFINING MODEL AND MATERIAL
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+AT=1.0e0;
+AC=1.2e0;
+BC=1.5e+03;
+BT=1.0E4;
+epsd0=1.0E-4;
+YG=1.0E+9;
+BBT=1.06e0;
+NNU=0.0;
+RO =2.3E+03;
+
+MOD1 = 'MODE' ELASPART 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE';
+MAT1 = 'MATE' MOD1 'YOUN' YG 'NU' NNU 'RHO' RO;
+
+MOD2 = 'MODE' DAMMPART 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 
+    'ENDOMMAGEMENT' 'MAZARS';
+MAT2 = 'MATE' MOD2 'YOUN' YG 'NU' NNU 'RHO' RO 'BTRA' BT 
+    'KTR0' epsd0 'ATRA' AT 'ACOM' AC 'BCOM' BC 'BETA' BBT;
+
+MODTOT = MOD1 'ET' MOD2;
+MATTOT = MAT1 'ET' MAT2;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF MODEL AND MATERIAL
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* DEFINING BOUNDARY CONDITIONS (known a priori)
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+CL1 = 'BLOQ' 'UX' leftedg;
+CL2 = 'BLOQ' 'UY' PA;
+CLT = CL1 'ET' CL2;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF BOUNDARY CONDITIONS
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* SPECIFYING THE PATH-FOLLOWING EQUATION (CMEP)
+* Note: this constraint equation is model-dependent. One controls
+* the maximum value of the elastic predictor of the damage criterion
+* function on the domain. In this test case, the element experiencing
+* the maximum value of the elastic predictor function is known a priori
+* (it is the weakened finite element), so one could directly control this
+* quantity. A nested interval algorithm is implemented here for the
+* sake of generality. This makes the implementation usable in more 
+* general/complex situations. 
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+'DEBP' PILOINDI PRECED*'TABLE'  U*'CHPOINT' DU*'CHPOINT' DUI*'CHPOINT'
+  DUII*'CHPOINT' DTAU*'FLOTTANT';
+
+  WTAB=PRECED.'WTABLE';
+  MODTOT = WTAB.'MO_TOT';
+  Var_int_ini = 'REDU' CONTI.'VARIABLES_INTERNES' MODTOT ;
+
+  CHATAU = 'MANU' 'CHML' MODTOT 'EPTI' DTAU 
+    'TYPE' 'DEFORMATIONS' 'STRESSES';
+  EPTI_ANT = ('MAXI'('EXCO' 'EPTI' Var_int_ini));
+
+  EPS_TOT = 'EPSI' MODTOT (u + Du + duI);
+  def_II  = 'EPSI' MODTOT duII;
+
+*               --- calulating epsilon tilde
+
+  EPS_PRIN = 'PRIN' EPS_TOT MODTOT ;
+  EPS_POS_1  = 'BORNER' EPS_PRIN 'SI11' 'MINIMUM' 0.0;
+  EPS_POS_2  = 'BORNER' EPS_PRIN 'SI22' 'MINIMUM' 0.0;
+  EPS_POS_3  = 'BORNER' EPS_PRIN 'SI33' 'MINIMUM' 0.0;
+      
+  AUX1  =  EPS_POS_1  '*'  EPS_POS_1  ('MOTS' 'SI11') 
+      ('MOTS' 'SI11') ('MOTS' 'EPTI') ; 
+  AUX2  =  EPS_POS_2  '*'  EPS_POS_2  ('MOTS' 'SI22') 
+      ('MOTS' 'SI22') ('MOTS' 'EPTI') ;
+  AUX3  =  EPS_POS_3  '*'  EPS_POS_3  ('MOTS' 'SI33') 
+      ('MOTS' 'SI33') ('MOTS' 'EPTI') ;
+
+  EPS_TILD = (AUX1 + AUX2 + AUX3)**(0.5);
+
+*               --- elastic predictor calculation
+  F_TILD = EPS_TILD - ('EXCO' 'EPTI' Var_int_ini);
+
+*       ----- calculation of CH_AUX1
+  CH_AUX1 = F_TILD - CHATAU;
+
+*       ----- calculation of CH_AUX2
+
+*               --- building macaulay tensor            
+  EPS_MAC = 'ZERO' MOD2 'DEFORMAT';
+  EPS_MAC = EPS_MAC + ('EXCO' 'SI11' EPS_POS_1 'EPXX');
+  EPS_MAC = EPS_MAC + ('EXCO' 'SI22' EPS_POS_2 'EPYY');
+  EPS_MAC = EPS_MAC + ('EXCO' 'SI33' EPS_POS_3 'EPZZ');
+
+*               --- rotating macaulay tensor to global                          
+  R =       ('EXCO' EPS_PRIN 'COX1' 'UX,X') ;
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COX2' 'UX,Y') ; 
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COX3' 'UX,Z') ;
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COY1' 'UY,X') ; 
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COY2' 'UY,Y') ; 
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COY3' 'UY,Z') ;
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COZ1' 'UZ,X') ; 
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COZ2' 'UZ,Y') ; 
+  R =  R 'ET' ('EXCO' EPS_PRIN 'COZ3' 'UZ,Z') ;
+  R =  'CHAN' R 'TYPE' 'GRADIENT' ;
+
+  DII_P  =  'RTEN' DEF_II MOD2  R ;
+
+  LIS1   = 'MOTS' 'EPXX' 'EPYY' 'EPZZ' 'GAXY';
+  LIS2   = 'MOTS' 'SMXX' 'SMYY' 'SMZZ' 'SMXY';
+  DII_P =  'CHAN' DII_P 'TYPE' 'CONTRAINTES' ;
+  DII_P =  'CHAN' 'COMP' LIS1  LIS2 DII_P;
+  NUM1 = 'ENER'  MOD2 EPS_MAC  DII_P  ;
+  NUM1 =  'CHAN' 'COMP' 'EPTI' NUM1;
+
+  'SI' ((WTAB.'SOUS_INCREMENT' 'EGA' 1) 'ET' (WTAB.'PAS' 'EGA' 1));
+    CH_AUX2 = 'MANU' 'CHML' MODTOT 'EPTI' 0.0 
+              'TYPE' 'DEFORMATIONS' 'STRESSES';
+    CH_LAMB = -1.0*(CH_AUX1);
+  'SINON';
+    NUM1 = 'REDU' NUM1 DAMMPART;
+    EPS_TILD = 'REDU' EPS_TILD DAMMPART;
+
+    VAVA = 1.E-10;
+    NUM1 = 'BORNER' NUM1 'EPTI' 'MINIMUM' VAVA;
+    EPS_TILD = 'BORNER' EPS_TILD 'EPTI' 'MINIMUM' VAVA;
+
+    CH_AUX2 = NUM1*(EPS_TILD**(-1.0));
+    CH_AUX2 = 'REDU' CH_AUX2 DAMMPART;
+    CH_AUX1 = 'REDU' CH_AUX1 DAMMPART;
+    CH_AUX2 = 'BORNER' CH_AUX2 'EPTI' 'MINIMUM' VAVA;
+    CH_LAMB = -1.0*(CH_AUX1*(CH_AUX2**(-1.0)));
+  'FINSI';
+
+*       ----- Nested intervals  
+  MA1 = 'MASQ' CH_AUX2 'EGSUPE' 0. ;
+  CH_LAMB_MAX = (MA1*CH_LAMB);
+
+  MA2 = 'MASQ' CH_AUX2 'INFERIEUR' 0. ;
+  CH_LAMB_MIN = (MA2*CH_LAMB);
+
+  big_value = 1.0E20;
+  CH_LAMB_MAX = CH_LAMB_MAX + (big_value*MA2);
+  CH_LAMB_MIN = CH_LAMB_MIN - (big_value*MA1);
+  
+  LIM_INF = 'MAXI' CH_LAMB_MIN 'AVEC' ('MOTS' 'EPTI');
+  LIM_SUP = 'MINI' CH_LAMB_MAX 'AVEC' ('MOTS' 'EPTI');
+      
+  D_eta= LIM_SUP;
+
+'FINPROC' D_ETA ;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF USER DEFINED PROCEDURE
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* PROBLEM SOLUTION
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+* 
+* number of time increments
+ntincrem = 25;
+*
+* control parameter
+TAU = 5.0E-5;
+*
+* direction of the applied displacement (u_hat)
+CL3 = 'BLOQ' 'UX' rigtedg;
+CLT = CLT 'ET' CL3;
+uch = 'DEPI' CL3 1.0;
+*
+lis_incr= 'PROG' 0. 'PAS' 1    (ntincrem. * 1) ;
+lis_tau = 'PROG' 0. 'PAS' TAU  (ntincrem. * TAU) ;
+ev1 = 'EVOL' 'MANU' 't' lis_incr 'tau' lis_tau ;
+*
+****  preparing PASAPAS input table
+tab1 = 'TABLE';
+tab1 . 'MOVA' = 'D' ;
+tab1 . 'BLOCAGES_MECANIQUES' = CLT ;
+tab1 . 'CARACTERISTIQUES' = mattot ;
+tab1 . 'MODELE' = modtot ;
+tab1 . 'TEMPS_CALCULES' = lis_incr ;
+
+****  lines to be included for ativating path-following control ******
+tab1 . 'PILOTAGE_INDIRECT'     = VRAI;
+tab1 . 'DEPLACEMENTS_PILOTES'  = uch ;
+tab1 . 'PARAMETRE_DE_PILOTAGE' = ev1 ;
+
+PASAPAS tab1;
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF SOLUTION
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* BEGIN OF POST-PROCESSING
+*
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+****  procedure @TOTAL adapted
+'DEBPROC' RESFORCE CH1*'CHPOINT' GEO*'MAILLAGE' COMP1*'MOT' ;
+  CH2 = 'REDU' CH1 GEO ;
+  CHTOT = 'RESU' CH2 ;
+  P1 = ('EXTR' CHTOT MAIL) 'POIN' 1 ;                               
+  TOT1 = 'EXTR' CHTOT COMP1 P1 ;
+'FINPROC' TOT1 ;
+*
+*
+nn = 'DIME' tab1 . 'TEMPS';
+*
+PROF = 'PROG' 0.;
+PROT = 'PROG' 0.;
+PROD = 'PROG' 0.;
+LISCT= 'PROG' 0.;
+*
+pelan = zero modtot 'VARINTER';
+'REPE' LAB (nn - 1 ) ;
+  ii = &LAB ;
+  TT     = tab1 . 'TEMPS' . ii ;
+  deplac = tab1 . 'DEPLACEMENTS' . ii ;
+  force_indirect = 'REAC' CL3 deplac  ;
+  FF = RESFORCE force_indirect rigtedg 'FX' ;
+  DD = 'EXTR' deplac 'UX' PB ;
+
+  pelcur = tab1 . 'VARIABLES_INTERNES' . ii ;
+  EPS_TOT = 'EPSI' MODTOT (deplac);
+  EPS_PRIN = 'PRIN' EPS_TOT MODTOT ;
+  EPS_POS_1  = 'BORNER' EPS_PRIN 'SI11' 'MINIMUM' 0.0;
+  EPS_POS_2  = 'BORNER' EPS_PRIN 'SI22' 'MINIMUM' 0.0;
+  EPS_POS_3  = 'BORNER' EPS_PRIN 'SI33' 'MINIMUM' 0.0;
+      
+  AUX1  =  EPS_POS_1  '*'  EPS_POS_1  ('MOTS' 'SI11') 
+      ('MOTS' 'SI11') ('MOTS' 'EPTI') ; 
+  AUX2  =  EPS_POS_2  '*'  EPS_POS_2  ('MOTS' 'SI22') 
+      ('MOTS' 'SI22') ('MOTS' 'EPTI') ;
+  AUX3  =  EPS_POS_3  '*'  EPS_POS_3  ('MOTS' 'SI33') 
+      ('MOTS' 'SI33') ('MOTS' 'EPTI') ;
+
+  EPS_TILD = (AUX1 + AUX2 + AUX3)**(0.5);
+
+*               --- elastic predictor calculation
+  F_TILD = EPS_TILD - ('EXCO' 'EPTI' pelan);
+  F_TILD = REDU F_TILD mod2;
+  pelan = pelcur;
+
+  CT = 'MAXI' F_TILD ;
+
+  PROT = PROT 'ET' ( 'PROG' TT) ;
+  PROF = PROF 'ET' ( 'PROG' FF) ;
+  PROD = PROD 'ET' ( 'PROG' DD) ;
+  LISCT= LISCT 'ET' ( 'PROG' CT) ;
+'FIN' LAB ;
+
+'SI' PLT1; 
+  PROETA = TAB1 . 'COEFFICIENT_DE_PILOTAGE' ;
+  evo11 = 'EVOL' 'TURQ' 'MANU' 'disp' PROD 'forc' PROF ; 
+  evo12 = 'EVOL' 'ROUG' 'MANU' 'increment' PROT 'eta' PROETA ; 
+  evo13 = 'EVOL' 'BLEU' 'MANU' 'increment' PROT 'max el pred' LISCT ;
+  'DESS' evo11 ;
+  'DESS' evo12 ;
+  'DESS' evo13 ;
+'FINSI';
+
+'SI' EXP1;
+  @EXCEL1 evo11 'forc_displ_cmep.txt' ;
+  @EXCEL1 evo13 'crit_pilo_cmep.txt' ;
+'FINSI';
+fin;
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF POST-PROCESSING
+* 
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* BEGIN OF NON-REGRESSION TEST
+* 
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+refx = 'PROG' 0.;
+refx = refx 'ET' ('PROG' 5.00000E-05);
+refx = refx 'ET' ('PROG' 1.00000E-04);
+refx = refx 'ET' ('PROG' 9.30148E-05);
+refx = refx 'ET' ('PROG' 7.79353E-05);
+refx = refx 'ET' ('PROG' 6.24797E-05);
+refx = refx 'ET' ('PROG' 4.95454E-05);
+refx = refx 'ET' ('PROG' 3.98080E-05);
+refx = refx 'ET' ('PROG' 3.30212E-05);
+refx = refx 'ET' ('PROG' 2.86375E-05);
+refx = refx 'ET' ('PROG' 2.60834E-05);
+refx = refx 'ET' ('PROG' 2.48648E-05);
+refx = refx 'ET' ('PROG' 2.45930E-05);
+refx = refx 'ET' ('PROG' 2.49786E-05);
+refx = refx 'ET' ('PROG' 2.58132E-05);
+refx = refx 'ET' ('PROG' 2.69508E-05);
+refx = refx 'ET' ('PROG' 2.82906E-05);
+refx = refx 'ET' ('PROG' 2.97642E-05);
+refx = refx 'ET' ('PROG' 3.13260E-05);
+refx = refx 'ET' ('PROG' 3.29452E-05);
+refx = refx 'ET' ('PROG' 3.46019E-05);
+
+refy = 'PROG' 0.;
+refy = refy 'ET' ('PROG' 5.00000E+03);
+refy = refy 'ET' ('PROG' 1.00000E+04);
+refy = refy 'ET' ('PROG' 9.09796E+03);
+refy = refy 'ET' ('PROG' 7.35759E+03);
+refy = refy 'ET' ('PROG' 5.57825E+03);
+refy = refy 'ET' ('PROG' 4.06006E+03);
+refy = refy 'ET' ('PROG' 2.87297E+03);
+refy = refy 'ET' ('PROG' 1.99148E+03);
+refy = refy 'ET' ('PROG' 1.35888E+03);
+refy = refy 'ET' ('PROG' 9.15782E+02);
+refy = refy 'ET' ('PROG' 6.10995E+02);
+refy = refy 'ET' ('PROG' 4.04277E+02);
+refy = refy 'ET' ('PROG' 2.65640E+02);
+refy = refy 'ET' ('PROG' 1.73513E+02);
+refy = refy 'ET' ('PROG' 1.12758E+02);
+refy = refy 'ET' ('PROG' 7.29507E+01);
+refy = refy 'ET' ('PROG' 4.70123E+01);
+refy = refy 'ET' ('PROG' 3.01917E+01);
+refy = refy 'ET' ('PROG' 1.93295E+01);
+refy = refy 'ET' ('PROG' 1.23410E+01);
+
+tol1 = 1.0e-4;
+maxres = 0.;
+'REPE' BTEST (nn - 1 ) ;
+ V1 = 'EXTR' refx (&BTEST + 1);
+ V2 = 'EXTR' prod (&BTEST + 1);
+ res1 = 'ABS' ((V1 - V2)/V1);
+ 'SI' (res1 > maxres); maxres = res1; 'FINSI';
+
+ W1 = 'EXTR' refy (&BTEST + 1);
+ W2 = 'EXTR' prof (&BTEST + 1);
+ res2 = 'ABS' ((W1 - W2)/W1);
+ 'SI' (res2 > maxres); maxres = res2; 'FINSI';
+
+'FIN' BTEST ;
+
+err1 = maxres > tol1;
+
+'SI' err1;
+ 'ERRE' 5 ;
+'FINSI';
+
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*
+* END OF NON-REGRESSION TEST
+* 
+*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'FIN'; 
+

@@ -1,0 +1,10 @@
+=== Cas 49 : gdep2 (grands deplacements coque) ===
+Valeurs comparees : 1440
+Temps horloge (ms) : origine 91821 ; niveau 1 57448 ; niveau 2 54788
+Acceleration par rapport a l origine : niveau 1   1.60 ; niveau 2   1.68
+Controles internes du cas : echecs origine 0 ; niveau 1 0 ; niveau 2 0 - reussites origine 1 ; niveau 1 1 ; niveau 2 1
+Classes exercees (1 MATVAR, 10 ENDOM, 20 VISCODOM, 100 GD) : 100
+Niveau 1 : raideur reutilisee 0 fois, recalculee 240 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Niveau 2 : raideur reutilisee 0 fois, recalculee 240 fois ; HOOK evite 0 fois ; caracteristiques reutilisees 0 fois
+Ecart relatif maximal : niveau 1  0.000E+00 ; niveau 2  0.000E+00
+RESULTAT : niveau 1 OK ; niveau 2 OK

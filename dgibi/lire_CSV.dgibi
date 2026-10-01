@@ -1,0 +1,124 @@
+
+* fichier :  lire_CSV.dgibi
+************************************************************************
+************************************************************************
+
+* Presentation : Ce cas-test permet de lire directement des fichiers au
+*                format 'CSV'. Le resultat est un objet de type
+*                TABLE indice de 1 a N. Chaque indice est un LISTREEL
+*                qui comporte les valeurs lues.
+*                De plus,il teste la possibilite de demarrer et/ou de
+*                finir la lecture des donnees a la ligne souhaitee.
+*
+* Creation : 02/04/2015
+* Createur : C. BERTHINIER
+
+
+* Modification : 05/06/223
+* Modifie par  : A. ROS
+*******************************************
+
+* repertoire des fichiers "divers"
+DIVERS ='VENV' 'CASTEM_DIVERS';
+
+* Initialisation du nombre de cas
+ NBCAS = 0;
+
+* Premier cas : Lecture en colonnes
+ TAB1 ='LIRE' 'CSV' ('CHAINE' DIVERS '/fichier_ACQ.txt') 'COLO';
+'LIST' TAB1    ;
+'LIST' TAB1. 1 ;
+ LUE11 = PROG 321 1e-3 1 2 1 ;
+'LIST' TAB1. 2 ;
+ LUE12 = PROG 564.654 1e5 2 4 2;
+'LIST' TAB1. 3 ;
+ LUE13 = PROG 88764.2 1e04 3 6 3  ;
+'LIST' TAB1. 4 ;
+ LUE14 = PROG 135. 1e-2 5 8 4 ;
+ NBCAS = NBCAS+1 ;
+
+* Deuxieme cas : Lecture en lignes
+ TAB2 ='LIRE' 'CSV' ('CHAINE' DIVERS '/fichier_ACQ.txt') 'LIGN';
+'LIST' TAB2    ;
+'LIST' TAB2. 1 ;
+ LUE21 = PROG 321 564.654 88764.2 135.;
+'LIST' TAB2. 2 ;
+ LUE22 = PROG 1e-3 1e5 1e04 1e-02 ;
+'LIST' TAB2. 3 ;
+ LUE23 = PROG 1 2 3 5  ;
+'LIST' TAB2. 4  ;
+ LUE24 = PROG 2 4 6 8 ;
+'LIST' TAB2. 5 ;
+ LUE25 = PROG 1 2 3 4 ;
+ NBCAS = NBCAS+1 ;
+
+* Troisieme cas : Lecture en lignes avec début ligne 2 ;
+ TAB3 ='LIRE' 'CSV' ('CHAINE' DIVERS '/fichier_ACQ.txt') 'DEBU' 2 'LIGN' ;
+'LIST' TAB3    ;
+'LIST' TAB3. 1 ;
+ LUE31 = PROG 1e-3 1e5 1e04 1e-02 ;
+'LIST' TAB3. 2 ;
+ LUE32 = PROG 1 2 3 5  ;
+'LIST' TAB3. 3 ;
+ LUE33 = PROG 2 4 6 8  ;
+'LIST' TAB3. 4 ;
+ LUE34 = PROG 1 2 3 4 ;
+ NBCAS = NBCAS+1 ;
+
+* Quatrieme cas : Lecture en lignes avec fin ligne 3 ;
+ TAB4 ='LIRE' 'CSV' ('CHAINE' DIVERS '/fichier_ACQ.txt') 'FIN' 3 'LIGN' ;
+'LIST' TAB4    ;
+'LIST' TAB4. 1 ;
+ LUE41 = PROG 321 564.654 88764.2 135.;
+'LIST' TAB4. 2 ;
+ LUE42 = PROG 1e-3 1e5 1e04 1e-02 ;
+'LIST' TAB4. 3 ;
+ LUE43 = PROG 1 2 3 5 ;
+ NBCAS = NBCAS+1 ;
+
+* Cinquieme cas : Lecture en lignes avec Début ligne 2 et fin ligne 3 ;
+ TAB5 ='LIRE' 'CSV' ('CHAINE' DIVERS '/fichier_ACQ.txt') 'DEBU' 2 'FIN' 3 'LIGN' ;
+'LIST' TAB5    ;
+'LIST' TAB5. 1 ;
+ LUE51 = PROG 1e-3 1e5 1e04 1e-02 ;
+'LIST' TAB5. 2 ;
+ LUE52 = PROG 1 2 3 5  ;
+ NBCAS = NBCAS+1 ;
+
+* Sixieme cas : Lecture en colonnes avec Debut colonne 2 et fin colonne 3 ;
+ TAB6 ='LIRE' 'CSV' ('CHAINE' DIVERS '/fichier_ACQ.txt') 'DEBU' 2 'FIN' 3 'COLO';
+'LIST' TAB6    ;
+'LIST' TAB6. 1 ;
+ LUE61 = PROG  1e-3 1;
+'LIST' TAB6. 2 ;
+ LUE62 = PROG 1e5 2 ;
+'LIST' TAB6. 3 ;
+ LUE63 = PROG  1e04 3;
+'LIST' TAB6. 4 ;
+ LUE64 = PROG 1e-2 5;
+ NBCAS = NBCAS+1 ;
+
+
+'REPE' CAS NBCAS ;
+ I1      = &CAS ;
+ TAB     ='CHAI' 'TAB'I1 ;
+ TAB     ='TEXT'  TAB    ;
+ DIMLIST ='DIME'  TAB    ;
+  'REPE' NBLIST DIMLIST ;
+   I2    = &NBLIST               ;
+   LUE   ='CHAI' 'LUE' I1 I2     ;
+   LUE   ='TEXT'  LUE            ;
+   TAB   ='CHAI' 'TAB' I1 '.' I2 ;
+   TAB   ='TEXT'  TAB            ;
+   diff1 = LUE - TAB             ;
+   MAX   ='MAXI' 'ABS' Diff1     ;
+  'MESS' 'MAXI DE L ABSOLU DE LA DIFF EST' MAX ' POUR LA TAB.' I1 ;
+    'SI' (MAX '>' (('VALE' 'PREC') * 10)) ;
+      'MESS' ' IL Y A UNE ERREUR DE PRECISION ';
+      'ERRE' 5 ;
+    'FINS';
+  'FIN' NBLIST ;
+'FIN' CAS ;
+FIN ;
+ 
+
