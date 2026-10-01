@@ -51,6 +51,11 @@ ATRAB0 = 0.8 ;
 BTRAB0 = 17000. ;
 BETAB0 = 1.06 ;
 EMAXB0 = 1.E-3 ;
+* Profil complet des operateurs et des procedures (0 : non ; 1 : oui).
+* Si 1, apres chaque calcul : TEMP 'IMPR' 'SOMM' (tous les operateurs) et
+* TEMP 'IMPR' 'PROC' (procedures) sont affiches a la console. A utiliser
+* avec un seul scenario (ex. LSCE = LECT 9 ; ou LECT 2 ;) et NREP0 = 1.
+IPROF0 = 0 ;
 * Tolerances de comparaison des courbes force/section avec la variante
 * orig : niveau 1 (doit etre identique) et niveau 2 (approche)
 TOLN1 = 1.E-8 ;
@@ -257,6 +262,12 @@ REPETER BREP NREP0 ;
         TEMP 'ZERO' ;
         PASAPAS TPAS1 ;
         VTHR = CHRONO ;
+        SI (IPROF0 EGA 1) ;
+            MESS (CHAI '--- Profil operateurs :' ' ' VETQ) ;
+            TEMP 'IMPR' 'SOMM' ;
+            MESS (CHAI '--- Profil procedures :' ' ' VETQ) ;
+            TEMP 'IMPR' 'PROC' ;
+        FINSI ;
         TNO = TEMP 'NOEC' ;
         VRES0 = TOPER TNO 'RESO' ;
         VRIG0 = TOPER TNO 'RIGI' ;

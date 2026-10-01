@@ -36,3 +36,6 @@ Compteurs : `reut.` pas où la raideur est réutilisée, `calc.` pas où elle es
 ## Lecture
 - `perf1` : écart attendu nul (≤ 1E-8). Le gain vient des pas où la raideur est réutilisée exactement (T constante, endommagement stable) et du HOOK évité.
 - `perf2` : accélération supplémentaire quand T ou l'endommagement varient doucement ; l'écart de courbe reste de l'ordre de la tolérance de convergence. Avec la rampe 20 à 100 °C, la diagonale change d'environ 0,04 % par pas : la raideur est recalculée tous les 2 à 3 pas environ. Avec une rampe plus rapide, le gain diminue.
+
+## Profil complet des operateurs (piste Esope, `IPROF0`)
+`IPROF0 = 1` (en tete de `bench_cube.dgibi`) affiche a la console, apres chaque calcul, `TEMP 'IMPR' 'SOMM'` (tous les operateurs) puis `TEMP 'IMPR' 'PROC'` (procedures). Usage : un seul scenario (`LSCE = LECT 9 ;` MAZARS perf2, ou `LECT 2 ;` CHABOCHE perf1) et `NREP0 = 1` ; renvoyer la sortie console. But : repartir le temps hors RESO/RIGI/HOOK/VARI (COMP = 41 % du total en MAZARS perf2) entre COMP, EPSI, BSIG, ELAS, operations sur champs et interpretation.
