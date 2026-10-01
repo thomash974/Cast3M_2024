@@ -1,6 +1,6 @@
 --- a/unpas.procedur
 +++ b/unpas.procedur
-@@ -116,6 +116,25 @@
+@@ -116,6 +116,34 @@
  *  definition de variables locales
  PASUNIL = FAUX;
  *'SI' ( 'EXIS' PRECED 'ECRIT' ) ; list wtab; 'FINS';
@@ -11,6 +11,15 @@
 +  IPERFRD = WTAB . 'PERF_RAID' ;
 +'FINSI' ;
 +IHKSKIP = FAUX ;
++*   PERF-RAID niveau 3 : rafraichissement de la raideur en cas de stagnation
++*   ('PERF_RAID_NIVEAU' >= 3 ou indice 'RAFRAICHISSEMENT_RAIDEUR' VRAI)
++IPERFSTG = FAUX ;
++'SI' (IPERFRD 'ET' ('EXIS' WTAB 'PERF_STAG')) ;
++  IPERFSTG = WTAB . 'PERF_STAG' ;
++'FINSI' ;
++'SI' ('NON' ('EXIS' WTAB 'NB_RAFRAICH')) ;
++  WTAB . 'NB_RAFRAICH' = 0 ;
++'FINSI' ;
 +'SI' ('NON' ('EXIS' WTAB 'NB_HOOK_EVITE')) ;
 +  WTAB . 'NB_HOOK_EVITE' = 0 ;
 +'FINSI' ;
@@ -26,7 +35,7 @@
  ICERAM = WTAB.'CERAMIQUE' ;
  IDYN   = WTAB.'DYNAMIQUE';
  IELANL = WTAB.'NON_LINEAIRE';
-@@ -407,6 +426,29 @@
+@@ -407,6 +435,29 @@
  PARALLEL = FAUX ;
  PARTLOCA = FAUX ;
  ZMODL  = ZMODLI ;
@@ -56,7 +65,7 @@
  *  jacobien du modele pour ponderer les champs de act3
  CH1 = 'MANU' 'CHML' zmodl  'SCAL' 1. 'GRAVITE';
  zjac= 'INTG' 'ELEM' CH1 zmodl;
-@@ -783,8 +825,11 @@
+@@ -783,8 +834,11 @@
    'SI' (knoconv '>' 1) ;
       MCHC = PAS_ETAT PRECED TI  ;
       MMMM = PAS_MATE PRECED MCHC;
@@ -68,7 +77,7 @@
    'FINS' ;
     MMMM = 'REDU' MMMM ZMODL;
  
-@@ -816,8 +861,176 @@
+@@ -816,8 +870,176 @@
     AA2 ='EXTR' ZCLIM0 'MAIL' ;
     AA3 ='DIFF' AA1 AA2       ;
     AA4 = NBNO  AA3           ;
@@ -246,7 +255,7 @@
      'SI' ('OU' IENDOM  IVIDOM ICERAM);
         HOOKENDO ='HOOK' ZMODL MMMM     ZVAR0;
         RH       ='RIGI' ZMODL HOOKENDO MMMM ;
-@@ -835,6 +1048,7 @@
+@@ -835,6 +1057,7 @@
            RH  = 'RIGI' ZMODL MMMM ;
         'FINSI';
      'FINS';
@@ -254,7 +263,7 @@
  *   RH peut contenir des CL
      ZCL = 'EXTR' RH 'RIGI' 'MULT' ;
      'SI' ('NEG' ('DIME' ZCL) 0) ;
-@@ -870,6 +1084,19 @@
+@@ -870,6 +1093,19 @@
      'SI' ('EGA' ('DIME' ZCL) 0) ;
  *   Stockage de la rigidite pour eviter de la recalculer
      WTAB.'RRRR'=RRRR;
@@ -274,7 +283,52 @@
      'FINSI';
  *
    'SINON';
-@@ -2573,9 +2800,15 @@
+@@ -1755,6 +1991,44 @@
+      CORREC=0;
+      PASREINI=VRAI;
+      coefmt=1.;
++*
++*   PERF-RAID niveau 3 : conditions du rafraichissement de la raideur en
++*   cours de pas (modeles d'endommagement, petits deplacements, raideur
++*   de la forme RH + ZCLIM0 sans autre terme) et memoire de la raideur du
++*   debut de pas
++     ZRAIDS0 = ZRAID ;
++     IRFRCH = FAUX ;
++     NBRFR  = 0 ;
++     ITRFR  = 0 ;
++     TSTG   = 'TABL' ;
++     ISTGOK = IPERFSTG ;
++     'SI' ISTGOK ;
++       ISTGOK = IPLAVI ;
++     'FINSI' ;
++     'SI' ISTGOK ;
++       ISTGOK = IENDOM 'OU' IVIDOM ;
++       ISTGOK = ISTGOK 'OU' ICERAM ;
++     'FINSI' ;
++     'SI' ISTGOK ;
++       IEXCSTG = IGRD 'OU' IDYN ;
++       IEXCSTG = IEXCSTG 'OU' IKTAN ;
++       IEXCSTG = IEXCSTG 'OU' IFEFP ;
++       IEXCSTG = IEXCSTG 'OU' IRCON ;
++       IEXCSTG = IEXCSTG 'OU' IRAUG ;
++       IEXCSTG = IEXCSTG 'OU' AUTAUG ;
++       IEXCSTG = IEXCSTG 'OU' LOGPIL ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'CONTACT' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'CONSOLIDATION' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'FREQUENTIEL' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'NVSTNL' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'ADHERENCE' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'CAFROTTE' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'MAN' ;
++       IEXCSTG = IEXCSTG 'OU' WTAB . 'CHAR_BLOM' ;
++       'SI' IEXCSTG ;
++         ISTGOK = FAUX ;
++       'FINSI' ;
++     'FINSI' ;
+ **
+ *
+ * initialisation des messages pour l'iteration en cours ****************
+@@ -2573,9 +2847,15 @@
        ZMATTEMP = ZMAT05;
      'FINS';
      'SI' ('OU' IENDOM IVIDOM ICERAM);
@@ -293,7 +347,7 @@
      'SINON';
          DEPST            = 'EPSI' 'LINE' 'NOER' ZMODL ZDEPT ZMATTEMP ;
      'FINS';
-@@ -2625,10 +2858,16 @@
+@@ -2625,10 +2905,16 @@
      'SI' IGRD;
        'FORM' GEOM1;
      'FINSI';
@@ -314,9 +368,59 @@
      'SINON';
         DEPST = 'EPSI' 'LINE' ZMODL ZDEPT ZMAT05;
      'FINSI';
+@@ -4174,6 +4460,37 @@
+ 
+ 'SI' IFEFP ; 'DETR' ZRIKTA ; 'DETR' GEOM2;  'FINS' ;
+ *
++*   PERF-RAID niveau 3 : stagnation de la convergence. La raideur gelee en
++*   debut de pas est devenue trop raide pour l'endommagement courant : elle
++*   est reconstruite (memes HOOK et RIGI qu'en debut de pas) avec les
++*   variables internes de l'iteration courante. Le residu et les criteres
++*   d'arret ne changent pas. Au plus 3 fois par pas, a 4 iterations
++*   d'intervalle, jamais en non-convergence deja declaree.
++'SI' ISTGOK ;
++  TSTG . IT = XCONV ;
++  XSTG3 = 1.E50 ;
++  ISTG3 = IT - 3 ;
++  'SI' ('EXIS' TSTG ISTG3) ;
++    XSTG3 = TSTG . ISTG3 ;
++  'FINSI' ;
++  'SI' ((IT '>EG' 5) 'ET' ((IT - ITRFR) '>EG' 4) 'ET' (NBRFR '<' 3) 'ET'
++        ('NON' PASTEST) 'ET' ('NON' NONCONV) 'ET'
++        ('EGA' ('TYPE' ZVARF) 'MCHAML  ') 'ET'
++        (XCONV '>' (10. * ZPREC)) 'ET' (XCONV '>' (0.7 * XSTG3))) ;
++    'MESS' ' PERF-RAID : stagnation a l''iteration' ' ' IT
++           ' : raideur reconstruite avec l''endommagement courant' ;
++    HOOKRF = 'HOOK' ZMODL MMMM ZVARF ;
++    RHRF   = 'RIGI' ZMODL HOOKRF MMMM ;
++    'DETR' HOOKRF ;
++    ZRAID  = RHRF 'ET' ZCLIM0 ;
++    IRFRCH = VRAI ;
++    NBRFR  = NBRFR + 1 ;
++    ITRFR  = IT ;
++    ITACC  = 4 ;
++    WTAB . 'NB_RAFRAICH' = WTAB . 'NB_RAFRAICH' + 1 ;
++  'FINSI' ;
++'FINSI' ;
++*
+ IPREM = FAUX;      IAFAIR=VRAI; RECA_K = FAUX;
+ *
+ dpsmaxp = dpsmax;
+@@ -4219,6 +4536,11 @@
+ *
+                STAB12.'RESIDU' = RESIDC;
+ ***            'SI' ('NEG' ('TYPE' ZRAIDNA) 'RIGIDITE'); ZRAIDNA = ZRAID; 'FINSI';
++*   PERF-RAID niveau 3 : l'estimation de FNONL utilise la raideur du debut
++*   de pas (comme sans rafraichissement)
++           'SI' IRFRCH ;
++               ZRAID = ZRAIDS0 ;
++           'FINSI' ;
+             zraidna = zraid;
+                XXX1 = ZRAIDNA * ZDEPT;
+                XXX3 = ZDFINI * COEPI;
 --- a/pasapas.procedur
 +++ b/pasapas.procedur
-@@ -961,6 +961,41 @@
+@@ -961,6 +961,47 @@
    WTAB1= 'ENLEVER' WTAB 'RRRR';
    PRECED .'WTABLE'= WTAB1;
  'FINSI';
@@ -349,6 +453,12 @@
 +           'fois (PERF-RAID)' ;
 +  'FINSI';
 +'FINSI';
++'SI' ('EXIS' WTAB2 'NB_RAFRAICH') ;
++  'SI' ('>' WTAB2 . 'NB_RAFRAICH' 0) ;
++    'MESS' 'PASAPAS : raideur rafraichie en cours de pas'
++           WTAB2 . 'NB_RAFRAICH' 'fois (PERF-RAID)' ;
++  'FINSI';
++'FINSI';
 +'SI' ('EXIS' WTAB2 'NB_MAT_REUT') ;
 +  'SI' ('>' WTAB2 . 'NB_MAT_REUT' 0) ;
 +    'MESS' 'PASAPAS : caracteristiques reutilisees'
@@ -360,7 +470,7 @@
  PRECED.'SOUSTYPE' = 'MOT' 'PASAPAS' ;
 --- a/pas_defa.procedur
 +++ b/pas_defa.procedur
-@@ -494,6 +494,29 @@
+@@ -494,6 +494,35 @@
    WTAB.'RECAOP'  = VRAI;
    WTAB.'RECADET' = FAUX;
    WTAB.'RECARI'  = FAUX;
@@ -387,10 +497,16 @@
 +  WTAB . 'NB_MAT_REUT' = 0 ;
 +  WTAB . 'PERF_STRUCT' = VRAI ;
 +  WTAB . 'TOL_RAIDEUR_DIAG' = 0. ;
++*  perf_stag        : rafraichissement de la raideur en cours de pas quand
++*                     la convergence stagne (niveau 3 de 'PERF_RAID_NIVEAU'
++*                     ou indice 'RAFRAICHISSEMENT_RAIDEUR')
++*  nb_rafraich      : compteur de rafraichissements (diagnostic)
++  WTAB . 'PERF_STAG' = FAUX ;
++  WTAB . 'NB_RAFRAICH' = 0 ;
  * relaxation_dupont2 coeff de relaxation pour dupont2  :  pas_defa
    WTAB.'RELAXATION_DUPONT'=0.25;
  * parametre de relaxation du pas de temps en non convergence
-@@ -1411,6 +1434,33 @@
+@@ -1411,6 +1440,42 @@
  'SI' ('EXISTE' PRECED 'PRECISION') ;
    WTAB.'PRECISION' = PRECED.'PRECISION' ;
  'FINS' ;
@@ -405,6 +521,15 @@
 +    WTAB . 'TOL_RAIDEUR_DIAG' = 1.E-3 ;
 +    WTAB . 'TOL_RAIDEUR_ENDO' = 1.E-3 ;
 +  'FINSI' ;
++'FINS' ;
++* niveau 3 : niveau 2 + rafraichissement de la raideur en cas de stagnation
++'SI' ('EXISTE' PRECED 'PERF_RAID_NIVEAU') ;
++  'SI' (PRECED . 'PERF_RAID_NIVEAU' '>EG' 3) ;
++    WTAB . 'PERF_STAG' = VRAI ;
++  'FINSI' ;
++'FINS' ;
++'SI' ('EXISTE' PRECED 'RAFRAICHISSEMENT_RAIDEUR') ;
++  WTAB . 'PERF_STAG' = PRECED . 'RAFRAICHISSEMENT_RAIDEUR' ;
 +'FINS' ;
 +'SI' ('EXISTE' PRECED 'TOLERANCE_RAIDEUR_DIAG') ;
 +  WTAB . 'TOL_RAIDEUR_DIAG' = PRECED . 'TOLERANCE_RAIDEUR_DIAG' ;

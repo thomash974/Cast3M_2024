@@ -151,3 +151,6 @@ Dans ce cas, la réutilisation n'a pas servi, et l'écart vient d'ailleurs (non-
 - La passe 1 utilise les procédures modifiées avec l'interrupteur à FAUX. Le chemin d'origine a été vérifié sur la campagne cubique (mêmes compteurs d'appels que les procédures officielles),
   mais pas sur ces cas. Un contrôle complémentaire consiste à lancer une fois le fichier sans les procédures modifiées : les deux passes sont alors identiques par construction, ce qui valide le pilote lui-même.
 - Les cas qui appellent `PASAPAS` dans une procédure, ou qui lisent/écrivent des fichiers, n'ont pas été retenus.
+
+## Niveau 3 (rafraîchissement de la raideur en cas de stagnation)
+`NIV_PASSE3=3 DGIBI_DIR=PCW_24/dgibi OUT_DIR=livraison/validation python3 tools/gen_validation.py` génère `valid_perf3.dgibi` : identique à `valid_perf.dgibi` mais la 3e passe utilise `'PERF_RAID_NIVEAU' = 3`. Même mode d'emploi ; les compteurs de `PASAPAS` incluent « raideur rafraichie ». Non exécuté.

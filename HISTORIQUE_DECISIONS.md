@@ -35,3 +35,11 @@
 
 ## Phase 7 : livraison
 - Paquet `livraison/` (rapport, procédures, diff, tests, résultats, manifeste), puis cette archive de reprise.
+
+## Phase 8 : reprise sous Claude Code (pistes Esope, profil, niveau 3)
+- **Piste RESO simple précision** : abandonnée. Banc Fortran `tools/bench_reso/refine_sp.f90` : avec le critère de `MONDES` (`crite = crit*sqrt(xzprec*xszpre)`), la descente-remontée en simple précision demande >= 2 passes (gain nul) et 31 passes sur matrice mal conditionnée (au-delà des 10 permises : erreur 1128). Seule variante viable : critère relâché sous option (non faite).
+- **Opérateur fusionné EPSI/COMP/BSIG** : abandonné après profil (`IPROF0`, `TEMP 'IMPR' 'SOMM'`). À 8 000 éléments : RESO 28 %, COMP+FINS 22 %, chaîne fusionnable 18 %, MENA 7 %, temps non attribué 21 % ; gain réaliste de la fusion <= 7 à 8 %.
+- **Correction de mesure** : `TEMP 'NOEC'` renvoie un temps par assistant ; la somme comptait COMP deux fois à 1 000 éléments (2 assistants). `TOPER` du benchmark prend maintenant le maximum. Les anciennes colonnes COMP sont à diviser par 2 à cette taille.
+- **Parallélisme** (`IPROC0` du benchmark, indice `'PROCESSEURS'`) : CHABOCHE à 1 000 éléments, défaut 10,8 s, mono 9,0 s, COMPORTEMENT 9,2 s, AUTOMATIQUE 18,2 s ; à 8 000 éléments, défaut 46,0 s, mono 58,4 s, COMPORTEMENT 49,5 s (une seule mesure chacune, 11 assistants imposés contre 2 au défaut à 1 000 éléments). Point d'équilibre estimé vers 2 500 éléments ; non traité.
+- **Itérations** (consoles 1 000 éléments) : CHABOCHE 204 itérations (47 pas à 3, 2 à 4, 11 à 5), pas d'itération évitable ; la « première résolution » de chaque pas (60 RESO sur 264) sert à la norme `XDENO` et n'est pas un doublon (RESIDU modifié par l'initialisation à partir de la solution précédente). MAZARS : 10 pas sur 76 (23, 24, 49 à 56) = 353 itérations sur 494 au niveau 1 (chemin de l'original) et 306 sur 447 au niveau 2 : stagnation due à la raideur gelée quand l'endommagement progresse.
+- **Niveau 3** (livré, non exécuté) : rafraîchissement de la raideur en cas de stagnation, voir `livraison/RAPPORT_LIVRAISON.md` §13.

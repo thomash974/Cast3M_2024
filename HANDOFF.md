@@ -5,7 +5,7 @@
 
 **Constat** : l'interprétation Gibiane de `UNPAS` pèse < 1 % à 8 000 éléments ; les opérateurs lourds (`RESO`, `COMP`, `BSIG`, `RIGI`…) sont déjà compilés. Le temps est gaspillé par des recalculs inutiles : refactorisation de la raideur à chaque pas (`RECALCUL` posé par `PAS_VERM`, `RECARI` forcé pour l'endommagement, purge de `RRRR` en fin de pas), réévaluation du matériau (`VARI`) à chaque pas, `HOOK` à chaque itération.
 
-**Livré (v5, état final)** : 4 procédures Gibiane modifiées (`UNPAS`, `PAS_MATE`, `PASAPAS`, `PAS_DEFA`), additives et gardées, interrupteur `'PERF_RAID'`, deux niveaux (1 exact par défaut, 2 approché optionnel). Aucune source Esope modifiée. Rapport complet : `livraison/RAPPORT_LIVRAISON.md`.
+**Livré (v5 + niveau 3 non exécuté)** : 4 procédures Gibiane modifiées (`UNPAS`, `PAS_MATE`, `PASAPAS`, `PAS_DEFA`), additives et gardées, interrupteur `'PERF_RAID'`, deux niveaux (1 exact par défaut, 2 approché optionnel). Aucune source Esope modifiée. Rapport complet : `livraison/RAPPORT_LIVRAISON.md`.
 
 **Gains mesurés** (1 000 éléments, benchmark v2) : CHABOCHE E(T) T constante ×1,50 ; MAZARS ×1,27 (niveau 1) / ×1,45 (niveau 2) ; CHABOCHE rampe T ×1,18 (niveau 2) ; MAZARS E(T) rampe ×1,28 (niveau 2). À 8 000 éléments (versions intermédiaires) : ×2,4 à ×2,7 (CHABOCHE), ×1,5 à ×1,8 (MAZARS). Détail : `MESURES.md`.
 
@@ -68,3 +68,8 @@ Regénérer le pilote : `DGIBI_DIR=PCW_24/dgibi OUT_DIR=livraison/validation pyt
 - Le niveau 2 compare la diagonale de la raideur, pas la matrice entière : un changement hors diagonale passerait inaperçu ; la solution reste imposée par le résidu (seule la convergence peut en pâtir).
 - L'identité de deux champs par `EGA` (cache `PAS_MATE`, `UNPAS`) est supposée valoir pour l'objet lui-même ; confirmée indirectement par les compteurs (« caractéristiques réutilisées 61 fois »).
 - La liste des éléments de coque exclus du HOOK évité (`DST DSQ DKT DKQ COQ2 COQ3 COQ4 COQ8`) est déduite des sources `epsi1.eso` / `epsi3.eso` ; un élément de structure absent de cette liste qui lirait la matrice de Hooke serait mal traité (aucun cas connu).
+
+## 7. Mise à jour (reprise Claude Code, 1 octobre 2026)
+- **Niveau 3** (`'PERF_RAID_NIVEAU' = 3` ou `'RAFRAICHISSEMENT_RAIDEUR'`) : rafraîchissement de la raideur en cas de stagnation (modèles d'endommagement). **Écrit, non exécuté** : à valider avec `benchmark/bench_cube.dgibi` scénarios 13 et 14 et `valid_perf3.dgibi` (`NIV_PASSE3=3`). Détail : `livraison/RAPPORT_LIVRAISON.md` §13.
+- **Pistes Esope** : simple précision de RESO et opérateur EPSI/COMP/BSIG fusionné **abandonnées** (raisons chiffrées dans `HISTORIQUE_DECISIONS.md` phase 8). Reste ouvert : seuil de parallélisation de `PAS_DEFA` (équilibre estimé vers 2 500 éléments ; à 1 000 éléments le mono est 17 % plus rapide), RESO en simple précision avec critère relâché sous option.
+- **Outils ajoutés** : `IPROF0`, `IPROC0` et scénarios 13-14 dans `bench_cube.dgibi`, `NIV_PASSE3` dans `gen_validation.py`, `tools/bench_reso/`.

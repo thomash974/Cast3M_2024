@@ -517,6 +517,12 @@ WTAB.'NOUVEAU'=INOUV;
   WTAB . 'NB_MAT_REUT' = 0 ;
   WTAB . 'PERF_STRUCT' = VRAI ;
   WTAB . 'TOL_RAIDEUR_DIAG' = 0. ;
+*  perf_stag        : rafraichissement de la raideur en cours de pas quand
+*                     la convergence stagne (niveau 3 de 'PERF_RAID_NIVEAU'
+*                     ou indice 'RAFRAICHISSEMENT_RAIDEUR')
+*  nb_rafraich      : compteur de rafraichissements (diagnostic)
+  WTAB . 'PERF_STAG' = FAUX ;
+  WTAB . 'NB_RAFRAICH' = 0 ;
 * relaxation_dupont2 coeff de relaxation pour dupont2  :  pas_defa
   WTAB.'RELAXATION_DUPONT'=0.25;
 * parametre de relaxation du pas de temps en non convergence
@@ -1445,6 +1451,15 @@ LOGERR2=VRAI;
     WTAB . 'TOL_RAIDEUR_DIAG' = 1.E-3 ;
     WTAB . 'TOL_RAIDEUR_ENDO' = 1.E-3 ;
   'FINSI' ;
+'FINS' ;
+* niveau 3 : niveau 2 + rafraichissement de la raideur en cas de stagnation
+'SI' ('EXISTE' PRECED 'PERF_RAID_NIVEAU') ;
+  'SI' (PRECED . 'PERF_RAID_NIVEAU' '>EG' 3) ;
+    WTAB . 'PERF_STAG' = VRAI ;
+  'FINSI' ;
+'FINS' ;
+'SI' ('EXISTE' PRECED 'RAFRAICHISSEMENT_RAIDEUR') ;
+  WTAB . 'PERF_STAG' = PRECED . 'RAFRAICHISSEMENT_RAIDEUR' ;
 'FINS' ;
 'SI' ('EXISTE' PRECED 'TOLERANCE_RAIDEUR_DIAG') ;
   WTAB . 'TOL_RAIDEUR_DIAG' = PRECED . 'TOLERANCE_RAIDEUR_DIAG' ;

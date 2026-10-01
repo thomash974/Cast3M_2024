@@ -43,3 +43,11 @@
 - Neutralisations dans les corps de cas : `FIN ;` final commenté, `ERRE 0|n|'texte'` → compteurs, `ECHO n` → `ECHO IECHO0`, `TRAC 'X'` → `'PSC'`, `@EXCEL1`, `temps;` commentés.
 - Cas exclus de la génération : ceux qui définissent des procédures (`DEBPROC`) ou lisent/écrivent des fichiers (`LIRE`, `ACQU`, `REST`, `SAUV`).
 - Ordre des passes alterné d'un cas à l'autre (1-2-3 / 3-2-1) ; suivi : console (`>>> Cas k` / `<<< Cas k`) + `valid_avancement.log` ; sorties : `valid_<cas>.log`, `valid_synthese.log`.
+
+## 6. Compléments (reprise Claude Code)
+- **`EGA` sur des mots** : forme préfixe obligatoire, `EGA MPROC0 'DEFAUT'` (la forme infixe `MPROC0 EGA 'DEFAUT'` ne marche que pour les nombres).
+- **Troncature à 4 caractères** : `COMPORTEMENT` est lu comme l'opérateur `COMP`. Éviter ce mot dans un script (utiliser un entier) ; dans `PAS_DEFA` il est protégé par `'MOT' 'COMPORTEMENT'`.
+- **`TEMP 'IMPR' 'SOMM'` / `TEMP 'NOEC'`** : maximum de l'horloge sur les assistants (le texte de la notice le dit) ; sommer les `LISTENTI` de `TEMPS_HORLOGE` double-compte les opérateurs parallèles.
+- **`FINS` dans le profil** : le temps entre un `FINSI` et la lecture de l'instruction suivante est imputé à `FINS` (pilote : `GOTO 2` ; `CHKESC` fusion des objets parallèles, ménage automatique, interprétation). Il inclut du travail des assistants (CPU >> horloge).
+- **Parallélisme de PAS_DEFA** : `NBPART` = min(assistants, éléments / 400) ; `b_PARA` = 2 (automatique) si éléments par partie > 200 ; un `'PROCESSEURS'` imposé saute cette réduction (11 partitions à 1 000 éléments).
+- **Mesure sans exécution** : un banc Fortran (gfortran) suffit pour vérifier un comportement numérique hors Cast3M (`tools/bench_reso`).

@@ -5,6 +5,7 @@ procedure Gibiane VC<k>, en trois passes (PERF_RAID FAUX / niveau 1 / niveau 2),
 compare les empreintes (extrema de DEPLACEMENTS, CONTRAINTES, TEMPERATURES) et
 ecrit les logs. Usage :
     DGIBI_DIR=/chemin/PCW_24/dgibi OUT_DIR=livraison/validation python3 tools/gen_validation.py
+    (NIV_PASSE3=3 : 3e passe au niveau 3, sortie valid_perf3.dgibi)
 """
 import re,os,sys,json
 # Chemins : variables d'environnement DGIBI_DIR (repertoire dgibi de l'archive
@@ -609,6 +610,13 @@ MESS '==================================================' ;
 *
 FIN ;
 """)
-open(f'{OUT}/valid_perf.dgibi','w',encoding='latin-1',newline='\n').write('\n'.join(drv))
+txt='\n'.join(drv)
+nom='valid_perf.dgibi'
+# NIV_PASSE3=3 : la 3e passe utilise 'PERF_RAID_NIVEAU' = 3 (niveau 2 +
+# rafraichissement de la raideur en cas de stagnation) -> valid_perf3.dgibi
+if os.environ.get('NIV_PASSE3')=='3':
+    txt=txt.replace('VNIV = 2 ;','VNIV = 3 ;').replace('niveau 2','niveau 3')
+    nom='valid_perf3.dgibi'
+open(f'{OUT}/{nom}','w',encoding='latin-1',newline='\n').write(txt)
 json.dump([(n,d,nt) for n,d,nt,_,_,_ in names],open(os.path.join(OUT,'names.json'),'w'))
 print(NC,'cas generes')

@@ -13,3 +13,6 @@ python3 tools/colorise_kate.py -s tools/gibiane.xml tools/esope.xml -o /tmp/aper
 DGIBI_DIR=PCW_24/dgibi OUT_DIR=livraison/validation python3 tools/gen_validation.py
 ```
 Avertissements du script de coloration : 156 sont préexistants dans les 4 procédures d'origine ; comparer le nombre et l'ensemble avant/après toute modification.
+| `bench_reso/refine_sp.f90` | banc Fortran (gfortran) : descente-remontée de RESO en simple précision et raffinement de MONDES (voir `bench_reso/README.md`) |
+
+`gen_validation.py` : `NIV_PASSE3=3` génère `valid_perf3.dgibi` (3e passe au niveau 3).

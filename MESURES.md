@@ -41,3 +41,10 @@ Décomposition de RESO à 8 000 éléments : factorisation ≈ 1,0 à 1,3 s (app
 - 11 cas en grands déplacements (dont 3 contacts, `dyna_nl1`) : aucune réutilisation.
 - 39 cas témoins sans mécanisme actif : « accélérations » 0,31 à 2,17 (médiane 0,99) = dispersion de mesure.
 - Détail par cas : `livraison/annexes/validation_detail_par_cas.md`.
+
+## 5. Reprise Claude Code (1 octobre 2026, exécutions de l'utilisateur)
+- **Profil CHABOCHE perf1, 1 000 éléments** (10,6 s) : COMP 2 149 ms (maximum sur 2 assistants ; la somme du benchmark donnait 4 275), RESO 1 508, FINS 2 115, BSIG 485, MENA 511, DETR 358, EPSI 206.
+- **Profil CHABOCHE perf1, 8 000 éléments** (62,6 s, job lent) : RESO 17 854 (264 résolutions), COMP 6 809, FINS 6 793, MENA 4 400, BSIG 2 143, REDU 1 906 ; CPU 173,7 s soit 2,8 cœurs en moyenne.
+- **Parallélisme** (CHABOCHE perf1) : 1 000 éléments : défaut 10 842 ms, mono 8 983, COMPORTEMENT 9 198, AUTOMATIQUE 18 161 ; 8 000 éléments : défaut 45 989, mono 58 429, COMPORTEMENT 49 531.
+- **Itérations par pas** : voir `HISTORIQUE_DECISIONS.md` phase 8 (CHABOCHE 204 itérations ; MAZARS 494 au niveau 1 dont 353 dans 10 pas, 447 au niveau 2 dont 306).
+- Les temps absolus varient d'un job à l'autre (maz_perf2 : 21,0, 22,1, 24,2 puis 30,4 s) ; comparer au sein d'un même job ou raisonner sur les itérations.

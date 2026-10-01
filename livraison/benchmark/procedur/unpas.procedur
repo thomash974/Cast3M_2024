@@ -123,6 +123,15 @@ IPERFRD = VRAI ;
   IPERFRD = WTAB . 'PERF_RAID' ;
 'FINSI' ;
 IHKSKIP = FAUX ;
+*   PERF-RAID niveau 3 : rafraichissement de la raideur en cas de stagnation
+*   ('PERF_RAID_NIVEAU' >= 3 ou indice 'RAFRAICHISSEMENT_RAIDEUR' VRAI)
+IPERFSTG = FAUX ;
+'SI' (IPERFRD 'ET' ('EXIS' WTAB 'PERF_STAG')) ;
+  IPERFSTG = WTAB . 'PERF_STAG' ;
+'FINSI' ;
+'SI' ('NON' ('EXIS' WTAB 'NB_RAFRAICH')) ;
+  WTAB . 'NB_RAFRAICH' = 0 ;
+'FINSI' ;
 'SI' ('NON' ('EXIS' WTAB 'NB_HOOK_EVITE')) ;
   WTAB . 'NB_HOOK_EVITE' = 0 ;
 'FINSI' ;
@@ -1982,6 +1991,44 @@ resmul = 1;
      CORREC=0;
      PASREINI=VRAI;
      coefmt=1.;
+*
+*   PERF-RAID niveau 3 : conditions du rafraichissement de la raideur en
+*   cours de pas (modeles d'endommagement, petits deplacements, raideur
+*   de la forme RH + ZCLIM0 sans autre terme) et memoire de la raideur du
+*   debut de pas
+     ZRAIDS0 = ZRAID ;
+     IRFRCH = FAUX ;
+     NBRFR  = 0 ;
+     ITRFR  = 0 ;
+     TSTG   = 'TABL' ;
+     ISTGOK = IPERFSTG ;
+     'SI' ISTGOK ;
+       ISTGOK = IPLAVI ;
+     'FINSI' ;
+     'SI' ISTGOK ;
+       ISTGOK = IENDOM 'OU' IVIDOM ;
+       ISTGOK = ISTGOK 'OU' ICERAM ;
+     'FINSI' ;
+     'SI' ISTGOK ;
+       IEXCSTG = IGRD 'OU' IDYN ;
+       IEXCSTG = IEXCSTG 'OU' IKTAN ;
+       IEXCSTG = IEXCSTG 'OU' IFEFP ;
+       IEXCSTG = IEXCSTG 'OU' IRCON ;
+       IEXCSTG = IEXCSTG 'OU' IRAUG ;
+       IEXCSTG = IEXCSTG 'OU' AUTAUG ;
+       IEXCSTG = IEXCSTG 'OU' LOGPIL ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'CONTACT' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'CONSOLIDATION' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'FREQUENTIEL' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'NVSTNL' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'ADHERENCE' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'CAFROTTE' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'MAN' ;
+       IEXCSTG = IEXCSTG 'OU' WTAB . 'CHAR_BLOM' ;
+       'SI' IEXCSTG ;
+         ISTGOK = FAUX ;
+       'FINSI' ;
+     'FINSI' ;
 **
 *
 * initialisation des messages pour l'iteration en cours ****************
@@ -4413,6 +4460,37 @@ XCONVMIN = XCONV; DPSMREF=DPSMAX/10;
 
 'SI' IFEFP ; 'DETR' ZRIKTA ; 'DETR' GEOM2;  'FINS' ;
 *
+*   PERF-RAID niveau 3 : stagnation de la convergence. La raideur gelee en
+*   debut de pas est devenue trop raide pour l'endommagement courant : elle
+*   est reconstruite (memes HOOK et RIGI qu'en debut de pas) avec les
+*   variables internes de l'iteration courante. Le residu et les criteres
+*   d'arret ne changent pas. Au plus 3 fois par pas, a 4 iterations
+*   d'intervalle, jamais en non-convergence deja declaree.
+'SI' ISTGOK ;
+  TSTG . IT = XCONV ;
+  XSTG3 = 1.E50 ;
+  ISTG3 = IT - 3 ;
+  'SI' ('EXIS' TSTG ISTG3) ;
+    XSTG3 = TSTG . ISTG3 ;
+  'FINSI' ;
+  'SI' ((IT '>EG' 5) 'ET' ((IT - ITRFR) '>EG' 4) 'ET' (NBRFR '<' 3) 'ET'
+        ('NON' PASTEST) 'ET' ('NON' NONCONV) 'ET'
+        ('EGA' ('TYPE' ZVARF) 'MCHAML  ') 'ET'
+        (XCONV '>' (10. * ZPREC)) 'ET' (XCONV '>' (0.7 * XSTG3))) ;
+    'MESS' ' PERF-RAID : stagnation a l''iteration' ' ' IT
+           ' : raideur reconstruite avec l''endommagement courant' ;
+    HOOKRF = 'HOOK' ZMODL MMMM ZVARF ;
+    RHRF   = 'RIGI' ZMODL HOOKRF MMMM ;
+    'DETR' HOOKRF ;
+    ZRAID  = RHRF 'ET' ZCLIM0 ;
+    IRFRCH = VRAI ;
+    NBRFR  = NBRFR + 1 ;
+    ITRFR  = IT ;
+    ITACC  = 4 ;
+    WTAB . 'NB_RAFRAICH' = WTAB . 'NB_RAFRAICH' + 1 ;
+  'FINSI' ;
+'FINSI' ;
+*
 IPREM = FAUX;      IAFAIR=VRAI; RECA_K = FAUX;
 *
 dpsmaxp = dpsmax;
@@ -4458,6 +4536,11 @@ zdeptp = zdept;
 *
                STAB12.'RESIDU' = RESIDC;
 ***            'SI' ('NEG' ('TYPE' ZRAIDNA) 'RIGIDITE'); ZRAIDNA = ZRAID; 'FINSI';
+*   PERF-RAID niveau 3 : l'estimation de FNONL utilise la raideur du debut
+*   de pas (comme sans rafraichissement)
+           'SI' IRFRCH ;
+               ZRAID = ZRAIDS0 ;
+           'FINSI' ;
             zraidna = zraid;
                XXX1 = ZRAIDNA * ZDEPT;
                XXX3 = ZDFINI * COEPI;

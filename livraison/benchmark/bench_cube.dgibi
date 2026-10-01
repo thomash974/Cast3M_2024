@@ -135,10 +135,15 @@ TSCE . 9  = PSCEN 'maz_perf2'    'MAZARS'   FAUX  VRAI  2 ;
 TSCE . 10 = PSCEN 'mazT_orig'    'MAZARS'   VRAI  FAUX  1 ;
 TSCE . 11 = PSCEN 'mazT_perf1'   'MAZARS'   VRAI  VRAI  1 ;
 TSCE . 12 = PSCEN 'mazT_perf2'   'MAZARS'   VRAI  VRAI  2 ;
+TSCE . 13 = PSCEN 'maz_perf3'    'MAZARS'   FAUX  VRAI  3 ;
+TSCE . 14 = PSCEN 'mazT_perf3'   'MAZARS'   VRAI  VRAI  3 ;
 * Scenarios a calculer (la variante orig d'une famille doit etre presente :
 * elle sert de reference). Pour un PC modeste, une famille (trois
 * scenarios) par session : par exemple LSCE = LECT 1 2 3 ;
-LSCE = LECT 1 2 3 4 5 6 7 8 9 10 11 12 ;
+* 13 et 14 : niveau 3 (niveau 2 + rafraichissement de la raideur en cas de
+* stagnation, modeles d'endommagement). La variante orig de la famille
+* (7 ou 10) doit etre dans la liste pour obtenir accelerations et ecarts.
+LSCE = LECT 1 2 3 4 5 6 7 8 9 10 11 12 13 14 ;
 NSCE0 = DIME LSCE ;
 *
 * ------------------------- Materiau CHABOCHE --------------------------
@@ -312,6 +317,10 @@ REPETER BREP NREP0 ;
         SI (EXIS WTB1 'NB_MAT_REUT') ;
             VNMA = WTB1 . 'NB_MAT_REUT' ;
         FINSI ;
+        VNRF = -1 ;
+        SI (EXIS WTB1 'NB_RAFRAICH') ;
+            VNRF = WTB1 . 'NB_RAFRAICH' ;
+        FINSI ;
 *       Courbe force/section (section unite)
         LF1 = PROG 0. ;
         NB1 = (DIME TPAS1 . 'TEMPS') - 1 ;
@@ -344,6 +353,7 @@ REPETER BREP NREP0 ;
         TR1 . 'NCA' = VNCA ;
         TR1 . 'NHK' = VNHK ;
         TR1 . 'NMA' = VNMA ;
+        TR1 . 'NRF' = VNRF ;
         VMSG = CHAI '<<< Calcul' ' ' IRUN ' ' 'sur' ' ' NRUN0 ' ' ':' ' ' VETQ
             ' ' ':' ' ' VTHR ' ' 'ms (RESO' ' ' VRES0 ' ' 'ms, raideur'
             ' ' 'reutilisee' ' ' VNRE ' ' 'fois)' ;
@@ -424,6 +434,7 @@ REPETER BSC3 NSCE0 ;
     VNCA = TR1 . 'NCA' ;
     VNHK = TR1 . 'NHK' ;
     VNMA = TR1 . 'NMA' ;
+    VNRF = TR1 . 'NRF' ;
     NEL1 = TR1 . 'NEL' ;
     NPAS0 = TR1 . 'NPAS' ;
     NOMR1 = CHAI 'bench_' VETQ '.log' ;
@@ -447,7 +458,8 @@ REPETER BSC3 NSCE0 ;
     SORT 'CHAI' VMSG ;
     VMSG = CHAI 'Raideur : reutilisee' ' ' VNRE ' ' 'fois, recalculee' ' '
         VNCA ' ' 'fois ; HOOK evite' ' ' VNHK ' ' 'fois ; caracteristiques'
-        ' ' 'reutilisees' ' ' VNMA ' ' 'fois' ;
+        ' ' 'reutilisees' ' ' VNMA ' ' 'fois ; raideur rafraichie' ' ' VNRF
+        ' ' 'fois' ;
     MESS VMSG ;
     SORT 'CHAI' VMSG ;
     VMSG = CHAI 'Ecart relatif de la courbe F/S avec orig :' ' ' VSE ' '

@@ -43,3 +43,6 @@ Compteurs : `reut.` pas où la raideur est réutilisée, `calc.` pas où elle es
 ## Parallelisme et correction de la mesure par operateur
 - `IPROC0` (en tete, entier) impose `'PROCESSEURS'` a PASAPAS : 0 = choix de PAS_DEFA (defaut), 1 = `'MONO_PROCESSEUR'`, 2 = `'COMPORTEMENT'`, 3 = `'AUTOMATIQUE'`. Un entier evite d'ecrire `COMPORTEMENT` dans le script : Cast3M ne lit que 4 caracteres des noms et le lit comme l'operateur `COMP`.
 - `TOPER` retourne maintenant le **maximum** sur les assistants (temps ecoule) au lieu de la somme. Les colonnes `COMP` etc. des campagnes precedentes (somme) surestimaient les operateurs executes en parallele : a 1 000 elements PAS_DEFA choisit 2 assistants (`NBPART` = 1000/400), donc `COMP` etait compte deux fois (4 275 ms au lieu de 2 149 ms en CHABOCHE perf1). `RESO`, `RIGI`, `HOOK`, `VARI` (un seul assistant) ne changent pas.
+
+## Scénarios 13 et 14 (niveau 3)
+`maz_perf3` (13) et `mazT_perf3` (14) : niveau 3 (niveau 2 + rafraîchissement de la raideur en cas de stagnation). La variante `orig` de la famille (7 ou 10) doit figurer dans `LSCE` (par exemple `LSCE = LECT 7 13 ;`). Le log de chaque scénario indique « raideur rafraichie N fois ». Comparer le nombre d'itérations par pas (`CONVERGENCE A L ITERATION`, console) avec les scénarios 8 et 9 : au niveau 1, 353 itérations sur 494 dans 10 pas.

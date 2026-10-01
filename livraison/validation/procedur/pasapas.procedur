@@ -990,6 +990,12 @@ PRECED . 'WTABLE' = WTAB2 ;
            'fois (PERF-RAID)' ;
   'FINSI';
 'FINSI';
+'SI' ('EXIS' WTAB2 'NB_RAFRAICH') ;
+  'SI' ('>' WTAB2 . 'NB_RAFRAICH' 0) ;
+    'MESS' 'PASAPAS : raideur rafraichie en cours de pas'
+           WTAB2 . 'NB_RAFRAICH' 'fois (PERF-RAID)' ;
+  'FINSI';
+'FINSI';
 'SI' ('EXIS' WTAB2 'NB_MAT_REUT') ;
   'SI' ('>' WTAB2 . 'NB_MAT_REUT' 0) ;
     'MESS' 'PASAPAS : caracteristiques reutilisees'

@@ -71,6 +71,8 @@ Volume : `UNPAS` +247 / −8 lignes, `PAS_MATE` +93 / −1, `PASAPAS` +35 / −0
 |---|---|---|
 | `'PERF_RAID'` | VRAI | FAUX : comportement strictement identique à l'original |
 | `'PERF_RAID_NIVEAU'` | 1 | 2 : réutilisation approchée de la raideur (tolérance 1E-3 sur la diagonale, pour tous les cas matériau variable et endommagement) |
+| `'PERF_RAID_NIVEAU'` = 3 | — | niveau 2 + rafraîchissement de la raideur en cas de stagnation de la convergence (modèles d'endommagement, petits déplacements) : voir §13 |
+| `'RAFRAICHISSEMENT_RAIDEUR'` | FAUX | VRAI : active le rafraîchissement du niveau 3 indépendamment du niveau |
 | `'TOLERANCE_RAIDEUR_DIAG'` | 0 | tolérance relative (> 0 : active) de la réutilisation approchée, indépendamment du niveau |
 | `'TOLERANCE_RAIDEUR_ENDO'` | 0 | tolérance relative sur la diagonale endommagée ; 0 = identique ; < 0 désactive la réutilisation en endommagement |
 | `'TOLERANCE_RAIDEUR'` | 1E-12 | tolérance relative sur les paramètres externes ; < 0 désactive la réutilisation pour matériau variable |
@@ -196,3 +198,14 @@ Voir `LISEZMOI.md` : copier les quatre fichiers de `procedur/` dans un répertoi
 | `resultats/` | logs du benchmark et de la validation exécutés par le client |
 | `annexes/validation_detail_par_cas.md` | résultat par cas de la validation |
 | `MANIFESTE.txt` | empreintes SHA-256 de tous les fichiers |
+
+## 13. Niveau 3 : rafraîchissement de la raideur en cas de stagnation (ajout, non exécuté)
+**Origine.** Le profil à 1 000 éléments (MAZARS, console `IPROF0 = 1`) montre que 10 pas sur 76 (23, 24, 49 à 56) consomment 353 itérations sur 494 au niveau 1 (donc dans l'original, dont le chemin d'itération est identique) et 306 sur 447 au niveau 2. La raideur gelée en début de pas est trop raide quand l'endommagement progresse : critère qui décroît lentement, accélération `ACT3` annulée (« retrograde »), puis non-convergence et sous-pas.
+
+**Mécanisme (`UNPAS`, bloc `PERF-RAID niveau 3` en fin d'itération).** Si le critère `XCONV` a décru de moins de 30 % en 3 itérations (`XCONV > 0,7 × XCONV(IT-3)`), reste supérieur à 10 fois la précision, à partir de l'itération 5, la raideur est reconstruite avec les variables internes de l'itération courante (`HOOK`, `RIGI`, comme en début de pas) puis `ZRAID = RH ET ZCLIM0`. Au plus 3 fois par pas, à 4 itérations d'intervalle ; l'accélération est suspendue 4 itérations (`ITACC = 4`). Le résidu et les critères d'arrêt ne changent pas : la solution convergée vérifie les mêmes critères. En fin de pas, la raideur du début de pas est restaurée pour l'estimation de `FNONL`, et `WTAB . 'RRRR'` et le cache du niveau 1/2 ne sont pas modifiés.
+
+**Domaine.** Actif seulement si `'PERF_RAID_NIVEAU'` >= 3 (ou `'RAFRAICHISSEMENT_RAIDEUR'` VRAI), modèle d'endommagement/viscoendommagement/céramique (`IENDOM`, `IVIDOM`, `ICERAM`) et ni grands déplacements, dynamique, `K_TANGENT`, FEFP, rigidité constante, augmentation de rigidité, pilotage, contact, consolidation, fréquentiel, `NVSTNL`, adhérence, frottement, `MAN`, blocages variables. Hors de ce domaine, le comportement est celui du niveau 2.
+
+**Diagnostic.** Compteur `NB_RAFRAICH` (message de fin de `PASAPAS`), message `PERF-RAID : stagnation a l'iteration N` à chaque rafraîchissement.
+
+**Statut : non exécuté.** Gain attendu (hypothèse) : jusqu'à environ −40 % du temps de MAZARS (353 itérations ramenées à environ 120) ; sans effet sur CHABOCHE. À valider : `benchmark/bench_cube.dgibi` scénarios 13 et 14 (`LSCE = LECT 7 13 ;` puis `LECT 10 14 ;`), `validation/valid_perf3.dgibi` généré par `NIV_PASSE3=3 DGIBI_DIR=... OUT_DIR=... python3 tools/gen_validation.py`. Critère d'acceptation : écart de la courbe force/section avec l'original <= 10 × `PRECISION` relative, 56 cas du pilote sans écart au-delà de la tolérance du niveau 2, nombre d'itérations par pas inférieur ou égal.
